@@ -1,0 +1,87 @@
+name: CI Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - preview
+  push:
+    branches:
+      - main
+      - preview
+
+jobs:
+  code-quality:
+    name: Code Quality & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting (Prettier)
+        run: npx prettier --check "**/*.{ts,tsx,js,jsx,json}" --ignore-path .gitignore
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check accessibility (a11y)
+        run: npx eslint --plugin react-native-a11y "app/**/*.{ts,tsx}" "components/**/*.{ts,tsx}" --no-eslintrc --parser @typescript-eslint/parser --parser-options=ecmaVersion:2020
+        continue-on-error: true
+
+      - name: Run Critical Tests
+        run: npm run test:ci
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Check circular dependencies
+        run: npx madge --circular --extensions ts,tsx,js,jsx app/ components/ context/ services/ utils/ hooks/
+
+      - name: Find dead code
+        run: npx ts-prune --error || true
+        continue-on-error: true
+
+      - name: Run security audit
+        run: |
+          echo "Running security audit..."
+          npm audit --omit=dev --audit-level=critical
+        continue-on-error: false
+
+      - name: Run Expo Doctor
+        run: |
+          echo "Running Expo Doctor..."
+          npx expo-doctor@latest
+        continue-on-error: false
+
+      - name: Report results
+        if: success()
+        run: echo "All checks passed!"
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --only-verified

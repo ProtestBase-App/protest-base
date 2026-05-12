@@ -1,0 +1,124 @@
+/**
+ * Co-organizer avatar information.
+ * Only populated when fetching an event with `includeAvatars=true`.
+ */
+export interface CoOrganizerAvatar {
+  id: string | null;
+  name: string;
+  avatar: string | null;
+}
+
+/** Event data as returned by the API. */
+export interface Event {
+  $id: string;
+  $createdAt?: string;
+  $updatedAt?: string;
+
+  id: string;
+  title: string;
+  description: string;
+  image?: string;
+
+  street_address?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country: string;
+  postal_code?: number | null;
+
+  geocod_status?: string | null;
+  geocod_lat?: number | null;
+  geocod_lng?: number | null;
+
+  start_time: string;
+  end_time?: string;
+
+  organization_id?: string;
+
+  // organizer_* fields are populated from the authenticated user who created the event.
+  organizer_id?: string;
+  organizer_name: string;
+  co_organizers?: string[];
+
+  website_url?: string | null;
+  categories?: string[];
+  disclaimer?: string | null;
+  help_needed?: boolean;
+  help_description?: string;
+
+  // Populated by backend; default 0.
+  view_count?: number;
+  participant_count?: number;
+  save_count?: number;
+  like_count?: number;
+
+  // 'active' default; 'cancelled' = creator cancelled; 'past' = nightly cron flip after end_time.
+  status?: EventStatus;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
+
+  // Only populated when includeAvatars=true.
+  organizer_avatar?: string | null;
+  co_organizer_avatars?: CoOrganizerAvatar[];
+}
+
+/**
+ * Event lifecycle status returned by the backend.
+ * Whether cancelled events appear in list endpoints is controlled by the
+ * `includeCancelled` query param (defaults to false client-side).
+ */
+export type EventStatus = 'active' | 'cancelled' | 'past';
+
+/** Image object from expo-image-picker. */
+export interface PickedImage {
+  uri: string;
+  mimeType?: string;
+  fileName?: string | null;
+}
+
+/** Request body for creating an event. */
+export interface CreateEventRequest {
+  organization_id: string;
+  title: string;
+  description: string;
+  start_time: string;
+
+  end_time?: string;
+  street_address?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  postal_code?: number;
+
+  // Either a picked image or omitted (backend supplies a default).
+  image?: PickedImage;
+
+  website_url?: string;
+  categories?: string | string[];
+  disclaimer?: string;
+  co_organizers?: string[];
+  help_needed?: boolean;
+  help_description?: string;
+
+  // Geocoding is filled in server-side; clients should not set these.
+  geocod_status?: string;
+  geocod_lat?: number;
+  geocod_lng?: number;
+}
+
+/**
+ * Request body for updating an event. All fields are optional; image can be a
+ * new file upload or an existing URL string (to keep the current image).
+ */
+export type UpdateEventRequest = Partial<Omit<CreateEventRequest, 'organization_id' | 'image'>> & {
+  image?: PickedImage | string;
+};
+
+/** Event extended with pre-formatted date/time strings for display components. */
+export interface EventDisplay extends Event {
+  startDateFull: string;
+  endDateFull: string | null;
+  startDateNoFormat: string;
+  endDateNoFormat: string | null;
+  start_date: string;
+  end_date: string;
+}

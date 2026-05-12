@@ -1,0 +1,76 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# credentials — NEVER commit any of these.
+# `credentials.json` leaked in commit a155f62 (Mar 2026) and the dist-cert
+# password was exposed in private git history. Rotate + purge before treating
+# this as closed. See also the *.p12 / *.mobileprovision / *.key rules below.
+credentials.json
+credentials/
+.null.swp
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+expo-env.d.ts
+/android
+/ios
+
+# EAS (ignore everything except workflows)
+.eas/*
+!.eas/workflows/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+
+# test coverage
+coverage/
+coverage-*/
+
+# backup files
+*.bak*
+
+# Claude Code project instructions
+CLAUDE.md
+.claude
+
+# Internal audit documents
+REVIEW.md

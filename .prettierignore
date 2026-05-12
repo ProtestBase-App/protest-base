@@ -1,0 +1,16 @@
+# Build artifacts
+ios/
+android/
+coverage/
+coverage-*/
+dist/
+build/
+
+# Auto-generated
+expo-env.d.ts
+.expo/
+node_modules/
+
+# Config & tooling
+.claude/
+.maestro/

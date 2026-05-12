@@ -1,0 +1,120 @@
+{
+  "name": "protest-base",
+  "main": "expo-router/entry",
+  "version": "3.0.1",
+  "scripts": {
+    "start": "expo start",
+    "start:mcp": "EXPO_UNSTABLE_MCP_SERVER=1 expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --config jest.ci.config.js --ci --maxWorkers=2",
+    "test:integration": "jest --testPathPattern='__integration_tests__'",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@expo/app-integrity": "^55.0.13",
+    "@expo/vector-icons": "^15.0.3",
+    "@maplibre/maplibre-react-native": "^10.4.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.6.0",
+    "@react-navigation/bottom-tabs": "^7.4.0",
+    "@react-navigation/native": "^7.1.8",
+    "axios": "^1.15.2",
+    "expo": "~55.0.23",
+    "expo-application": "~55.0.14",
+    "expo-blur": "~55.0.14",
+    "expo-build-properties": "~55.0.13",
+    "expo-calendar": "~55.0.14",
+    "expo-constants": "~55.0.14",
+    "expo-dev-client": "~55.0.32",
+    "expo-file-system": "~55.0.16",
+    "expo-font": "~55.0.6",
+    "expo-haptics": "~55.0.14",
+    "expo-image": "~55.0.10",
+    "expo-image-manipulator": "~55.0.16",
+    "expo-image-picker": "~55.0.20",
+    "expo-linear-gradient": "~55.0.13",
+    "expo-linking": "~55.0.15",
+    "expo-localization": "~55.0.13",
+    "expo-navigation-bar": "~55.0.12",
+    "expo-router": "~55.0.14",
+    "expo-secure-store": "~55.0.13",
+    "expo-splash-screen": "~55.0.20",
+    "expo-status-bar": "~55.0.6",
+    "expo-symbols": "~55.0.8",
+    "expo-updates": "~55.0.21",
+    "expo-web-browser": "~55.0.15",
+    "i18n-js": "^4.5.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-element-dropdown": "^2.12.4",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-image-viewing": "^0.2.2",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.23.0",
+    "react-native-url-polyfill": "^3.0.0",
+    "react-native-web": "^0.21.0",
+    "react-native-webview": "13.16.0",
+    "react-native-worklets": "0.7.4",
+    "semver": "^7.7.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "~19.2.10",
+    "@types/semver": "^7.7.1",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~55.0.0",
+    "eslint-plugin-react-native-a11y": "^3.5.1",
+    "expo-module-scripts": "^5.0.8",
+    "jest": "^29.7.0",
+    "jest-expo": "~55.0.17",
+    "madge": "^8.0.0",
+    "prettier": "^3.8.1",
+    "react-test-renderer": "19.2.0",
+    "ts-prune": "^0.10.3",
+    "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "~5.9.2",
+    "eslint": "^9.0.0",
+    "tar": "^7.5.3",
+    "lodash": "^4.18.1"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "react-native-worklets"
+      ]
+    }
+  },
+  "description": "A React Native mobile app for discovering and organizing protest events",
+  "author": "ProtestBase contributors",
+  "license": "UNLICENSED",
+  "homepage": "https://protestbase.be",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maticlav/protest-base.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maticlav/protest-base/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "protest",
+    "events",
+    "mobile-app"
+  ]
+}

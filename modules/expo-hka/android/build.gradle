@@ -1,0 +1,28 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'expo.modules.hka'
+version = '0.1.0'
+
+// Aligns with the host app's SDK config when applied by expo-modules-core.
+expoModule {
+  canBePublished false
+}
+
+android {
+  namespace 'expo.modules.hka'
+
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+}
