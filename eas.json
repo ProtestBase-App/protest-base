@@ -49,7 +49,8 @@
   "submit": {
     "production": {
       "ios": {
-        "bundleIdentifier": "be.protestbase.app"
+        "bundleIdentifier": "be.protestbase.app",
+        "ascAppId": "6754519362"
       }
     }
   }
