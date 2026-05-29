@@ -23,7 +23,7 @@
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/native": "^7.1.8",
-    "axios": "^1.15.2",
+    "axios": "^1.16.0",
     "expo": "~55.0.24",
     "expo-application": "~55.0.15",
     "expo-blur": "~55.0.14",
