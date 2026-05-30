@@ -1,8 +1,7 @@
 name: Build production for all platforms
 
-on:
-  push:
-    branches: ['main']
+# Manual-only: run with `eas workflow:run .eas/workflows/create-production-builds.yml`.
+# Intentionally has no `on:` trigger so merges/pushes to main do NOT start a build.
 
 jobs:
   build_android:
