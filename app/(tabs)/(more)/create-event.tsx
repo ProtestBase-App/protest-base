@@ -21,7 +21,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
-import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
@@ -90,7 +89,6 @@ const hasFormChanges = (current: FormState, initial: FormState): boolean => {
 export default function CreateEventModal() {
   const { user, loading, isLogged, userLanguage, refreshUserEventCounts, upsertEventInCache } =
     useGlobalContext();
-  const { dropdownItems: organizations } = useOrganizations();
   const {
     selectedOrganizationId,
     hasOrganizations,
@@ -449,34 +447,10 @@ export default function CreateEventModal() {
 
     setSubmitting(true);
     try {
-      // Backend expects co_organizers as '["Org Name 1", "Org Name 2"]' (names,
-      // not IDs). If user has co-organizers selected but organizations haven't
-      // loaded yet, we can't map IDs to names — bail out.
-      if (trimmedForm.co_organizers?.length && organizations.length === 0) {
-        Alert.alert(t('common.error'), t('createEvent.organizationsLoading'));
-        setSubmitting(false);
-        return;
-      }
-
-      const coOrganizerResults = trimmedForm.co_organizers?.length
-        ? trimmedForm.co_organizers.map((id) => ({
-            id,
-            name: organizations.find((org) => org.value === id)?.label,
-          }))
-        : [];
-
-      const missingOrgs = coOrganizerResults.filter((r) => !r.name);
-      if (missingOrgs.length > 0) {
-        logger.warn('Some co-organizers could not be found', {
-          missingIds: missingOrgs.map((m) => m.id),
-        });
-      }
-
-      const coOrganizerNames = coOrganizerResults
-        .map((r) => r.name)
-        .filter((name): name is string => Boolean(name));
-
-      const finalCoOrganizers = coOrganizerNames.length > 0 ? coOrganizerNames : undefined;
+      // co_organizers holds org IDs (the dropdown values) — sent through as-is.
+      const finalCoOrganizers = trimmedForm.co_organizers?.length
+        ? trimmedForm.co_organizers
+        : undefined;
 
       // Backend handles image upload, geocoding, URL validation, category
       // formatting; it also fills in organizer_id and organizer_name from the JWT.

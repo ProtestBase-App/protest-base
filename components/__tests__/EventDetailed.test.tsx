@@ -563,25 +563,17 @@ describe('EventDetailed — co-organizers rendering', () => {
     expect(screen.getByText('Green Peace')).toBeTruthy();
   });
 
-  it('renders co-organizers from string array when no avatars', () => {
+  it('does not render raw co_organizers values when avatars are absent', () => {
+    // co_organizers holds org IDs; co-organizers are displayed only via
+    // co_organizer_avatars[].name. Without avatars nothing is rendered, so raw
+    // IDs never leak into the UI.
     const coOrgEvent = {
       ...mockEvent,
       co_organizer_avatars: [],
-      co_organizers: ['Org X', 'Org Y'],
+      co_organizers: ['aae8afb4-4512-4b6c-ad62-6a262cf09ae6'],
     };
     render(<EventDetailed {...defaultProps} event={coOrgEvent} />);
-    expect(screen.getByText('Org X')).toBeTruthy();
-    expect(screen.getByText('Org Y')).toBeTruthy();
-  });
-
-  it('filters out empty names from co_organizers string array', () => {
-    const coOrgEvent = {
-      ...mockEvent,
-      co_organizer_avatars: [],
-      co_organizers: ['Org X', '', '  '],
-    };
-    render(<EventDetailed {...defaultProps} event={coOrgEvent} />);
-    expect(screen.getByText('Org X')).toBeTruthy();
+    expect(screen.queryByText('aae8afb4-4512-4b6c-ad62-6a262cf09ae6')).toBeNull();
   });
 
   it('renders organizer from organization lookup when org_id matches', () => {

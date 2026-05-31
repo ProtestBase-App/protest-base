@@ -19,7 +19,6 @@ import { getEventByIdBackend, updateEvent } from '@/services/event.service';
 import { Event } from '@/types/event.types';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
-import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
@@ -37,7 +36,6 @@ const URL_REGEX =
 export default function EditEvent() {
   const { user, isLogged, userLanguage, eventsCache, refetchEvents, refreshUserEventCounts } =
     useGlobalContext();
-  const { dropdownItems: organizations } = useOrganizations();
   const { userOrganizations } = useUserOrganizations();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -112,18 +110,9 @@ export default function EditEvent() {
     }
   }, [eventId, eventsCache, userLanguage]);
 
-  // Populate form once event data and organizations are available.
+  // Populate form once event data is available.
   useEffect(() => {
     if (eventDetail && eventDetail.length > 0) {
-      const hasCoOrganizers =
-        eventDetail[0].co_organizers && eventDetail[0].co_organizers.length > 0;
-
-      // If event has co-organizers but organizations haven't loaded yet, wait —
-      // the effect will re-run when organizations load.
-      if (hasCoOrganizers && organizations.length === 0) {
-        return;
-      }
-
       let postalCode = null;
       if (eventDetail[0].postal_code) {
         postalCode =
@@ -133,11 +122,6 @@ export default function EditEvent() {
 
         if (isNaN(postalCode)) postalCode = null;
       }
-
-      // Backend stores co_organizers as names; the dropdown uses IDs.
-      const coOrganizerIds = (eventDetail[0].co_organizers || [])
-        .map((name) => organizations.find((org) => org.label === name)?.value)
-        .filter((id): id is string => Boolean(id));
 
       setForm((prevForm) => ({
         ...prevForm,
@@ -151,7 +135,7 @@ export default function EditEvent() {
         start_time: eventDetail[0].startDateFull || '',
         end_time: eventDetail[0].endDateFull || '',
         postal_code: postalCode,
-        co_organizers: coOrganizerIds,
+        co_organizers: eventDetail[0].co_organizers || [],
         categories:
           eventDetail[0].categories && eventDetail[0].categories.length > 0
             ? eventDetail[0].categories[0]
@@ -162,7 +146,7 @@ export default function EditEvent() {
         help_description: eventDetail[0].help_description || '',
       }));
     }
-  }, [eventDetail, organizations]);
+  }, [eventDetail]);
 
   const handleBackPress = () => {
     if (isCreated) {
@@ -218,34 +202,8 @@ export default function EditEvent() {
 
     setSubmitting(true);
     try {
-      // Backend expects co_organizers as '["Org Name 1", "Org Name 2"]' (names,
-      // not IDs). If user has co-organizers selected but organizations haven't
-      // loaded yet, we can't map IDs to names — bail out.
-      if (form.co_organizers?.length && organizations.length === 0) {
-        Alert.alert(t('common.error'), t('createEvent.organizationsLoading'));
-        setSubmitting(false);
-        return;
-      }
-
-      const coOrganizerResults = form.co_organizers?.length
-        ? form.co_organizers.map((id) => ({
-            id,
-            name: organizations.find((org) => org.value === id)?.label,
-          }))
-        : [];
-
-      const missingOrgs = coOrganizerResults.filter((r) => !r.name);
-      if (missingOrgs.length > 0) {
-        logger.warn('Some co-organizers could not be found', {
-          missingIds: missingOrgs.map((m) => m.id),
-        });
-      }
-
-      const coOrganizerNames = coOrganizerResults
-        .map((r) => r.name)
-        .filter((name): name is string => Boolean(name));
-
-      const finalCoOrganizers = coOrganizerNames.length > 0 ? coOrganizerNames : undefined;
+      // co_organizers holds org IDs (the dropdown values) — sent through as-is.
+      const finalCoOrganizers = form.co_organizers?.length ? form.co_organizers : undefined;
 
       // organizer_name is intentionally not sent — it's tied to the creator.
       await updateEvent(eventId, {
