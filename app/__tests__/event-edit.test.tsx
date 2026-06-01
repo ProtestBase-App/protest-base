@@ -201,7 +201,7 @@ describe('EditEvent', () => {
       const eventWithCategories = {
         ...mockEvent,
         categories: ['protest', 'climate'],
-        co_organizers: ['Org A', 'Org B'],
+        co_organizers: ['org-a', 'org-b'],
       };
 
       const { findByDisplayValue } = renderWithProviders(<EditEvent />, {
@@ -228,6 +228,42 @@ describe('EditEvent', () => {
 
       await findByDisplayValue(eventWithCategories.title);
       await findByDisplayValue(eventWithCategories.description);
+    });
+
+    it('pre-fills co-organizers from the event using IDs directly', async () => {
+      // co_organizers from the API are org IDs; the form uses them as-is (no
+      // name->ID lookup) and the dropdown resolves each ID to its label.
+      const eventWithCoOrgs = {
+        ...mockEvent,
+        co_organizers: ['org-a', 'org-b'],
+      };
+
+      const { findByText } = renderWithProviders(<EditEvent />, {
+        providerOverrides: {
+          globalContext: {
+            user: mockUser,
+            isLogged: true,
+            loading: false,
+            userLanguage: 'en',
+            eventsCache: {
+              'event-1': eventWithCoOrgs,
+            },
+            refetchEvents: jest.fn(),
+            refreshUserEventCounts: jest.fn(),
+          },
+          organizationsContext: {
+            dropdownItems: [
+              { label: 'Org A', value: 'org-a' },
+              { label: 'Org B', value: 'org-b' },
+            ],
+          },
+        },
+      });
+
+      // Selected co-organizer chips render the resolved labels, proving the IDs
+      // were placed into the form and matched against the org list.
+      expect(await findByText('Org A')).toBeTruthy();
+      expect(await findByText('Org B')).toBeTruthy();
     });
   });
 

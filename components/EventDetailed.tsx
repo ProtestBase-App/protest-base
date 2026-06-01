@@ -619,29 +619,18 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 />
               )}
 
-              {event.co_organizer_avatars && event.co_organizer_avatars.length > 0
-                ? event.co_organizer_avatars
-                    .filter((co: CoOrganizerAvatar) => co.name?.trim())
-                    .map((co: CoOrganizerAvatar, i: number) => (
-                      <OrganizerRow
-                        key={`co-${i}`}
-                        name={co.name}
-                        avatarUrl={co.avatar}
-                        navigable={!!co.id}
-                        onPress={co.id ? () => onOrganizerPress(co.id!) : undefined}
-                        themeColors={themeColors}
-                      />
-                    ))
-                : event.co_organizers
-                    ?.filter((n: string) => n?.trim())
-                    .map((n: string, i: number) => (
-                      <OrganizerRow
-                        key={`co-${i}`}
-                        name={n}
-                        navigable={false}
-                        themeColors={themeColors}
-                      />
-                    ))}
+              {event.co_organizer_avatars
+                ?.filter((co: CoOrganizerAvatar) => co.name?.trim())
+                .map((co: CoOrganizerAvatar, i: number) => (
+                  <OrganizerRow
+                    key={`co-${i}`}
+                    name={co.name}
+                    avatarUrl={co.avatar}
+                    navigable={!!co.id}
+                    onPress={co.id ? () => onOrganizerPress(co.id!) : undefined}
+                    themeColors={themeColors}
+                  />
+                ))}
             </View>
           )}
 
