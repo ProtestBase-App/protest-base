@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Modal,
   Pressable,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,20 +14,17 @@ import { getThemeColors } from '@/utils/themeColors';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
 
-const MAX_REASON_LENGTH = 1000;
-
 interface CancelEventModalProps {
   visible: boolean;
   onDismiss: () => void;
-  /** Called with the trimmed reason (empty string when user left it blank). */
-  onConfirm: (reason: string) => Promise<void> | void;
+  /** Confirm the cancellation. */
+  onConfirm: () => Promise<void> | void;
   /** When true, the confirm button shows a spinner and is disabled. */
   submitting?: boolean;
 }
 
 /**
- * Confirmation dialog for cancelling an event. Shows an optional reason
- * text area (≤1000 chars) and sends it to `onConfirm` as a trimmed string.
+ * Confirmation dialog for cancelling an event.
  *
  * Kept deliberately simple — renders a centered card, not a full-screen route,
  * so the parent can handle the 409 "already cancelled" path without stacking
@@ -42,15 +38,13 @@ export default function CancelEventModal({
 }: CancelEventModalProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const [reason, setReason] = useState('');
 
   const handleConfirm = async () => {
-    await onConfirm(reason.trim());
+    await onConfirm();
   };
 
   const handleDismiss = () => {
     if (submitting) return;
-    setReason('');
     onDismiss();
   };
 
@@ -63,24 +57,6 @@ export default function CancelEventModal({
             <ThemedText style={[styles.message, { color: themeColors.subtleText }]}>
               {t('events.cancelConfirmMessage')}
             </ThemedText>
-
-            <TextInput
-              value={reason}
-              onChangeText={setReason}
-              placeholder={t('events.cancelReasonPlaceholder')}
-              placeholderTextColor={themeColors.placeholder}
-              multiline
-              maxLength={MAX_REASON_LENGTH}
-              editable={!submitting}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: themeColors.inputBackground,
-                  borderColor: themeColors.inputBorder,
-                  color: themeColors.text,
-                },
-              ]}
-            />
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
@@ -147,16 +123,6 @@ const styles = StyleSheet.create({
     fontFamily: Typography.families.regular,
     fontSize: Typography.sizes.sm,
     lineHeight: 20,
-    marginBottom: Spacing.lg,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    minHeight: 88,
-    textAlignVertical: 'top',
-    fontFamily: Typography.families.regular,
-    fontSize: Typography.sizes.sm,
     marginBottom: Spacing.lg,
   },
   buttonRow: {

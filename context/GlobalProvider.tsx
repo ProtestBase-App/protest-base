@@ -109,7 +109,7 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   const refreshUserEventCounts = useCallback(async (organizationIds?: string[]): Promise<void> => {
     // If no organizations, set counts to zero (not null) to exit loading state
     if (!organizationIds || organizationIds.length === 0) {
-      const zeroCounts: EventCounts = { upcoming: 0, past: 0 };
+      const zeroCounts: EventCounts = { upcoming: 0, past: 0, draft: 0 };
       setUserEventCounts(zeroCounts);
       await AsyncStorage.setItem(USER_EVENT_COUNTS_KEY, JSON.stringify(zeroCounts));
       return;

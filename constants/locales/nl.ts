@@ -336,6 +336,8 @@ const nl = {
     myEvents: 'Mijn evenementen',
     myUpcomingEvents: 'Mijn aankomende evenementen',
     myPastEvents: 'Mijn afgelopen evenementen',
+    draftEvents: 'Concept-evenementen',
+    draftEventsEmpty: 'Nog geen concept-evenementen',
     eventTemplates: 'Evenementsjablonen',
     becomeOrganizer: 'Word organisator',
     signInToManageEvents: 'Log in om evenementen te beheren',
@@ -434,7 +436,6 @@ const nl = {
     // Creator stats banner
     yourEvent: 'UW EVENEMENT',
     viewCount: 'Weergaven',
-    participantsCount: 'Deelnemers',
     savesCount: 'Opgeslagen',
 
     // Organizer row
@@ -443,14 +444,12 @@ const nl = {
     // Creator action sheet
     editDetails: 'Details bewerken',
     editDetailsDesc: 'Titel, datum, locatie, beschrijving',
-    viewStats: 'Statistieken bekijken',
-    viewStatsDesc: 'Weergaven, deelnemers, betrokkenheid',
     notifyParticipants: 'Deelnemers informeren',
     notifyParticipantsDesc: 'Een update sturen',
     visitorPreview: 'Bezoekersweergave',
     visitorPreviewDesc: 'Zien als een gewone gebruiker',
     cancelEvent: 'Evenement annuleren',
-    cancelEventDesc: 'Deelnemers worden op de hoogte gesteld',
+    cancelEventDesc: 'Dit kan niet ongedaan worden gemaakt',
     comingSoon: 'Binnenkort beschikbaar',
 
     // Cancellation / lifecycle banners
@@ -461,8 +460,7 @@ const nl = {
     pastBadge: 'Afgelopen evenement',
     cancelConfirmTitle: 'Dit evenement annuleren?',
     cancelConfirmMessage:
-      'Deelnemers worden op de hoogte gesteld. Je kan hieronder optioneel een reden toevoegen.',
-    cancelReasonPlaceholder: 'Reden (optioneel, maximaal 1000 tekens)',
+      'Het evenement wordt gemarkeerd als geannuleerd. Dit kan niet ongedaan worden gemaakt.',
     cancelAction: 'Evenement annuleren',
     keepActive: 'Evenement behouden',
     cancelSuccess: 'Evenement geannuleerd',
@@ -1410,6 +1408,30 @@ const nl = {
     saveWarningTitle: 'Probleem met automatisch opslaan',
     saveWarningMessage:
       'Je concept kon niet automatisch worden opgeslagen. Je wijzigingen kunnen verloren gaan als je dit scherm verlaat. Probeer handmatig op te slaan of controleer de opslag van je apparaat.',
+  },
+
+  // ============================================
+  // Drafts - Backend draft events (save-now-publish-later).
+  // NOTE: distinct from the `draft` namespace above (local form-autosave).
+  // ============================================
+  drafts: {
+    editTitle: 'Concept bewerken',
+    saveAsDraft: 'Opslaan als concept',
+    savedConfirmation: 'Concept opgeslagen.',
+    save: 'Concept opslaan',
+    publish: 'Publiceren',
+    published: 'Evenement gepubliceerd.',
+    publishIssuesTitle: 'Nog niet klaar om te publiceren',
+    issueDescription: 'Voeg een beschrijving toe.',
+    issueCategory: 'Kies minstens één categorie.',
+    issueLocation: 'Voeg een locatie toe (stad of adres).',
+    issueStartTime: 'Kies een startdatum en -tijd in de toekomst.',
+    issueIncomplete: 'Sommige verplichte gegevens ontbreken.',
+    delete: 'Concept verwijderen',
+    deleted: 'Concept verwijderd.',
+    deleteConfirmTitle: 'Concept verwijderen?',
+    deleteConfirmMessage:
+      'Dit concept wordt definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt.',
   },
 
   // ============================================

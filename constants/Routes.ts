@@ -24,6 +24,8 @@ export const Routes = {
   EVENT_TEMPLATES: '/event-templates',
   CREATE_TEMPLATE: '/create-template',
 
+  DRAFT_EVENTS: '/draft-events',
+
   MY_EVENTS: '/my-events',
   MY_EVENTS_UPCOMING: '/upcoming',
   MY_EVENTS_PAST: '/past',
@@ -45,6 +47,10 @@ export const DynamicRoutes = {
     pathname: '/event-edit/[id]' as const,
     params: { id, ...(queryParams?.isCreated ? { isCreated: 'true' } : {}) },
   }),
+  draftEdit: (id: string) => ({
+    pathname: '/draft-edit/[id]' as const,
+    params: { id },
+  }),
   editTemplate: (id: string) => ({
     pathname: '/edit-template/[id]' as const,
     params: { id },
@@ -65,4 +71,5 @@ export const RelativeRoutes = {
 export type StaticRoute = (typeof Routes)[keyof typeof Routes];
 export type EventRoute = ReturnType<typeof DynamicRoutes.event>;
 export type EventEditRoute = ReturnType<typeof DynamicRoutes.eventEdit>;
+export type DraftEditRoute = ReturnType<typeof DynamicRoutes.draftEdit>;
 export type EditTemplateRoute = ReturnType<typeof DynamicRoutes.editTemplate>;

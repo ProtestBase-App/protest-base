@@ -224,10 +224,10 @@ describe('GlobalProvider', () => {
         await result.current.refreshUserEventCounts([]);
       });
 
-      expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0 });
+      expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0, draft: 0 });
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
         'userEventCounts',
-        JSON.stringify({ upcoming: 0, past: 0 })
+        JSON.stringify({ upcoming: 0, past: 0, draft: 0 })
       );
       expect(mockFetchEventCounts).not.toHaveBeenCalled();
     });
@@ -240,7 +240,7 @@ describe('GlobalProvider', () => {
         await result.current.refreshUserEventCounts(undefined);
       });
 
-      expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0 });
+      expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0, draft: 0 });
     });
 
     it('should call fetchEventCounts and update state when orgs provided', async () => {

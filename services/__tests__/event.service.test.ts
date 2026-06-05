@@ -5,6 +5,7 @@ jest.mock('@/services/api', () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    patch: jest.fn(),
     delete: jest.fn(),
     interceptors: {
       request: { use: jest.fn() },
@@ -37,6 +38,13 @@ import {
   updateEvent,
   deleteEvent,
   fetchEventCounts,
+  createDraftEvent,
+  getDraftEvents,
+  getDraftEventPreview,
+  patchEvent,
+  publishDraft,
+  EventIncompleteError,
+  EventNotFoundError,
 } from '@/services/event.service';
 import type { Event } from '@/types/event.types';
 
@@ -533,6 +541,17 @@ describe('event.service', () => {
       expect(payload.postal_code).toBeUndefined();
     });
 
+    it('coerces postal_code to a string in the JSON payload', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-6' } },
+      });
+
+      await createEventBackend({ ...baseEventData, postal_code: 1000 });
+
+      const [, payload]: any[] = mockApi.post.mock.calls[0];
+      expect(payload.postal_code).toBe('1000');
+    });
+
     it('wraps a single-string categories into a 1-element FormData array', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-cat-str' } },
@@ -899,14 +918,14 @@ describe('event.service', () => {
   // fetchEventCounts
   // ============================================================
   describe('fetchEventCounts', () => {
-    it('returns { upcoming: 0, past: 0 } when organizationIds is empty', async () => {
+    it('returns { upcoming: 0, past: 0, draft: 0 } when organizationIds is empty', async () => {
       const result = await fetchEventCounts([]);
 
-      expect(result).toEqual({ upcoming: 0, past: 0 });
+      expect(result).toEqual({ upcoming: 0, past: 0, draft: 0 });
       expect(mockApi.get).not.toHaveBeenCalled();
     });
 
-    it('counts ongoing events for upcoming and uses total for past', async () => {
+    it('counts ongoing upcoming, past total, and draft total', async () => {
       const events = [makeEvent(), makeEvent({ $id: 'evt-2', id: 'evt-2' })];
       // First call: getOrganizationUpcomingEvents
       mockApi.get.mockResolvedValueOnce({
@@ -916,6 +935,10 @@ describe('event.service', () => {
       mockApi.get.mockResolvedValueOnce({
         data: { success: true, data: { events: [], total: 5 } },
       });
+      // Third call: getDraftEvents
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 4 } },
+      });
 
       mockIsEventOngoing.mockReturnValueOnce(true).mockReturnValueOnce(false);
 
@@ -923,6 +946,7 @@ describe('event.service', () => {
 
       expect(result.upcoming).toBe(1); // Only 1 of 2 is ongoing
       expect(result.past).toBe(5);
+      expect(result.draft).toBe(4);
     });
 
     it('counts all events as upcoming when all are ongoing', async () => {
@@ -933,6 +957,9 @@ describe('event.service', () => {
       mockApi.get.mockResolvedValueOnce({
         data: { success: true, data: { events: [], total: 3 } },
       });
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0 } },
+      });
 
       mockIsEventOngoing.mockReturnValue(true);
 
@@ -940,10 +967,14 @@ describe('event.service', () => {
 
       expect(result.upcoming).toBe(2);
       expect(result.past).toBe(3);
+      expect(result.draft).toBe(0);
     });
 
-    it('uses only the first organizationId', async () => {
+    it('fetches drafts from the drafts endpoint scoped to the first organizationId', async () => {
       mockApi.get
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        })
         .mockResolvedValueOnce({
           data: { success: true, data: { events: [], total: 0 } },
         })
@@ -953,20 +984,161 @@ describe('event.service', () => {
 
       await fetchEventCounts(['org-1', 'org-2', 'org-3']);
 
-      // Both calls should use org-1
-      const firstCallUrl = mockApi.get.mock.calls[0][0];
-      const secondCallUrl = mockApi.get.mock.calls[1][0];
-      expect(firstCallUrl).toBe('/organizations/org-1/events');
-      expect(secondCallUrl).toBe('/organizations/org-1/events');
+      // Upcoming + past hit the org events endpoint; drafts hit /events/drafts.
+      expect(mockApi.get.mock.calls[0][0]).toBe('/organizations/org-1/events');
+      expect(mockApi.get.mock.calls[1][0]).toBe('/organizations/org-1/events');
+      const draftCall = mockApi.get.mock.calls.find((call) => call[0] === '/events/drafts');
+      expect(draftCall).toBeDefined();
+      expect(draftCall?.[1]?.params?.organization_id).toBe('org-1');
     });
 
     it('throws with error message on API failure', async () => {
-      mockApi.get.mockRejectedValueOnce({
-        response: { data: { error: 'Organization not found' } },
-        message: 'Request failed',
-      });
+      // Only the upcoming call fails; the others resolve so the rejection is
+      // deterministic (Promise.all rejects with the first/only rejection).
+      mockApi.get
+        .mockRejectedValueOnce({
+          response: { data: { error: 'Organization not found' } },
+          message: 'Request failed',
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
 
       await expect(fetchEventCounts(['org-1'])).rejects.toThrow('Organization not found');
+    });
+  });
+
+  describe('draft events', () => {
+    describe('createDraftEvent', () => {
+      it('posts /events with is_draft: true (JSON path, no image)', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'draft-1' } } });
+
+        await createDraftEvent({ organization_id: 'org-1', title: 'My draft' });
+
+        const [url, payload]: any[] = mockApi.post.mock.calls[0];
+        expect(url).toBe('/events');
+        expect(payload.is_draft).toBe(true);
+        expect(payload.title).toBe('My draft');
+      });
+
+      it('keeps is_draft in the multipart body when an image is attached', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'draft-img' } } });
+
+        await createDraftEvent({
+          organization_id: 'org-1',
+          title: 'D',
+          image: { uri: 'file:///i.jpg', mimeType: 'image/jpeg', fileName: 'i.jpg' },
+        });
+
+        const [, payload] = mockApi.post.mock.calls[0];
+        expect(payload).toBeInstanceOf(FormData);
+        expect((payload as FormData).get('is_draft')).toBe('true');
+      });
+    });
+
+    describe('getDraftEvents', () => {
+      it('requests /events/drafts with organization_id, includeAvatars and pagination', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [makeEvent()], total: 1 } },
+        });
+
+        const result = await getDraftEvents('org-1', { limit: 10, offset: 20 });
+
+        const [url, config]: any[] = mockApi.get.mock.calls[0];
+        expect(url).toBe('/events/drafts');
+        expect(config.params).toEqual({
+          organization_id: 'org-1',
+          includeAvatars: true,
+          limit: 10,
+          offset: 20,
+        });
+        expect(result.total).toBe(1);
+        expect(result.events).toHaveLength(1);
+      });
+
+      it('throws when success is false', async () => {
+        mockApi.get.mockResolvedValueOnce({ data: { success: false } });
+        await expect(getDraftEvents('org-1')).rejects.toThrow('Failed to fetch draft events');
+      });
+    });
+
+    describe('getDraftEventPreview', () => {
+      it('requests the /events/:id/preview endpoint', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: makeEvent({ $id: 'd1' }) },
+        });
+
+        const event = await getDraftEventPreview('d1');
+
+        expect(mockApi.get.mock.calls[0][0]).toBe('/events/d1/preview');
+        expect(event.$id).toBe('d1');
+      });
+
+      it('throws EventNotFoundError on 404', async () => {
+        mockApi.get.mockRejectedValueOnce({ response: { status: 404 } });
+        await expect(getDraftEventPreview('missing')).rejects.toBeInstanceOf(EventNotFoundError);
+      });
+    });
+
+    describe('patchEvent', () => {
+      it('sends JSON via api.patch when there is no new image file', async () => {
+        mockApi.patch.mockResolvedValueOnce({ data: { success: true, data: makeEvent() } });
+
+        await patchEvent('evt-1', { title: 'Updated', image: 'https://cdn.example.com/x.jpg' });
+
+        const [url, body, config]: any[] = mockApi.patch.mock.calls[0];
+        expect(url).toBe('/events/evt-1');
+        expect(body.title).toBe('Updated');
+        expect(config.headers['Content-Type']).toBe('application/json');
+        expect(mockApi.put).not.toHaveBeenCalled();
+      });
+
+      it('delegates to the multipart PUT path when a new image file is provided', async () => {
+        mockApi.put.mockResolvedValueOnce({ data: { success: true, data: makeEvent() } });
+
+        await patchEvent('evt-1', {
+          title: 'Updated',
+          image: { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' },
+        });
+
+        expect(mockApi.put).toHaveBeenCalledTimes(1);
+        expect(mockApi.patch).not.toHaveBeenCalled();
+        const [url, payload] = mockApi.put.mock.calls[0];
+        expect(url).toBe('/events/evt-1');
+        expect(payload).toBeInstanceOf(FormData);
+      });
+    });
+
+    describe('publishDraft', () => {
+      it('posts an empty body to /events/:id/publish and returns the status', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'd1', status: 'active' } },
+        });
+
+        const result = await publishDraft('d1');
+
+        const [url, body]: any[] = mockApi.post.mock.calls[0];
+        expect(url).toBe('/events/d1/publish');
+        expect(body).toEqual({});
+        expect(result.status).toBe('active');
+      });
+
+      it('throws EventIncompleteError carrying the fields on 422 EVENT_INCOMPLETE', async () => {
+        mockApi.post.mockRejectedValueOnce({
+          response: {
+            status: 422,
+            data: { code: 'EVENT_INCOMPLETE', fields: ['description', 'categories'] },
+          },
+        });
+
+        await expect(publishDraft('d1')).rejects.toMatchObject({
+          name: 'EventIncompleteError',
+          fields: ['description', 'categories'],
+        });
+      });
     });
   });
 });

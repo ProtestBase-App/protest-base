@@ -80,15 +80,14 @@ describe('More Screen', () => {
       expect(getByText('tabs.more')).toBeTruthy();
     });
 
-    it('shows sign in button in header', () => {
-      const { getAllByText } = renderWithProviders(<MoreScreen />, {
+    it('shows the sign in button', () => {
+      const { getByTestId } = renderWithProviders(<MoreScreen />, {
         providerOverrides: {
           globalContext: { isLogged: false },
         },
       });
 
-      const signInButtons = getAllByText('auth.signIn');
-      expect(signInButtons.length).toBeGreaterThan(0);
+      expect(getByTestId('btn-more-sign-in')).toBeTruthy();
     });
 
     it('shows become organizer option', () => {
@@ -272,6 +271,21 @@ describe('More Screen', () => {
       expect(getByText('more.eventTemplates')).toBeTruthy();
     });
 
+    it('shows draft events option', () => {
+      const mockUser = createMockUser();
+      const { getByText } = renderWithProviders(<MoreScreen />, {
+        providerOverrides: {
+          globalContext: {
+            isLogged: true,
+            user: mockUser,
+            userEventCounts: { upcoming: 0, past: 0, total: 0 },
+          },
+        },
+      });
+
+      expect(getByText('more.draftEvents')).toBeTruthy();
+    });
+
     it('shows logout option', () => {
       const mockUser = createMockUser();
       const { getByText } = renderWithProviders(<MoreScreen />, {
@@ -311,14 +325,13 @@ describe('More Screen', () => {
         loading: false,
       });
 
-      const { getAllByText } = renderWithProviders(<MoreScreen />, {
+      const { getByTestId } = renderWithProviders(<MoreScreen />, {
         providerOverrides: {
           globalContext: { isLogged: false },
         },
       });
 
-      const signInButtons = getAllByText('auth.signIn');
-      fireEvent.press(signInButtons[0]);
+      fireEvent.press(getByTestId('btn-more-sign-in'));
 
       expect(router.push).toHaveBeenCalled();
     });
@@ -550,6 +563,28 @@ describe('More Screen', () => {
       });
 
       expect(getByText('more.myPastEvents')).toBeTruthy();
+    });
+
+    it('displays the draft event count badge', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLogged: true,
+        loading: false,
+      });
+
+      const mockUser = createMockUser();
+      const { getByText } = renderWithProviders(<MoreScreen />, {
+        providerOverrides: {
+          globalContext: {
+            isLogged: true,
+            user: mockUser,
+            userEventCounts: { upcoming: 0, past: 0, draft: 7, total: 7 },
+          },
+        },
+      });
+
+      expect(getByText('more.draftEvents')).toBeTruthy();
+      // Only the draft count is non-zero, so the badge number is unambiguous.
+      expect(getByText('7')).toBeTruthy();
     });
 
     it('defaults to 0 counts when userEventCounts is null', () => {

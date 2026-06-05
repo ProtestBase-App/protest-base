@@ -464,11 +464,6 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <View style={styles.creatorStats}>
                 <CreatorStat label={t('events.viewCount')} value={String(viewCount)} />
                 <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
-                <CreatorStat
-                  label={t('events.participantsCount')}
-                  value={String(event.participant_count ?? 0)}
-                />
-                <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
                 <CreatorStat label={t('events.savesCount')} value={String(event.save_count ?? 0)} />
               </View>
             </View>

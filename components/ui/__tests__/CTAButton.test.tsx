@@ -73,8 +73,8 @@ describe('CTAButton', () => {
       expect(screen.getByText('Create Event')).toBeTruthy();
     });
 
-    it('accepts custom badge color', () => {
-      render(<CTAButton {...defaultProps} badge={3} badgeColor="#00FF00" />);
+    it('renders a single-digit badge', () => {
+      render(<CTAButton {...defaultProps} badge={3} />);
       expect(screen.getByText('3')).toBeTruthy();
     });
   });

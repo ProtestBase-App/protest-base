@@ -12,7 +12,7 @@ import { router, Link, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createEventBackend } from '@/services/event.service';
+import { createEventBackend, createDraftEvent } from '@/services/event.service';
 import { getTemplate } from '@/services/template.service';
 import { saveEventDraft, getEventDraft, clearEventDraft } from '@/services/localStorageService';
 import CustomButton from '@/components/CustomButton';
@@ -27,7 +27,7 @@ import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
 import { Typography } from '@/constants/DesignTokens';
-import { DynamicRoutes } from '@/constants/Routes';
+import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
@@ -100,6 +100,7 @@ export default function CreateEventModal() {
   const params = useLocalSearchParams<{ templateId?: string; source?: string }>();
 
   const [isSubmitting, setSubmitting] = useState(false);
+  const [isSavingDraft, setSavingDraft] = useState(false);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isCheckingDraft, setIsCheckingDraft] = useState(true);
 
@@ -497,6 +498,98 @@ export default function CreateEventModal() {
     }
   };
 
+  // Save the in-progress form as a backend draft (status: 'draft'). Drafts may
+  // be incomplete, so validation is relaxed to just organization + title; the
+  // rest is enforced at publish time. This is unrelated to the LOCAL form
+  // autosave (clearEventDraft below only clears that local snapshot).
+  const submitDraft = async () => {
+    const trimmedForm = {
+      ...form,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      street_address: form.street_address?.trim() || '',
+      city: form.city?.trim() || '',
+      region: form.region?.trim() || '',
+      website_url: form.website_url?.trim() || '',
+      disclaimer: form.disclaimer?.trim() || '',
+      help_description: form.help_description?.trim() || '',
+    };
+
+    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+
+    const newEmptyFields = {
+      organization_id: !effectiveOrgId,
+      title: trimmedForm.title === '',
+      start_time: false,
+      description: false,
+      help_description: false,
+    };
+    setEmptyFields(newEmptyFields);
+
+    if (newEmptyFields.organization_id || newEmptyFields.title) {
+      const missingFields: string[] = [];
+      if (newEmptyFields.organization_id) missingFields.push(t('createEvent.organization'));
+      if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
+      Alert.alert(
+        t('common.error'),
+        t('createEvent.missingFieldsError', { fields: missingFields.join(', ') })
+      );
+      scrollToTop();
+      return;
+    }
+
+    if (trimmedForm.website_url && !isValidUrl(trimmedForm.website_url)) {
+      Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
+      return;
+    }
+
+    setSavingDraft(true);
+    try {
+      const finalCoOrganizers = trimmedForm.co_organizers?.length
+        ? trimmedForm.co_organizers
+        : undefined;
+
+      await createDraftEvent({
+        organization_id: effectiveOrgId,
+        title: trimmedForm.title,
+        description: trimmedForm.description || undefined,
+        start_time: trimmedForm.start_time || undefined,
+        end_time: trimmedForm.end_time || undefined,
+        street_address: trimmedForm.street_address || undefined,
+        city: trimmedForm.city || undefined,
+        region: trimmedForm.region || undefined,
+        country: trimmedForm.country || undefined,
+        postal_code: trimmedForm.postal_code || undefined,
+        image:
+          trimmedForm.image && typeof trimmedForm.image === 'object'
+            ? trimmedForm.image
+            : undefined,
+        website_url: trimmedForm.website_url || undefined,
+        categories: trimmedForm.categories,
+        disclaimer: trimmedForm.disclaimer || undefined,
+        co_organizers: finalCoOrganizers,
+        help_needed: trimmedForm.help_needed,
+        help_description: trimmedForm.help_description || undefined,
+      });
+
+      // Clear the LOCAL autosave snapshot now that it's persisted server-side.
+      await clearEventDraft();
+
+      // Refresh the draft badge count (drafts ARE counted). The global events
+      // cache is NOT touched — drafts are excluded from it.
+      const orgIds = userOrganizations.map((org) => org.$id);
+      refreshUserEventCounts(orgIds);
+
+      router.replace(Routes.DRAFT_EVENTS);
+      Alert.alert(t('common.success'), t('drafts.savedConfirmation'));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert(t('common.error'), errorMessage);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   if (!loading && !isLogged) {
     return <Redirect href="/(tabs)/(more)/more" />;
   }
@@ -507,6 +600,7 @@ export default function CreateEventModal() {
 
   if (
     isSubmitting ||
+    isSavingDraft ||
     isLoadingTemplate ||
     (isCheckingDraft && !params.templateId) ||
     userOrgsLoading
@@ -579,6 +673,14 @@ export default function CreateEventModal() {
               isLoading={isSubmitting}
             />
 
+            <CustomButton
+              testID="btn-create-event-draft"
+              title={t('drafts.saveAsDraft')}
+              handlePress={submitDraft}
+              containerStyles={styles.buttonDraft}
+              isLoading={isSavingDraft}
+            />
+
             {!isPresented && <Link href="../">{t('common.dismiss')}</Link>}
           </ThemedView>
         </ScrollView>
@@ -623,6 +725,10 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 20,
     marginBottom: 20,
+  },
+  buttonDraft: {
+    marginBottom: 20,
+    backgroundColor: '#687076',
   },
   splashContainer: {
     flex: 1,
