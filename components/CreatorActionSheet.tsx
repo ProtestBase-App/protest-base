@@ -57,17 +57,6 @@ export default function CreatorActionSheet({
             <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
 
             <ActionRow
-              icon="chart.bar"
-              label={t('events.viewStats')}
-              description={t('events.viewStatsDesc')}
-              iconColor={themeColors.text}
-              disabled
-              onPress={showComingSoon}
-            />
-
-            <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
-
-            <ActionRow
               icon="bell.badge"
               label={t('events.notifyParticipants')}
               description={t('events.notifyParticipantsDesc')}
@@ -113,7 +102,7 @@ export default function CreatorActionSheet({
 }
 
 interface ActionRowProps {
-  icon: 'pencil' | 'chart.bar' | 'bell.badge' | 'eye' | 'xmark.circle';
+  icon: 'pencil' | 'bell.badge' | 'eye' | 'xmark.circle';
   label: string;
   description: string;
   iconColor: string;

@@ -1,6 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Alert, TouchableOpacity, Linking } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { ScrollView, StyleSheet, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
@@ -14,7 +13,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { logout } from '@/services/auth.service';
 import { createEventBackend } from '@/services/event.service';
 import { eventCategories } from '@/constants/EventCategories';
-import { Spacing, Typography } from '@/constants/DesignTokens';
+import { Spacing } from '@/constants/DesignTokens';
 import { ExternalLinks } from '@/constants/ExternalLinks';
 import { Routes } from '@/constants/Routes';
 import { t } from '@/utils/i18n';
@@ -23,12 +22,10 @@ export default function MoreScreen() {
   const { userEventCounts, clearAuthState } = useGlobalContext();
   const { selectedOrganizationId } = useUserOrganizations();
   const { isLogged, loading } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
   const [isCreatingFake, setCreatingFake] = React.useState(false);
 
   // null means counts haven't loaded yet.
-  const eventCounts = userEventCounts ?? { upcoming: 0, past: 0 };
+  const eventCounts = userEventCounts ?? { upcoming: 0, past: 0, draft: 0 };
 
   // __DEV__ ensures dev tools are stripped from production builds.
   const showDevTools = __DEV__;
@@ -123,46 +120,29 @@ export default function MoreScreen() {
     return (
       <ThemedView style={styles.wrapper}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-          <ThemedView
-            style={[
-              styles.header,
-              { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
-            ]}
-          >
-            <ThemedText type="title" style={styles.headerTitle}>
-              {t('tabs.more')}
-            </ThemedText>
-            <TouchableOpacity
-              onPress={() => router.push(Routes.SIGN_IN)}
-              style={styles.headerLoginButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('auth.signIn')}
-              testID="btn-more-sign-in"
-            >
-              <ThemedText type="defaultSemiBold" style={styles.headerLoginText}>
-                {t('auth.signIn')}
-              </ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
             <ThemedView style={styles.container}>
+              <ThemedText type="title" style={styles.pageTitle}>
+                {t('tabs.more')}
+              </ThemedText>
+
               <SectionHeader title={t('more.accountResources').toUpperCase()} />
+              <CTAButton
+                testID="btn-more-sign-in"
+                text={t('more.signInToManageEvents')}
+                leftIcon="person.crop.circle"
+                variant="secondary"
+                onPress={() => router.push(Routes.SIGN_IN)}
+              />
               <CTAButton
                 text={t('more.becomeOrganizer')}
                 leftIcon="megaphone"
                 variant="secondary"
                 onPress={() => router.push(Routes.BECOME_ORGANIZER)}
-              />
-              <CTAButton
-                text={t('more.signInToManageEvents')}
-                leftIcon="person.crop.circle"
-                variant="secondary"
-                onPress={() => router.push(Routes.SIGN_IN)}
               />
               <CTAButton
                 text={t('more.giveFeedback')}
@@ -226,7 +206,6 @@ export default function MoreScreen() {
                 router.push({ pathname: Routes.MY_EVENTS, params: { section: 'upcoming' } })
               }
               badge={eventCounts.upcoming}
-              badgeColor="#FF3B30"
             />
             <CTAButton
               text={t('more.myPastEvents')}
@@ -236,7 +215,14 @@ export default function MoreScreen() {
                 router.push({ pathname: Routes.MY_EVENTS, params: { section: 'past' } })
               }
               badge={eventCounts.past}
-              badgeColor="#888888"
+            />
+            <CTAButton
+              testID="btn-draft-events"
+              text={t('more.draftEvents')}
+              leftIcon="square.and.pencil"
+              variant="secondary"
+              onPress={() => router.push(Routes.DRAFT_EVENTS)}
+              badge={eventCounts.draft}
             />
             <CTAButton
               text={t('more.account')}
@@ -313,30 +299,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes['3xl'],
-    fontFamily: Typography.families.extraBold,
-  },
-  headerLoginButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerLoginText: {
-    fontSize: Typography.sizes.base,
-    fontFamily: Typography.families.semiBold,
   },
   scrollView: {
     flex: 1,

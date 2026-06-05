@@ -1,4 +1,4 @@
-import { Event, CoOrganizerAvatar } from '@/types/event.types';
+import { Event, CoOrganizerAvatar, EventStatus } from '@/types/event.types';
 
 /**
  * Event timezone — all events are displayed in Belgium time to match the
@@ -112,7 +112,7 @@ export interface FormattedEvent {
   save_count: number;
   like_count: number;
 
-  status: 'active' | 'cancelled' | 'past';
+  status: EventStatus;
   cancelled_at: string | null;
   cancellation_reason: string | null;
 }

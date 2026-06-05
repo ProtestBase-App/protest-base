@@ -1,11 +1,25 @@
 import api from './api';
-import { Event, CreateEventRequest, UpdateEventRequest, PickedImage } from '@/types/event.types';
+import {
+  Event,
+  CreateEventRequest,
+  CreateDraftRequest,
+  UpdateEventRequest,
+  PublishDraftResponse,
+  PickedImage,
+} from '@/types/event.types';
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { isEventOngoing } from '@/utils/eventStatus';
 import { logger } from '@/utils/logger';
 
-export type { Event, CreateEventRequest, UpdateEventRequest, PickedImage };
+export type {
+  Event,
+  CreateEventRequest,
+  CreateDraftRequest,
+  UpdateEventRequest,
+  PublishDraftResponse,
+  PickedImage,
+};
 
 /**
  * Filter parameters for server-side event filtering
@@ -347,7 +361,7 @@ function normalizeEventPayload<T extends Record<string, unknown>>(eventData: T):
     co_organizers: normalizeArrayField(eventData.co_organizers),
     postal_code:
       eventData.postal_code !== null && eventData.postal_code !== undefined
-        ? eventData.postal_code
+        ? String(eventData.postal_code)
         : undefined,
   } as T;
 }
@@ -378,8 +392,8 @@ function buildEventFormData(
         (value as string[]).forEach((item) => formData.append(key, item));
       }
     } else if (key === 'postal_code') {
-      formData.append(key, (value as number).toString());
-    } else if (key === 'help_needed') {
+      formData.append(key, String(value));
+    } else if (key === 'help_needed' || key === 'is_draft') {
       formData.append(key, String(value));
     } else if (typeof value === 'string') {
       formData.append(key, value);
@@ -586,30 +600,33 @@ export async function deleteEvent(eventId: string): Promise<void> {
 export interface EventCounts {
   upcoming: number;
   past: number;
+  draft: number;
 }
 
 /**
- * Fetch event counts (upcoming/ongoing and past) for the current user's organizations.
- * Upcoming uses a startDate filter then filters for ongoing; past uses an endDate filter.
+ * Fetch event counts (upcoming/ongoing, past and draft) for the current user's
+ * organizations. Upcoming uses a startDate filter then filters for ongoing; past
+ * uses an endDate filter; draft uses the dedicated drafts endpoint's total.
  *
  * @param organizationIds - Array of organization IDs to fetch event counts for
- * @returns Object containing upcoming and past event counts
+ * @returns Object containing upcoming, past and draft event counts
  */
 export async function fetchEventCounts(organizationIds: string[]): Promise<EventCounts> {
   try {
     if (organizationIds.length === 0) {
-      return { upcoming: 0, past: 0 };
+      return { upcoming: 0, past: 0, draft: 0 };
     }
 
     // Look back to include ongoing events that started recently.
     const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
 
-    const [upcomingResponse, pastResponse] = await Promise.all([
+    const [upcomingResponse, pastResponse, draftResponse] = await Promise.all([
       getOrganizationUpcomingEvents(organizationIds[0], {
         startDate: lookbackDate,
         limit: API_LIMITS.EVENTS_DEFAULT,
       }),
       getOrganizationPastEvents(organizationIds[0], { limit: 1 }),
+      getDraftEvents(organizationIds[0], { limit: 1 }),
     ]);
 
     const ongoingCount = upcomingResponse.events.filter((event) => isEventOngoing(event)).length;
@@ -617,8 +634,205 @@ export async function fetchEventCounts(organizationIds: string[]): Promise<Event
     return {
       upcoming: ongoingCount,
       past: pastResponse.total,
+      draft: draftResponse.total,
     };
   } catch (error: any) {
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch event counts');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Draft events (status: 'draft')
+//
+// Drafts are a save-now-publish-later feature. They are excluded from every
+// public list endpoint and from the global events cache; they are only
+// reachable via the dedicated authenticated endpoints below.
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a draft event. Identical to createEventBackend but flags the event as a
+ * draft (status: 'draft') at create time. Drafts may be incomplete — the fields
+ * mandatory for a published event are optional here (see CreateDraftRequest).
+ *
+ * @param eventData - Draft event data (description/start_time optional)
+ * @returns The created draft event
+ */
+export async function createDraftEvent(eventData: CreateDraftRequest): Promise<Event> {
+  // The runtime body-builder tolerates the missing required fields; only the
+  // static signature is loosened relative to a published create.
+  return createEventBackend({ ...eventData, is_draft: true } as CreateEventRequest);
+}
+
+/**
+ * List draft events for an organization. Auth + membership gated; the public
+ * /events list never returns drafts.
+ *
+ * @param organizationId - The organization whose drafts to fetch
+ * @param options - Optional pagination (limit, offset)
+ * @returns Object containing the draft events array and total count
+ */
+export async function getDraftEvents(
+  organizationId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<OrganizationEventsResponse> {
+  try {
+    const params: Record<string, string | number | boolean> = {
+      organization_id: organizationId,
+      includeAvatars: true,
+    };
+    if (options?.limit) params.limit = options.limit;
+    if (options?.offset) params.offset = options.offset;
+
+    logger.debug('[EventService] getDraftEvents called', { organizationId, params });
+
+    const response = await api.get<{
+      success: boolean;
+      data: {
+        events: Event[];
+        total: number;
+      };
+    }>('/events/drafts', { params });
+
+    if (!response.data.success) {
+      throw new Error('Failed to fetch draft events');
+    }
+
+    return response.data.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to fetch draft events');
+  }
+}
+
+/**
+ * Load a single draft (or published) event for editing via the preview endpoint.
+ * The public GET /events/:id 404s on drafts, so draft editors must use this.
+ *
+ * @param eventId - The ID of the draft to load
+ * @returns The raw event (map directly to form state; do NOT run through
+ *   formatEventForDisplay, which assumes a non-empty start_time)
+ * @throws EventNotFoundError on 404
+ */
+export async function getDraftEventPreview(eventId: string): Promise<Event> {
+  try {
+    const response = await api.get<{
+      success: boolean;
+      data: Event;
+    }>(`/events/${eventId}/preview`);
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to load draft');
+    }
+
+    return response.data.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      throw new EventNotFoundError(eventId);
+    }
+    throw new Error(error.response?.data?.error || error.message || 'Failed to load draft');
+  }
+}
+
+/**
+ * Partially update an event via PATCH (JSON). Lighter than the full PUT for
+ * editing drafts on flaky mobile connections. Editing never changes the draft
+ * status (is_draft is create-only; PUT/PATCH ignore it).
+ *
+ * When a NEW image file is supplied we fall back to the existing multipart PUT
+ * (updateEvent) since the JSON path cannot carry a file; otherwise the image
+ * stays as its existing URL string (or is omitted).
+ *
+ * @param eventId - The ID of the event to patch
+ * @param partial - The fields to update
+ * @returns The updated event
+ */
+export async function patchEvent(eventId: string, partial: UpdateEventRequest): Promise<Event> {
+  const imageIsFile =
+    typeof partial.image === 'object' && partial.image !== null && 'uri' in partial.image;
+  if (imageIsFile) {
+    // Reuse the proven multipart PUT path for new-image edits.
+    return updateEvent(eventId, partial);
+  }
+
+  try {
+    logger.debug('[EventService] patchEvent called', { eventId });
+    const normalized = normalizeEventPayload(partial as unknown as Record<string, unknown>);
+
+    const response = await api.patch<{
+      success: boolean;
+      data: Event;
+      message: string;
+    }>(`/events/${eventId}`, normalized, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+    });
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to update draft');
+    }
+
+    return response.data.data;
+  } catch (error: any) {
+    if (error.response?.status === 403) {
+      throw new Error('You do not have permission to edit this event');
+    }
+    if (error.response?.status === 404) {
+      throw new Error('Event not found');
+    }
+    throw new Error(error.response?.data?.error || error.message || 'Failed to update draft');
+  }
+}
+
+/**
+ * Thrown when POST /events/:id/publish returns 422 EVENT_INCOMPLETE — the draft
+ * is missing fields required to publish. Carries the offending field names so
+ * the caller can surface them all at once.
+ */
+export class EventIncompleteError extends Error {
+  code = 'EVENT_INCOMPLETE' as const;
+  fields: string[];
+  constructor(fields: string[]) {
+    super('This draft is missing required fields and cannot be published yet');
+    this.name = 'EventIncompleteError';
+    this.fields = fields;
+  }
+}
+
+/**
+ * Publish a draft event. The backend returns the resulting status: 'active' for
+ * a future-dated event, 'past' for a past-dated one (the backend does NOT block
+ * past-dated publishes — callers must run the client readiness check first).
+ *
+ * @param eventId - The ID of the draft to publish
+ * @returns The resulting { $id, status }
+ * @throws EventIncompleteError on 422 (missing required fields)
+ */
+export async function publishDraft(eventId: string): Promise<PublishDraftResponse> {
+  try {
+    // Empty object body — Fastify rejects a no-body POST (415); the axios
+    // instance default Content-Type is application/json.
+    const response = await api.post<{
+      success: boolean;
+      data: PublishDraftResponse;
+    }>(`/events/${eventId}/publish`, {});
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to publish draft');
+    }
+
+    return response.data.data;
+  } catch (error: any) {
+    if (error.response?.status === 422 && error.response?.data?.code === 'EVENT_INCOMPLETE') {
+      throw new EventIncompleteError(error.response.data.fields ?? []);
+    }
+    if (error.response?.status === 401) {
+      throw new Error('Please log in to publish this event');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('You do not have permission to publish this event');
+    }
+    if (error.response?.status === 404) {
+      throw new Error('Event not found');
+    }
+    throw new Error(error.response?.data?.error || error.message || 'Failed to publish draft');
   }
 }

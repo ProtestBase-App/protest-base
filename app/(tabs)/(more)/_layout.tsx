@@ -95,6 +95,14 @@ export default function MoreLayout() {
           }}
         />
         <Stack.Screen
+          name="draft-events"
+          options={{
+            headerShown: true,
+            headerBackVisible: true,
+            headerTitle: t('more.draftEvents'),
+          }}
+        />
+        <Stack.Screen
           name="create-template"
           options={{
             presentation: 'modal',

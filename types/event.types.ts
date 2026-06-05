@@ -63,10 +63,15 @@ export interface Event {
 
 /**
  * Event lifecycle status returned by the backend.
- * Whether cancelled events appear in list endpoints is controlled by the
- * `includeCancelled` query param (defaults to false client-side).
+ *
+ * - 'draft' events are excluded from all list endpoints (e.g. GET /events)
+ *   unconditionally on the server, for every caller. They are only reachable
+ *   via the dedicated authenticated drafts endpoint, so the public explore
+ *   feed and the global events cache never contain them.
+ * - Whether 'cancelled' events appear in list endpoints is controlled by the
+ *   `includeCancelled` query param (defaults to false client-side).
  */
-export type EventStatus = 'active' | 'cancelled' | 'past';
+export type EventStatus = 'draft' | 'active' | 'cancelled' | 'past';
 
 /** Image object from expo-image-picker. */
 export interface PickedImage {
@@ -99,11 +104,24 @@ export interface CreateEventRequest {
   help_needed?: boolean;
   help_description?: string;
 
+  // Create-only: when true the event is born status:'draft'. PUT/PATCH ignore it.
+  is_draft?: boolean;
+
   // Geocoding is filled in server-side; clients should not set these.
   geocod_status?: string;
   geocod_lat?: number;
   geocod_lng?: number;
 }
+
+/**
+ * Request body for creating a draft event. Drafts may be incomplete, so the
+ * fields that are mandatory for a published event (`description`, `start_time`)
+ * are optional here. Completeness is enforced at publish time, not create time.
+ */
+export type CreateDraftRequest = Omit<CreateEventRequest, 'description' | 'start_time'> & {
+  description?: string;
+  start_time?: string;
+};
 
 /**
  * Request body for updating an event. All fields are optional; image can be a
@@ -112,6 +130,15 @@ export interface CreateEventRequest {
 export type UpdateEventRequest = Partial<Omit<CreateEventRequest, 'organization_id' | 'image'>> & {
   image?: PickedImage | string;
 };
+
+/**
+ * Response from publishing a draft. The backend returns the resulting status:
+ * 'active' for a future-dated event, 'past' for a past-dated one.
+ */
+export interface PublishDraftResponse {
+  $id: string;
+  status: 'active' | 'past';
+}
 
 /** Event extended with pre-formatted date/time strings for display components. */
 export interface EventDisplay extends Event {

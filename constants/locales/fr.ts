@@ -304,6 +304,8 @@ const fr: LocaleData = {
     myEvents: 'Mes événements',
     myUpcomingEvents: 'Mes événements à venir',
     myPastEvents: 'Mes événements passés',
+    draftEvents: 'Événements brouillons',
+    draftEventsEmpty: 'Aucun événement brouillon pour le moment',
     eventTemplates: "Modèles d'événements",
     becomeOrganizer: 'Devenir organisateur',
     signInToManageEvents: 'Connectez-vous pour gérer les événements',
@@ -383,7 +385,6 @@ const fr: LocaleData = {
     // Creator stats banner
     yourEvent: 'VOTRE ÉVÉNEMENT',
     viewCount: 'Vues',
-    participantsCount: 'Participants',
     savesCount: 'Sauvegardes',
 
     // Organizer row
@@ -392,14 +393,12 @@ const fr: LocaleData = {
     // Creator action sheet
     editDetails: 'Modifier les détails',
     editDetailsDesc: 'Titre, date, lieu, description',
-    viewStats: 'Voir les statistiques',
-    viewStatsDesc: 'Vues, participants, engagement',
     notifyParticipants: 'Notifier les participants',
     notifyParticipantsDesc: 'Envoyer une mise à jour',
     visitorPreview: 'Aperçu visiteur',
     visitorPreviewDesc: 'Voir comme un utilisateur normal',
     cancelEvent: "Annuler l'événement",
-    cancelEventDesc: 'Les participants seront prévenus',
+    cancelEventDesc: 'Cette action est irréversible',
     comingSoon: 'Bientôt disponible',
 
     // Cancellation / lifecycle banners
@@ -409,9 +408,7 @@ const fr: LocaleData = {
     cancelledNoReason: 'Aucune raison indiquée',
     pastBadge: 'Événement passé',
     cancelConfirmTitle: 'Annuler cet événement ?',
-    cancelConfirmMessage:
-      'Les participants seront prévenus. Vous pouvez ajouter une raison ci-dessous.',
-    cancelReasonPlaceholder: "Raison (facultatif, jusqu'à 1000 caractères)",
+    cancelConfirmMessage: "L'événement sera marqué comme annulé. Cette action est irréversible.",
     cancelAction: "Annuler l'événement",
     keepActive: "Conserver l'événement",
     cancelSuccess: 'Événement annulé',
@@ -1074,6 +1071,30 @@ const fr: LocaleData = {
     saveWarningTitle: 'Problème de sauvegarde automatique',
     saveWarningMessage:
       "Votre brouillon n'a pas pu être enregistré automatiquement. Vos modifications pourraient être perdues si vous quittez cet écran. Veuillez essayer d'enregistrer manuellement ou vérifier le stockage de votre appareil.",
+  },
+
+  // ============================================
+  // Drafts - Backend draft events (save-now-publish-later).
+  // NOTE: distinct from the `draft` namespace above (local form-autosave).
+  // ============================================
+  drafts: {
+    editTitle: 'Modifier le brouillon',
+    saveAsDraft: 'Enregistrer comme brouillon',
+    savedConfirmation: 'Brouillon enregistré.',
+    save: 'Enregistrer le brouillon',
+    publish: 'Publier',
+    published: 'Événement publié.',
+    publishIssuesTitle: 'Pas encore prêt à publier',
+    issueDescription: 'Ajoutez une description.',
+    issueCategory: 'Choisissez au moins une catégorie.',
+    issueLocation: 'Ajoutez un lieu (ville ou adresse).',
+    issueStartTime: 'Définissez une date de début dans le futur.',
+    issueIncomplete: 'Certaines informations requises sont manquantes.',
+    delete: 'Supprimer le brouillon',
+    deleted: 'Brouillon supprimé.',
+    deleteConfirmTitle: 'Supprimer le brouillon ?',
+    deleteConfirmMessage:
+      'Ce brouillon sera définitivement supprimé. Cette action est irréversible.',
   },
 
   // ============================================

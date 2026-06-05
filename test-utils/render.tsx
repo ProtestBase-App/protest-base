@@ -49,7 +49,7 @@ export interface MockGlobalContext {
   refetchEvents?: jest.Mock;
   upsertEventInCache?: jest.Mock;
   removeEventFromCache?: jest.Mock;
-  userEventCounts?: { total: number; upcoming: number; past: number } | null;
+  userEventCounts?: { total?: number; upcoming: number; past: number; draft?: number } | null;
   userEventCountsLoading?: boolean;
   refreshUserEventCounts?: jest.Mock;
   clearAuthState?: jest.Mock;

@@ -12,7 +12,6 @@ interface CTAButtonProps {
   onPress: () => void;
   variant?: 'primary' | 'secondary';
   badge?: number | string;
-  badgeColor?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -23,7 +22,6 @@ export function CTAButton({
   onPress,
   variant = 'secondary',
   badge,
-  badgeColor,
   style,
   testID,
 }: CTAButtonProps) {
@@ -50,11 +48,12 @@ export function CTAButton({
     return value.toString();
   };
 
-  const defaultBadgeColor = themeColors.error;
-  const finalBadgeColor = badgeColor || defaultBadgeColor;
-
   const badgeText = badge !== undefined ? formatBadgeText(badge) : '';
   const showBadge = badge !== undefined && badge !== '' && badge !== 0;
+
+  // Neutral count chip: a subtle, theme-aware pill with a high-contrast number,
+  // sitting inline (vertically centered) just before the chevron.
+  const badgeBackground = isPrimary ? 'rgba(255, 255, 255, 0.22)' : themeColors.badgeBg;
 
   return (
     <Pressable
@@ -70,19 +69,14 @@ export function CTAButton({
     >
       <IconSymbol name={leftIcon} size={IconSizes.md} color={iconColor} />
       <ThemedText style={[styles.ctaButtonText, { color: textColor }]}>{text}</ThemedText>
-      <IconSymbol name="chevron.forward" size={IconSizes.md} color={chevronColor} />
 
       {showBadge && (
-        <View
-          style={[
-            styles.badge,
-            { backgroundColor: finalBadgeColor },
-            badgeText.length === 1 && styles.badgeCircle,
-          ]}
-        >
-          <ThemedText style={styles.badgeText}>{badgeText}</ThemedText>
+        <View style={[styles.badge, { backgroundColor: badgeBackground }]}>
+          <ThemedText style={[styles.badgeText, { color: textColor }]}>{badgeText}</ThemedText>
         </View>
       )}
+
+      <IconSymbol name="chevron.forward" size={IconSizes.md} color={chevronColor} />
     </Pressable>
   );
 }
@@ -108,27 +102,17 @@ const styles = StyleSheet.create({
     fontFamily: Typography.families.semiBold,
   },
   badge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    minWidth: 28,
+    height: 26,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  badgeCircle: {
-    width: 20,
-    borderRadius: 10,
-    paddingHorizontal: 0,
+    marginLeft: Spacing.sm,
+    marginRight: Spacing.sm,
   },
   badgeText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.xs,
+    fontSize: Typography.sizes.sm,
     fontFamily: Typography.families.semiBold,
-    lineHeight: Typography.sizes.xs,
   },
 });

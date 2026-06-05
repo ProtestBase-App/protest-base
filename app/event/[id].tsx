@@ -187,10 +187,10 @@ export default function EventDetails() {
     }
   };
 
-  const handleConfirmCancel = async (reason: string) => {
+  const handleConfirmCancel = async () => {
     try {
       setIsCancelling(true);
-      const result = await cancelEvent(eventId, reason || undefined);
+      const result = await cancelEvent(eventId);
       // Merge the server response into local state to avoid a full refetch.
       setRawEvent((prev) =>
         prev

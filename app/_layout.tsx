@@ -125,9 +125,10 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      {/* Edit screen: only accessible when logged in */}
+      {/* Edit screens: only accessible when logged in */}
       <Stack.Protected guard={isLogged}>
         <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="draft-edit/[id]" options={{ headerShown: false }} />
       </Stack.Protected>
 
       {/* Public routes: always accessible */}

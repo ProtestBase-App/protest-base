@@ -372,7 +372,7 @@ describe('Auth Flow Integration', () => {
       await result.current.refreshUserEventCounts([]);
     });
 
-    expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0 });
+    expect(result.current.userEventCounts).toEqual({ upcoming: 0, past: 0, draft: 0 });
     expect(mockFetchEventCounts).not.toHaveBeenCalled();
   });
 

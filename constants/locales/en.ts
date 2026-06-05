@@ -298,6 +298,8 @@ const en: LocaleData = {
     myEvents: 'My Events',
     myUpcomingEvents: 'My Upcoming Events',
     myPastEvents: 'My Past Events',
+    draftEvents: 'Draft Events',
+    draftEventsEmpty: 'No draft events yet',
     eventTemplates: 'Event Templates',
     becomeOrganizer: 'Become an Organizer',
     signInToManageEvents: 'Sign In to Manage Events',
@@ -381,7 +383,6 @@ const en: LocaleData = {
     // Creator mode — stats banner
     yourEvent: 'YOUR EVENT',
     viewCount: 'Views',
-    participantsCount: 'Participants',
     savesCount: 'Saves',
 
     // Organizer row
@@ -390,14 +391,12 @@ const en: LocaleData = {
     // Creator action sheet
     editDetails: 'Edit details',
     editDetailsDesc: 'Title, date, location, description',
-    viewStats: 'View statistics',
-    viewStatsDesc: 'Views, participants, engagement',
     notifyParticipants: 'Notify participants',
     notifyParticipantsDesc: 'Send an update',
     visitorPreview: 'Visitor preview',
     visitorPreviewDesc: 'See as a normal user',
     cancelEvent: 'Cancel event',
-    cancelEventDesc: 'Participants will be notified',
+    cancelEventDesc: "This can't be undone",
     comingSoon: 'Coming soon',
 
     // Cancellation / lifecycle banners
@@ -407,8 +406,7 @@ const en: LocaleData = {
     cancelledNoReason: 'No reason given',
     pastBadge: 'Past event',
     cancelConfirmTitle: 'Cancel this event?',
-    cancelConfirmMessage: 'Participants will be notified. You can add an optional reason below.',
-    cancelReasonPlaceholder: 'Reason (optional, up to 1000 characters)',
+    cancelConfirmMessage: "The event will be marked as cancelled. This can't be undone.",
     cancelAction: 'Cancel event',
     keepActive: 'Keep event',
     cancelSuccess: 'Event cancelled',
@@ -1055,6 +1053,30 @@ const en: LocaleData = {
     saveWarningTitle: 'Auto-Save Issue',
     saveWarningMessage:
       'Your draft could not be saved automatically. Your changes may be lost if you leave this screen. Please try saving manually or check your device storage.',
+  },
+
+  // ============================================
+  // Drafts - Backend draft events (save-now-publish-later).
+  // NOTE: distinct from the `draft` namespace above, which is the local
+  // form-autosave / resume feature.
+  // ============================================
+  drafts: {
+    editTitle: 'Edit Draft',
+    saveAsDraft: 'Save as draft',
+    savedConfirmation: 'Draft saved.',
+    save: 'Save draft',
+    publish: 'Publish',
+    published: 'Event published.',
+    publishIssuesTitle: 'Not ready to publish',
+    issueDescription: 'Add a description.',
+    issueCategory: 'Choose at least one category.',
+    issueLocation: 'Add a location (city or street address).',
+    issueStartTime: 'Set a start date and time in the future.',
+    issueIncomplete: 'Some required information is missing.',
+    delete: 'Delete draft',
+    deleted: 'Draft deleted.',
+    deleteConfirmTitle: 'Delete draft?',
+    deleteConfirmMessage: 'This draft will be permanently deleted. This action cannot be undone.',
   },
 
   // ============================================

@@ -103,8 +103,12 @@ describe('Routes', () => {
       expect(Routes.REPORT_EVENT).toBe('/report-event');
     });
 
-    it('should have 23 static route definitions', () => {
-      expect(Object.keys(Routes)).toHaveLength(23);
+    it('should define DRAFT_EVENTS as /draft-events', () => {
+      expect(Routes.DRAFT_EVENTS).toBe('/draft-events');
+    });
+
+    it('should have 24 static route definitions', () => {
+      expect(Object.keys(Routes)).toHaveLength(24);
     });
 
     it('should have all route values starting with /', () => {
@@ -181,6 +185,23 @@ describe('Routes', () => {
     it('should include isCreated as string "true" when isCreated is true', () => {
       const result = DynamicRoutes.eventEdit('xyz789', { isCreated: true });
       expect(result.params.isCreated).toBe('true');
+    });
+  });
+
+  describe('DynamicRoutes.draftEdit', () => {
+    it('should return the correct pathname', () => {
+      const result = DynamicRoutes.draftEdit('draft001');
+      expect(result.pathname).toBe('/draft-edit/[id]');
+    });
+
+    it('should include the id in params', () => {
+      const result = DynamicRoutes.draftEdit('draft001');
+      expect(result.params.id).toBe('draft001');
+    });
+
+    it('should only have id in params', () => {
+      const result = DynamicRoutes.draftEdit('draft001');
+      expect(Object.keys(result.params)).toEqual(['id']);
     });
   });
 
