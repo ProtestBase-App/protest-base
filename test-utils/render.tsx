@@ -19,6 +19,7 @@
 import React from 'react';
 import { render, RenderOptions } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import type { LocationFilterOption } from '@/utils/locationFilterOptions';
 
 // Re-export everything from testing library
 export * from '@testing-library/react-native';
@@ -85,6 +86,10 @@ export interface MockPostalCodeContext {
   loadPostalCodesForCountry?: jest.Mock;
   cacheVersion?: number;
   getPostalCodeData?: jest.Mock;
+  locationFilterOptions?: LocationFilterOption[];
+  expandLocationTokens?: jest.Mock;
+  resolveLocationLabel?: jest.Mock;
+  isLocationSelectionTooBroad?: jest.Mock;
 }
 
 export interface MockExploreTabContext {
@@ -235,6 +240,10 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
   loadPostalCodesForCountry: jest.fn().mockResolvedValue(undefined),
   cacheVersion: 0,
   getPostalCodeData: jest.fn().mockReturnValue([]),
+  locationFilterOptions: [],
+  expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
+  resolveLocationLabel: jest.fn((value: string) => value),
+  isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
 };
 
 const defaultExploreTabContext: Required<MockExploreTabContext> = {

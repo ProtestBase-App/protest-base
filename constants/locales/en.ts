@@ -45,6 +45,11 @@ const en: LocaleData = {
     selected: 'Selected:',
     clearAllOrganizations: 'Clear all selected organizations',
     clearAllLocations: 'Clear all selected locations',
+    tierRegion: 'Region',
+    tierProvince: 'Province',
+    tierMunicipality: 'Municipality',
+    postalCodesCount: '{{count}} postal codes',
+    selectionTooBroad: 'Selection too broad — pick fewer or smaller areas.',
   },
 
   // ============================================

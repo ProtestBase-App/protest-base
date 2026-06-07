@@ -45,6 +45,12 @@ const fr: LocaleData = {
     selected: 'Sélectionné :',
     clearAllOrganizations: 'Effacer toutes les organisations sélectionnées',
     clearAllLocations: 'Effacer tous les lieux sélectionnés',
+    tierRegion: 'Région',
+    tierProvince: 'Province',
+    tierMunicipality: 'Commune',
+    postalCodesCount: '{{count}} codes postaux',
+    selectionTooBroad:
+      'Sélection trop large — choisissez moins de zones ou des zones plus petites.',
   },
 
   // ============================================

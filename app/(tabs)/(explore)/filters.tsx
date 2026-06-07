@@ -38,7 +38,7 @@ export default function FiltersModal() {
     setGlobalOrganizationFilterValue,
     setShouldScrollToTop,
   } = useExploreTabContext();
-  const { getSubMunicipalityName } = usePostalCodes();
+  const { resolveLocationLabel } = usePostalCodes();
   const { dropdownItems: orgDropdownItems } = useOrganizations();
 
   const [selectedValueDate, setSelectedValueDate] = useState<string | null>('allDates');
@@ -146,14 +146,7 @@ export default function FiltersModal() {
             </ThemedText>
 
             <FiltersInputBoxArray
-              value={locationFilter.map((postalCode: string) => {
-                // Try Belgium first, then Netherlands
-                const cityName =
-                  getSubMunicipalityName(postalCode, 'belgium') ||
-                  getSubMunicipalityName(postalCode, 'netherlands');
-
-                return cityName ? `${cityName} (${postalCode})` : postalCode;
-              })}
+              value={locationFilter.map((value: string) => resolveLocationLabel(value))}
               onPress={() => router.navigate('/(tabs)/(explore)/location-filter')}
               placeholderText={t('filters.allLocations')}
             />

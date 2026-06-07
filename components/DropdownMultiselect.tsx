@@ -45,6 +45,22 @@ export interface DropdownMultiselectProps {
   /** Custom search query function for filtering */
   searchQuery?: (keyword: string, labelText: string) => boolean;
 
+  /**
+   * Item field matched against the search keyword (default: labelField). Set to
+   * a combined search field (e.g. name + member codes) so a query can match
+   * content not shown in the visible label.
+   */
+  searchField?: string;
+
+  /** Item field rendered as a muted secondary line under the label. */
+  sublabelField?: string;
+
+  /**
+   * Returns a section-header key for grouping (overrides alphabetical grouping).
+   * Items must be pre-sorted by the caller so equal keys are contiguous.
+   */
+  sectionKeyExtractor?: (item: DropdownItem) => string;
+
   /** Callback when search text changes */
   onChangeSearchText?: (search: string) => void;
 
@@ -233,6 +249,9 @@ export function DropdownMultiselect({
   searchable = true,
   searchPlaceholder = 'Search...',
   searchQuery,
+  searchField,
+  sublabelField,
+  sectionKeyExtractor,
   onChangeSearchText,
   disabled = false,
   mode = 'default',
@@ -283,8 +302,12 @@ export function DropdownMultiselect({
   // Ref (rather than state) so updates during render don't trigger re-renders.
   const lastRenderedHeaderRef = React.useRef<string | null>(null);
 
+  // Custom section grouping assumes caller-sorted items; alphabetical grouping
+  // sorts by label here.
+  const groupingEnabled = enableAlphabeticalGrouping || !!sectionKeyExtractor;
+
   const processedItems = React.useMemo(() => {
-    if (!enableAlphabeticalGrouping) {
+    if (sectionKeyExtractor || !enableAlphabeticalGrouping) {
       return items;
     }
 
@@ -293,7 +316,7 @@ export function DropdownMultiselect({
       const labelB = String(b[labelField] || '').toLowerCase();
       return labelA.localeCompare(labelB);
     });
-  }, [items, enableAlphabeticalGrouping, labelField]);
+  }, [items, enableAlphabeticalGrouping, labelField, sectionKeyExtractor]);
 
   useEffect(() => {
     if (externalValue !== undefined) {
@@ -416,18 +439,19 @@ export function DropdownMultiselect({
   const renderItemDefault = (item: DropdownItem, selected?: boolean): React.ReactElement => {
     let sectionHeader: React.ReactElement | null = null;
 
-    if (enableAlphabeticalGrouping) {
-      const currentLetter = getItemLetter(item);
+    if (groupingEnabled) {
+      const currentKey = sectionKeyExtractor ? sectionKeyExtractor(item) : getItemLetter(item);
 
-      if (currentLetter !== lastRenderedHeaderRef.current) {
-        lastRenderedHeaderRef.current = currentLetter;
+      if (currentKey !== lastRenderedHeaderRef.current) {
+        lastRenderedHeaderRef.current = currentKey;
         sectionHeader = renderSectionHeader
-          ? renderSectionHeader(currentLetter)
-          : renderDefaultSectionHeader(currentLetter);
+          ? renderSectionHeader(currentKey)
+          : renderDefaultSectionHeader(currentKey);
       }
     }
 
     const label = item[labelField];
+    const sublabel = sublabelField ? item[sublabelField] : undefined;
 
     return (
       <>
@@ -439,6 +463,11 @@ export function DropdownMultiselect({
           ]}
         >
           {highlightText(label, searchText, selected)}
+          {sublabel ? (
+            <ThemedText style={[styles.sublabelText, { color: themeColors.secondaryText }]}>
+              {sublabel}
+            </ThemedText>
+          ) : null}
         </ThemedView>
       </>
     );
@@ -463,6 +492,7 @@ export function DropdownMultiselect({
         data={processedItems}
         labelField={labelField}
         valueField={valueField}
+        searchField={searchField as never}
         value={internalValue}
         onChange={handleChange}
         placeholder={placeholder}
@@ -496,13 +526,14 @@ export function DropdownMultiselect({
 
             initialNumToRender: 10,
 
-            getItemLayout: enableAlphabeticalGrouping
-              ? undefined // Can't use with section headers as heights vary
-              : (_data: any, index: number) => ({
-                  length: 44, // minHeight from styles.dropdownItem
-                  offset: 44 * index,
-                  index,
-                }),
+            getItemLayout:
+              groupingEnabled || sublabelField
+                ? undefined // Heights vary with section headers / sublabels
+                : (_data: any, index: number) => ({
+                    length: 44, // minHeight from styles.dropdownItem
+                    offset: 44 * index,
+                    index,
+                  }),
           }),
         }}
         onFocus={handleFocus}
@@ -664,6 +695,11 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: Typography.sizes.sm,
     fontFamily: Typography.families.regular,
+  },
+  sublabelText: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    marginTop: 2,
   },
   badge: {
     position: 'absolute',

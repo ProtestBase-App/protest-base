@@ -326,6 +326,10 @@ describe('usePostalCodeOptions hook', () => {
       getPostalCodeData: mockGetPostalCodeData,
       getSubMunicipalityName: jest.fn().mockReturnValue(''),
       loading: false,
+      locationFilterOptions: [],
+      expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
+      resolveLocationLabel: jest.fn((value: string) => value),
+      isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
     });
   });
 
@@ -615,6 +619,10 @@ describe('usePostalCodeOptions hook', () => {
         getPostalCodeData: mockGetPostalCodeData,
         getSubMunicipalityName: jest.fn().mockReturnValue(''),
         loading: false,
+        locationFilterOptions: [],
+        expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
+        resolveLocationLabel: jest.fn((value: string) => value),
+        isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
       });
 
       const { result, rerender } = renderHook(() => usePostalCodeOptions(['belgium']));
@@ -630,6 +638,10 @@ describe('usePostalCodeOptions hook', () => {
         getPostalCodeData: mockGetPostalCodeData,
         getSubMunicipalityName: jest.fn().mockReturnValue(''),
         loading: false,
+        locationFilterOptions: [],
+        expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
+        resolveLocationLabel: jest.fn((value: string) => value),
+        isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
       });
 
       act(() => {

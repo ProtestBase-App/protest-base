@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { StyleSheet, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,7 +41,11 @@ export default function ExploreTab() {
   const logo = useLogoScheme();
   const { userLanguage, eventsCache } = useGlobalContext();
   const { saveEvent, unsaveEvent, isSaved, savedEventIds } = useSavedEvents();
-  const { getSubMunicipalityName, loading: postalCodesLoading } = usePostalCodes();
+  const {
+    getSubMunicipalityName,
+    loading: postalCodesLoading,
+    expandLocationTokens,
+  } = usePostalCodes();
   const {
     valueCategoryOpeningModal,
     valueDateOpeningModal,
@@ -65,6 +69,14 @@ export default function ExploreTab() {
   const themeColors = getThemeColors(colorScheme);
   const flatListRef = useRef<FlatList>(null);
 
+  // Hierarchy tokens (e.g. r:be:brussels) are expanded to their member postal
+  // codes here; the backend receives the comma-joined code list. Raw codes pass
+  // through unchanged.
+  const expandedPostalCodes = useMemo(
+    () => expandLocationTokens(globalLocationFilterValue).codes,
+    [expandLocationTokens, globalLocationFilterValue]
+  );
+
   const {
     events: displayedEvents,
     loading,
@@ -78,7 +90,7 @@ export default function ExploreTab() {
     pageSize: 20,
     filters: {
       dateFilter: valueDateOpeningModal === 'allDates' ? null : valueDateOpeningModal,
-      postalCodes: globalLocationFilterValue,
+      postalCodes: expandedPostalCodes,
       organizers: globalOrganizationFilterValue,
       category: valueCategoryOpeningModal === 'allCategories' ? null : valueCategoryOpeningModal,
       search: searchQuery,
