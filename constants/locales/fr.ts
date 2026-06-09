@@ -503,6 +503,14 @@ const fr: LocaleData = {
     postalCodePlaceholder: 'Code postal',
     searchPostalCode: 'Rechercher par code postal ou commune...',
     streetAddressPlaceholder: 'Nom et numéro de rue',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Rechercher une adresse…',
+    addressSearching: 'Recherche…',
+    addressNoResults: 'Aucune adresse correspondante',
+    addressError: 'Échec de la recherche d’adresses. Veuillez réessayer.',
+    addressUnavailable:
+      'La recherche d’adresses est indisponible pour le moment. Vous pouvez quand même enregistrer.',
+    clearStreetAddressAccessibilityLabel: 'Effacer l’adresse',
     organizerNamePlaceholder: 'Nom de votre organisation',
     contactEmailPlaceholder: 'contact@exemple.com',
     helpDescriptionPlaceholder: "Décrivez les bénévoles ou l'aide dont vous avez besoin...",

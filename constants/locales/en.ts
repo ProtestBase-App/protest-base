@@ -503,6 +503,13 @@ const en: LocaleData = {
     postalCodePlaceholder: 'Postal code',
     searchPostalCode: 'Search by postal code or municipality...',
     streetAddressPlaceholder: 'Street name and number',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Search for an address…',
+    addressSearching: 'Searching…',
+    addressNoResults: 'No matching addresses found',
+    addressError: 'Could not search addresses. Please try again.',
+    addressUnavailable: 'Address search is unavailable right now. You can still save.',
+    clearStreetAddressAccessibilityLabel: 'Clear street address',
     organizerNamePlaceholder: 'Your organization name',
     contactEmailPlaceholder: 'contact@example.com',
     helpDescriptionPlaceholder: 'Describe what volunteers or help you need...',

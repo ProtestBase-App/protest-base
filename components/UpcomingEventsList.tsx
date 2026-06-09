@@ -53,7 +53,7 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
     // Get city name from postal code using context
     const cityLabel =
       item.postal_code && item.country
-        ? getSubMunicipalityName(String(item.postal_code), item.country)
+        ? getSubMunicipalityName(String(item.postal_code), item.country, item.city)
         : '';
 
     return (

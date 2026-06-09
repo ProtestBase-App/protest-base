@@ -207,7 +207,8 @@ export default function HomeTab() {
 
       const cityLabel =
         event.postal_code && event.country
-          ? getSubMunicipalityName(String(event.postal_code), event.country) || undefined
+          ? getSubMunicipalityName(String(event.postal_code), event.country, event.city) ||
+            undefined
           : undefined;
 
       await shareEventWithAlert(event, userLanguage, cityLabel);

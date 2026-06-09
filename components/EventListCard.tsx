@@ -25,7 +25,7 @@ const EventListCardComponent: React.FC<EventListCardProps> = ({ item, onShare })
 
   const cityLabel =
     item.postal_code && item.country
-      ? getSubMunicipalityName(String(item.postal_code), item.country)
+      ? getSubMunicipalityName(String(item.postal_code), item.country, item.city)
       : '';
 
   return (

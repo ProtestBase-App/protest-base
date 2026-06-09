@@ -160,6 +160,51 @@ describe('PostalCodeProvider', () => {
     });
   });
 
+  describe('getSubMunicipalityName - fallbackCity', () => {
+    it('returns the fallback city for an invalid country', async () => {
+      const { result } = renderHook(() => usePostalCodes(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.getSubMunicipalityName('1000', 'france', 'Paris')).toBe('Paris');
+    });
+
+    it('returns the fallback city for an unknown postal code not in the bundled set', async () => {
+      const { result } = renderHook(() => usePostalCodes(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // 99999 doesn't exist in the dataset — e.g. an NL/edge OSM code from a suggestion.
+      expect(result.current.getSubMunicipalityName('99999', 'belgium', 'Mystery Town')).toBe(
+        'Mystery Town'
+      );
+    });
+
+    it('trims the fallback city', async () => {
+      const { result } = renderHook(() => usePostalCodes(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.getSubMunicipalityName('99999', 'belgium', '  Spaced  ')).toBe(
+        'Spaced'
+      );
+    });
+
+    it('still returns empty string when not found and no fallback is given', async () => {
+      const { result } = renderHook(() => usePostalCodes(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.getSubMunicipalityName('99999', 'belgium')).toBe('');
+    });
+
+    it('prefers the bundled municipality name over the fallback when the code is known', async () => {
+      const { result } = renderHook(() => usePostalCodes(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // 1000 is a real Belgian code; the dataset name must win over the fallback.
+      const name = result.current.getSubMunicipalityName('1000', 'belgium', 'WRONG_FALLBACK');
+      expect(name).not.toBe('WRONG_FALLBACK');
+      expect(name.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('getPostalCodeData - invalid input guards', () => {
     it('should return empty array for invalid country', async () => {
       const { result } = renderHook(() => usePostalCodes(), { wrapper });

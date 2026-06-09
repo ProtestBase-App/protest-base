@@ -140,7 +140,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
   const cityLabel =
     event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country)
+      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
       : '';
 
   const fullAddress = [event.street_address, event.postal_code, cityLabel, countryLabel]

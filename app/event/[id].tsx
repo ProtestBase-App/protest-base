@@ -240,7 +240,7 @@ export default function EventDetails() {
     if (!event?.geocod_lat || !event?.geocod_lng) return;
     const cityLabel =
       event.postal_code && event.country
-        ? getSubMunicipalityName(String(event.postal_code), event.country)
+        ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
         : '';
     const address = [event.street_address, event.postal_code, cityLabel || event.city]
       .filter(Boolean)

@@ -151,7 +151,7 @@ describe('getThemeColors', () => {
       const propertyCount = Object.keys(colors).length;
 
       // Dynamically validate against actual source — count should stay in sync
-      expect(propertyCount).toBe(33);
+      expect(propertyCount).toBe(34);
     });
 
     it('should have all properties as strings', () => {

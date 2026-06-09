@@ -19,12 +19,14 @@ import FormDateField from '@/components/FormDateField';
 import FormLongText from '@/components/FormLongText';
 import { DropdownCustom } from '@/components/DropdownCustom';
 import { DropdownMultiselect } from '@/components/DropdownMultiselect';
+import AddressAutocompleteField from '@/components/AddressAutocompleteField';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { RemovableChip } from '@/components/RemovableChip';
 import { eventCategories } from '@/constants/EventCategories';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
 import type { EventFormProps } from '@/types/eventForm.types';
+import type { AddressSuggestion, AddressCountryCode, AddressLang } from '@/types/address.types';
 import { SectionHeader, HelperText } from '@/utils/formHelpers';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
@@ -72,15 +74,30 @@ const EventForm: React.FC<EventFormProps> = ({
 
   React.useEffect(() => {
     const loadPostalCodes = async () => {
-      // Only clear postal code when the user explicitly changes country —
-      // not on initial mount or draft restore.
+      // Only clear the location fields when the user explicitly changes country —
+      // not on initial mount or async hydration. The truthy check on
+      // previousCountry is load-bearing: on an edit/draft screen the form first
+      // mounts with country='' and the real country arrives in a *later* setForm
+      // (unbatched), re-running this effect. A `!== null` guard would treat that
+      // ''→'belgium' transition as a user change and wipe the just-loaded address;
+      // requiring a truthy previousCountry (a real prior country code) skips it
+      // while still firing on genuine 'belgium'→'netherlands' switches. The
+      // accepted street + its synced city/region belong to the previous country,
+      // so they're cleared alongside the postal code; the autocomplete field
+      // re-syncs to the now-empty value via its reset effect.
       if (
         !isInitialMount.current &&
-        previousCountry.current !== null &&
+        previousCountry.current &&
         previousCountry.current !== form.country &&
-        form.postal_code
+        (form.postal_code || form.street_address || form.city || form.region)
       ) {
-        setForm((prev) => ({ ...prev, postal_code: null }));
+        setForm((prev) => ({
+          ...prev,
+          postal_code: null,
+          street_address: '',
+          city: '',
+          region: '',
+        }));
         setPostalCodeSearch('');
       }
       previousCountry.current = form.country;
@@ -173,16 +190,18 @@ const EventForm: React.FC<EventFormProps> = ({
       if (selectedItem) {
         return [selectedItem];
       }
-      // Postal codes data hasn't loaded yet — return a placeholder so the
-      // dropdown can display the saved value while loading.
-      if (listPostalCodes.length === 0) {
-        return [{ label: String(form.postal_code), value: String(form.postal_code) }];
-      }
-      return [];
+      // The code isn't in the bundled dataset — either it's still loading, or it
+      // came from an address suggestion for an NL/edge postcode the static set
+      // lacks. Synthesize a display item from the stored city so the dropdown
+      // reflects the accepted selection instead of showing the placeholder.
+      const synthLabel = form.city
+        ? `${form.city} (${form.postal_code})`
+        : String(form.postal_code);
+      return [{ label: synthLabel, value: String(form.postal_code) }];
     }
 
     return [];
-  }, [postalCodeSearch, listPostalCodes, form.postal_code]);
+  }, [postalCodeSearch, listPostalCodes, form.postal_code, form.city]);
 
   const getFormProgress = useMemo(() => {
     // Templates don't require start_time; only title is "recommended" for templates.
@@ -199,6 +218,49 @@ const EventForm: React.FC<EventFormProps> = ({
     () => new Map(organizations.map((o) => [o.value, o.label])),
     [organizations]
   );
+
+  // Map the form's country value to the address endpoint's lowercase ISO code.
+  // null when no (or an unsupported) country is selected — gates the autocomplete.
+  const addressCountryCode: AddressCountryCode | null =
+    form.country === 'belgium' ? 'be' : form.country === 'netherlands' ? 'nl' : null;
+
+  // userLanguage is en/fr/nl in this app; pass it through only when it's a value
+  // the endpoint accepts (it 400s on unknown langs).
+  const addressLang: AddressLang | undefined =
+    userLang === 'en' || userLang === 'fr' || userLang === 'nl' ? userLang : undefined;
+
+  // Commit a chosen suggestion. postal_code is the field that drives the
+  // *displayed* city on mobile (via getSubMunicipalityName), so it must stay
+  // consistent with the city/region we store:
+  //  - Suggestion carries a postal → take postal+city+region together from it
+  //    (NL "1234 AB" → 1234; the numeric part still resolves the municipality).
+  //  - Sparse POI with no postal → keep the prior postal/city/region as a
+  //    consistent set and change only the street, rather than clearing city while
+  //    leaving a now-mismatched stale postal behind.
+  const handleAddressSelect = useCallback(
+    (s: AddressSuggestion) => {
+      setForm((f) => {
+        if (!s.postal_code) {
+          return { ...f, street_address: s.street_address };
+        }
+        const parsed = parseInt(s.postal_code, 10);
+        return {
+          ...f,
+          street_address: s.street_address,
+          city: s.city ?? '',
+          region: s.region ?? '',
+          postal_code: Number.isNaN(parsed) ? f.postal_code : parsed,
+        };
+      });
+      // Reset the postal dropdown's search so it shows the synced selection.
+      setPostalCodeSearch('');
+    },
+    [setForm]
+  );
+
+  const handleAddressClear = useCallback(() => {
+    setForm((f) => ({ ...f, street_address: '' }));
+  }, [setForm]);
 
   const handleRemoveCoOrganizer = useCallback(
     (valueToRemove: string) => {
@@ -543,7 +605,16 @@ const EventForm: React.FC<EventFormProps> = ({
             {form.postal_code && !postalCodesLoading && (
               <TouchableOpacity
                 onPress={() => {
-                  setForm({ ...form, postal_code: null });
+                  // Street is gated behind the postal code, so clearing the
+                  // postal also clears the street + derived city/region —
+                  // otherwise a now-hidden street_address would still save.
+                  setForm({
+                    ...form,
+                    postal_code: null,
+                    street_address: '',
+                    city: '',
+                    region: '',
+                  });
                   setPostalCodeSearch('');
                 }}
                 style={styles.clearButton}
@@ -555,15 +626,29 @@ const EventForm: React.FC<EventFormProps> = ({
             )}
           </ThemedView>
 
-          <FormField
-            testID="input-event-street-address"
-            title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
-            value={form.street_address}
-            placeholder={t('createEvent.streetAddressPlaceholder')}
-            handleChangeText={(value) => setForm({ ...form, street_address: value })}
-            otherStyles={styles.fieldSpacingNested}
-            maxLength={75}
-          />
+          {/* Stepwise reveal: the street field appears only after a postal code
+              is picked (country → postal → street). The `|| street_address`
+              guard keeps an already-saved street visible when editing a legacy
+              event that has no postal code, so existing data is never hidden. */}
+          {(form.postal_code || form.street_address) && (
+            <AddressAutocompleteField
+              testID="input-event-street-address"
+              title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
+              value={form.street_address}
+              countryCode={addressCountryCode}
+              lang={addressLang}
+              postalCode={form.postal_code ? String(form.postal_code) : undefined}
+              onSelect={handleAddressSelect}
+              onClear={handleAddressClear}
+              placeholder={t('createEvent.addressSearchPlaceholder')}
+              searchingText={t('createEvent.addressSearching')}
+              noResultsText={t('createEvent.addressNoResults')}
+              errorText={t('createEvent.addressError')}
+              unavailableText={t('createEvent.addressUnavailable')}
+              clearAccessibilityLabel={t('createEvent.clearStreetAddressAccessibilityLabel')}
+              otherStyles={styles.fieldSpacingNested}
+            />
+          )}
           <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
         </ThemedView>
       )}

@@ -205,7 +205,7 @@ export default function OrganizerProfile() {
   const formatEventLocation = (ev: FormattedEvent): string => {
     const city =
       ev.postal_code && ev.country
-        ? getSubMunicipalityName(String(ev.postal_code), ev.country)
+        ? getSubMunicipalityName(String(ev.postal_code), ev.country, ev.city)
         : ev.city;
     return ev.street_address || city || '';
   };

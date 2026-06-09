@@ -26,7 +26,17 @@ const isValidCountry = (country: string): country is Country => {
 };
 
 interface PostalCodeContextType {
-  getSubMunicipalityName: (postalCode: string, country: string) => string;
+  /**
+   * Resolve a postal code to its localized municipality name from the bundled
+   * dataset. `fallbackCity` (e.g. the event's stored `city`) is returned when the
+   * code isn't in the static set — common for NL and edge OSM postcodes sourced
+   * from address autocomplete — so the location still displays instead of blank.
+   */
+  getSubMunicipalityName: (
+    postalCode: string,
+    country: string,
+    fallbackCity?: string | null
+  ) => string;
   loading: boolean;
   loadPostalCodesForCountry: (country: string) => Promise<void>;
   /** Bumped when the cache updates so consumers can re-render. */
@@ -138,27 +148,29 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
   }, [loadPostalCodesForCountry]);
 
   const getSubMunicipalityName = useCallback(
-    (postalCode: string, country: string): string => {
+    (postalCode: string, country: string, fallbackCity?: string | null): string => {
+      const fallback = (fallbackCity ?? '').trim();
+
       if (!isValidCountry(country)) {
-        return '';
+        return fallback;
       }
 
       const codes = postalCodesCache[country];
-      if (!codes || !postalCode) return '';
+      if (!codes || !postalCode) return fallback;
 
       // Postal codes are stored as numbers in the data set.
       const postalCodeNum = parseInt(postalCode, 10);
-      if (isNaN(postalCodeNum)) return '';
+      if (isNaN(postalCodeNum)) return fallback;
 
       const postalCodeData = codes.find((pc: any) => pc.post_code === postalCodeNum);
-      if (!postalCodeData) return '';
+      if (!postalCodeData) return fallback;
 
       // Pick the locale-specific 'sub_municipality_name_*' field at runtime.
       const subMunicipalityKey = Object.keys(postalCodeData).find((key) =>
         key.startsWith('sub_municipality_name')
       );
 
-      return subMunicipalityKey ? postalCodeData[subMunicipalityKey] : '';
+      return subMunicipalityKey ? postalCodeData[subMunicipalityKey] : fallback;
     },
     [postalCodesCache]
   );

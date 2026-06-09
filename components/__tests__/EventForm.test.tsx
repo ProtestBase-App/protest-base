@@ -200,12 +200,27 @@ jest.mock('@/constants/PostalCodes_BE_FR', () => ({
   ],
 }));
 
+// Mock the address autocomplete service so the street field never hits the network.
+jest.mock('@/services/address.service', () => ({
+  searchAddress: jest.fn(),
+  AddressSearchError: class AddressSearchError extends Error {
+    kind: string;
+    constructor(kind: string, message: string) {
+      super(message);
+      this.kind = kind;
+    }
+  },
+}));
+
 import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import EventForm from '@/components/EventForm';
 import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
+import { searchAddress } from '@/services/address.service';
+
+const mockSearchAddress = searchAddress as jest.Mock;
 
 const mockForm: FormState = {
   organization_id: 'org-a',
@@ -619,12 +634,23 @@ describe('EventForm — country and postal code loading', () => {
   });
 });
 
-describe('EventForm — street address', () => {
+describe('EventForm — street address autocomplete', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('calls setForm when street address changes', async () => {
+  const SUGGESTION = {
+    street_address: 'Rue de la Loi 16',
+    postal_code: '1000',
+    city: 'Brussels',
+    region: 'Brussels-Capital',
+    country: 'belgium',
+    lat: 50.8467,
+    lng: 4.3625,
+    label: 'Rue de la Loi 16, 1000, Brussels',
+  };
+
+  it('seeds the field with the existing street address and does not auto-search', async () => {
     const setForm = jest.fn();
-    const formWithCountry = { ...mockForm, country: 'belgium', street_address: '123 Main St' };
+    const formWithCountry = { ...mockForm, country: 'belgium', street_address: 'Legacy Street 7' };
     render(
       <EventForm
         form={formWithCountry}
@@ -636,11 +662,313 @@ describe('EventForm — street address', () => {
     await act(async () => {
       await flushPromises();
     });
-    const streetInput = screen.getByDisplayValue('123 Main St');
-    fireEvent.changeText(streetInput, '456 Oak Ave');
-    expect(setForm).toHaveBeenCalledWith(
-      expect.objectContaining({ street_address: '456 Oak Ave' })
+    // Pre-accepted: the value shows without forcing a re-search.
+    expect(screen.getByDisplayValue('Legacy Street 7')).toBeTruthy();
+    expect(mockSearchAddress).not.toHaveBeenCalled();
+  });
+
+  it('does NOT commit free-typed text to street_address (suggestions only)', async () => {
+    const setForm = jest.fn();
+    // postal_code is set because the street field is gated behind it.
+    const formWithCountry = {
+      ...mockForm,
+      country: 'belgium',
+      street_address: '',
+      postal_code: 1000,
+    };
+    mockSearchAddress.mockResolvedValue([]);
+    render(
+      <EventForm
+        form={formWithCountry}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
     );
+    await act(async () => {
+      await flushPromises();
+    });
+    const streetInput = screen.getByTestId('input-event-street-address');
+    await act(async () => {
+      fireEvent.changeText(streetInput, '456 Oak Ave');
+    });
+    // No setForm call (object or functional updater) may set the typed text.
+    const committedTypedText = setForm.mock.calls.some((call) => {
+      const arg = call[0];
+      const next = typeof arg === 'function' ? arg(formWithCountry) : arg;
+      return next?.street_address === '456 Oak Ave';
+    });
+    expect(committedTypedText).toBe(false);
+  });
+
+  it('commits the canonical street and syncs city/region/postal when a suggestion is picked', async () => {
+    const setForm = jest.fn();
+    // postal_code is set because the street field is gated behind it.
+    const formWithCountry = {
+      ...mockForm,
+      country: 'belgium',
+      street_address: '',
+      postal_code: 1000,
+    };
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+    render(
+      <EventForm
+        form={formWithCountry}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    const streetInput = screen.getByTestId('input-event-street-address');
+    fireEvent.changeText(streetInput, 'rue de la loi');
+
+    const row = await screen.findByTestId('address-suggestion-0');
+    await act(async () => {
+      fireEvent.press(row);
+    });
+
+    // setForm is called with a functional updater; apply it to assert the result.
+    const updater = setForm.mock.calls
+      .map((c) => c[0])
+      .reverse()
+      .find((arg) => typeof arg === 'function');
+    expect(updater).toBeDefined();
+    const next = updater(formWithCountry);
+    expect(next).toEqual(
+      expect.objectContaining({
+        street_address: 'Rue de la Loi 16',
+        city: 'Brussels',
+        region: 'Brussels-Capital',
+        postal_code: 1000,
+      })
+    );
+  });
+
+  it('keeps the prior location set and only changes the street for a postal-less POI', async () => {
+    const setForm = jest.fn();
+    const formWithLocation = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: 1000,
+      city: 'Brussels',
+      region: 'Brussels-Capital',
+      street_address: '',
+    };
+    const POI = {
+      street_address: 'Grote Markt',
+      postal_code: null,
+      city: null,
+      region: null,
+      country: 'belgium',
+      lat: 50.8467,
+      lng: 4.3625,
+      label: 'Grote Markt',
+    };
+    mockSearchAddress.mockResolvedValue([POI]);
+    render(
+      <EventForm
+        form={formWithLocation}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'grote markt');
+    const row = await screen.findByTestId('address-suggestion-0');
+    await act(async () => {
+      fireEvent.press(row);
+    });
+
+    const updater = setForm.mock.calls
+      .map((c) => c[0])
+      .reverse()
+      .find((arg) => typeof arg === 'function');
+    const next = updater(formWithLocation);
+    // Street updates; the prior postal/city/region stay intact (no stale-postal /
+    // cleared-city mismatch) since the POI carries no postal of its own.
+    expect(next).toEqual(
+      expect.objectContaining({
+        street_address: 'Grote Markt',
+        postal_code: 1000,
+        city: 'Brussels',
+        region: 'Brussels-Capital',
+      })
+    );
+  });
+
+  it('forwards the selected postal code from form state to the address search', async () => {
+    const setForm = jest.fn();
+    const formWithPostal = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: 1000,
+      street_address: '',
+    };
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+    render(
+      <EventForm
+        form={formWithPostal}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'avenue des casernes');
+    await screen.findByTestId('address-suggestion-0');
+
+    // The numeric form.postal_code reaches the endpoint as a string hint (4th arg).
+    expect(mockSearchAddress).toHaveBeenCalledWith(
+      'avenue des casernes',
+      'be',
+      'en',
+      '1000',
+      expect.anything()
+    );
+  });
+
+  it('hides the street field until a postal code is selected', async () => {
+    const setForm = jest.fn();
+    const formNoPostal = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: null,
+      street_address: '',
+    };
+    const { rerender } = render(
+      <EventForm
+        form={formNoPostal}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    // Country chosen but no postal yet → street field is not rendered.
+    expect(screen.queryByTestId('input-event-street-address')).toBeNull();
+
+    // Selecting a postal code reveals the street field.
+    await act(async () => {
+      rerender(
+        <EventForm
+          form={{ ...formNoPostal, postal_code: 1000 }}
+          setForm={setForm}
+          emptyFields={mockEmptyFields}
+          userLanguage="en"
+        />
+      );
+      await flushPromises();
+    });
+    expect(screen.getByTestId('input-event-street-address')).toBeTruthy();
+  });
+
+  it('keeps an existing street visible for a legacy event with no postal code', async () => {
+    const setForm = jest.fn();
+    const legacyForm = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: null,
+      street_address: 'Old Street 9',
+    };
+    render(
+      <EventForm
+        form={legacyForm}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    // The `|| street_address` guard shows a saved street even without a postal
+    // code, so editing legacy data never hides the existing address.
+    expect(screen.getByDisplayValue('Old Street 9')).toBeTruthy();
+  });
+});
+
+describe('EventForm — country-change location clearing', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  // Helper: did any setForm call (object or functional updater) clear the address?
+  const didClearAddress = (setForm: jest.Mock, base: FormState) =>
+    setForm.mock.calls.some((call) => {
+      const arg = call[0];
+      const next = typeof arg === 'function' ? arg(base) : arg;
+      return next?.street_address === '' && next?.postal_code === null;
+    });
+
+  it('does NOT wipe an address that arrives via async hydration (country ""→real)', async () => {
+    // Reproduces the edit/draft load: the form first renders with country='' and
+    // the real country + address arrive in a later setForm (unbatched re-render).
+    const setForm = jest.fn();
+    const emptyForm = { ...mockForm, country: '', street_address: '', postal_code: null };
+    const { rerender } = render(
+      <EventForm
+        form={emptyForm}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+
+    const loadedForm = {
+      ...mockForm,
+      country: 'belgium',
+      street_address: 'Loaded Street 5',
+      city: 'Brussels',
+      postal_code: 1000,
+    };
+    await act(async () => {
+      rerender(
+        <EventForm
+          form={loadedForm}
+          setForm={setForm}
+          emptyFields={mockEmptyFields}
+          userLanguage="en"
+        />
+      );
+      await flushPromises();
+    });
+
+    expect(didClearAddress(setForm, loadedForm)).toBe(false);
+  });
+
+  it('DOES clear the address on a genuine country change', async () => {
+    const setForm = jest.fn();
+    const beForm = {
+      ...mockForm,
+      country: 'belgium',
+      street_address: 'Rue X 1',
+      city: 'Brussels',
+      region: 'BC',
+      postal_code: 1000,
+    };
+    const { rerender } = render(
+      <EventForm form={beForm} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+
+    const nlForm = { ...beForm, country: 'netherlands' };
+    await act(async () => {
+      rerender(
+        <EventForm
+          form={nlForm}
+          setForm={setForm}
+          emptyFields={mockEmptyFields}
+          userLanguage="en"
+        />
+      );
+      await flushPromises();
+    });
+
+    expect(didClearAddress(setForm, nlForm)).toBe(true);
   });
 });
 
@@ -1246,12 +1574,19 @@ describe('EventForm — filteredPostalCodes branches', () => {
     expect(screen.toJSON()).toBeTruthy();
   });
 
-  it('returns empty filtered list when postal code not found in loaded data', async () => {
-    // postal_code 9999 does not exist in the mock data
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 9999 };
+  it('synthesizes a postal dropdown item from the stored city when the code is not in the bundled set', async () => {
+    // postal_code 9999 does not exist in the mock data (e.g. an NL/edge OSM code
+    // arriving from an address suggestion). The dropdown must still reflect the
+    // selection, labelled with the stored city, instead of falling back to blank.
+    const formWithUncoveredCode = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: 9999,
+      city: 'Mystery Town',
+    };
     render(
       <EventForm
-        form={formWithPostalCode}
+        form={formWithUncoveredCode}
         setForm={jest.fn()}
         emptyFields={mockEmptyFields}
         userLanguage="en"
@@ -1260,8 +1595,23 @@ describe('EventForm — filteredPostalCodes branches', () => {
     await act(async () => {
       await flushPromises();
     });
-    // The postal code should still render as placeholder
-    expect(screen.toJSON()).toBeTruthy();
+    expect(screen.getAllByText('Mystery Town (9999)').length).toBeGreaterThan(0);
+  });
+
+  it('synthesizes a code-only dropdown item when no city is stored', async () => {
+    const formWithUncoveredCode = { ...mockForm, country: 'belgium', postal_code: 9999, city: '' };
+    render(
+      <EventForm
+        form={formWithUncoveredCode}
+        setForm={jest.fn()}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(screen.getAllByText('9999').length).toBeGreaterThan(0);
   });
 });
 

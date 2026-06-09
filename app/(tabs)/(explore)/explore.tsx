@@ -183,7 +183,7 @@ export default function ExploreTab() {
 
       const cityLabel =
         event.postal_code && event.country
-          ? getSubMunicipalityNameRef.current(String(event.postal_code), event.country)
+          ? getSubMunicipalityNameRef.current(String(event.postal_code), event.country, event.city)
           : undefined;
 
       await shareEventWithAlert(event, userLanguageRef.current, cityLabel);
@@ -216,7 +216,7 @@ export default function ExploreTab() {
 
       const cityLabel =
         item.postal_code && item.country
-          ? getSubMunicipalityNameRef.current(String(item.postal_code), item.country)
+          ? getSubMunicipalityNameRef.current(String(item.postal_code), item.country, item.city)
           : '';
 
       return (

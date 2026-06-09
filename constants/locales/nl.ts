@@ -561,6 +561,13 @@ const nl = {
     postalCodePlaceholder: 'Postcode',
     searchPostalCode: 'Zoek op postcode of gemeente...',
     streetAddressPlaceholder: 'Straat en huisnummer',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Zoek een adres…',
+    addressSearching: 'Zoeken…',
+    addressNoResults: 'Geen overeenkomende adressen gevonden',
+    addressError: 'Adressen zoeken mislukt. Probeer opnieuw.',
+    addressUnavailable: 'Adres zoeken is momenteel niet beschikbaar. Je kunt nog steeds opslaan.',
+    clearStreetAddressAccessibilityLabel: 'Adres wissen',
     cityPlaceholder: 'Stad',
     eventLinkPlaceholder: 'https://www.voorbeeld.com',
     selectCoOrganizers: 'Selecteer mede-organiserende groepen',

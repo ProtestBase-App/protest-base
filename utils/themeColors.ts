@@ -47,6 +47,7 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
     border: c.border,
     inputBorder: c.inputBorder,
+    inputBorderFocused: c.inputBorderFocused,
     separator: c.separator,
     cardBorder: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
 

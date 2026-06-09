@@ -48,7 +48,7 @@ const MyEventsList: React.FC<EventListProps> = ({
     // cacheVersion triggers re-renders when postal codes load
     const cityLabel =
       item.postal_code && item.country
-        ? getSubMunicipalityName(String(item.postal_code), item.country)
+        ? getSubMunicipalityName(String(item.postal_code), item.country, item.city)
         : '';
 
     return (
