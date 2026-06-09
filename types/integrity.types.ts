@@ -76,9 +76,10 @@ export interface IosAttestRequest extends AttestRequestBase {
 /**
  * Android Hardware Key Attestation first-run payload.
  *
- * `keyId` is the lowercase hex SHA-256 of the leaf certificate's
- * SubjectPublicKeyInfo DER (what the backend stores as the public-key
- * identifier). `certChain` is leaf-first, base64-DER, ≤10 entries, ≤4 KiB each.
+ * `keyId` is base64url(SHA-256(...)) — URL-safe, no padding — of the leaf
+ * certificate's SubjectPublicKeyInfo DER (what the backend stores as the
+ * public-key identifier, and can recompute from the leaf cert to confirm).
+ * `certChain` is leaf-first, base64-DER, ≤10 entries, ≤4 KiB each.
  */
 export interface AndroidAttestationRequest extends AttestRequestBase {
   platform: 'android';

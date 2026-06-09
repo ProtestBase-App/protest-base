@@ -76,11 +76,13 @@ class HkaModule : Module() {
         Base64.encodeToString(cert.encoded, Base64.NO_WRAP)
       }
 
-      // keyId = lowercase hex SHA-256 of the leaf cert's SubjectPublicKeyInfo
-      // DER. `publicKey.encoded` on a Java/Android cert is already X.509 SPKI
-      // DER per spec, so no extra encoding step needed.
+      // keyId = base64url(SHA-256(leaf SPKI)) — URL-safe alphabet, no padding —
+      // matching the backend integration spec so the server can recompute the
+      // same value from the leaf cert and confirm it. `publicKey.encoded` on a
+      // Java/Android cert is already X.509 SubjectPublicKeyInfo DER, so we hash
+      // exactly the SPKI bytes (not the whole cert).
       val spkiBytes = chain[0].publicKey.encoded
-      val keyId = sha256Hex(spkiBytes)
+      val keyId = sha256Base64Url(spkiBytes)
 
       mapOf("keyId" to keyId, "certChain" to certChain)
     }
@@ -123,15 +125,17 @@ class HkaModule : Module() {
     if (!isApiSupported()) throw HkaUnsupportedDeviceException()
   }
 
-  private fun sha256Hex(bytes: ByteArray): String {
+  /**
+   * base64url(SHA-256(bytes)) — URL-safe alphabet (`-`/`_`), no `=` padding,
+   * no line wrapping. Matches the backend's keyId derivation so the
+   * server-side recomputation of the leaf SPKI hash agrees with what we send.
+   */
+  private fun sha256Base64Url(bytes: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
-    val sb = StringBuilder(digest.size * 2)
-    for (b in digest) {
-      val unsigned = b.toInt() and 0xff
-      if (unsigned < 0x10) sb.append('0')
-      sb.append(unsigned.toString(16))
-    }
-    return sb.toString()
+    return Base64.encodeToString(
+      digest,
+      Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP,
+    )
   }
 
   companion object {
