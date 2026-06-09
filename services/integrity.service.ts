@@ -35,6 +35,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { logger } from '@/utils/logger';
 import { SECURE_STORE_KEYS } from '@/constants/StorageConfig';
+import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { API_BASE_URL, getApiPrefix } from '@/services/api';
 import { getInstalledAppVersion } from '@/utils/appVersion';
 import type {
@@ -185,10 +186,15 @@ async function readCachedToken(): Promise<string | null> {
 
 async function persistToken(response: InstallTokenResponse): Promise<void> {
   await Promise.all([
-    SecureStore.setItemAsync(SECURE_STORE_KEYS.INSTALL_TOKEN, response.installToken),
+    SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.INSTALL_TOKEN,
+      response.installToken,
+      SECURE_STORE_OPTIONS
+    ),
     SecureStore.setItemAsync(
       SECURE_STORE_KEYS.INSTALL_TOKEN_EXPIRES_AT,
-      String(response.expiresAt)
+      String(response.expiresAt),
+      SECURE_STORE_OPTIONS
     ),
   ]);
 }
@@ -357,7 +363,11 @@ async function attestInstallInternal(attempt: 1 | 2): Promise<InstallTokenRespon
     (attestPayload.platform === 'ios' || attestPayload.platform === 'android') &&
     attestPayload.mode === 'attestation'
   ) {
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.INTEGRITY_KEY_ID, attestPayload.keyId);
+    await SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.INTEGRITY_KEY_ID,
+      attestPayload.keyId,
+      SECURE_STORE_OPTIONS
+    );
   }
 
   logger.info('[Integrity] Install token issued', {

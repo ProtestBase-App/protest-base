@@ -10,8 +10,9 @@
  * Fail-open: if the API errors out, the user proceeds to the app.
  */
 
-import { Platform, Linking } from 'react-native';
+import { Platform } from 'react-native';
 import { logger } from '@/utils/logger';
+import { openStoreUrlSafely } from '@/utils/urlSafety';
 // Import individual semver functions; importing the full package breaks Metro.
 import semverValid from 'semver/functions/valid';
 import semverLt from 'semver/functions/lt';
@@ -149,11 +150,15 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
   }
 }
 
-/** Open the platform store URL for updates. */
+/**
+ * Open the platform store URL for updates.
+ *
+ * The URL is server-supplied via the anonymous `/app/config` response, so it is
+ * opened through `openStoreUrlSafely`, which only permits known App Store /
+ * Play Store hosts and store-app schemes. This prevents a MITM that tampers
+ * with `/app/config` (e.g. pairing `forceUpdate: true` with a phishing URL)
+ * from redirecting a forced-update tap to an arbitrary web page.
+ */
 export function openUpdateUrl(url: string): void {
-  if (url) {
-    Linking.openURL(url).catch((err) => {
-      logger.error('[VersionService] Failed to open store URL:', err);
-    });
-  }
+  void openStoreUrlSafely(url, 'version-update');
 }

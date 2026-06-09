@@ -28,6 +28,7 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '@/utils/logger';
+import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 
 const CHUNK_SIZE_BYTES = 1800;
 
@@ -192,7 +193,7 @@ export async function writeList<T>(secureKey: string, items: T[]): Promise<void>
   }
 
   if (utf8ByteLength(payload) <= CHUNK_SIZE_BYTES) {
-    await SecureStore.setItemAsync(secureKey, payload);
+    await SecureStore.setItemAsync(secureKey, payload, SECURE_STORE_OPTIONS);
     if (previousChunks > 0) {
       await deleteChunkRange(secureKey, 0, previousChunks);
     }
@@ -209,11 +210,11 @@ export async function writeList<T>(secureKey: string, items: T[]): Promise<void>
   }
 
   for (let i = 0; i < chunks.length; i += 1) {
-    await SecureStore.setItemAsync(chunkKey(secureKey, i), chunks[i]);
+    await SecureStore.setItemAsync(chunkKey(secureKey, i), chunks[i], SECURE_STORE_OPTIONS);
   }
 
   const manifest: ChunkManifest = { __chunks: chunks.length };
-  await SecureStore.setItemAsync(secureKey, JSON.stringify(manifest));
+  await SecureStore.setItemAsync(secureKey, JSON.stringify(manifest), SECURE_STORE_OPTIONS);
 
   if (previousChunks > chunks.length) {
     await deleteChunkRange(secureKey, chunks.length, previousChunks);

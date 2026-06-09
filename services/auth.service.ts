@@ -9,6 +9,7 @@ import type {
 } from '@/types/auth.types';
 import { SECURE_STORE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
+import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 
 export const login = async (email: string, password: string): Promise<User> => {
   try {
@@ -27,9 +28,21 @@ export const login = async (email: string, password: string): Promise<User> => {
       throw new Error('Invalid login response from server');
     }
 
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, responseData.accessToken);
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, responseData.refreshToken);
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.SESSION_ID, responseData.session.$id);
+    await SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.ACCESS_TOKEN,
+      responseData.accessToken,
+      SECURE_STORE_OPTIONS
+    );
+    await SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.REFRESH_TOKEN,
+      responseData.refreshToken,
+      SECURE_STORE_OPTIONS
+    );
+    await SecureStore.setItemAsync(
+      SECURE_STORE_KEYS.SESSION_ID,
+      responseData.session.$id,
+      SECURE_STORE_OPTIONS
+    );
 
     return responseData.user;
   } catch (error: any) {

@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   View,
-  Linking,
   Image as RNImage,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +25,7 @@ import { getOrganizationById } from '@/services/organizer.service';
 import { OrganizationDetail } from '@/types/organization.types';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
+import { openExternalUrlSafely } from '@/utils/urlSafety';
 import { DynamicRoutes, Routes } from '@/constants/Routes';
 import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
@@ -447,12 +447,10 @@ export default function OrganizerProfile() {
                         style={styles.aboutRow}
                         onPress={() => {
                           if (!websiteUrl) return;
-                          Linking.openURL(websiteUrl).catch((err) =>
-                            logger.warn('[OrganizerProfile] Failed to open website', {
-                              error: err,
-                              url: websiteUrl,
-                            })
-                          );
+                          // website_url is organizer-supplied (untrusted); only
+                          // open plain http(s) links so a crafted value cannot
+                          // trigger arbitrary scheme handling on the device.
+                          void openExternalUrlSafely(websiteUrl, 'organizer-website');
                         }}
                         accessibilityRole="link"
                       >
