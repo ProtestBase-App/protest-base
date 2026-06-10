@@ -3,6 +3,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  View,
+  ScrollView,
   Alert,
   ActivityIndicator,
   LayoutAnimation,
@@ -23,14 +25,16 @@ import AddressAutocompleteField from '@/components/AddressAutocompleteField';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { RemovableChip } from '@/components/RemovableChip';
 import { eventCategories } from '@/constants/EventCategories';
+import { MAX_EVENT_IMAGES } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
 import type { EventFormProps } from '@/types/eventForm.types';
+import type { PickedImage } from '@/types/event.types';
 import type { AddressSuggestion, AddressCountryCode, AddressLang } from '@/types/address.types';
 import { SectionHeader, HelperText } from '@/utils/formHelpers';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
-import { Spacing, Typography } from '@/constants/DesignTokens';
+import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { optimizeImageForUpload } from '@/utils/imageOptimization';
 
@@ -343,31 +347,62 @@ const EventForm: React.FC<EventFormProps> = ({
         return;
       }
 
+      const remaining = MAX_EVENT_IMAGES - form.images.length;
+      if (remaining <= 0) {
+        Alert.alert(
+          t('common.error'),
+          t('createEvent.maxImagesReached', { max: MAX_EVENT_IMAGES }),
+          [{ text: t('common.ok') }]
+        );
+        return;
+      }
+
+      // allowsEditing (single-image crop) is unavailable with multiple selection,
+      // so picks are uploaded uncropped. orderedSelection keeps the user's tap
+      // order as the display order on iOS.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        orderedSelection: true,
         quality: 1,
       });
 
-      if (!result.canceled && result.assets?.[0]) {
-        const selectedAsset = result.assets[0];
-        if (selectedAsset.type === 'image' || selectedAsset.uri) {
-          // Backend rejects multipart > 15 MB. Resize/compress before storing on the form
-          // so users with high-res phone cameras (HEIC > 18 MB) can still upload.
-          const optimized = await optimizeImageForUpload({
-            uri: selectedAsset.uri,
-            mimeType: selectedAsset.mimeType,
-            fileName: selectedAsset.fileName,
-            width: selectedAsset.width,
-            height: selectedAsset.height,
-            fileSize: selectedAsset.fileSize,
-          });
-          setForm({
-            ...form,
-            image: optimized,
-          });
+      if (!result.canceled && result.assets?.length) {
+        // selectionLimit is best-effort on some Android pickers — enforce the cap.
+        const selectedAssets = result.assets.slice(0, remaining);
+
+        // Backend rejects multipart > 15 MB. Resize/compress before storing on
+        // the form so users with high-res phone cameras (HEIC > 18 MB) can
+        // still upload. Sequential on purpose: decoding 5 full-resolution
+        // photos at once can spike memory on older devices.
+        const optimized: PickedImage[] = [];
+        for (const asset of selectedAssets) {
+          optimized.push(
+            await optimizeImageForUpload({
+              uri: asset.uri,
+              mimeType: asset.mimeType,
+              fileName: asset.fileName,
+              width: asset.width,
+              height: asset.height,
+              fileSize: asset.fileSize,
+            })
+          );
         }
+
+        if (result.assets.length > remaining) {
+          Alert.alert(
+            t('common.error'),
+            t('createEvent.maxImagesReached', { max: MAX_EVENT_IMAGES }),
+            [{ text: t('common.ok') }]
+          );
+        }
+
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setForm((prev) => ({
+          ...prev,
+          images: [...prev.images, ...optimized].slice(0, MAX_EVENT_IMAGES),
+        }));
       }
     } catch (error) {
       logger.warn('Image picker failed', {
@@ -376,6 +411,31 @@ const EventForm: React.FC<EventFormProps> = ({
       Alert.alert(t('common.error'), t('createEvent.imagePickerError'), [{ text: t('common.ok') }]);
     }
   };
+
+  const handleRemoveImage = useCallback(
+    (index: number) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setForm((prev) => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index),
+      }));
+    },
+    [setForm]
+  );
+
+  const handleMoveImage = useCallback(
+    (index: number, direction: -1 | 1) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setForm((prev) => {
+        const target = index + direction;
+        if (target < 0 || target >= prev.images.length) return prev;
+        const reordered = [...prev.images];
+        [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+        return { ...prev, images: reordered };
+      });
+    },
+    [setForm]
+  );
 
   const handleStartTimeChange = (isoString: string) => {
     const newStartTime = safeParseDate(isoString);
@@ -392,33 +452,103 @@ const EventForm: React.FC<EventFormProps> = ({
     }
   };
 
-  const renderImage = () => {
-    if (!form.image) {
+  const renderImages = () => {
+    if (form.images.length === 0) {
       return (
-        <ThemedView style={styles.uploadImageBoxSection}>
-          <ThemedView style={styles.uploadImageBox}>
-            <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
+        <TouchableOpacity
+          onPress={pickImage}
+          accessibilityLabel={t('createEvent.addImageAccessibilityLabel')}
+          accessibilityHint={t('createEvent.imageAccessibilityHint')}
+          accessibilityRole="button"
+        >
+          <ThemedView style={styles.uploadImageBoxSection}>
+            <ThemedView style={styles.uploadImageBox}>
+              {isPickingImage ? (
+                <ActivityIndicator color={themeColors.tint} />
+              ) : (
+                <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
+              )}
+            </ThemedView>
           </ThemedView>
-        </ThemedView>
+        </TouchableOpacity>
       );
     }
 
-    // Image-picker result object.
-    if (typeof form.image === 'object' && form.image.uri) {
-      return <Image source={{ uri: form.image.uri }} style={styles.imagePreview} />;
-    }
-
-    // URL string (from an existing event).
-    if (typeof form.image === 'string' && form.image.length > 0) {
-      return <Image source={{ uri: form.image }} style={styles.imagePreview} />;
-    }
-
     return (
-      <ThemedView style={styles.uploadImageBoxSection}>
-        <ThemedView style={styles.uploadImageBox}>
-          <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
-        </ThemedView>
-      </ThemedView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        // Nested ScrollViews don't inherit the parent's setting; without this
+        // the first tap on remove/reorder/add only dismisses the keyboard.
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.imageThumbRow}
+      >
+        {form.images.map((img, index) => {
+          const uri = typeof img === 'string' ? img : img.uri;
+          return (
+            // Plain Views: ThemedView would paint the theme background over the image.
+            <View key={`${uri}-${index}`} style={styles.imageThumbWrapper}>
+              <Image source={{ uri }} style={styles.imageThumb} />
+              {index === 0 && (
+                <View style={[styles.mainImageBadge, { backgroundColor: themeColors.tint }]}>
+                  <ThemedText style={styles.mainImageBadgeText}>
+                    {t('createEvent.mainImageBadge')}
+                  </ThemedText>
+                </View>
+              )}
+              <TouchableOpacity
+                onPress={() => handleRemoveImage(index)}
+                style={styles.imageThumbRemove}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={t('createEvent.removeImageAccessibilityLabel')}
+                accessibilityRole="button"
+              >
+                <IconSymbol name="xmark" size={12} color="white" />
+              </TouchableOpacity>
+              {form.images.length > 1 && (
+                <View style={styles.imageThumbActions}>
+                  <TouchableOpacity
+                    onPress={() => handleMoveImage(index, -1)}
+                    disabled={index === 0}
+                    style={[styles.imageMoveButton, index === 0 && styles.imageMoveButtonDisabled]}
+                    accessibilityLabel={t('createEvent.moveImageLeftAccessibilityLabel')}
+                    accessibilityRole="button"
+                  >
+                    <IconSymbol name="chevron.left" size={16} color={themeColors.icon} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleMoveImage(index, 1)}
+                    disabled={index === form.images.length - 1}
+                    style={[
+                      styles.imageMoveButton,
+                      index === form.images.length - 1 && styles.imageMoveButtonDisabled,
+                    ]}
+                    accessibilityLabel={t('createEvent.moveImageRightAccessibilityLabel')}
+                    accessibilityRole="button"
+                  >
+                    <IconSymbol name="chevron.right" size={16} color={themeColors.icon} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
+        {form.images.length < MAX_EVENT_IMAGES && (
+          <TouchableOpacity
+            onPress={pickImage}
+            style={[styles.imageAddTile, { borderColor: themeColors.inputBorder }]}
+            accessibilityLabel={t('createEvent.addImageAccessibilityLabel')}
+            accessibilityHint={t('createEvent.imageAccessibilityHint')}
+            accessibilityRole="button"
+          >
+            {isPickingImage ? (
+              <ActivityIndicator color={themeColors.tint} />
+            ) : (
+              <IconSymbol name="photo.badge.plus" size={28} color={iconColor} />
+            )}
+          </TouchableOpacity>
+        )}
+      </ScrollView>
     );
   };
 
@@ -666,31 +796,14 @@ const EventForm: React.FC<EventFormProps> = ({
         <ThemedView style={styles.uploadImageContainer}>
           <ThemedView style={styles.imageTitleWrapper}>
             <ThemedText style={styles.imageTitle}>
-              {t('createEvent.uploadImage')} ({t('common.optional')})
+              {t('createEvent.uploadImage')} (
+              {form.images.length > 0
+                ? `${form.images.length}/${MAX_EVENT_IMAGES}`
+                : t('common.optional')}
+              )
             </ThemedText>
-            {form.image && (
-              <TouchableOpacity
-                onPress={() => setForm({ ...form, image: null })}
-                style={styles.clearImageButton}
-                accessibilityLabel={t('createEvent.removeImageAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-              </TouchableOpacity>
-            )}
           </ThemedView>
-          <TouchableOpacity
-            onPress={pickImage}
-            accessibilityLabel={
-              form.image
-                ? t('createEvent.changeImageAccessibilityLabel')
-                : t('createEvent.addImageAccessibilityLabel')
-            }
-            accessibilityHint={t('createEvent.imageAccessibilityHint')}
-            accessibilityRole="button"
-          >
-            {renderImage()}
-          </TouchableOpacity>
+          {renderImages()}
           <HelperText text={t('createEvent.imageHelper')} isDark={isDark} />
         </ThemedView>
       )}
@@ -871,16 +984,65 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontFamily: Typography.families.medium,
   },
-  clearImageButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  imageThumbRow: {
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
-  imagePreview: {
-    width: '100%',
-    height: 158,
-    borderRadius: 12,
+  imageThumbWrapper: {
+    width: 96,
+  },
+  imageThumb: {
+    width: 96,
+    height: 96,
+    borderRadius: BorderRadius.lg,
     resizeMode: 'cover',
+  },
+  imageThumbRemove: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    // Constant dark overlay so the white xmark stays readable on any photo.
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainImageBadge: {
+    position: 'absolute',
+    top: Spacing.xs,
+    left: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  mainImageBadgeText: {
+    color: 'white',
+    fontSize: Typography.sizes.xxs,
+    fontFamily: Typography.families.semiBold,
+  },
+  imageThumbActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  imageMoveButton: {
+    padding: Spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageMoveButtonDisabled: {
+    opacity: 0.3,
+  },
+  imageAddTile: {
+    width: 96,
+    height: 96,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   uploadImageBoxSection: {
     width: '100%',

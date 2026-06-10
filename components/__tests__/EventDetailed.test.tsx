@@ -94,6 +94,7 @@ const mockEvent: FormattedEvent = {
   postal_code: 1000,
   categories: ['Climate'],
   image: 'https://example.com/image.jpg',
+  images: ['https://example.com/image.jpg'],
   help_needed: false,
   help_description: '',
   organizer_name: 'Climate Org',

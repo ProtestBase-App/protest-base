@@ -366,21 +366,42 @@ function normalizeEventPayload<T extends Record<string, unknown>>(eventData: T):
   } as T;
 }
 
+/** Narrow a mixed images-list entry to a picked file (vs a kept URL string). */
+function isPickedImage(value: unknown): value is PickedImage {
+  return typeof value === 'object' && value !== null && 'uri' in value;
+}
+
+/** React Native FormData file part for a picked image. */
+function toImageFilePart(image: PickedImage): Blob {
+  return {
+    uri: image.uri,
+    type: image.mimeType || 'image/jpeg',
+    name: image.fileName || `event_${Date.now()}.jpg`,
+  } as unknown as Blob;
+}
+
 /**
- * Build a FormData payload from event data and an image file.
+ * Build a FormData payload from event data and its image(s).
  * Shared by createEventBackend and updateEvent to avoid duplication.
  *
  * Caller is expected to have run the data through `normalizeEventPayload` first,
  * so categories/co_organizers are either undefined or a non-empty string[].
+ *
+ * When `images` is provided it is authoritative: the backend receives one text
+ * field `images` — a JSON array in display order where kept URLs appear
+ * verbatim and each new file is the literal `"new"` — followed by each new
+ * file as a file part named `images`, in that same order (FormData preserves
+ * append order). The legacy `image` part is never sent alongside it.
  */
 function buildEventFormData(
   eventData: Record<string, unknown>,
-  image: PickedImage
+  image: PickedImage | null,
+  images?: (PickedImage | string)[]
 ): { payload: FormData; headers: Record<string, string> } {
   const formData = new FormData();
 
   Object.keys(eventData).forEach((key) => {
-    if (key === 'image') return; // Handle image separately
+    if (key === 'image' || key === 'images') return; // Handled separately below
 
     const value = eventData[key];
 
@@ -400,12 +421,17 @@ function buildEventFormData(
     }
   });
 
-  const imageFile = {
-    uri: image.uri,
-    type: image.mimeType || 'image/jpeg',
-    name: image.fileName || `event_${Date.now()}.jpg`,
-  } as unknown as Blob;
-  formData.append('image', imageFile);
+  if (images) {
+    formData.append(
+      'images',
+      JSON.stringify(images.map((entry) => (isPickedImage(entry) ? 'new' : entry)))
+    );
+    images
+      .filter(isPickedImage)
+      .forEach((file) => formData.append('images', toImageFilePart(file)));
+  } else if (image) {
+    formData.append('image', toImageFilePart(image));
+  }
 
   return { payload: formData, headers: { 'Content-Type': 'multipart/form-data' } };
 }
@@ -415,7 +441,8 @@ function buildEventFormData(
  * The backend handles image upload, geocoding, URL validation and category
  * formatting, and fills in organizer_id and organizer_name from the JWT.
  *
- * @param eventData - Event data object (can include image file object or URL string)
+ * @param eventData - Event data object (images: up to 5 picked files, sent as
+ *   ordered multipart parts; falls back to the legacy single image field)
  * @returns The created event object from the backend
  */
 export async function createEventBackend(eventData: CreateEventRequest): Promise<Event> {
@@ -423,17 +450,24 @@ export async function createEventBackend(eventData: CreateEventRequest): Promise
     logger.debug('[EventService] createEventBackend called', {
       title: eventData.title,
       hasImage: !!eventData.image,
+      imageCount: eventData.images?.length ?? 0,
     });
     const normalized = normalizeEventPayload(eventData as unknown as Record<string, unknown>);
+    const hasImagesList = Array.isArray(eventData.images) && eventData.images.length > 0;
     const hasImageFile = !!eventData.image?.uri;
 
     let payload: FormData | Record<string, unknown>;
     let headers: Record<string, string> = {};
 
-    if (hasImageFile) {
+    if (hasImagesList) {
+      ({ payload, headers } = buildEventFormData(normalized, null, eventData.images));
+    } else if (hasImageFile) {
       ({ payload, headers } = buildEventFormData(normalized, eventData.image!));
     } else {
       payload = normalized;
+      // An empty images list is the same as absent (backend default image) —
+      // drop it so the JSON body never carries a redundant [].
+      delete (payload as Record<string, unknown>).images;
       headers['Content-Type'] = 'application/json';
     }
 
@@ -463,24 +497,37 @@ export async function createEventBackend(eventData: CreateEventRequest): Promise
  *
  * organizer_name cannot be updated (tied to the event creator).
  *
+ * `images`, when present, is the authoritative full ordered final list (kept
+ * URL strings + new PickedImage files); `null` removes all images. When it is
+ * absent, the legacy single `image` field behaves as before.
+ *
  * @param eventId - The ID of the event to update
- * @param eventData - Updated event data (can include image file object or URL string)
+ * @param eventData - Updated event data
  * @returns The updated event object from the backend
  */
 export async function updateEvent(eventId: string, eventData: UpdateEventRequest): Promise<Event> {
   try {
     logger.debug('[EventService] updateEvent called', { eventId });
     const normalized = normalizeEventPayload(eventData as unknown as Record<string, unknown>);
-    const imageIsFile =
-      typeof eventData.image === 'object' && eventData.image !== null && 'uri' in eventData.image;
+    const imagesHasNewFile =
+      Array.isArray(eventData.images) && eventData.images.some(isPickedImage);
+    const imageIsFile = isPickedImage(eventData.image);
 
     let payload: FormData | Record<string, unknown>;
     let headers: Record<string, string> = {};
 
-    if (imageIsFile) {
+    if (imagesHasNewFile) {
+      ({ payload, headers } = buildEventFormData(normalized, null, eventData.images!));
+    } else if (eventData.images === undefined && imageIsFile) {
       ({ payload, headers } = buildEventFormData(normalized, eventData.image as PickedImage));
     } else {
+      // JSON path: images is undefined (unchanged), null (clear all), or an
+      // all-URL kept list — every case is JSON-safe. When images is present it
+      // is authoritative, so drop the legacy image field to avoid conflicts.
       payload = normalized;
+      if (eventData.images !== undefined) {
+        delete (payload as Record<string, unknown>).image;
+      }
       headers['Content-Type'] = 'application/json';
     }
 
@@ -737,18 +784,18 @@ export async function getDraftEventPreview(eventId: string): Promise<Event> {
  * editing drafts on flaky mobile connections. Editing never changes the draft
  * status (is_draft is create-only; PUT/PATCH ignore it).
  *
- * When a NEW image file is supplied we fall back to the existing multipart PUT
- * (updateEvent) since the JSON path cannot carry a file; otherwise the image
- * stays as its existing URL string (or is omitted).
+ * When a NEW image file is supplied (legacy `image` or inside `images`) we fall
+ * back to the existing multipart PUT (updateEvent) since the JSON path cannot
+ * carry a file; otherwise images stay as kept URL strings (or are omitted).
  *
  * @param eventId - The ID of the event to patch
  * @param partial - The fields to update
  * @returns The updated event
  */
 export async function patchEvent(eventId: string, partial: UpdateEventRequest): Promise<Event> {
-  const imageIsFile =
-    typeof partial.image === 'object' && partial.image !== null && 'uri' in partial.image;
-  if (imageIsFile) {
+  const imageIsFile = isPickedImage(partial.image);
+  const imagesHasNewFile = Array.isArray(partial.images) && partial.images.some(isPickedImage);
+  if (imageIsFile || imagesHasNewFile) {
     // Reuse the proven multipart PUT path for new-image edits.
     return updateEvent(eventId, partial);
   }
@@ -756,6 +803,10 @@ export async function patchEvent(eventId: string, partial: UpdateEventRequest): 
   try {
     logger.debug('[EventService] patchEvent called', { eventId });
     const normalized = normalizeEventPayload(partial as unknown as Record<string, unknown>);
+    // images (when present) is authoritative — drop the legacy field to avoid conflicts.
+    if (partial.images !== undefined) {
+      delete (normalized as Record<string, unknown>).image;
+    }
 
     const response = await api.patch<{
       success: boolean;

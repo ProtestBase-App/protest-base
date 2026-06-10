@@ -55,7 +55,7 @@ export default function DraftEdit() {
     organization_id: '',
     title: '',
     description: '',
-    image: '',
+    images: [],
     street_address: '',
     city: '',
     region: '',
@@ -96,7 +96,9 @@ export default function DraftEdit() {
           organization_id: event.organization_id || '',
           title: event.title || '',
           description: event.description || '',
-          image: event.image || '',
+          // Raw Event (not formatEventForDisplay) — heal pre-multi-image
+          // responses by surfacing the legacy single image as slot 0.
+          images: event.images?.length ? event.images : event.image ? [event.image] : [],
           street_address: event.street_address || '',
           city: event.city || '',
           region: event.region || '',
@@ -139,7 +141,9 @@ export default function DraftEdit() {
       region: form.region || undefined,
       country: form.country || undefined,
       postal_code: form.postal_code || undefined,
-      image: form.image || undefined,
+      // Authoritative full ordered list (kept URLs + new files); an emptied
+      // list is an explicit removal of every image.
+      images: form.images.length ? form.images : null,
       website_url: form.website_url || undefined,
       categories: form.categories,
       disclaimer: form.disclaimer || undefined,

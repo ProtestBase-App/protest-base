@@ -560,7 +560,8 @@ const fr: LocaleData = {
     endTimeHelper: "Laissez vide si la durée de l'événement est flexible",
     locationHelper:
       "Indiquez un lieu précis pour que les participants puissent trouver l'événement facilement",
-    imageHelper: 'Ajoutez une image attrayante pour attirer plus de participants',
+    imageHelper:
+      "Ajoutez jusqu'à 5 images — la première est la photo de couverture de votre événement",
     eventLinkHelper:
       "Partagez un lien vers la page de votre événement, le formulaire d'inscription ou plus d'informations",
     coOrganizersHelper: 'Organisations qui collaborent sur cet événement',
@@ -574,6 +575,7 @@ const fr: LocaleData = {
 
     // Labels
     selected: 'Sélectionné',
+    mainImageBadge: 'Principale',
 
     // Validation Messages
     titleRequired: "Le titre de l'événement est obligatoire",
@@ -608,9 +610,10 @@ const fr: LocaleData = {
     closeAccessibilityLabel: "Fermer l'écran de création d'événement",
     progressAccessibilityLabel: 'Progression du formulaire : {{percentage}}% complété',
     removeImageAccessibilityLabel: "Supprimer l'image sélectionnée",
-    changeImageAccessibilityLabel: "Changer l'image sélectionnée",
     addImageAccessibilityLabel: 'Ajouter une image à votre événement',
     imageAccessibilityHint: 'Ouvre la bibliothèque photo pour sélectionner une image',
+    moveImageLeftAccessibilityLabel: "Déplacer l'image vers l'avant",
+    moveImageRightAccessibilityLabel: "Déplacer l'image vers l'arrière",
     clearPostalCodeAccessibilityLabel: 'Effacer la sélection du code postal',
     clearCoOrganizersAccessibilityLabel: 'Effacer la sélection des co-organisateurs',
 
@@ -620,6 +623,7 @@ const fr: LocaleData = {
     photoPermissionMessage:
       "Veuillez autoriser l'accès à la bibliothèque photo pour ajouter des images à votre événement.",
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
+    maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images par événement.",
     missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
   },
 

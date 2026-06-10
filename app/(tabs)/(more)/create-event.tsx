@@ -26,6 +26,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
+import type { PickedImage } from '@/types/event.types';
 import { Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
@@ -64,12 +65,30 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
 
+// Order-sensitive (reorder counts as a change); entries compare by reference.
+const areImageListsEqual = (a: FormState['images'], b: FormState['images']): boolean =>
+  a.length === b.length && a.every((img, idx) => img === b[idx]);
+
+/**
+ * Local drafts saved before multi-image support stored a single `image`
+ * (PickedImage | string | null) instead of the `images` list; fold it in so
+ * resuming an old draft doesn't crash on the missing array.
+ */
+const migrateDraftFormState = (saved: FormState & { image?: unknown }): FormState => {
+  if (Array.isArray(saved.images)) return saved;
+  const legacy = saved.image;
+  return {
+    ...saved,
+    images: legacy && typeof legacy === 'object' ? [legacy as PickedImage] : [],
+  };
+};
+
 const hasFormChanges = (current: FormState, initial: FormState): boolean => {
   return (
     current.organization_id !== initial.organization_id ||
     current.title !== initial.title ||
     current.description !== initial.description ||
-    current.image !== initial.image ||
+    !areImageListsEqual(current.images, initial.images) ||
     current.street_address !== initial.street_address ||
     current.city !== initial.city ||
     current.region !== initial.region ||
@@ -108,7 +127,7 @@ export default function CreateEventModal() {
     organization_id: '',
     title: '',
     description: '',
-    image: '',
+    images: [],
     street_address: '',
     city: '',
     region: '',
@@ -138,7 +157,7 @@ export default function CreateEventModal() {
       organization_id: '',
       title: '',
       description: '',
-      image: '',
+      images: [],
       street_address: '',
       city: '',
       region: '',
@@ -235,7 +254,7 @@ export default function CreateEventModal() {
               {
                 text: t('draft.resumeDraft'),
                 onPress: () => {
-                  setForm(draft.formData);
+                  setForm(migrateDraftFormState(draft.formData));
                   setIsCheckingDraft(false);
                 },
               },
@@ -453,6 +472,12 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
+      // On create every entry is a freshly picked file; URL strings can't occur
+      // (there is no existing event to keep images from).
+      const imageFiles = trimmedForm.images.filter(
+        (img): img is PickedImage => typeof img === 'object' && img !== null
+      );
+
       // Backend handles image upload, geocoding, URL validation, category
       // formatting; it also fills in organizer_id and organizer_name from the JWT.
       const resultCreateEvent = await createEventBackend({
@@ -466,10 +491,7 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
-        image:
-          trimmedForm.image && typeof trimmedForm.image === 'object'
-            ? trimmedForm.image
-            : undefined, // Can be file object or omitted (backend uses default)
+        images: imageFiles.length ? imageFiles : undefined, // Omitted → backend uses default
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories, // Service normalizes string -> string[]
         disclaimer: trimmedForm.disclaimer || undefined,
@@ -549,6 +571,10 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
+      const imageFiles = trimmedForm.images.filter(
+        (img): img is PickedImage => typeof img === 'object' && img !== null
+      );
+
       await createDraftEvent({
         organization_id: effectiveOrgId,
         title: trimmedForm.title,
@@ -560,10 +586,7 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
-        image:
-          trimmedForm.image && typeof trimmedForm.image === 'object'
-            ? trimmedForm.image
-            : undefined,
+        images: imageFiles.length ? imageFiles : undefined,
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories,
         disclaimer: trimmedForm.disclaimer || undefined,

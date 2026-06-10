@@ -558,7 +558,7 @@ const en: LocaleData = {
     categoryHelper: 'Helps people discover your event through filters',
     endTimeHelper: 'Leave blank if the event duration is flexible',
     locationHelper: 'Provide a specific location so attendees can find the event easily',
-    imageHelper: 'Add a compelling image to attract more attendees',
+    imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',
     volunteerHelper: 'Let volunteers know how they can support your event',
@@ -570,6 +570,7 @@ const en: LocaleData = {
 
     // Labels
     selected: 'Selected',
+    mainImageBadge: 'Main',
 
     // Validation Messages
     titleRequired: 'Event title is required',
@@ -604,9 +605,10 @@ const en: LocaleData = {
     closeAccessibilityLabel: 'Close create event screen',
     progressAccessibilityLabel: 'Form progress: {{percentage}}% complete',
     removeImageAccessibilityLabel: 'Remove selected image',
-    changeImageAccessibilityLabel: 'Change selected image',
     addImageAccessibilityLabel: 'Add an image to your event',
     imageAccessibilityHint: 'Opens photo library to select an image',
+    moveImageLeftAccessibilityLabel: 'Move image earlier',
+    moveImageRightAccessibilityLabel: 'Move image later',
     clearPostalCodeAccessibilityLabel: 'Clear postal code selection',
     clearCoOrganizersAccessibilityLabel: 'Clear co-organizers selection',
 
@@ -615,6 +617,7 @@ const en: LocaleData = {
     permissionRequired: 'Permission Required',
     photoPermissionMessage: 'Please grant photo library access to add images to your event.',
     imagePickerError: 'Failed to select image. Please try again.',
+    maxImagesReached: 'You can add up to {{max}} images per event.',
     missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 

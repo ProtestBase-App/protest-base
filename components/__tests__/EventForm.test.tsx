@@ -226,7 +226,7 @@ const mockForm: FormState = {
   organization_id: 'org-a',
   title: 'Climate March',
   description: 'A march for the climate',
-  image: null,
+  images: [],
   street_address: '',
   city: '',
   region: '',
@@ -1005,12 +1005,104 @@ describe('EventForm — image picking', () => {
 
     expect(mockGetPermission).toHaveBeenCalled();
     expect(mockRequestPermission).toHaveBeenCalled();
-    expect(mockLaunchImageLibrary).toHaveBeenCalled();
-    expect(setForm).toHaveBeenCalledWith(
+    expect(mockLaunchImageLibrary).toHaveBeenCalledWith(
       expect.objectContaining({
-        image: expect.objectContaining({ uri: 'file:///test-image.jpg' }),
+        allowsMultipleSelection: true,
+        selectionLimit: 5,
       })
     );
+    // setForm receives a functional updater — apply it to derive the next state.
+    expect(setForm).toHaveBeenCalledWith(expect.any(Function));
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    expect(updater(mockForm).images).toEqual([
+      expect.objectContaining({ uri: 'file:///test-image.jpg' }),
+    ]);
+  });
+
+  it('appends multiple picked images in order after existing ones', async () => {
+    const setForm = jest.fn();
+    const formWithImage: FormState = { ...mockForm, images: ['https://example.com/keep.jpg'] };
+    (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      granted: true,
+    });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [
+        { uri: 'file:///a.jpg', type: 'image' },
+        { uri: 'file:///b.jpg', type: 'image' },
+      ],
+    });
+
+    render(
+      <EventForm
+        form={formWithImage}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      await flushPromises();
+    });
+
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ selectionLimit: 4 })
+    );
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    expect(updater(formWithImage).images).toEqual([
+      'https://example.com/keep.jpg',
+      expect.objectContaining({ uri: 'file:///a.jpg' }),
+      expect.objectContaining({ uri: 'file:///b.jpg' }),
+    ]);
+  });
+
+  it('caps the image list at 5 and warns when the picker returns too many', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    const setForm = jest.fn();
+    const fourImages: FormState = {
+      ...mockForm,
+      images: ['https://1.jpg', 'https://2.jpg', 'https://3.jpg', 'https://4.jpg'],
+    };
+    (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
+      granted: true,
+    });
+    // selectionLimit is best-effort on some Android pickers — simulate overflow.
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [
+        { uri: 'file:///a.jpg', type: 'image' },
+        { uri: 'file:///b.jpg', type: 'image' },
+      ],
+    });
+
+    render(
+      <EventForm
+        form={fourImages}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      await flushPromises();
+    });
+
+    expect(alertSpy).toHaveBeenCalled();
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    const nextImages = updater(fourImages).images;
+    expect(nextImages).toHaveLength(5);
+    expect(nextImages[4]).toEqual(expect.objectContaining({ uri: 'file:///a.jpg' }));
+    alertSpy.mockRestore();
   });
 
   it('shows pre-permission dialog when permission is undetermined', async () => {
@@ -1117,8 +1209,11 @@ describe('EventForm — image picking', () => {
     expect(setForm).not.toHaveBeenCalled();
   });
 
-  it('renders image preview when form has image object with uri', () => {
-    const formWithImage = { ...mockForm, image: { uri: 'file:///test-image.jpg', type: 'image' } };
+  it('renders a thumbnail with a remove button when form has a picked image', () => {
+    const formWithImage: FormState = {
+      ...mockForm,
+      images: [{ uri: 'file:///test-image.jpg' }],
+    };
     render(
       <EventForm
         form={formWithImage}
@@ -1127,11 +1222,13 @@ describe('EventForm — image picking', () => {
         userLanguage="en"
       />
     );
-    expect(screen.getByLabelText(/change.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/remove.*image/i)).toBeTruthy();
+    // The add tile stays visible while under the 5-image cap.
+    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
   });
 
-  it('renders image preview when form has image as URL string', () => {
-    const formWithImage = { ...mockForm, image: 'https://example.com/image.jpg' };
+  it('renders a thumbnail with a remove button when form has an image URL string', () => {
+    const formWithImage: FormState = { ...mockForm, images: ['https://example.com/image.jpg'] };
     render(
       <EventForm
         form={formWithImage}
@@ -1140,36 +1237,66 @@ describe('EventForm — image picking', () => {
         userLanguage="en"
       />
     );
-    expect(screen.getByLabelText(/change.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/remove.*image/i)).toBeTruthy();
   });
 
-  it('renders upload placeholder for invalid image data', () => {
-    const formWithBadImage = { ...mockForm, image: 'invalid' as any };
-    render(
-      <EventForm
-        form={formWithBadImage}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-    expect(screen.toJSON()).toBeTruthy();
-  });
-
-  it('removes image when clear image button is pressed', () => {
+  it('removes the pressed image from the list', () => {
     const setForm = jest.fn();
-    const formWithImage = { ...mockForm, image: { uri: 'file:///test-image.jpg', type: 'image' } };
+    const formWithImages: FormState = {
+      ...mockForm,
+      images: ['https://example.com/first.jpg', 'https://example.com/second.jpg'],
+    };
     render(
       <EventForm
-        form={formWithImage}
+        form={formWithImages}
         setForm={setForm}
         emptyFields={mockEmptyFields}
         userLanguage="en"
       />
     );
-    const removeButton = screen.getByLabelText(/remove.*image/i);
-    fireEvent.press(removeButton);
-    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ image: null }));
+    const removeButtons = screen.getAllByLabelText(/remove.*image/i);
+    fireEvent.press(removeButtons[0]);
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    expect(updater(formWithImages).images).toEqual(['https://example.com/second.jpg']);
+  });
+
+  it('reorders images with the move buttons', () => {
+    const setForm = jest.fn();
+    const formWithImages: FormState = {
+      ...mockForm,
+      images: ['https://example.com/first.jpg', 'https://example.com/second.jpg'],
+    };
+    render(
+      <EventForm
+        form={formWithImages}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    const moveRightButtons = screen.getAllByLabelText(/move image later/i);
+    fireEvent.press(moveRightButtons[0]);
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    expect(updater(formWithImages).images).toEqual([
+      'https://example.com/second.jpg',
+      'https://example.com/first.jpg',
+    ]);
+  });
+
+  it('hides the add tile when the 5-image cap is reached', () => {
+    const fullForm: FormState = {
+      ...mockForm,
+      images: ['https://1.jpg', 'https://2.jpg', 'https://3.jpg', 'https://4.jpg', 'https://5.jpg'],
+    };
+    render(
+      <EventForm
+        form={fullForm}
+        setForm={jest.fn()}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    expect(screen.queryByLabelText(/add.*image/i)).toBeNull();
   });
 });
 
@@ -2022,12 +2149,12 @@ describe('EventForm — pre-permission dialog callbacks', () => {
       await allowButton.onPress();
       await flushPromises();
     });
-    // Image should have been set
-    expect(setForm).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image: expect.objectContaining({ uri: 'file:///selected.jpg' }),
-      })
-    );
+    // Image should have been set via the functional updater.
+    expect(setForm).toHaveBeenCalledWith(expect.any(Function));
+    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
+    expect(updater(mockForm).images).toEqual([
+      expect.objectContaining({ uri: 'file:///selected.jpg' }),
+    ]);
     alertSpy.mockRestore();
   });
 

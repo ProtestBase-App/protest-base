@@ -600,7 +600,7 @@ const nl = {
     endTimeHelper: 'Laat leeg als de duur van het evenement flexibel is',
     locationHelper:
       'Geef een specifieke locatie zodat deelnemers het evenement gemakkelijk kunnen vinden',
-    imageHelper: 'Voeg een aantrekkelijke afbeelding toe om meer deelnemers aan te trekken',
+    imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',
     volunteerHelper: 'Laat vrijwilligers weten hoe ze je evenement kunnen ondersteunen',
@@ -612,6 +612,7 @@ const nl = {
 
     // Labels
     selected: 'Geselecteerd',
+    mainImageBadge: 'Hoofd',
 
     // Progress & Actions
     requiredFieldsProgress: 'Verplichte velden ingevuld: {{completed}}/{{total}}',
@@ -653,9 +654,10 @@ const nl = {
     closeAccessibilityLabel: 'Sluit evenement aanmaken scherm',
     progressAccessibilityLabel: 'Formuliervoortgang: {{percentage}}% voltooid',
     removeImageAccessibilityLabel: 'Geselecteerde afbeelding verwijderen',
-    changeImageAccessibilityLabel: 'Geselecteerde afbeelding wijzigen',
     addImageAccessibilityLabel: 'Een afbeelding toevoegen aan je evenement',
     imageAccessibilityHint: 'Opent fotobibliotheek om een afbeelding te selecteren',
+    moveImageLeftAccessibilityLabel: 'Afbeelding naar voren verplaatsen',
+    moveImageRightAccessibilityLabel: 'Afbeelding naar achteren verplaatsen',
     clearPostalCodeAccessibilityLabel: 'Postcodeselectie wissen',
     clearCoOrganizersAccessibilityLabel: 'Mede-organisatoren selectie wissen',
 
@@ -665,6 +667,7 @@ const nl = {
     photoPermissionMessage:
       'Geef toegang tot de fotobibliotheek om afbeeldingen aan je evenement toe te voegen.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
+    maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen per evenement toevoegen.',
     missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
   },
 

@@ -77,6 +77,7 @@ export interface FormattedEvent {
   title: string;
   description: string;
   image: string;
+  images: string[];
   street_address: string | null;
   city: string | null;
   region: string | null;
@@ -170,6 +171,8 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     title: event.title,
     description: event.description,
     image: event.image || '',
+    // Heal pre-multi-image responses: surface the legacy single image as slot 0.
+    images: event.images?.length ? event.images : event.image ? [event.image] : [],
     street_address: event.street_address || null,
     city: event.city || null,
     region: event.region || null,

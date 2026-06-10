@@ -856,6 +856,145 @@ describe('event.service', () => {
   });
 
   // ============================================================
+  // multi-image payloads (docs/MULTI_IMAGE_API.md contract)
+  // ============================================================
+  describe('multi-image payloads', () => {
+    const baseCreate = {
+      organization_id: 'org-1',
+      title: 'Climate March',
+      description: 'A march for the climate',
+      start_time: '2025-06-01T10:00:00Z',
+    };
+    const fileA = { uri: 'file:///a.jpg', mimeType: 'image/jpeg', fileName: 'a.jpg' };
+    const fileB = { uri: 'file:///b.jpg', mimeType: 'image/png', fileName: 'b.png' };
+
+    it('create: sends one images text field plus file parts in order, and no legacy image part', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-multi' } },
+      });
+
+      await createEventBackend({ ...baseCreate, images: [fileA, fileB] });
+
+      const [, payload, config]: any[] = mockApi.post.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+      expect(config.headers['Content-Type']).toBe('multipart/form-data');
+
+      // The test-env FormData stringifies file parts, so assert the text field
+      // content plus the part count/order rather than the file objects.
+      const parts = (payload as FormData).getAll('images');
+      expect(parts).toHaveLength(3);
+      expect(parts[0]).toBe('["new","new"]');
+      expect((payload as FormData).getAll('image')).toHaveLength(0);
+    });
+
+    it('create: drops an empty images list from the JSON payload', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-empty' } },
+      });
+
+      await createEventBackend({ ...baseCreate, images: [] });
+
+      const [, payload, config]: any[] = mockApi.post.mock.calls[0];
+      expect(config.headers['Content-Type']).toBe('application/json');
+      expect(payload.images).toBeUndefined();
+    });
+
+    it('update: interleaves kept URLs and "new" placeholders in display order', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', {
+        title: 'Updated',
+        images: ['https://cdn.example.com/keep1.jpg', fileA, 'https://cdn.example.com/keep2.jpg'],
+      });
+
+      const [, payload]: any[] = mockApi.put.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+
+      const parts = (payload as FormData).getAll('images');
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toBe(
+        '["https://cdn.example.com/keep1.jpg","new","https://cdn.example.com/keep2.jpg"]'
+      );
+      expect((payload as FormData).getAll('image')).toHaveLength(0);
+    });
+
+    it('update: sends an all-URL kept list as JSON and drops the legacy image field', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', {
+        title: 'Updated',
+        image: 'https://cdn.example.com/legacy.jpg',
+        images: ['https://cdn.example.com/keep1.jpg', 'https://cdn.example.com/keep2.jpg'],
+      });
+
+      const [, payload, config]: any[] = mockApi.put.mock.calls[0];
+      expect(config.headers['Content-Type']).toBe('application/json');
+      expect(payload.images).toEqual([
+        'https://cdn.example.com/keep1.jpg',
+        'https://cdn.example.com/keep2.jpg',
+      ]);
+      expect(payload.image).toBeUndefined();
+    });
+
+    it('update: sends images: null as JSON to remove all images', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', { title: 'Updated', images: null });
+
+      const [, payload, config]: any[] = mockApi.put.mock.calls[0];
+      expect(config.headers['Content-Type']).toBe('application/json');
+      expect(payload.images).toBeNull();
+    });
+
+    it('update: keeps the legacy single-image multipart path when images is absent', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', { title: 'Updated', image: fileA });
+
+      const [, payload]: any[] = mockApi.put.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+      expect((payload as FormData).getAll('image')).toHaveLength(1);
+      expect((payload as FormData).getAll('images')).toHaveLength(0);
+    });
+
+    it('patch: falls back to the multipart PUT when images contains a new file', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await patchEvent('evt-1', { images: ['https://cdn.example.com/keep1.jpg', fileB] });
+
+      expect(mockApi.patch).not.toHaveBeenCalled();
+      const [, payload]: any[] = mockApi.put.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+    });
+
+    it('patch: passes an all-URL kept list straight through the JSON PATCH', async () => {
+      mockApi.patch.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await patchEvent('evt-1', {
+        image: 'https://cdn.example.com/legacy.jpg',
+        images: ['https://cdn.example.com/keep1.jpg'],
+      });
+
+      expect(mockApi.put).not.toHaveBeenCalled();
+      const [, payload]: any[] = mockApi.patch.mock.calls[0];
+      expect(payload.images).toEqual(['https://cdn.example.com/keep1.jpg']);
+      expect(payload.image).toBeUndefined();
+    });
+  });
+
+  // ============================================================
   // deleteEvent
   // ============================================================
   describe('deleteEvent', () => {

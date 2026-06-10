@@ -4,7 +4,8 @@ export interface FormState {
   organization_id: string;
   title: string;
   description: string;
-  image: PickedImage | string | null;
+  /** Ordered images (max 5): URL strings are kept existing images, PickedImages are new picks. */
+  images: (PickedImage | string)[];
   street_address: string;
   city: string;
   region: string;

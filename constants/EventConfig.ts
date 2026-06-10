@@ -19,3 +19,6 @@ export const MAX_EVENT_LOOKBACK_MS = 20 * 24 * 60 * 60 * 1000;
 
 /** MAX_EVENT_LOOKBACK_MS expressed in days. */
 export const MAX_EVENT_LOOKBACK_DAYS = 20;
+
+/** Maximum number of images per event — mirrors the backend's MAX_EVENT_IMAGES cap. */
+export const MAX_EVENT_IMAGES = 5;
