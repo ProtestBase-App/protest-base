@@ -42,14 +42,6 @@ export function getISOWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
 export function toDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -95,7 +87,10 @@ export function getTodayDateKeyInBelgium(): string {
  * @returns Array of 6 CalendarWeek objects
  */
 export function generateCalendarGrid(year: number, month: number): CalendarWeek[] {
-  const today = new Date();
+  // "Today" is the Belgium calendar date so the today ring always marks the
+  // same cell as the (Belgium-keyed) selection highlight and event keys, even
+  // for viewers outside CET around midnight.
+  const todayKey = getTodayDateKeyInBelgium();
   const firstOfMonth = new Date(year, month, 1);
 
   // Find the Monday on or before the first of the month so Monday is the first
@@ -116,16 +111,20 @@ export function generateCalendarGrid(year: number, month: number): CalendarWeek[
         startDate.getDate() + week * 7 + dayIdx
       );
 
-      const isToday = isSameDay(cellDate, today);
+      // Construct the key from y/m/d directly so it doesn't drift with the
+      // viewer's local TZ — matches the Belgium-TZ keys used for events.
+      const dateKey = belgiumDateKey(
+        cellDate.getFullYear(),
+        cellDate.getMonth(),
+        cellDate.getDate()
+      );
       days.push({
         date: cellDate,
         day: cellDate.getDate(),
         isCurrentMonth: cellDate.getMonth() === month && cellDate.getFullYear() === year,
-        isToday,
-        isPast: !isToday && cellDate < today,
-        // Construct the key from y/m/d directly so it doesn't drift with the
-        // viewer's local TZ — matches the Belgium-TZ keys used for events.
-        dateKey: belgiumDateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate()),
+        isToday: dateKey === todayKey,
+        isPast: dateKey < todayKey,
+        dateKey,
       });
     }
 

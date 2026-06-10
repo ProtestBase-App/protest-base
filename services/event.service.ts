@@ -32,8 +32,8 @@ export interface EventFilterParams {
   limit?: number;
   /** Pagination offset */
   offset?: number;
-  /** Date filter preset: 'today', 'tomorrow', 'thisWeek', 'thisWeekend' */
-  dateFilter?: 'today' | 'tomorrow' | 'thisWeek' | 'thisWeekend';
+  /** Date filter preset: 'today', 'tomorrow', 'thisWeek', 'thisWeekend', 'thisMonth' */
+  dateFilter?: 'today' | 'tomorrow' | 'thisWeek' | 'thisWeekend' | 'thisMonth';
   /** Array of postal codes to filter by (will be sent as comma-separated string) */
   postalCodes?: string[];
   /** Array of organization IDs to filter by (will be sent as comma-separated string) */

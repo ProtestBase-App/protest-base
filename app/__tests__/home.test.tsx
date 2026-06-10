@@ -1,8 +1,19 @@
 jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockReturnValue('light') }));
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
+
+// useHomeViewPreference is a module-level mock, so per-test re-mocking is not
+// possible. Instead the factory reads a mutable variable at hook-call time —
+// tests flip `mockViewMode` before rendering to switch month/agenda views.
+let mockViewMode: 'month' | 'agenda' = 'month';
+const mockSetViewMode = jest.fn();
 jest.mock('@/hooks/useHomeViewPreference', () => ({
-  useHomeViewPreference: () => ({ viewMode: 'calendar', setViewMode: jest.fn(), ready: true }),
+  useHomeViewPreference: () => ({
+    viewMode: mockViewMode,
+    setViewMode: mockSetViewMode,
+    ready: true,
+  }),
 }));
+
 jest.mock('@/services/event.service', () => ({
   getEventByIdBackend: jest.fn(),
   EventNotFoundError: class extends Error {
@@ -11,17 +22,23 @@ jest.mock('@/services/event.service', () => ({
 }));
 
 import React from 'react';
-import { renderWithProviders, createMockEvent } from '@/test-utils/render';
+import { renderWithProviders, createMockEvent, fireEvent, act } from '@/test-utils/render';
 import HomeTab from '@/app/(tabs)/home';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
-describe('Home Screen', () => {
+/** ISO timestamp N hours from the pinned "now". */
+const hoursFromNow = (hours: number) => new Date(Date.now() + hours * 3600000).toISOString();
+
+/** Day-cell accessibility labels start with `Date.toDateString()` output. */
+const DAY_CELL_LABEL = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /;
+
+describe('Home Screen (calendar tab)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Pin Date.now() to mid-morning UTC so that test events scheduled at
-    // `Date.now() + 1h` always land on the same local *and* UTC calendar day.
-    // Without this, runs between ~22:00 and 24:00 in CEST roll over to the
-    // next UTC day and the calendar grid's "today selected" assertion fails.
+    mockViewMode = 'month';
+    // Pin Date.now() to mid-morning UTC so events at `now + 1h` always land on
+    // the same Belgium-TZ (Europe/Brussels) calendar day as "today". Pinned
+    // date: Tuesday 2026-05-12, 12:00 in Brussels (CEST).
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
   });
@@ -31,386 +48,255 @@ describe('Home Screen', () => {
   });
 
   describe('Loading States', () => {
-    it('shows loading indicator when events are loading', () => {
+    it('shows the splash loader on first events load (loading + empty cache)', () => {
       const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
         providerOverrides: {
-          globalContext: { eventsLoading: true },
+          globalContext: { eventsCache: {}, eventsLoading: true },
         },
       });
 
-      const loader = UNSAFE_getByType(BrandLoader);
-      expect(loader).toBeTruthy();
+      expect(UNSAFE_getByType(BrandLoader)).toBeTruthy();
     });
 
-    it('shows loading indicator when saved events are loading', () => {
+    it('shows the splash loader when saved events are loading', () => {
       const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
         providerOverrides: {
           savedEventsContext: { loading: true },
         },
       });
 
-      const loader = UNSAFE_getByType(BrandLoader);
-      expect(loader).toBeTruthy();
+      expect(UNSAFE_getByType(BrandLoader)).toBeTruthy();
     });
 
-    it('shows loading indicator when postal codes are loading', () => {
+    it('shows the splash loader when postal codes are loading', () => {
       const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
         providerOverrides: {
           postalCodeContext: { loading: true },
         },
       });
 
-      const loader = UNSAFE_getByType(BrandLoader);
-      expect(loader).toBeTruthy();
-    });
-  });
-
-  describe('Calendar Header', () => {
-    it('renders the month picker button', () => {
-      const { getByLabelText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      expect(getByLabelText(/open month picker/)).toBeTruthy();
+      expect(UNSAFE_getByType(BrandLoader)).toBeTruthy();
     });
 
-    it('renders the today button', () => {
-      const { getByLabelText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      expect(getByLabelText('Go to today')).toBeTruthy();
-    });
-  });
-
-  describe('Calendar Grid', () => {
-    it('renders day-of-week headers', () => {
-      const { getAllByLabelText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      // Calendar grid should contain day cells
-      const dayCells = getAllByLabelText(/has events|Mon|Tue|Wed|Thu|Fri|Sat|Sun/);
-      expect(dayCells.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Rendering - Guest User', () => {
-    it('renders empty state when user is not logged in', () => {
-      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: false },
-          savedEventsContext: { savedEventIds: [] },
-        },
-      });
-
-      const EmptyEventComponent = require('@/components/EmptyEvent').default;
-      expect(UNSAFE_getByType(EmptyEventComponent)).toBeTruthy();
-    });
-  });
-
-  describe('Saved Events Display', () => {
-    it('shows event dots on days with saved events', () => {
-      // Create an event for today so it shows on the calendar
-      const todayEvent = createMockEvent({
-        $id: 'event-today',
-        title: 'Today Event',
-        start_time: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-      });
-
-      const eventsCache = {
-        'event-today': todayEvent,
-      };
-
-      const { queryByText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache },
-          savedEventsContext: { savedEventIds: ['event-today'] },
-        },
-      });
-
-      // Event on today's selected day should be visible
-      expect(queryByText('Today Event')).toBeTruthy();
-    });
-
-    it('shows empty state when user has no saved events', () => {
-      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache: {} },
-          savedEventsContext: { savedEventIds: [] },
-        },
-      });
-
-      // EmptyEvent component should be rendered
-      const EmptyEvent = require('@/components/EmptyEvent').default;
-      expect(UNSAFE_getByType(EmptyEvent)).toBeTruthy();
-    });
-
-    it('shows empty state for a day with no events when user has saved events on other days', () => {
-      // Event is tomorrow, but today is selected by default
-      const tomorrowEvent = createMockEvent({
-        $id: 'event-tomorrow',
-        title: 'Tomorrow Event',
-        start_time: new Date(Date.now() + 86400000).toISOString(),
-      });
-
-      const eventsCache = {
-        'event-tomorrow': tomorrowEvent,
-      };
-
-      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache },
-          savedEventsContext: { savedEventIds: ['event-tomorrow'] },
-        },
-      });
-
-      const EmptyEventComponent = require('@/components/EmptyEvent').default;
-      expect(UNSAFE_getByType(EmptyEventComponent)).toBeTruthy();
-    });
-
-    it('filters out past events from saved events', () => {
-      const pastEvent = createMockEvent({
-        $id: 'event-past',
-        title: 'Past Event',
-        start_time: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-        end_time: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      });
-
-      const eventsCache = {
-        'event-past': pastEvent,
-      };
-
-      const { queryByText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache },
-          savedEventsContext: { savedEventIds: ['event-past'] },
-        },
-      });
-
-      // Past event should not be shown
-      expect(queryByText('Past Event')).toBeNull();
-    });
-  });
-
-  describe('Pull to Refresh', () => {
-    it('calls refetchEvents when pull-to-refresh is triggered', async () => {
-      const mockRefetch = jest.fn().mockResolvedValue(undefined);
-
-      renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { refetchEvents: mockRefetch },
-        },
-      });
-
-      expect(mockRefetch).toBeDefined();
-    });
-
-    it('shows alert when refresh fails', async () => {
-      const mockRefetch = jest.fn().mockRejectedValue(new Error('Network error'));
-
-      renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { refetchEvents: mockRefetch },
-        },
-      });
-
-      expect(mockRefetch).toBeDefined();
-    });
-  });
-
-  describe('Event Sharing', () => {
-    it('handles share event action', async () => {
-      const mockEvent = createMockEvent({
-        $id: 'event-share',
-        title: 'Shareable Event',
-        postal_code: 1000,
-        country: 'belgium',
-      });
-
-      const eventsCache = {
-        'event-share': mockEvent,
-      };
-
-      const mockGetSubMunicipalityName = jest.fn().mockReturnValue('Brussels');
-
-      renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache },
-          savedEventsContext: { savedEventIds: ['event-share'] },
-          postalCodeContext: { getSubMunicipalityName: mockGetSubMunicipalityName },
-        },
-      });
-
-      expect(mockGetSubMunicipalityName).toBeDefined();
-    });
-  });
-
-  describe('Past Month Navigation Blocking', () => {
-    it('canGoPrev is false when the home screen first renders on the current month', () => {
-      // CalendarGrid receives canGoPrev as a prop. On mount, displayMonth equals
-      // today.getMonth() and displayYear equals today.getFullYear(), so canGoPrev
-      // must be false. We verify this indirectly: the CalendarGrid is rendered
-      // (day cells visible) and no day cell for a past month is pressable.
-      const { getAllByRole } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      // At least one button (day cell) should be rendered in the calendar
-      const buttons = getAllByRole('button');
-      expect(buttons.length).toBeGreaterThan(0);
-    });
-
-    it('past day cells are rendered with accessibilityState disabled=true', () => {
-      // Days in the past receive disabled={true} on their Pressable which sets
-      // accessibilityState.disabled. getAllByRole('button') returns all buttons;
-      // we filter for those whose accessibilityState marks them disabled.
-      const { getAllByRole } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      const allButtons = getAllByRole('button');
-      const disabledButtons = allButtons.filter(
-        (btn) => btn.props.accessibilityState?.disabled === true
-      );
-      // On any day after the first of the current month there should be disabled cells
-      expect(disabledButtons.length).toBeGreaterThan(0);
-    });
-
-    it('today button is always visible regardless of canGoPrev state', () => {
-      const { getByLabelText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { isLogged: true },
-        },
-      });
-
-      expect(getByLabelText('Go to today')).toBeTruthy();
-    });
-  });
-
-  describe('Calendar Shows Event on Correct Day', () => {
-    it('shows an event on its saved day when that day is selected', () => {
-      // Build an event that starts today (in 1 hour) so it lands on today's date key.
-      const eventStartTime = new Date(Date.now() + 3600000).toISOString(); // +1 h
-      const todayEvent = createMockEvent({
-        $id: 'event-calendar-day',
-        title: 'Calendar Day Event',
-        start_time: eventStartTime,
-      });
-
-      const { getByText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache: { 'event-calendar-day': todayEvent } },
-          savedEventsContext: { savedEventIds: ['event-calendar-day'] },
-        },
-      });
-
-      // The home screen defaults selectedDateKey to today, so the event
-      // should appear in the list immediately.
-      expect(getByText('Calendar Day Event')).toBeTruthy();
-    });
-
-    it('does not show a future-day event when today is selected', () => {
-      // Event is 3 days in the future — today is selected by default.
-      const futureStart = new Date(Date.now() + 3 * 86400000).toISOString();
-      const futureEvent = createMockEvent({
-        $id: 'event-future',
-        title: 'Future Day Event',
-        start_time: futureStart,
-      });
-
-      const { queryByText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache: { 'event-future': futureEvent } },
-          savedEventsContext: { savedEventIds: ['event-future'] },
-        },
-      });
-
-      expect(queryByText('Future Day Event')).toBeNull();
-    });
-
-    it('does not show a multi-day event on a non-start day', () => {
-      // Event started yesterday, ends tomorrow. The selected day defaults to
-      // today, but the event's start key is yesterday — so it should NOT show
-      // (the calendar uses one-dot-per-event semantics).
-      const startTime = new Date(Date.now() - 26 * 3600 * 1000).toISOString();
-      const endTime = new Date(Date.now() + 25 * 3600 * 1000).toISOString();
-      const multiDayEvent = createMockEvent({
-        $id: 'event-multi',
-        title: 'Multi Day Event',
-        start_time: startTime,
-        end_time: endTime,
-      });
-
-      const { queryByText } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache: { 'event-multi': multiDayEvent } },
-          savedEventsContext: { savedEventIds: ['event-multi'] },
-        },
-      });
-
-      expect(queryByText('Multi Day Event')).toBeNull();
-    });
-  });
-
-  describe('Cache miss tolerance', () => {
-    it('renders without crashing when a saved ID has no matching event in the cache', () => {
-      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
-        providerOverrides: {
-          globalContext: { eventsCache: {} },
-          // SavedEventsProvider hydration is mocked at the context layer here, so the
-          // home screen should silently render an empty calendar rather than throw
-          // when an ID has no entry yet.
-          savedEventsContext: { savedEventIds: ['ghost-id'] },
-        },
-      });
-
-      const EmptyEventComponent = require('@/components/EmptyEvent').default;
-      expect(UNSAFE_getByType(EmptyEventComponent)).toBeTruthy();
-    });
-  });
-
-  describe('Loader gating during refetch', () => {
-    it('does not render the splash loader when eventsLoading=true but cache is non-empty', () => {
+    it('keeps the calendar visible during a warm refetch (loading + non-empty cache)', () => {
       const cachedEvent = createMockEvent({
         $id: 'cached-event',
         title: 'Cached Event',
-        start_time: new Date(Date.now() + 3600000).toISOString(),
+        start_time: hoursFromNow(1),
       });
 
-      const { UNSAFE_queryByType } = renderWithProviders(<HomeTab />, {
+      const { UNSAFE_queryByType, getByText } = renderWithProviders(<HomeTab />, {
         providerOverrides: {
           globalContext: {
             eventsCache: { 'cached-event': cachedEvent },
             eventsLoading: true,
           },
-          savedEventsContext: { savedEventIds: ['cached-event'] },
         },
       });
 
-      // BrandLoader should NOT be rendered — calendar stays visible during refetch.
       expect(UNSAFE_queryByType(BrandLoader)).toBeNull();
+      expect(getByText('Cached Event')).toBeTruthy();
+    });
+  });
+
+  describe('Calendar Header', () => {
+    it('renders the month picker button', () => {
+      const { getByLabelText } = renderWithProviders(<HomeTab />);
+
+      expect(getByLabelText(/open month picker/)).toBeTruthy();
     });
 
-    it('renders the splash loader on first load (cache empty + eventsLoading=true)', () => {
-      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
+    it('does not show the "Go to today" chip initially (selection starts on today)', () => {
+      const { queryByLabelText } = renderWithProviders(<HomeTab />);
+
+      expect(queryByLabelText('Go to today')).toBeNull();
+    });
+
+    it('renders the month grid day-cell buttons', () => {
+      const { getAllByRole, getAllByLabelText } = renderWithProviders(<HomeTab />);
+
+      expect(getAllByRole('button').length).toBeGreaterThan(0);
+      // 6-week grid → at least 28 day cells regardless of month layout.
+      expect(getAllByLabelText(DAY_CELL_LABEL).length).toBeGreaterThanOrEqual(28);
+    });
+
+    it('renders the filter button', () => {
+      const { getByLabelText } = renderWithProviders(<HomeTab />);
+
+      expect(getByLabelText('home.openFilters')).toBeTruthy();
+    });
+  });
+
+  describe('All-Events Browsing', () => {
+    it('shows an unsaved cache event on today immediately (not saved-only anymore)', () => {
+      const todayEvent = createMockEvent({
+        $id: 'event-today',
+        title: 'Today Event',
+        start_time: hoursFromNow(1),
+      });
+
+      const { getByText } = renderWithProviders(<HomeTab />, {
         providerOverrides: {
-          globalContext: { eventsCache: {}, eventsLoading: true },
+          globalContext: { eventsCache: { 'event-today': todayEvent } },
+          // Explicitly no saved events — the redesigned tab browses ALL events.
           savedEventsContext: { savedEventIds: [] },
         },
       });
 
-      expect(UNSAFE_getByType(BrandLoader)).toBeTruthy();
+      expect(getByText('Today Event')).toBeTruthy();
+    });
+  });
+
+  describe('Day Markers', () => {
+    it('marks days with events in the day-cell accessibility labels', () => {
+      const todayEvent = createMockEvent({
+        $id: 'event-today',
+        title: 'Today Event',
+        start_time: hoursFromNow(1),
+      });
+
+      const { getAllByLabelText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-today': todayEvent } },
+        },
+      });
+
+      expect(getAllByLabelText(/, has events/).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Empty Day', () => {
+    it('shows the empty-day state and the next-event pill when the only event is days away', () => {
+      const futureEvent = createMockEvent({
+        $id: 'event-future',
+        title: 'Future Day Event',
+        start_time: hoursFromNow(3 * 24),
+      });
+
+      const { queryByText, getByText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-future': futureEvent } },
+        },
+      });
+
+      // Today (default selection) has no events.
+      expect(queryByText('Future Day Event')).toBeNull();
+      expect(queryByText('home.emptyDayTitle')).toBeTruthy();
+      // t() is mocked to return keys, so the pill renders its raw key.
+      expect(getByText(/home.nextEventPill/)).toBeTruthy();
+    });
+  });
+
+  describe('Multi-Day Expansion', () => {
+    it('shows a multi-day event on an in-between day (started yesterday, ends tomorrow)', () => {
+      const multiDayEvent = createMockEvent({
+        $id: 'event-multi',
+        title: 'Multi Day Event',
+        start_time: '2026-05-11T10:00:00Z', // yesterday (Belgium TZ)
+        end_time: '2026-05-13T18:00:00Z', // tomorrow (Belgium TZ)
+      });
+
+      const { getByText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-multi': multiDayEvent } },
+        },
+      });
+
+      // Today is day 2/3 of the span — the row must appear on today's list.
+      expect(getByText('Multi Day Event')).toBeTruthy();
+    });
+  });
+
+  describe('Past Days Selectable', () => {
+    it('renders no disabled day-cell buttons (past days are selectable)', () => {
+      const { getAllByLabelText } = renderWithProviders(<HomeTab />);
+
+      const dayCells = getAllByLabelText(DAY_CELL_LABEL);
+      expect(dayCells.length).toBeGreaterThan(0);
+      const disabledCells = dayCells.filter(
+        (cell) => cell.props.accessibilityState?.disabled === true
+      );
+      expect(disabledCells).toHaveLength(0);
+    });
+  });
+
+  describe('Agenda View', () => {
+    it('renders all month events grouped by day with agenda day labels', () => {
+      mockViewMode = 'agenda';
+
+      const eventA = createMockEvent({
+        $id: 'event-a',
+        title: 'Agenda Event A',
+        start_time: '2026-05-14T10:00:00Z',
+      });
+      const eventB = createMockEvent({
+        $id: 'event-b',
+        title: 'Agenda Event B',
+        start_time: '2026-05-20T10:00:00Z',
+      });
+
+      const { getByText, queryByText, getAllByText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-a': eventA, 'event-b': eventB } },
+        },
+      });
+
+      // Both future days of the displayed month render chronologically.
+      expect(getByText('Agenda Event A')).toBeTruthy();
+      expect(getByText('Agenda Event B')).toBeTruthy();
+      expect(queryByText('home.emptyDayTitle')).toBeNull();
+      // Uppercased day-group labels like "THU, MAY 14".
+      expect(getAllByText(/MAY \d+/).length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('Saved Toggle', () => {
+    it('calls saveEvent when pressing the bookmark on an unsaved event row', async () => {
+      const saveEvent = jest.fn().mockResolvedValue(1);
+      const todayEvent = createMockEvent({
+        $id: 'event-today',
+        title: 'Today Event',
+        start_time: hoursFromNow(1),
+      });
+
+      const { getByLabelText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-today': todayEvent } },
+          savedEventsContext: { saveEvent, isSaved: jest.fn().mockReturnValue(false) },
+        },
+      });
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Save event'), { stopPropagation: jest.fn() });
+      });
+
+      expect(saveEvent).toHaveBeenCalledWith('event-today', expect.any(Number));
+    });
+
+    it('calls unsaveEvent when pressing the bookmark on a saved event row', async () => {
+      const unsaveEvent = jest.fn().mockResolvedValue(1);
+      const todayEvent = createMockEvent({
+        $id: 'event-today',
+        title: 'Today Event',
+        start_time: hoursFromNow(1),
+      });
+
+      const { getByLabelText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-today': todayEvent } },
+          savedEventsContext: {
+            savedEventIds: ['event-today'],
+            unsaveEvent,
+            isSaved: jest.fn().mockReturnValue(true),
+          },
+        },
+      });
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Remove from saved'), { stopPropagation: jest.fn() });
+      });
+
+      expect(unsaveEvent).toHaveBeenCalledWith('event-today');
     });
   });
 });

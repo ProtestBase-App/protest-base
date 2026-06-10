@@ -293,6 +293,41 @@ describe('Locales', () => {
       expect(nlTabKeys).toEqual(enTabKeys);
     });
 
+    it('should have home section matching exactly across all locales', () => {
+      // The calendar tab redesign rebuilt the home section identically in all
+      // 3 locales (including nested plural objects like dayEventCount).
+      const enHomeKeys = getAllKeys(en.home);
+      const frHomeKeys = getAllKeys(fr.home);
+      const nlHomeKeys = getAllKeys(nl.home);
+
+      expect(frHomeKeys).toEqual(enHomeKeys);
+      expect(nlHomeKeys).toEqual(enHomeKeys);
+    });
+
+    it('should not contain removed pre-redesign home keys', () => {
+      const removedKeys = [
+        'title',
+        'emptyTitle',
+        'emptySubtitle',
+        'emptyButton',
+        'noEvents',
+        'viewToggleCalendar',
+        'viewToggleList',
+        'listSectionUpcoming',
+        'listSectionPast',
+        'listEmptyTitle',
+        'listEmptySubtitle',
+        'loadingEvents',
+        'noUpcomingEvents',
+      ];
+
+      for (const key of removedKeys) {
+        expect((en.home as Record<string, unknown>)[key]).toBeUndefined();
+        expect((fr.home as Record<string, unknown>)[key]).toBeUndefined();
+        expect((nl.home as Record<string, unknown>)[key]).toBeUndefined();
+      }
+    });
+
     it('should have core categories in all locales', () => {
       // Core categories that must exist in all locales
       const coreCategories = ['protest', 'act', 'learn', 'support', 'strike'];
@@ -414,6 +449,32 @@ describe('Locales', () => {
       expect(frValue).toContain('{{name}}');
       expect(nlValue).toContain('{{name}}');
     });
+
+    it('should have {{count}} in the "other" plural form of home plural keys', () => {
+      const pluralKeys = [
+        'home.dayEventCount.other',
+        'home.multiDayBadge.other',
+        'home.filterApplyCount.other',
+      ];
+
+      for (const key of pluralKeys) {
+        expect(getValueByKey(en, key)).toContain('{{count}}');
+        expect(getValueByKey(fr, key)).toContain('{{count}}');
+        expect(getValueByKey(nl, key)).toContain('{{count}}');
+      }
+    });
+
+    it('should have matching placeholders in home.nextEventPill and home.dayProgress', () => {
+      expect(en.home.nextEventPill).toContain('{{date}}');
+      expect(fr.home.nextEventPill).toContain('{{date}}');
+      expect(nl.home.nextEventPill).toContain('{{date}}');
+
+      for (const placeholder of ['{{index}}', '{{total}}']) {
+        expect(en.home.dayProgress).toContain(placeholder);
+        expect(fr.home.dayProgress).toContain(placeholder);
+        expect(nl.home.dayProgress).toContain(placeholder);
+      }
+    });
   });
 
   describe('Critical Keys Existence', () => {
@@ -431,7 +492,21 @@ describe('Locales', () => {
       'events.saved',
       'events.share',
       'explore.searchPlaceholder',
-      'home.title',
+      'home.viewToggleMonth',
+      'home.viewToggleAgenda',
+      'home.emptyDayTitle',
+      'home.emptyFilteredTitle',
+      'home.savedOnlyTitle',
+      'home.openFilters',
+      'home.previousMonth',
+      'home.nextMonth',
+      // Nested plural objects — assert both plural forms resolve to strings
+      'home.dayEventCount.one',
+      'home.dayEventCount.other',
+      'home.multiDayBadge.one',
+      'home.multiDayBadge.other',
+      'home.filterApplyCount.one',
+      'home.filterApplyCount.other',
       'createEvent.title',
       'myEvents.upcoming',
       'myEvents.past',

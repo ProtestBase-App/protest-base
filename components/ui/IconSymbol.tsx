@@ -91,6 +91,10 @@ const MAPPING = {
   'chart.bar': 'bar-chart',
   'bell.badge': 'notifications-active',
   'xmark.circle': 'cancel',
+  'slider.horizontal.3': 'tune',
+  'square.grid.2x2': 'grid-view',
+  'mappin.and.ellipse': 'place',
+  person: 'person',
 } as Partial<
   Record<
     Extract<import('expo-symbols').SymbolViewProps['name'], string>,

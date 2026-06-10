@@ -201,7 +201,7 @@ describe('useExplorePagination', () => {
   });
 
   describe('filter params sent to API', () => {
-    it('sends dateFilter when set to a non-allDates value', async () => {
+    it('sends dateFilter when set', async () => {
       mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
@@ -215,23 +215,6 @@ describe('useExplorePagination', () => {
 
       expect(mockGetEventsBackend).toHaveBeenCalledWith(
         expect.objectContaining({ dateFilter: 'today' })
-      );
-    });
-
-    it('does not send dateFilter when value is "allDates"', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
-
-      const filters: ExploreFilters = {
-        ...defaultFilters,
-        dateFilter: 'allDates',
-      };
-
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
-
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.not.objectContaining({ dateFilter: 'allDates' })
       );
     });
 
@@ -295,7 +278,7 @@ describe('useExplorePagination', () => {
       );
     });
 
-    it('sends category when not "allCategories"', async () => {
+    it('sends category when set', async () => {
       mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
@@ -310,22 +293,6 @@ describe('useExplorePagination', () => {
       expect(mockGetEventsBackend).toHaveBeenCalledWith(
         expect.objectContaining({ category: 'Climate' })
       );
-    });
-
-    it('does not send category when value is "allCategories"', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
-
-      const filters: ExploreFilters = {
-        ...defaultFilters,
-        category: 'allCategories',
-      };
-
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
-
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      const callArgs = mockGetEventsBackend.mock.calls[0][0];
-      expect(callArgs).not.toHaveProperty('category');
     });
 
     it('sends trimmed search when not empty', async () => {

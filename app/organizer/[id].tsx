@@ -18,7 +18,7 @@ import { OrganizerAvatar } from '@/components/OrganizerAvatar';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useFollowedOrgs } from '@/context/FollowedOrgsProvider';
-import { useExploreTabContext } from '@/context/ExploreTabProvider';
+import { DEFAULT_EXPLORE_FILTERS, useExploreTabContext } from '@/context/ExploreTabProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { getEventsBackend } from '@/services/event.service';
 import { getOrganizationById } from '@/services/organizer.service';
@@ -61,18 +61,7 @@ export default function OrganizerProfile() {
     isFollowing: isFollowingOrg,
   } = useFollowedOrgs();
   const { getSubMunicipalityName } = usePostalCodes();
-  const {
-    setGlobalOrganizationFilterValue,
-    setOrganizationFilter,
-    setValueOrganizationOpeningModal,
-    setGlobalLocationFilterValue,
-    setLocationFilter,
-    setValueLocationOpeningModal,
-    setValueCategoryOpeningModal,
-    setValueDateOpeningModal,
-    setSearchQuery,
-    setShouldScrollToTop,
-  } = useExploreTabContext();
+  const { setAppliedFilters, setSearchQuery, setShouldScrollToTop } = useExploreTabContext();
 
   // Listing cache supplies Name/$createdAt without waiting for the detail fetch.
   const cachedOrg = organizations.find((o) => o.$id === orgId);
@@ -171,14 +160,7 @@ export default function OrganizerProfile() {
   const handleSeeAllEvents = () => {
     if (!orgId) return;
     const orgArr = [orgId];
-    setGlobalOrganizationFilterValue(orgArr);
-    setOrganizationFilter(orgArr);
-    setValueOrganizationOpeningModal(orgArr);
-    setGlobalLocationFilterValue([]);
-    setLocationFilter([]);
-    setValueLocationOpeningModal([]);
-    setValueCategoryOpeningModal('allCategories');
-    setValueDateOpeningModal('allDates');
+    setAppliedFilters({ ...DEFAULT_EXPLORE_FILTERS, organizations: orgArr });
     setSearchQuery('');
     setShouldScrollToTop(true);
     router.push(Routes.EXPLORE);

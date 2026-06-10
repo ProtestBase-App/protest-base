@@ -1,123 +1,197 @@
 import { useMemo, useCallback, useState } from 'react';
 import { StyleSheet, Alert, Platform, View, ScrollView, RefreshControl } from 'react-native';
+import Animated, { Easing, FadeIn, withTiming } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { formatEventForList } from '@/utils/eventFormatters';
-import { Event } from '@/services/event.service';
-import { shareEventWithAlert } from '@/utils/shareHelpers';
-import { isEventOngoing } from '@/utils/eventStatus';
-import EventList from '@/components/EventList';
-import EventListCard from '@/components/EventListCard';
-import EmptyEvent from '@/components/EmptyEvent';
+import { Event } from '@/types/event.types';
 import CalendarHeader from '@/components/CalendarHeader';
 import CalendarGrid from '@/components/CalendarGrid';
+import CalendarActiveFilterChips from '@/components/CalendarActiveFilterChips';
+import CalendarEventRow from '@/components/CalendarEventRow';
+import { CalendarEmptyState } from '@/components/CalendarEmptyState';
+import { CalendarFiltersSheet } from '@/components/CalendarFiltersSheet';
 import MonthYearPicker from '@/components/MonthYearPicker';
-import HomeViewToggle from '@/components/HomeViewToggle';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
+import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useHomeViewPreference } from '@/hooks/useHomeViewPreference';
-import { usePreloadPostalCodes } from '@/hooks/usePreloadPostalCodes';
 import { Spacing, Typography } from '@/constants/DesignTokens';
+import { DynamicRoutes } from '@/constants/Routes';
+import { getPrimaryCategoryColors } from '@/constants/CategoryColors';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { getTodayDateKeyInBelgium, CalendarDay } from '@/utils/calendarUtils';
 import {
-  buildEventDateSet,
-  formatDayHeader,
-  getTodayDateKeyInBelgium,
-  getEventDateKeyInBelgium,
-  CalendarDay,
-} from '@/utils/calendarUtils';
+  CalendarFilters,
+  DEFAULT_CALENDAR_FILTERS,
+  CalendarDayEntry,
+  countActiveCalendarFilters,
+  countUpcomingCalendarMatches,
+  dateKeyToDate,
+  expandEventsByDay,
+  findNextEventDayKey,
+  hasActiveCalendarFilters,
+  matchesCalendarFilters,
+} from '@/utils/calendarTabUtils';
+import { parseAsUTC } from '@/utils/eventFormatters';
 import { logger } from '@/utils/logger';
+
+const LOCALE_MAP: Record<string, string> = { en: 'en-US', fr: 'fr-FR', nl: 'nl-NL' };
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** "Mercredi 10 juin" / "Wednesday, June 10" — heading above the day list. */
+function formatSelectedDayHeading(dateKey: string, locale: string): string {
+  const resolvedLocale = LOCALE_MAP[locale] || 'en-US';
+  const formatted = dateKeyToDate(dateKey).toLocaleDateString(resolvedLocale, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return capitalize(formatted);
+}
+
+/** "MER. 10 JUIN" / "WED, JUNE 10" — agenda day-group label (uppercased). */
+function formatAgendaDayLabel(dateKey: string, locale: string): string {
+  const resolvedLocale = LOCALE_MAP[locale] || 'en-US';
+  return dateKeyToDate(dateKey)
+    .toLocaleDateString(resolvedLocale, { weekday: 'short', day: 'numeric', month: 'long' })
+    .toUpperCase();
+}
+
+/** Today's calendar date in Belgium time — all month math uses this, not the
+ * device-local date, so floors/agenda stay correct for non-CET users. */
+function getBelgiumToday(): Date {
+  return dateKeyToDate(getTodayDateKeyInBelgium());
+}
+
+/** True when year/month is before the current Belgium month (the navigation
+ * floor — the events cache only reaches ~20 days back). */
+function isMonthBeforeCurrent(year: number, month: number): boolean {
+  const belgiumToday = getBelgiumToday();
+  return (
+    year < belgiumToday.getFullYear() ||
+    (year === belgiumToday.getFullYear() && month < belgiumToday.getMonth())
+  );
+}
+
+/** The handoff's day-list entrance: fade + slide up 10pt over 0.28s. */
+function fadeSlideIn() {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 10 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 280, easing: Easing.ease }),
+      transform: [{ translateY: withTiming(0, { duration: 280, easing: Easing.ease }) }],
+    },
+  };
+}
 
 export default function HomeTab() {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { userLanguage, eventsCache, eventsLoading, refetchEvents } = useGlobalContext();
-  const { savedEventIds, loading: savedEventsLoading } = useSavedEvents();
-  const { loading: postalCodesLoading, getSubMunicipalityName } = usePostalCodes();
+  const { isSaved, saveEvent, unsaveEvent, loading: savedEventsLoading } = useSavedEvents();
+  const {
+    loading: postalCodesLoading,
+    getSubMunicipalityName,
+    expandLocationTokens,
+    resolveLocationLabel,
+  } = usePostalCodes();
+  const { dropdownItems: organizationItems } = useOrganizations();
   const { viewMode, setViewMode, ready: viewPreferenceReady } = useHomeViewPreference();
 
-  const today = new Date();
-  const [displayYear, setDisplayYear] = useState(today.getFullYear());
-  const [displayMonth, setDisplayMonth] = useState(today.getMonth());
-  // Initial selection uses Belgium-TZ today so the highlight lines up with
-  // event keys (also in Belgium TZ) for users outside CET.
+  const todayKey = getTodayDateKeyInBelgium();
+  const belgiumToday = dateKeyToDate(todayKey);
+  const [displayYear, setDisplayYear] = useState(() => getBelgiumToday().getFullYear());
+  const [displayMonth, setDisplayMonth] = useState(() => getBelgiumToday().getMonth());
+  // Belgium-TZ selection key so the highlight lines up with event keys (also
+  // Belgium TZ) for users outside CET.
   const [selectedDateKey, setSelectedDateKey] = useState(getTodayDateKeyInBelgium);
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [filters, setFilters] = useState<CalendarFilters>(DEFAULT_CALENDAR_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [listRefreshing, setListRefreshing] = useState(false);
-  const [calendarRefreshing, setCalendarRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const allSavedEvents = useMemo(() => {
-    if (savedEventIds.length === 0) return [];
-    return savedEventIds
-      .map((id) => eventsCache[id] as Event | undefined)
-      .filter((event): event is Event => event !== undefined);
-  }, [savedEventIds, eventsCache]);
+  const allEvents = useMemo(() => Object.values(eventsCache), [eventsCache]);
 
-  // Calendar view shows ongoing events only.
-  const ongoingSavedEvents = useMemo(
-    () => allSavedEvents.filter((event) => isEventOngoing(event)),
-    [allSavedEvents]
+  const postalCodeSet = useMemo(
+    () =>
+      filters.locations.length > 0 ? new Set(expandLocationTokens(filters.locations).codes) : null,
+    [filters.locations, expandLocationTokens]
   );
 
-  // Set of date keys with saved events, for dot indicators.
-  const eventDateKeys = useMemo(() => buildEventDateSet(ongoingSavedEvents), [ongoingSavedEvents]);
+  const filterContext = useMemo(() => ({ isSaved, postalCodeSet }), [isSaved, postalCodeSet]);
 
-  // Events for the currently selected day. Matches on the event's Belgium-TZ
-  // start-day key — keeps the calendar's "one dot, one event" semantics
-  // consistent with `buildEventDateSet`.
-  const selectedDayEvents = useMemo(() => {
-    const eventsForDay = ongoingSavedEvents.filter(
-      (event) => getEventDateKeyInBelgium(event.start_time) === selectedDateKey
-    );
-    eventsForDay.sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
-    return eventsForDay.map((event) => formatEventForList(event, userLanguage));
-  }, [ongoingSavedEvents, selectedDateKey, userLanguage]);
+  const filteredEvents = useMemo(
+    () => allEvents.filter((event) => matchesCalendarFilters(event, filters, filterContext)),
+    [allEvents, filters, filterContext]
+  );
 
-  // List view: split saved events into upcoming (not yet started) and past
-  // (already started — including currently in-progress events).
-  const { upcomingFormatted, pastFormatted } = useMemo(() => {
-    const now = Date.now();
-    const upcoming: Event[] = [];
-    const past: Event[] = [];
-    for (const event of allSavedEvents) {
-      if (new Date(event.start_time).getTime() > now) {
-        upcoming.push(event);
-      } else {
-        past.push(event);
-      }
+  // One entry per Belgium-TZ day each event spans (multi-day events expand).
+  const eventsByDay = useMemo(() => expandEventsByDay(filteredEvents), [filteredEvents]);
+
+  // Category dot colors per day for the month grid markers.
+  const dayMarkers = useMemo(() => {
+    const markers: Record<string, string[]> = {};
+    for (const [dateKey, entries] of Object.entries(eventsByDay)) {
+      markers[dateKey] = entries.map(
+        (entry) => getPrimaryCategoryColors(entry.event.categories).color
+      );
     }
-    upcoming.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-    past.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-    return {
-      upcomingFormatted: upcoming.map((e) => formatEventForList(e, userLanguage)),
-      pastFormatted: past.map((e) => formatEventForList(e, userLanguage)),
-    };
-  }, [allSavedEvents, userLanguage]);
+    return markers;
+  }, [eventsByDay]);
 
-  // List view renders cards directly via .map(); preload postal-code data so
-  // city labels resolve without lazy-load gaps.
-  usePreloadPostalCodes(viewMode === 'list' ? [...upcomingFormatted, ...pastFormatted] : []);
-
-  const dayHeaderText = useMemo(
-    () => formatDayHeader(selectedDate, userLanguage),
-    [selectedDate, userLanguage]
+  const selectedDayEntries = useMemo(
+    () => eventsByDay[selectedDateKey] ?? [],
+    [eventsByDay, selectedDateKey]
   );
+
+  const nextEventDayKey = useMemo(
+    () => findNextEventDayKey(eventsByDay, selectedDateKey),
+    [eventsByDay, selectedDateKey]
+  );
+
+  const monthPrefix = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}`;
+  const isCurrentMonthDisplayed = todayKey.startsWith(monthPrefix);
+
+  // Agenda is scoped to the displayed month; on the current month it starts
+  // from today.
+  const agendaDayKeys = useMemo(() => {
+    return Object.keys(eventsByDay)
+      .filter((key) => key.startsWith(monthPrefix) && (!isCurrentMonthDisplayed || key >= todayKey))
+      .sort();
+  }, [eventsByDay, monthPrefix, isCurrentMonthDisplayed, todayKey]);
+
+  // Next event relative to the displayed month (agenda empty state).
+  const agendaNextDayKey = useMemo(() => {
+    const monthStartKey = `${monthPrefix}-01`;
+    const fromKey = monthStartKey < todayKey ? todayKey : monthStartKey;
+    return findNextEventDayKey(eventsByDay, fromKey, true);
+  }, [eventsByDay, monthPrefix, todayKey]);
+
+  const activeFilterCount = countActiveCalendarFilters(filters);
+  const anyFilterActive = hasActiveCalendarFilters(filters);
+
+  const isOnToday =
+    selectedDateKey === todayKey &&
+    displayYear === belgiumToday.getFullYear() &&
+    displayMonth === belgiumToday.getMonth();
 
   const canGoPrev =
-    displayYear > today.getFullYear() ||
-    (displayYear === today.getFullYear() && displayMonth > today.getMonth());
+    displayYear > belgiumToday.getFullYear() ||
+    (displayYear === belgiumToday.getFullYear() && displayMonth > belgiumToday.getMonth());
 
   const goToPrevMonth = useCallback(() => {
-    const now = new Date();
+    const now = getBelgiumToday();
     if (displayYear < now.getFullYear()) return;
     if (displayYear === now.getFullYear() && displayMonth <= now.getMonth()) return;
 
@@ -140,25 +214,33 @@ export default function HomeTab() {
     });
   }, []);
 
-  // Go to today. Use Belgium TZ for the selection key (consistent with the
-  // initial selection on mount and with event keys). Display year/month still
-  // come from the local Date — the calendar grid layout is driven by local
-  // arithmetic, and that's only ever off-by-one for users outside CET right
-  // around midnight; impact is purely cosmetic.
   const goToToday = useCallback(() => {
-    const now = new Date();
+    const key = getTodayDateKeyInBelgium();
+    const now = dateKeyToDate(key);
     setDisplayYear(now.getFullYear());
     setDisplayMonth(now.getMonth());
-    setSelectedDateKey(getTodayDateKeyInBelgium());
-    setSelectedDate(now);
+    setSelectedDateKey(key);
   }, []);
 
   const handleSelectDay = useCallback((day: CalendarDay) => {
     setSelectedDateKey(day.dateKey);
-    setSelectedDate(day.date);
     if (!day.isCurrentMonth) {
-      setDisplayYear(day.date.getFullYear());
-      setDisplayMonth(day.date.getMonth());
+      // Page to the tapped day's month, but never below the current-month
+      // floor (the events cache only reaches ~20 days back).
+      const target = day.date;
+      if (!isMonthBeforeCurrent(target.getFullYear(), target.getMonth())) {
+        setDisplayYear(target.getFullYear());
+        setDisplayMonth(target.getMonth());
+      }
+    }
+  }, []);
+
+  const handleJumpToDate = useCallback((dateKey: string) => {
+    const target = dateKeyToDate(dateKey);
+    setSelectedDateKey(dateKey);
+    if (!isMonthBeforeCurrent(target.getFullYear(), target.getMonth())) {
+      setDisplayYear(target.getFullYear());
+      setDisplayMonth(target.getMonth());
     }
   }, []);
 
@@ -169,6 +251,7 @@ export default function HomeTab() {
 
   const onRefresh = useCallback(async () => {
     logger.info('[HomeTab] Pull to refresh triggered');
+    setRefreshing(true);
     try {
       await refetchEvents();
     } catch (error) {
@@ -176,50 +259,101 @@ export default function HomeTab() {
       Alert.alert(t('home.refreshFailed'), t('home.refreshFailedMessage'), [
         { text: t('common.ok') },
       ]);
+    } finally {
+      setRefreshing(false);
     }
   }, [refetchEvents]);
 
-  const onCalendarRefresh = useCallback(async () => {
-    setCalendarRefreshing(true);
-    try {
-      await onRefresh();
-    } finally {
-      setCalendarRefreshing(false);
-    }
-  }, [onRefresh]);
+  const handleEventPress = useCallback((eventId: string) => {
+    router.push(DynamicRoutes.event(eventId));
+  }, []);
 
-  const onListRefresh = useCallback(async () => {
-    setListRefreshing(true);
-    try {
-      await onRefresh();
-    } finally {
-      setListRefreshing(false);
-    }
-  }, [onRefresh]);
-
-  const handleShareEvent = useCallback(
-    async (eventId: string) => {
-      const event = eventsCache[eventId] as Event | undefined;
-      if (!event) {
-        Alert.alert(t('share.errorTitle'), t('share.eventNotFound'));
-        return;
+  const handleToggleSave = useCallback(
+    async (event: Event, currentlySaved: boolean) => {
+      try {
+        if (currentlySaved) {
+          await unsaveEvent(event.$id);
+        } else {
+          const endsAt = event.end_time
+            ? parseAsUTC(event.end_time).getTime()
+            : parseAsUTC(event.start_time).getTime();
+          await saveEvent(event.$id, endsAt);
+        }
+      } catch (error) {
+        logger.warn('[HomeTab] Failed to toggle saved event', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        Alert.alert(t('common.error'), t('explore.saveError'));
       }
-
-      const cityLabel =
-        event.postal_code && event.country
-          ? getSubMunicipalityName(String(event.postal_code), event.country, event.city) ||
-            undefined
-          : undefined;
-
-      await shareEventWithAlert(event, userLanguage, cityLabel);
     },
-    [eventsCache, userLanguage, getSubMunicipalityName]
+    [saveEvent, unsaveEvent]
   );
 
-  // Loading state — show the splash only on the very first cache load (when the
-  // events map is still empty). Subsequent refetches trigger eventsLoading=true
-  // but should NOT replace the screen with a loader; the per-list RefreshControl
-  // handles the indicator instead.
+  const resolveCityLabel = useCallback(
+    (event: Event): string => {
+      if (event.postal_code && event.country) {
+        const resolved = getSubMunicipalityName(
+          String(event.postal_code),
+          event.country,
+          event.city
+        );
+        if (resolved) return resolved;
+      }
+      return event.city ?? '';
+    },
+    [getSubMunicipalityName]
+  );
+
+  const resolveOrganizationLabel = useCallback(
+    (id: string) => organizationItems.find((item) => item.value === id)?.label ?? id,
+    [organizationItems]
+  );
+
+  const countMatchesForDraft = useCallback(
+    (draft: CalendarFilters) => {
+      const draftPostalCodes =
+        draft.locations.length > 0 ? new Set(expandLocationTokens(draft.locations).codes) : null;
+      return countUpcomingCalendarMatches(
+        allEvents,
+        draft,
+        { isSaved, postalCodeSet: draftPostalCodes },
+        getTodayDateKeyInBelgium()
+      );
+    },
+    [allEvents, isSaved, expandLocationTokens]
+  );
+
+  const removeCategoriesFilter = useCallback(
+    () => setFilters((prev) => ({ ...prev, categories: [] })),
+    []
+  );
+  const removeLocationFilter = useCallback(
+    (token: string) =>
+      setFilters((prev) => ({
+        ...prev,
+        locations: prev.locations.filter((value) => value !== token),
+      })),
+    []
+  );
+  const removeOrganizationFilter = useCallback(
+    (id: string) =>
+      setFilters((prev) => ({
+        ...prev,
+        organizations: prev.organizations.filter((value) => value !== id),
+      })),
+    []
+  );
+  const removeSavedOnlyFilter = useCallback(
+    () => setFilters((prev) => ({ ...prev, savedOnly: false })),
+    []
+  );
+  const removeHelpNeededFilter = useCallback(
+    () => setFilters((prev) => ({ ...prev, helpNeeded: false })),
+    []
+  );
+
+  // Splash only on the very first cache load; refetches keep the screen
+  // visible and use the RefreshControl indicator instead.
   const isInitialEventsLoad = eventsLoading && Object.keys(eventsCache).length === 0;
   if (isInitialEventsLoad || savedEventsLoading || postalCodesLoading || !viewPreferenceReady) {
     return (
@@ -229,130 +363,178 @@ export default function HomeTab() {
     );
   }
 
-  const hasAnySaved = upcomingFormatted.length > 0 || pastFormatted.length > 0;
+  const renderDayEntries = (entries: CalendarDayEntry[]) => (
+    <View style={styles.rowsContainer}>
+      {entries.map((entry) => (
+        <CalendarEventRow
+          key={`${entry.event.$id}-${entry.dayIndex}`}
+          entry={entry}
+          isSaved={isSaved(entry.event.$id)}
+          onPress={handleEventPress}
+          onToggleSave={handleToggleSave}
+          userLanguage={userLanguage}
+          cityLabel={resolveCityLabel(entry.event)}
+        />
+      ))}
+    </View>
+  );
 
   return (
     <ThemedView style={styles.wrapper}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedView style={styles.container}>
-          <HomeViewToggle value={viewMode} onChange={setViewMode} />
+          <CalendarHeader
+            year={displayYear}
+            month={displayMonth}
+            userLanguage={userLanguage}
+            viewMode={viewMode}
+            onChangeViewMode={setViewMode}
+            isOnToday={isOnToday}
+            onGoToToday={goToToday}
+            onOpenPicker={() => setPickerVisible(true)}
+            onPrevMonth={goToPrevMonth}
+            onNextMonth={goToNextMonth}
+            canGoPrev={canGoPrev}
+            activeFilterCount={activeFilterCount}
+            onOpenFilters={() => setSheetOpen(true)}
+          />
 
-          {viewMode === 'calendar' && (
-            <CalendarHeader
-              year={displayYear}
-              month={displayMonth}
-              userLanguage={userLanguage}
-              onOpenPicker={() => setPickerVisible(true)}
-              onGoToToday={goToToday}
-            />
-          )}
-          {viewMode === 'calendar' ? (
-            <>
-              <CalendarGrid
-                year={displayYear}
-                month={displayMonth}
-                selectedDateKey={selectedDateKey}
-                eventDateKeys={eventDateKeys}
-                onSelectDay={handleSelectDay}
-                onPrevMonth={goToPrevMonth}
-                onNextMonth={goToNextMonth}
-                canGoPrev={canGoPrev}
-                userLanguage={userLanguage}
+          <CalendarActiveFilterChips
+            filters={filters}
+            resolveLocationLabel={resolveLocationLabel}
+            resolveOrganizationLabel={resolveOrganizationLabel}
+            onRemoveCategories={removeCategoriesFilter}
+            onRemoveLocation={removeLocationFilter}
+            onRemoveOrganization={removeOrganizationFilter}
+            onRemoveSavedOnly={removeSavedOnlyFilter}
+            onRemoveHelpNeeded={removeHelpNeededFilter}
+          />
+
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={themeColors.tint}
               />
-
-              <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
-
-              <ThemedText style={[styles.dayHeader, { color: themeColors.calendarAccent }]}>
-                {dayHeaderText}
-              </ThemedText>
-
-              <ThemedView style={styles.eventsContainer}>
-                <EventList
-                  events={selectedDayEvents}
-                  refreshing={calendarRefreshing}
-                  onRefresh={onCalendarRefresh}
-                  onShare={handleShareEvent}
-                  ListEmptyComponent={<EmptyEvent />}
-                  loading={eventsLoading}
+            }
+          >
+            {viewMode === 'month' ? (
+              // Keyed by view mode so switching cross-fades per the handoff.
+              <Animated.View key="month-view" entering={FadeIn.duration(280)}>
+                <CalendarGrid
+                  year={displayYear}
+                  month={displayMonth}
+                  selectedDateKey={selectedDateKey}
+                  dayMarkers={dayMarkers}
+                  onSelectDay={handleSelectDay}
+                  onPrevMonth={goToPrevMonth}
+                  onNextMonth={goToNextMonth}
+                  canGoPrev={canGoPrev}
                   userLanguage={userLanguage}
+                  showLegend={filters.categories.length === 0}
                 />
-              </ThemedView>
 
-              <MonthYearPicker
-                visible={pickerVisible}
-                year={displayYear}
-                month={displayMonth}
-                userLanguage={userLanguage}
-                minYear={today.getFullYear()}
-                minMonth={today.getMonth()}
-                onSelect={handlePickerSelect}
-                onClose={() => setPickerVisible(false)}
-              />
-            </>
-          ) : (
-            <ScrollView
-              style={styles.listScroll}
-              contentContainerStyle={styles.listScrollContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={listRefreshing}
-                  onRefresh={onListRefresh}
-                  tintColor={themeColors.tint}
-                />
-              }
-            >
-              {!hasAnySaved ? (
-                <ThemedView style={styles.listEmpty}>
-                  <ThemedText type="subtitleBold" style={styles.listEmptyTitle}>
-                    {t('home.listEmptyTitle')}
-                  </ThemedText>
-                  <ThemedText style={[styles.listEmptySubtitle, { color: themeColors.subtleText }]}>
-                    {t('home.listEmptySubtitle')}
-                  </ThemedText>
-                </ThemedView>
-              ) : (
-                <>
-                  {upcomingFormatted.length > 0 && (
-                    <View style={styles.listSection}>
-                      <ThemedText
-                        type="subtitleBold"
-                        accessibilityRole="header"
-                        style={styles.listSectionHeader}
-                      >
-                        {t('home.listSectionUpcoming')}
+                <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
+
+                {/* Keyed by day so each selection re-runs the fade/slide-in. */}
+                <Animated.View
+                  key={selectedDateKey}
+                  entering={fadeSlideIn}
+                  style={styles.daySection}
+                >
+                  <View style={styles.dayHeadingRow}>
+                    <ThemedText style={styles.dayHeading} numberOfLines={1}>
+                      {formatSelectedDayHeading(selectedDateKey, userLanguage)}
+                    </ThemedText>
+                    {selectedDayEntries.length > 0 && (
+                      <ThemedText style={[styles.dayCount, { color: themeColors.tint }]}>
+                        {t('home.dayEventCount', { count: selectedDayEntries.length })}
                       </ThemedText>
-                      {upcomingFormatted.map((item) => (
-                        <EventListCard
-                          key={item.$id || `upcoming-${item.id}`}
-                          item={item}
-                          onShare={handleShareEvent}
-                        />
-                      ))}
-                    </View>
+                    )}
+                  </View>
+
+                  {selectedDayEntries.length === 0 ? (
+                    <CalendarEmptyState
+                      filtered={anyFilterActive}
+                      nextDateKey={nextEventDayKey}
+                      onJumpToDate={handleJumpToDate}
+                      userLanguage={userLanguage}
+                    />
+                  ) : (
+                    renderDayEntries(selectedDayEntries)
                   )}
-                  {pastFormatted.length > 0 && (
-                    <View style={styles.listSection}>
-                      <ThemedText
-                        type="subtitleBold"
-                        accessibilityRole="header"
-                        style={styles.listSectionHeader}
-                      >
-                        {t('home.listSectionPast')}
-                      </ThemedText>
-                      {pastFormatted.map((item) => (
-                        <EventListCard
-                          key={item.$id || `past-${item.id}`}
-                          item={item}
-                          onShare={handleShareEvent}
+                </Animated.View>
+              </Animated.View>
+            ) : (
+              <Animated.View
+                key="agenda-view"
+                entering={fadeSlideIn}
+                style={styles.agendaContainer}
+              >
+                {agendaDayKeys.length === 0 && (
+                  <CalendarEmptyState
+                    filtered={anyFilterActive}
+                    nextDateKey={agendaNextDayKey}
+                    onJumpToDate={handleJumpToDate}
+                    userLanguage={userLanguage}
+                  />
+                )}
+                {agendaDayKeys.map((dateKey) => {
+                  const isTodayGroup = dateKey === todayKey;
+                  const dayOfWeek = dateKeyToDate(dateKey).getDay();
+                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                  const labelColor = isTodayGroup
+                    ? themeColors.tint
+                    : isWeekend
+                    ? themeColors.text
+                    : themeColors.secondaryText;
+                  return (
+                    <View key={dateKey}>
+                      <View style={styles.agendaDayHeader}>
+                        <ThemedText
+                          style={[
+                            styles.agendaDayLabel,
+                            { color: labelColor },
+                            !isTodayGroup && isWeekend && styles.agendaWeekendLabel,
+                          ]}
+                        >
+                          {isTodayGroup ? `${t('filters.today').toUpperCase()} · ` : ''}
+                          {formatAgendaDayLabel(dateKey, userLanguage)}
+                        </ThemedText>
+                        <View
+                          style={[styles.agendaDayRule, { backgroundColor: themeColors.separator }]}
                         />
-                      ))}
+                      </View>
+                      {renderDayEntries(eventsByDay[dateKey])}
                     </View>
-                  )}
-                </>
-              )}
-            </ScrollView>
-          )}
+                  );
+                })}
+              </Animated.View>
+            )}
+          </ScrollView>
+
+          <MonthYearPicker
+            visible={pickerVisible}
+            year={displayYear}
+            month={displayMonth}
+            userLanguage={userLanguage}
+            minYear={belgiumToday.getFullYear()}
+            minMonth={belgiumToday.getMonth()}
+            onSelect={handlePickerSelect}
+            onClose={() => setPickerVisible(false)}
+          />
+
+          <CalendarFiltersSheet
+            visible={sheetOpen}
+            initialFilters={filters}
+            onApply={setFilters}
+            onClose={() => setSheetOpen(false)}
+            countMatches={countMatchesForDraft}
+          />
         </ThemedView>
       </SafeAreaView>
     </ThemedView>
@@ -369,57 +551,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-  },
-  dayHeader: {
-    fontFamily: Typography.families.semiBold,
-    fontSize: Typography.sizes.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-  },
-  eventsContainer: {
-    flex: 1,
-    marginHorizontal: Spacing.sm,
-    marginBottom: Platform.OS === 'ios' ? Spacing.bottomTabOffset : 0,
-  },
   splashContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listScroll: {
+  body: {
     flex: 1,
-    marginTop: Spacing.sm,
   },
-  listScrollContent: {
-    flexGrow: 1,
+  bodyContent: {
+    paddingBottom: Platform.OS === 'ios' ? Spacing.bottomTabOffset + Spacing.xl : Spacing.xl,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.lg,
+    marginVertical: 14,
+  },
+  daySection: {
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.bottomTabOffset : Spacing.lg,
   },
-  listSection: {
-    marginTop: Spacing.md,
+  dayHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  listSectionHeader: {
-    marginBottom: Spacing.lg,
+  dayHeading: {
+    fontFamily: Typography.families.bold,
+    fontSize: 17,
+    lineHeight: 24,
+    flexShrink: 1,
   },
-  listEmpty: {
-    flex: 1,
+  dayCount: {
+    fontFamily: Typography.families.semiBold,
+    fontSize: 13,
+  },
+  rowsContainer: {
+    gap: 10,
+  },
+  agendaContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    gap: 18,
+  },
+  agendaDayHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing['3xl'],
-  },
-  listEmptyTitle: {
-    textAlign: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  listEmptySubtitle: {
-    textAlign: 'center',
-    fontFamily: Typography.families.regular,
-    fontSize: Typography.sizes.sm,
+  agendaDayLabel: {
+    fontFamily: Typography.families.bold,
+    fontSize: Typography.sizes.xs,
+    letterSpacing: 0.8,
+  },
+  agendaWeekendLabel: {
+    opacity: 0.75,
+  },
+  agendaDayRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
   },
 });

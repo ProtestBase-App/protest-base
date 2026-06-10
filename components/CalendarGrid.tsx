@@ -11,17 +11,24 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { getThemeColors } from '@/utils/themeColors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Typography, Spacing, BorderRadius } from '@/constants/DesignTokens';
+import { Typography, Spacing } from '@/constants/DesignTokens';
 import { generateCalendarGrid, getDayHeaders, CalendarDay } from '@/utils/calendarUtils';
+import { getCategoryColors } from '@/constants/CategoryColors';
+import { eventCategories } from '@/constants/EventCategories';
+import { t } from '@/utils/i18n';
 
 const SWIPE_THRESHOLD = 50;
 const ANIMATION_DURATION = 250;
+const MAX_VISIBLE_DOTS = 3;
+const OVERFLOW_VISIBLE_DOTS = 2;
 
-interface CalendarGridProps {
+export interface CalendarGridProps {
   year: number;
   month: number;
   selectedDateKey: string;
-  eventDateKeys: Set<string>;
+  /** Belgium-TZ dateKey → ordered dot colors, one per event that day. */
+  dayMarkers: Record<string, string[]>;
+  showLegend: boolean;
   onSelectDay: (day: CalendarDay) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -33,7 +40,8 @@ export default function CalendarGrid({
   year,
   month,
   selectedDateKey,
-  eventDateKeys,
+  dayMarkers,
+  showLegend,
   onSelectDay,
   onPrevMonth,
   onNextMonth,
@@ -131,11 +139,13 @@ export default function CalendarGrid({
     <ThemedView style={styles.container} {...panResponder.panHandlers}>
       {/* Day-of-week headers stay fixed; only the grid below animates on swipe. */}
       <View style={styles.headerRow}>
-        <View style={styles.weekNumCell} />
         {dayHeaders.map((label, i) => (
           <View key={i} style={styles.dayHeaderCell}>
             <ThemedText
-              style={[styles.dayHeaderText, i === 6 && { color: themeColors.calendarAccent }]}
+              style={[
+                styles.dayHeaderText,
+                { color: i === 6 ? themeColors.tint : themeColors.secondaryText },
+              ]}
             >
               {label}
             </ThemedText>
@@ -146,22 +156,20 @@ export default function CalendarGrid({
       <Animated.View style={animatedStyle}>
         {weeks.map((week, weekIdx) => (
           <View key={weekIdx} style={styles.weekRow}>
-            <View style={styles.weekNumCell}>
-              <ThemedText style={[styles.weekNumText, { color: themeColors.subtleText }]}>
-                {week.weekNumber}
-              </ThemedText>
-            </View>
-
             {week.days.map((day, dayIdx) => {
               const isSelected = day.dateKey === selectedDateKey;
-              const hasEvents = eventDateKeys.has(day.dateKey);
+              const markerColors = dayMarkers[day.dateKey] ?? [];
+              const hasEvents = markerColors.length > 0;
+              const showOverflow = markerColors.length > MAX_VISIBLE_DOTS;
+              const visibleDotColors = showOverflow
+                ? markerColors.slice(0, OVERFLOW_VISIBLE_DOTS)
+                : markerColors;
 
               return (
                 <Pressable
                   key={dayIdx}
                   style={styles.dayCell}
-                  onPress={() => !day.isPast && onSelectDay(day)}
-                  disabled={day.isPast}
+                  onPress={() => onSelectDay(day)}
                   accessibilityRole="button"
                   accessibilityLabel={`${day.date.toDateString()}${
                     hasEvents ? ', has events' : ''
@@ -170,49 +178,78 @@ export default function CalendarGrid({
                   <View
                     style={[
                       styles.dayCircle,
-                      day.isToday && { backgroundColor: themeColors.calendarAccent },
-                      isSelected &&
-                        !day.isToday &&
-                        !day.isPast && {
-                          backgroundColor: themeColors.badgeBg,
-                        },
+                      isSelected && [
+                        styles.dayCircleSelected,
+                        { backgroundColor: themeColors.tint, shadowColor: themeColors.tint },
+                      ],
+                      !isSelected &&
+                        day.isToday && [styles.dayCircleToday, { borderColor: themeColors.tint }],
                     ]}
                   >
                     <ThemedText
                       style={[
                         styles.dayText,
-                        !day.isCurrentMonth && { color: themeColors.subtleText, opacity: 0.5 },
-                        day.isCurrentMonth && !day.isPast && { color: themeColors.text },
-                        day.isPast && { color: themeColors.subtleText, opacity: 0.3 },
-                        day.isToday && { color: 'white' },
+                        isSelected
+                          ? styles.dayTextSelected
+                          : day.isToday
+                          ? [styles.dayTextToday, { color: themeColors.tint }]
+                          : !day.isCurrentMonth
+                          ? [styles.dayTextOutOfMonth, { color: themeColors.placeholder }]
+                          : hasEvents
+                          ? [styles.dayTextHasEvents, { color: themeColors.text }]
+                          : [styles.dayTextDefault, { color: themeColors.secondaryText }],
                       ]}
                     >
                       {day.day}
                     </ThemedText>
                   </View>
-                  {hasEvents && (
-                    <View
-                      style={[
-                        styles.eventDot,
-                        {
-                          backgroundColor: day.isToday ? 'white' : themeColors.calendarDotDefault,
-                        },
-                      ]}
-                    />
-                  )}
+                  <View style={[styles.dotRow, !day.isCurrentMonth && styles.dotRowOutOfMonth]}>
+                    {visibleDotColors.map((color, dotIdx) => (
+                      <View
+                        key={dotIdx}
+                        style={[styles.eventDot, { backgroundColor: isSelected ? 'white' : color }]}
+                      />
+                    ))}
+                    {showOverflow && (
+                      <ThemedText
+                        style={[
+                          styles.dotOverflowText,
+                          { color: isSelected ? 'white' : themeColors.secondaryText },
+                        ]}
+                      >
+                        {`+${markerColors.length - OVERFLOW_VISIBLE_DOTS}`}
+                      </ThemedText>
+                    )}
+                  </View>
                 </Pressable>
               );
             })}
           </View>
         ))}
       </Animated.View>
+
+      {showLegend && (
+        <View style={styles.legendRow}>
+          {eventCategories.map(({ value }) => (
+            <View key={value} style={styles.legendItem}>
+              <View
+                style={[styles.legendDot, { backgroundColor: getCategoryColors(value).color }]}
+              />
+              <ThemedText style={[styles.legendLabel, { color: themeColors.placeholder }]}>
+                {t(`categories.${value.toLowerCase()}`)}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+      )}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingTop: 14,
     overflow: 'hidden',
   },
   headerRow: {
@@ -220,50 +257,104 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xs,
   },
-  weekNumCell: {
-    width: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   dayHeaderCell: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayHeaderText: {
-    fontFamily: Typography.families.medium,
+    fontFamily: Typography.families.bold,
     fontSize: Typography.sizes.xs,
+    letterSpacing: 0.5,
   },
   weekRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 3,
-  },
-  weekNumText: {
-    fontFamily: Typography.families.regular,
-    fontSize: Typography.sizes.xxs,
   },
   dayCell: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 34,
+    minHeight: 48,
+    gap: 3,
   },
   dayCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: BorderRadius.full,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dayCircleSelected: {
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  dayCircleToday: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+  },
   dayText: {
+    fontSize: Typography.sizes.base,
+  },
+  dayTextSelected: {
+    color: 'white',
+    fontFamily: Typography.families.bold,
+  },
+  dayTextToday: {
+    fontFamily: Typography.families.bold,
+  },
+  dayTextOutOfMonth: {
+    opacity: 0.45,
     fontFamily: Typography.families.regular,
-    fontSize: Typography.sizes.xs,
+  },
+  dayTextHasEvents: {
+    fontFamily: Typography.families.semiBold,
+  },
+  dayTextDefault: {
+    fontFamily: Typography.families.regular,
+  },
+  dotRow: {
+    height: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  dotRowOutOfMonth: {
+    opacity: 0.3,
   },
   eventDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    marginTop: 2,
+  },
+  dotOverflowText: {
+    fontSize: 8.5,
+    fontFamily: Typography.families.extraBold,
+    lineHeight: 10,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    marginTop: Spacing.sm,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  legendLabel: {
+    fontSize: 11,
+    fontFamily: Typography.families.medium,
   },
 });

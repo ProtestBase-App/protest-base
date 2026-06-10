@@ -1,14 +1,14 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
-import { Spacing, BorderRadius, Typography, IconSizes, Shadows } from '@/constants/DesignTokens';
+import { Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
 import type { HomeViewMode } from '@/hooks/useHomeViewPreference';
 
-interface HomeViewToggleProps {
+export interface HomeViewToggleProps {
   value: HomeViewMode;
   onChange: (next: HomeViewMode) => void;
 }
@@ -16,16 +16,17 @@ interface HomeViewToggleProps {
 interface ToggleOption {
   mode: HomeViewMode;
   label: string;
-  icon: 'calendar' | 'list.bullet';
+  icon: IconSymbolName;
 }
 
+/** Segmented month/agenda switch for the calendar tab header. */
 export default function HomeViewToggle({ value, onChange }: HomeViewToggleProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
   const options: ToggleOption[] = [
-    { mode: 'calendar', label: t('home.viewToggleCalendar'), icon: 'calendar' },
-    { mode: 'list', label: t('home.viewToggleList'), icon: 'list.bullet' },
+    { mode: 'month', label: t('home.viewToggleMonth'), icon: 'square.grid.2x2' },
+    { mode: 'agenda', label: t('home.viewToggleAgenda'), icon: 'list.bullet' },
   ];
 
   return (
@@ -34,8 +35,8 @@ export default function HomeViewToggle({ value, onChange }: HomeViewToggleProps)
       style={[
         styles.container,
         {
-          backgroundColor: themeColors.surfaceBackground,
-          borderColor: themeColors.border,
+          backgroundColor: themeColors.cardBackground,
+          borderColor: themeColors.cardBorder,
         },
       ]}
     >
@@ -50,24 +51,25 @@ export default function HomeViewToggle({ value, onChange }: HomeViewToggleProps)
             activeOpacity={0.7}
             onPress={() => onChange(option.mode)}
             style={[
-              styles.option,
-              selected && {
-                backgroundColor: themeColors.cardBackground,
-                shadowColor: Shadows.card.ios.shadowColor,
+              styles.segment,
+              {
+                backgroundColor: selected ? themeColors.surfaceAltBackground : 'transparent',
+                borderColor: selected ? themeColors.cardBorder : 'transparent',
               },
-              selected && styles.optionSelected,
             ]}
           >
             <IconSymbol
               name={option.icon}
-              size={IconSizes.sm}
-              color={selected ? themeColors.tint : themeColors.subtleText}
+              size={14}
+              color={selected ? themeColors.text : themeColors.placeholder}
             />
             <ThemedText
               style={[
                 styles.label,
-                { color: selected ? themeColors.text : themeColors.subtleText },
+                { color: selected ? themeColors.text : themeColors.placeholder },
               ]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
             >
               {option.label}
             </ThemedText>
@@ -81,32 +83,33 @@ export default function HomeViewToggle({ value, onChange }: HomeViewToggleProps)
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.sm,
-    padding: Spacing.xs,
-    borderRadius: BorderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: Spacing.xs,
+    // flexBasis stays 'auto' (not flex: 1) so the control is never allocated
+    // less than its content width by siblings competing for free space.
+    flexGrow: 1,
+    flexShrink: 1,
+    maxWidth: 220,
+    borderRadius: 30,
+    borderWidth: 1,
+    padding: 3,
+    // Whatever happens at extreme font scales, nothing may paint outside the pill.
+    overflow: 'hidden',
   },
-  option: {
+  segment: {
     flex: 1,
+    minWidth: 0,
+    height: 30,
+    borderRadius: 30,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-  },
-  optionSelected: {
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
+    gap: 6,
+    paddingHorizontal: Spacing.xs,
   },
   label: {
     fontFamily: Typography.families.semiBold,
-    fontSize: Typography.sizes.sm,
+    fontSize: 13,
+    lineHeight: 18,
+    flexShrink: 1,
   },
 });

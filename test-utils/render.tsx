@@ -93,24 +93,15 @@ export interface MockPostalCodeContext {
 }
 
 export interface MockExploreTabContext {
-  valueCategoryOpeningModal?: string | null;
-  setValueCategoryOpeningModal?: jest.Mock;
-  valueDateOpeningModal?: string | null;
-  setValueDateOpeningModal?: jest.Mock;
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
-  locationFilter?: string[];
-  setLocationFilter?: jest.Mock;
-  valueLocationOpeningModal?: string[];
-  setValueLocationOpeningModal?: jest.Mock;
-  globalLocationFilterValue?: string[];
-  setGlobalLocationFilterValue?: jest.Mock;
-  organizationFilter?: string[];
-  setOrganizationFilter?: jest.Mock;
-  valueOrganizationOpeningModal?: string[];
-  setValueOrganizationOpeningModal?: jest.Mock;
-  globalOrganizationFilterValue?: string[];
-  setGlobalOrganizationFilterValue?: jest.Mock;
+  appliedFilters?: {
+    category: string | null;
+    dateFilter: string | null;
+    locations: string[];
+    organizations: string[];
+  };
+  setAppliedFilters?: jest.Mock;
   shouldScrollToTop?: boolean;
   setShouldScrollToTop?: jest.Mock;
 }
@@ -247,24 +238,10 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
 };
 
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
-  valueCategoryOpeningModal: 'allCategories',
-  setValueCategoryOpeningModal: jest.fn(),
-  valueDateOpeningModal: 'allDates',
-  setValueDateOpeningModal: jest.fn(),
   searchQuery: '',
   setSearchQuery: jest.fn(),
-  locationFilter: [],
-  setLocationFilter: jest.fn(),
-  valueLocationOpeningModal: [],
-  setValueLocationOpeningModal: jest.fn(),
-  globalLocationFilterValue: [],
-  setGlobalLocationFilterValue: jest.fn(),
-  organizationFilter: [],
-  setOrganizationFilter: jest.fn(),
-  valueOrganizationOpeningModal: [],
-  setValueOrganizationOpeningModal: jest.fn(),
-  globalOrganizationFilterValue: [],
-  setGlobalOrganizationFilterValue: jest.fn(),
+  appliedFilters: { category: null, dateFilter: null, locations: [], organizations: [] },
+  setAppliedFilters: jest.fn(),
   shouldScrollToTop: false,
   setShouldScrollToTop: jest.fn(),
 };

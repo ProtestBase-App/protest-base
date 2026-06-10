@@ -6,7 +6,11 @@
  */
 import React from 'react';
 import { renderHook, act } from '@testing-library/react-native';
-import { ExploreTabProvider, useExploreTabContext } from '@/context/ExploreTabProvider';
+import {
+  ExploreTabProvider,
+  useExploreTabContext,
+  DEFAULT_EXPLORE_FILTERS,
+} from '@/context/ExploreTabProvider';
 
 // ============================================
 // Wrapper
@@ -35,56 +39,9 @@ describe('ExploreTabProvider', () => {
   it('should expose initial default values', () => {
     const { result } = renderHook(() => useExploreTabContext(), { wrapper });
 
-    expect(result.current.valueCategoryOpeningModal).toBe('allCategories');
-    expect(result.current.valueDateOpeningModal).toBe('allDates');
     expect(result.current.searchQuery).toBe('');
-    expect(result.current.locationFilter).toEqual([]);
-    expect(result.current.valueLocationOpeningModal).toEqual([]);
-    expect(result.current.globalLocationFilterValue).toEqual([]);
-    expect(result.current.organizationFilter).toEqual([]);
-    expect(result.current.valueOrganizationOpeningModal).toEqual([]);
-    expect(result.current.globalOrganizationFilterValue).toEqual([]);
+    expect(result.current.appliedFilters).toEqual(DEFAULT_EXPLORE_FILTERS);
     expect(result.current.shouldScrollToTop).toBe(false);
-  });
-
-  it('should update category filter via setValueCategoryOpeningModal', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setValueCategoryOpeningModal('environment');
-    });
-
-    expect(result.current.valueCategoryOpeningModal).toBe('environment');
-  });
-
-  it('should allow category filter to be set to null', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setValueCategoryOpeningModal(null);
-    });
-
-    expect(result.current.valueCategoryOpeningModal).toBeNull();
-  });
-
-  it('should update date filter via setValueDateOpeningModal', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setValueDateOpeningModal('thisWeek');
-    });
-
-    expect(result.current.valueDateOpeningModal).toBe('thisWeek');
-  });
-
-  it('should allow date filter to be set to null', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setValueDateOpeningModal(null);
-    });
-
-    expect(result.current.valueDateOpeningModal).toBeNull();
   });
 
   it('should update search query via setSearchQuery', () => {
@@ -97,64 +54,39 @@ describe('ExploreTabProvider', () => {
     expect(result.current.searchQuery).toBe('climate');
   });
 
-  it('should update locationFilter via setLocationFilter', () => {
+  it('should replace appliedFilters via setAppliedFilters', () => {
     const { result } = renderHook(() => useExploreTabContext(), { wrapper });
 
     act(() => {
-      result.current.setLocationFilter(['1000', '1040']);
+      result.current.setAppliedFilters({
+        category: 'Protest',
+        dateFilter: 'thisWeek',
+        locations: ['BE.BRU'],
+        organizations: ['org-1'],
+      });
     });
 
-    expect(result.current.locationFilter).toEqual(['1000', '1040']);
+    expect(result.current.appliedFilters).toEqual({
+      category: 'Protest',
+      dateFilter: 'thisWeek',
+      locations: ['BE.BRU'],
+      organizations: ['org-1'],
+    });
   });
 
-  it('should update valueLocationOpeningModal via setValueLocationOpeningModal', () => {
+  it('should support functional updates via setAppliedFilters', () => {
     const { result } = renderHook(() => useExploreTabContext(), { wrapper });
 
     act(() => {
-      result.current.setValueLocationOpeningModal(['2000']);
+      result.current.setAppliedFilters((prev) => ({ ...prev, organizations: ['org-2'] }));
     });
 
-    expect(result.current.valueLocationOpeningModal).toEqual(['2000']);
-  });
-
-  it('should update globalLocationFilterValue via setGlobalLocationFilterValue', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setGlobalLocationFilterValue(['3000', '9000']);
+    expect(result.current.appliedFilters).toEqual({
+      category: null,
+      dateFilter: null,
+      locations: [],
+      organizations: ['org-2'],
     });
-
-    expect(result.current.globalLocationFilterValue).toEqual(['3000', '9000']);
-  });
-
-  it('should update organizationFilter via setOrganizationFilter', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setOrganizationFilter(['org-1', 'org-2']);
-    });
-
-    expect(result.current.organizationFilter).toEqual(['org-1', 'org-2']);
-  });
-
-  it('should update valueOrganizationOpeningModal via setValueOrganizationOpeningModal', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setValueOrganizationOpeningModal(['org-3']);
-    });
-
-    expect(result.current.valueOrganizationOpeningModal).toEqual(['org-3']);
-  });
-
-  it('should update globalOrganizationFilterValue via setGlobalOrganizationFilterValue', () => {
-    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
-
-    act(() => {
-      result.current.setGlobalOrganizationFilterValue(['org-4', 'org-5']);
-    });
-
-    expect(result.current.globalOrganizationFilterValue).toEqual(['org-4', 'org-5']);
   });
 
   it('should update shouldScrollToTop via setShouldScrollToTop', () => {
@@ -178,13 +110,35 @@ describe('ExploreTabProvider', () => {
 
     act(() => {
       result.current.setSearchQuery('protest');
-      result.current.setValueCategoryOpeningModal('environment');
+      result.current.setAppliedFilters((prev) => ({ ...prev, category: 'Environment' }));
     });
 
     expect(result.current.searchQuery).toBe('protest');
-    expect(result.current.valueCategoryOpeningModal).toBe('environment');
+    expect(result.current.appliedFilters.category).toBe('Environment');
     // Other fields remain at defaults
-    expect(result.current.locationFilter).toEqual([]);
-    expect(result.current.organizationFilter).toEqual([]);
+    expect(result.current.appliedFilters.locations).toEqual([]);
+    expect(result.current.appliedFilters.organizations).toEqual([]);
+    expect(result.current.shouldScrollToTop).toBe(false);
+  });
+
+  it('should not mutate DEFAULT_EXPLORE_FILTERS when filters change', () => {
+    const { result } = renderHook(() => useExploreTabContext(), { wrapper });
+
+    act(() => {
+      result.current.setAppliedFilters({
+        category: 'Strike',
+        dateFilter: 'today',
+        locations: ['NL.NH'],
+        organizations: ['org-3'],
+      });
+    });
+
+    expect(DEFAULT_EXPLORE_FILTERS).toEqual({
+      category: null,
+      dateFilter: null,
+      locations: [],
+      organizations: [],
+    });
+    expect(Object.isFrozen(DEFAULT_EXPLORE_FILTERS)).toBe(true);
   });
 });

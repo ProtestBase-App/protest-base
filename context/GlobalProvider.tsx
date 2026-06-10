@@ -25,6 +25,48 @@ import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
 import { clearAllUserData } from '@/services/localStorageService';
 
+// Safety ceiling for the paginated cache fill (pages × EVENTS_DEFAULT events).
+const MAX_EVENT_PAGES = 5;
+
+/**
+ * Fetch the full browse window (lookback + all upcoming events), paging until
+ * the server's `total` is exhausted or the safety ceiling is hit. The calendar
+ * tab browses ALL events from this cache, so a single page (100 events) is not
+ * enough once the backend holds more.
+ */
+async function fetchAllCacheableEvents(): Promise<Event[]> {
+  // Look back to include events that started recently but may still be ongoing.
+  // This ensures multi-day events and events without end_time are included.
+  const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
+
+  const events: Event[] = [];
+  let total = Number.POSITIVE_INFINITY;
+
+  for (let page = 0; page < MAX_EVENT_PAGES && events.length < total; page++) {
+    // includeEnded: true so the cache can serve saved events whose end_time is
+    // in the past but still within the saved-event retention window (kept by
+    // SavedEventsProvider).
+    const result = await getEventsBackend({
+      startDate: lookbackDate,
+      limit: API_LIMITS.EVENTS_DEFAULT,
+      offset: events.length,
+      includeEnded: true,
+    });
+    events.push(...result.events);
+    total = result.total;
+    if (result.events.length === 0) break;
+  }
+
+  if (events.length < total) {
+    logger.warn('[GlobalProvider] Events cache truncated at page ceiling', {
+      fetched: events.length,
+      total,
+    });
+  }
+
+  return events;
+}
+
 export interface GlobalContextValue {
   isLogged: boolean;
   setIsLogged: (value: boolean) => void;
@@ -197,27 +239,15 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      // Look back to include events that started recently but may still be ongoing.
-      // This ensures multi-day events and events without end_time are included.
-      const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
-
-      // includeEnded: true so the cache can serve saved events whose end_time is
-      // in the past but still within the saved-event retention window (kept by
-      // SavedEventsProvider).
-      const result = await getEventsBackend({
-        startDate: lookbackDate,
-        limit: API_LIMITS.EVENTS_DEFAULT,
-        offset: 0,
-        includeEnded: true,
-      });
+      const events = await fetchAllCacheableEvents();
 
       const eventsMap: Record<string, Event> = {};
-      result.events.forEach((event) => {
+      events.forEach((event) => {
         eventsMap[event.$id] = event;
       });
 
       setEventsCache(eventsMap);
-      logger.info('[GlobalProvider] Events cache initialized', { count: result.events.length });
+      logger.info('[GlobalProvider] Events cache initialized', { count: events.length });
     } catch (error) {
       logger.error('Failed to fetch events cache:', { error });
       if (isNetworkError(error)) {
@@ -285,22 +315,14 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
-      const result = await getEventsBackend({
-        startDate: lookbackDate,
-        limit: API_LIMITS.EVENTS_DEFAULT,
-        offset: 0,
-        includeEnded: true,
-      });
+      const events = await fetchAllCacheableEvents();
 
       const eventsMap: Record<string, Event> = {};
-      result.events.forEach((event) => {
+      events.forEach((event) => {
         eventsMap[event.$id] = event;
       });
 
       setEventsCache(eventsMap);
-    } catch (error) {
-      throw error;
     } finally {
       setEventsLoading(false);
     }

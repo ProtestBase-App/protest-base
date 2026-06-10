@@ -42,6 +42,7 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
     background: c.background,
     cardBackground: c.cardBackground,
     surfaceBackground: c.surfaceBackground,
+    surfaceAltBackground: c.surfaceAltBackground,
     inputBackground: c.inputBackground,
     headerBackground: c.headerBackground,
 

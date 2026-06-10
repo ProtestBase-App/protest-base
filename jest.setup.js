@@ -158,7 +158,8 @@ jest.mock('react-native-reanimated', () => {
     elastic: jest.fn(() => identity),
     back: jest.fn(() => identity),
     bounce: identity,
-    bezier: jest.fn(() => identity),
+    // Real bezier returns an EasingFunctionFactory ({ factory() }) in v3+.
+    bezier: jest.fn(() => ({ factory: () => identity })),
     in: jest.fn((e) => e || identity),
     out: jest.fn((e) => e || identity),
     inOut: jest.fn((e) => e || identity),
@@ -218,6 +219,20 @@ jest.mock('react-native-reanimated', () => {
     FadeOutUp: { duration: jest.fn().mockReturnThis() },
     SlideInRight: { duration: jest.fn().mockReturnThis() },
     SlideOutLeft: { duration: jest.fn().mockReturnThis() },
+    SlideInDown: (() => {
+      const builder = {};
+      builder.duration = jest.fn(() => builder);
+      builder.easing = jest.fn(() => builder);
+      builder.delay = jest.fn(() => builder);
+      return builder;
+    })(),
+    SlideOutDown: (() => {
+      const builder = {};
+      builder.duration = jest.fn(() => builder);
+      builder.easing = jest.fn(() => builder);
+      builder.delay = jest.fn(() => builder);
+      return builder;
+    })(),
     Layout: { duration: jest.fn().mockReturnThis() },
     ZoomIn: { duration: jest.fn().mockReturnThis() },
     ZoomOut: { duration: jest.fn().mockReturnThis() },
