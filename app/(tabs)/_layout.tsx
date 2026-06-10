@@ -36,6 +36,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="(maps)"
+        options={{
+          title: t('tabs.map'),
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="mappin.and.ellipse" color={color} />
+          ),
+          tabBarAccessibilityLabel: 'tab-maps',
+        }}
+      />
+      <Tabs.Screen
         name="home"
         options={{
           title: t('tabs.home'),

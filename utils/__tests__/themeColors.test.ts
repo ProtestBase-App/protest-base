@@ -160,8 +160,9 @@ describe('getThemeColors', () => {
       const propertyCount = Object.keys(colors).length;
 
       // Dynamically validate against actual source — count should stay in sync
-      // 35 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
-      expect(propertyCount).toBe(35);
+      // 43 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
+      //    + 8 map overlay tokens (maps tab)
+      expect(propertyCount).toBe(43);
     });
 
     it('should have all properties as strings', () => {

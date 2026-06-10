@@ -12,7 +12,39 @@ const nl = {
   tabs: {
     home: 'Kalender',
     explore: 'Ontdekken',
+    map: 'Kaart',
     more: 'Meer',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Kaart',
+    actionCount: {
+      one: '1 actie',
+      other: '{{count}} acties',
+    },
+    actionCountNone: 'Geen acties',
+    timeAll: 'Alles',
+    timeToday: 'Vandaag',
+    timeWeek: '7 dagen',
+    today: 'Vandaag',
+    actionType: 'Soort actie',
+    country: 'Land',
+    countryAll: 'Alle',
+    postalCode: 'Postcode',
+    searchPostalCode: 'Zoek een postcode...',
+    filterApplyCount: {
+      one: 'Bekijk 1 actie',
+      other: 'Bekijk {{count}} acties',
+    },
+    filterApplyNone: 'Geen resultaten',
+    emptyTitle: 'Geen acties met deze filters',
+    resetFilters: 'Filters herstellen',
+    mapUnavailable: 'De kaart is niet beschikbaar op dit apparaat',
+    zoomIn: 'Inzoomen',
+    zoomOut: 'Uitzoomen',
   },
 
   // ============================================

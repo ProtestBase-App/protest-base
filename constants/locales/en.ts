@@ -14,7 +14,39 @@ const en: LocaleData = {
   tabs: {
     home: 'Calendar',
     explore: 'Explore',
+    map: 'Map',
     more: 'More',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Map',
+    actionCount: {
+      one: '1 action',
+      other: '{{count}} actions',
+    },
+    actionCountNone: 'No actions',
+    timeAll: 'All',
+    timeToday: 'Today',
+    timeWeek: '7 days',
+    today: 'Today',
+    actionType: 'Action type',
+    country: 'Country',
+    countryAll: 'All',
+    postalCode: 'Postal code',
+    searchPostalCode: 'Search a postal code...',
+    filterApplyCount: {
+      one: 'See 1 action',
+      other: 'See {{count}} actions',
+    },
+    filterApplyNone: 'No results',
+    emptyTitle: 'No actions with these filters',
+    resetFilters: 'Reset filters',
+    mapUnavailable: 'The map is not available on this device',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
   },
 
   // ============================================

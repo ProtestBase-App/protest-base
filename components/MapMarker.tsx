@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { MarkerView } from '@maplibre/maplibre-react-native';
+import { Marker } from '@maplibre/maplibre-react-native';
 
 interface MapMarkerProps {
   /**
@@ -10,7 +10,7 @@ interface MapMarkerProps {
   /**
    * Unique identifier for the annotation
    */
-  id: string;
+  id?: string;
   /**
    * Text to display in the callout bubble when the marker is tapped
    */
@@ -29,16 +29,17 @@ interface MapMarkerProps {
 
 /**
  * Custom map marker component that displays the ProtestBase logo
- * using MapLibre's MarkerView (renders native React Native views
+ * using MapLibre's Marker (renders native React Native views
  * reliably on both iOS and Android).
  */
 export const MapMarker: React.FC<MapMarkerProps> = ({
   coordinate,
+  id,
   markerWidth = 40,
   markerHeight = 22,
 }) => {
   return (
-    <MarkerView coordinate={coordinate} anchor={{ x: 0.5, y: 1 }}>
+    <Marker id={id} lngLat={coordinate} anchor="bottom">
       <View style={styles.markerContainer}>
         <View style={{ width: markerWidth, height: markerHeight }}>
           <Image
@@ -48,7 +49,7 @@ export const MapMarker: React.FC<MapMarkerProps> = ({
           />
         </View>
       </View>
-    </MarkerView>
+    </Marker>
   );
 };
 

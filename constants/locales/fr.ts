@@ -14,7 +14,39 @@ const fr: LocaleData = {
   tabs: {
     home: 'Calendrier',
     explore: 'Explorer',
+    map: 'Carte',
     more: 'Plus',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Carte',
+    actionCount: {
+      one: '1 action',
+      other: '{{count}} actions',
+    },
+    actionCountNone: 'Aucune action',
+    timeAll: 'Tout',
+    timeToday: "Aujourd'hui",
+    timeWeek: '7 jours',
+    today: "Aujourd'hui",
+    actionType: "Type d'action",
+    country: 'Pays',
+    countryAll: 'Tous',
+    postalCode: 'Code postal',
+    searchPostalCode: 'Rechercher un code postal...',
+    filterApplyCount: {
+      one: 'Voir 1 action',
+      other: 'Voir {{count}} actions',
+    },
+    filterApplyNone: 'Aucun résultat',
+    emptyTitle: 'Aucune action avec ces filtres',
+    resetFilters: 'Réinitialiser les filtres',
+    mapUnavailable: "La carte n'est pas disponible sur cet appareil",
+    zoomIn: 'Zoom avant',
+    zoomOut: 'Zoom arrière',
   },
 
   // ============================================

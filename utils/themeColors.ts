@@ -76,6 +76,23 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
     calendarAccent: c.calendarAccent,
     calendarDotDefault: c.calendarDotDefault,
+
+    // Map tab overlays — translucent surfaces floating over the basemap.
+    // Dark values follow the designer handoff (surface #1E1F27 ≈ cardBackground
+    // #1E1E2D at 0.88–0.94 alpha); light values mirror them on white.
+    mapOverlay: isDark ? 'rgba(30, 30, 45, 0.9)' : 'rgba(255, 255, 255, 0.92)',
+    mapOverlayStrong: isDark ? 'rgba(30, 30, 45, 0.94)' : 'rgba(255, 255, 255, 0.96)',
+    mapOverlayBorder: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+    mapOverlayBorderActive: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.16)',
+    // Inactive overlay-chip text sits brighter than secondaryText for contrast
+    // against the basemap.
+    mapChipText: isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.7)',
+    // Soft accent for active time chips / active filter button icon — the
+    // handoff's #FF9CAB reads better than the raw tint on dark surfaces.
+    mapAccentSoftText: isDark ? '#FF9CAB' : c.tint,
+    // Header fade-out gradient over the map (background color at 0.95 → 0.72 → 0).
+    mapHeaderGradientStart: isDark ? 'rgba(22, 22, 34, 0.95)' : 'rgba(250, 250, 250, 0.95)',
+    mapHeaderGradientMid: isDark ? 'rgba(22, 22, 34, 0.72)' : 'rgba(250, 250, 250, 0.72)',
   };
 };
 

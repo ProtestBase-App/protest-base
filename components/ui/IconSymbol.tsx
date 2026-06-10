@@ -95,6 +95,7 @@ const MAPPING = {
   'square.grid.2x2': 'grid-view',
   'mappin.and.ellipse': 'place',
   person: 'person',
+  minus: 'remove',
 } as Partial<
   Record<
     Extract<import('expo-symbols').SymbolViewProps['name'], string>,

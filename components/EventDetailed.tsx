@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   View,
-  NativeModules,
+  TurboModuleRegistry,
   ActivityIndicator,
   Image as RNImage,
 } from 'react-native';
@@ -33,19 +33,21 @@ import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useLogoScheme } from '@/hooks/useLogoScheme';
 
-// Dynamically load MapLibre to avoid dual CJS/ESM module instantiation.
-let MapView: any = null;
+// Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
+// import time, which throws when the native modules are missing (Expo Go,
+// Jest) — so probe non-throwingly first and require behind a guard.
+let MapLibreMap: any = null;
 let Camera: any = null;
 let MapMarker: any = null;
 let isMapAvailable = false;
 
-if (NativeModules.MLRNModule) {
+if (TurboModuleRegistry.get('MLRNMapViewModule')) {
   try {
     const MC = require('@/components/MapComponents');
-    MapView = MC.MapView;
+    MapLibreMap = MC.MapLibreMap;
     Camera = MC.Camera;
     MapMarker = MC.MapMarker;
-    isMapAvailable = !!(MapView && Camera && MapMarker);
+    isMapAvailable = !!(MapLibreMap && Camera && MapMarker);
     logger.info('[EventDetailed] Map components loaded', { isMapAvailable });
   } catch (error) {
     logger.warn('[EventDetailed] MapLibre failed to load', {
@@ -657,31 +659,33 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <ThemedText style={styles.sectionTitle}>{t('events.location')}</ThemedText>
 
               <View style={[styles.mapContainer, { borderColor: themeColors.cardBorder }]}>
-                {isMapAvailable && MapView && Camera && MapMarker && (
+                {isMapAvailable && MapLibreMap && Camera && MapMarker && (
                   <>
-                    <MapView
+                    <MapLibreMap
                       style={styles.map}
                       mapStyle={OPENFREEMAP_STYLE}
-                      attributionEnabled={true}
-                      logoEnabled={false}
-                      scrollEnabled={false}
-                      zoomEnabled={false}
-                      rotateEnabled={false}
-                      pitchEnabled={false}
+                      attribution={true}
+                      logo={false}
+                      dragPan={false}
+                      touchZoom={false}
+                      doubleTapZoom={false}
+                      doubleTapHoldZoom={false}
+                      touchRotate={false}
+                      touchPitch={false}
                       onDidFinishLoadingMap={() => setMapLoaded(true)}
                     >
                       <Camera
-                        centerCoordinate={[event.geocod_lng!, event.geocod_lat!]}
-                        zoomLevel={13}
-                        animationMode="moveTo"
-                        animationDuration={0}
+                        initialViewState={{
+                          center: [event.geocod_lng!, event.geocod_lat!],
+                          zoom: 13,
+                        }}
                       />
                       <MapMarker
                         coordinate={[event.geocod_lng!, event.geocod_lat!]}
                         markerWidth={40}
                         markerHeight={22}
                       />
-                    </MapView>
+                    </MapLibreMap>
                     {!mapLoaded && (
                       <View
                         style={[
