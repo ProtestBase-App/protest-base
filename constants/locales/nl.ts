@@ -603,6 +603,7 @@ const nl = {
     imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',
+    maxCoOrganizers: 'Je kunt maximaal {{max}} mede-organisatoren toevoegen.',
     volunteerHelper: 'Laat vrijwilligers weten hoe ze je evenement kunnen ondersteunen',
     disclaimerHelper:
       'Belangrijke informatie die deelnemers moeten weten (veiligheid, toegankelijkheid, vereisten, etc.)',

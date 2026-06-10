@@ -408,9 +408,11 @@ function buildEventFormData(
     if (value === null || value === undefined) return;
 
     if (key === 'categories' || key === 'co_organizers') {
-      // After normalization these are always string[] when present.
+      // Backend expects a single JSON-array string for these list fields
+      // (matches frontend-protest-base's buildEventFormData). After
+      // normalization the value is a non-empty string[] when present.
       if (Array.isArray(value)) {
-        (value as string[]).forEach((item) => formData.append(key, item));
+        formData.append(key, JSON.stringify(value));
       }
     } else if (key === 'postal_code') {
       formData.append(key, String(value));

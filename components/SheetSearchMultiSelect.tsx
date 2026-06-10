@@ -26,6 +26,19 @@ export interface SheetSearchMultiSelectProps {
   /** Minimum query length before suggestions appear (0 = show on focus). */
   minSearchLength?: number;
   maxVisibleOptions?: number;
+  /**
+   * Restrict the selection to a single value: picking an option replaces the
+   * current selection and collapses the dropdown. The selected value still
+   * renders as one removable chip above the input. Defaults to multi-select.
+   */
+  singleSelect?: boolean;
+  /**
+   * Cap the number of selected values (multi-select only). Once reached, no more
+   * options are offered until a chip is removed. Ignored when singleSelect.
+   */
+  maxSelected?: number;
+  /** Hint shown once the maxSelected cap is reached (e.g. "Max 10 co-organizers"). */
+  maxSelectedHint?: string;
   testID?: string;
 }
 
@@ -47,6 +60,9 @@ export function SheetSearchMultiSelect({
   leadingIconName,
   minSearchLength = 0,
   maxVisibleOptions = 5,
+  singleSelect = false,
+  maxSelected,
+  maxSelectedHint,
   testID,
 }: SheetSearchMultiSelectProps) {
   const colorScheme = useColorScheme();
@@ -78,8 +94,12 @@ export function SheetSearchMultiSelect({
 
   const normalizedQuery = query.trim().toLowerCase();
 
+  // Multi-select cap: once reached, stop offering options until a chip is removed.
+  // singleSelect always replaces its one value, so the cap never applies there.
+  const atMax = !singleSelect && maxSelected != null && selected.length >= maxSelected;
+
   const visibleOptions = useMemo(() => {
-    if (!focused) return [];
+    if (!focused || atMax) return [];
     if (normalizedQuery.length < minSearchLength) return [];
     const unselected = options.filter((option) => !selected.includes(option.value));
     const matched =
@@ -89,7 +109,7 @@ export function SheetSearchMultiSelect({
             (option.searchText ?? option.label.toLowerCase()).includes(normalizedQuery)
           );
     return matched.slice(0, maxVisibleOptions);
-  }, [focused, normalizedQuery, options, selected, minSearchLength, maxVisibleOptions]);
+  }, [focused, atMax, normalizedQuery, options, selected, minSearchLength, maxVisibleOptions]);
 
   const dropdownOpen = visibleOptions.length > 0;
 
@@ -98,10 +118,16 @@ export function SheetSearchMultiSelect({
   };
 
   const handleSelect = (value: string) => {
-    onChange([...selected, value]);
+    if (atMax) return;
+    onChange(singleSelect ? [value] : [...selected, value]);
     setQuery('');
-    // Keep the input focused so the user can chain selections.
-    inputRef.current?.focus();
+    if (singleSelect) {
+      // Single value chosen — collapse the dropdown rather than inviting another pick.
+      inputRef.current?.blur();
+    } else {
+      // Keep the input focused so the user can chain selections.
+      inputRef.current?.focus();
+    }
   };
 
   const handleClearQuery = () => {
@@ -206,6 +232,12 @@ export function SheetSearchMultiSelect({
           ))}
         </View>
       )}
+
+      {atMax && maxSelectedHint ? (
+        <ThemedText style={[styles.maxHint, { color: themeColors.secondaryText }]}>
+          {maxSelectedHint}
+        </ThemedText>
+      ) : null}
     </View>
   );
 }
@@ -264,6 +296,11 @@ const styles = StyleSheet.create({
   },
   optionAdd: {
     fontSize: Typography.sizes.base,
+  },
+  maxHint: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    marginTop: 6,
   },
 });
 

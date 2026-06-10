@@ -19,13 +19,16 @@ import { ThemedView } from '@/components/ThemedView';
 import FormField from '@/components/FormField';
 import FormDateField from '@/components/FormDateField';
 import FormLongText from '@/components/FormLongText';
-import { DropdownCustom } from '@/components/DropdownCustom';
-import { DropdownMultiselect } from '@/components/DropdownMultiselect';
+import {
+  SheetSearchMultiSelect,
+  SheetSearchMultiSelectOption,
+} from '@/components/SheetSearchMultiSelect';
 import AddressAutocompleteField from '@/components/AddressAutocompleteField';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { RemovableChip } from '@/components/RemovableChip';
+import { FilterChip } from '@/components/ui/FilterChip';
 import { eventCategories } from '@/constants/EventCategories';
-import { MAX_EVENT_IMAGES } from '@/constants/EventConfig';
+import { getCategoryColors } from '@/constants/CategoryColors';
+import { MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
 import type { EventFormProps } from '@/types/eventForm.types';
@@ -69,7 +72,6 @@ const EventForm: React.FC<EventFormProps> = ({
   // Template mode hides date/time and image fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
   const { dropdownItems: organizations, loading: organizationsLoading } = useOrganizations();
-  const [postalCodeSearch, setPostalCodeSearch] = React.useState('');
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
   const [isPickingImage, setIsPickingImage] = React.useState(false);
@@ -102,7 +104,6 @@ const EventForm: React.FC<EventFormProps> = ({
           city: '',
           region: '',
         }));
-        setPostalCodeSearch('');
       }
       previousCountry.current = form.country;
       isInitialMount.current = false;
@@ -184,28 +185,30 @@ const EventForm: React.FC<EventFormProps> = ({
     return [];
   }, [postalCodesData, userLang, form.country]);
 
-  const filteredPostalCodes = useMemo(() => {
-    if (postalCodeSearch.length >= 2) {
-      return listPostalCodes;
-    }
+  const postalCodeOptions = useMemo<SheetSearchMultiSelectOption[]>(
+    () =>
+      listPostalCodes.map((item) => ({
+        value: item.value,
+        label: item.label,
+        searchText: item.label.toLowerCase(),
+      })),
+    [listPostalCodes]
+  );
 
-    if (form.postal_code) {
-      const selectedItem = listPostalCodes.find((item) => item.value === String(form.postal_code));
-      if (selectedItem) {
-        return [selectedItem];
-      }
-      // The code isn't in the bundled dataset — either it's still loading, or it
-      // came from an address suggestion for an NL/edge postcode the static set
-      // lacks. Synthesize a display item from the stored city so the dropdown
-      // reflects the accepted selection instead of showing the placeholder.
-      const synthLabel = form.city
-        ? `${form.city} (${form.postal_code})`
-        : String(form.postal_code);
-      return [{ label: synthLabel, value: String(form.postal_code) }];
-    }
+  // value → label for the selected chip; SheetSearchMultiSelect filters the full
+  // option list internally, so no pre-filtering is needed here.
+  const postalLabelMap = useMemo(
+    () => new Map(listPostalCodes.map((item) => [item.value, item.label])),
+    [listPostalCodes]
+  );
 
-    return [];
-  }, [postalCodeSearch, listPostalCodes, form.postal_code, form.city]);
+  // Resolve a postal code to its display label, falling back to the synced city
+  // for NL/edge codes absent from the bundled dataset (or still loading) — the
+  // same synthesized label the old dropdown showed.
+  const resolvePostalLabel = useCallback(
+    (code: string) => postalLabelMap.get(code) ?? (form.city ? `${form.city} (${code})` : code),
+    [postalLabelMap, form.city]
+  );
 
   const getFormProgress = useMemo(() => {
     // Templates don't require start_time; only title is "recommended" for templates.
@@ -217,10 +220,20 @@ const EventForm: React.FC<EventFormProps> = ({
     return { completed, total, percentage: Math.round((completed / total) * 100) };
   }, [form.title, form.description, form.start_time, isTemplateMode]);
 
-  // O(1) lookup when rendering chips.
+  // O(1) lookup when resolving co-organizer chip labels.
   const orgLookup = useMemo(
     () => new Map(organizations.map((o) => [o.value, o.label])),
     [organizations]
+  );
+
+  const organizationOptions = useMemo<SheetSearchMultiSelectOption[]>(
+    () => organizations.map((o) => ({ value: o.value, label: o.label })),
+    [organizations]
+  );
+
+  const resolveOrganizationLabel = useCallback(
+    (id: string) => orgLookup.get(id) ?? id,
+    [orgLookup]
   );
 
   // Map the form's country value to the address endpoint's lowercase ISO code.
@@ -256,8 +269,6 @@ const EventForm: React.FC<EventFormProps> = ({
           postal_code: Number.isNaN(parsed) ? f.postal_code : parsed,
         };
       });
-      // Reset the postal dropdown's search so it shows the synced selection.
-      setPostalCodeSearch('');
     },
     [setForm]
   );
@@ -265,17 +276,6 @@ const EventForm: React.FC<EventFormProps> = ({
   const handleAddressClear = useCallback(() => {
     setForm((f) => ({ ...f, street_address: '' }));
   }, [setForm]);
-
-  const handleRemoveCoOrganizer = useCallback(
-    (valueToRemove: string) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setForm((prev) => ({
-        ...prev,
-        co_organizers: prev.co_organizers.filter((v) => v !== valueToRemove),
-      }));
-    },
-    [setForm]
-  );
 
   // Scroll to end when the disclaimer focuses; delay lets the keyboard appear first.
   const handleDisclaimerFocus = useCallback(() => {
@@ -621,30 +621,30 @@ const EventForm: React.FC<EventFormProps> = ({
       <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>
         {t('createEvent.category')} ({t('common.optional')})
       </ThemedText>
-      <ThemedView style={styles.dropdownWrapper}>
-        <DropdownCustom
-          testID="dropdown-event-category"
-          items={eventCategories.map((cat) => ({
-            label: t(`categories.${cat.value.toLowerCase()}`),
-            value: cat.value,
-          }))}
-          placeholder={t('createEvent.selectCategory')}
-          onValueChange={(value) => setForm({ ...form, categories: value })}
-          value={form.categories}
-          containerStyle={{ marginTop: 8, flex: 1 }}
-          searchable={false}
-          excludeSearchField={true}
-          maxHeight={200}
-          mode="auto"
-        />
-        {form.categories && (
-          <TouchableOpacity
-            onPress={() => setForm({ ...form, categories: '' })}
-            style={styles.clearButton}
-          >
-            <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-          </TouchableOpacity>
-        )}
+      <ThemedView style={styles.chipRow}>
+        {eventCategories.map(({ value }) => {
+          const categoryColors = getCategoryColors(value);
+          const active = form.categories === value;
+          return (
+            <FilterChip
+              key={value}
+              testID={`category-chip-${value}`}
+              label={t(`categories.${value.toLowerCase()}`)}
+              active={active}
+              activeColor={categoryColors.color}
+              activeBackground={categoryColors.bg}
+              leading={
+                <View
+                  style={[
+                    styles.categoryDot,
+                    { backgroundColor: categoryColors.color, opacity: active ? 1 : 0.6 },
+                  ]}
+                />
+              }
+              onPress={() => setForm({ ...form, categories: active ? '' : value })}
+            />
+          );
+        })}
       </ThemedView>
       <HelperText text={t('createEvent.categoryHelper')} isDark={isDark} />
 
@@ -681,19 +681,20 @@ const EventForm: React.FC<EventFormProps> = ({
       <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>
         {t('createEvent.country')} ({t('common.optional')})
       </ThemedText>
-      <DropdownCustom
-        testID="dropdown-event-country"
-        items={countries.map((c) => ({
-          label: c.label[userLang as keyof typeof c.label] || c.label.en,
-          value: c.value,
-        }))}
-        placeholder={t('createEvent.selectCountry')}
-        onValueChange={(value) => setForm({ ...form, country: value })}
-        value={form.country}
-        containerStyle={{ marginTop: 8 }}
-        searchable={false}
-        excludeSearchField={true}
-      />
+      <ThemedView style={styles.chipRow}>
+        {countries.map((c) => {
+          const active = form.country === c.value;
+          return (
+            <FilterChip
+              key={c.value}
+              testID={`country-chip-${c.value}`}
+              label={c.label[userLang as keyof typeof c.label] || c.label.en}
+              active={active}
+              onPress={() => setForm({ ...form, country: active ? '' : c.value })}
+            />
+          );
+        })}
+      </ThemedView>
 
       {form.country && (
         <ThemedView style={styles.nestedFieldGroup}>
@@ -710,34 +711,17 @@ const EventForm: React.FC<EventFormProps> = ({
             )}
           </ThemedView>
 
-          <ThemedView style={styles.postalCodeWrapper}>
-            <ThemedView style={styles.inputPostalCode}>
-              <DropdownCustom
-                testID="dropdown-event-postal-code"
-                items={filteredPostalCodes}
-                placeholder={
-                  postalCodesLoading ? t('common.loading') : t('createEvent.postalCodePlaceholder')
-                }
-                onValueChange={(value) =>
-                  setForm({ ...form, postal_code: value ? Number(value) : null })
-                }
-                value={form.postal_code ? String(form.postal_code) : undefined}
-                searchable={true}
-                searchPlaceholder={t('createEvent.searchPostalCode')}
-                inputSearchStyle={{ fontSize: Typography.sizes.xs }}
-                onChangeSearchText={(text) => setPostalCodeSearch(text)}
-                mode="auto"
-                dropdownPosition="auto"
-                containerStyle={{ flex: 1 }}
-                disabled={postalCodesLoading}
-              />
-            </ThemedView>
-            {form.postal_code && !postalCodesLoading && (
-              <TouchableOpacity
-                onPress={() => {
-                  // Street is gated behind the postal code, so clearing the
-                  // postal also clears the street + derived city/region —
-                  // otherwise a now-hidden street_address would still save.
+          <ThemedView style={styles.controlSpacing}>
+            <SheetSearchMultiSelect
+              testID="dropdown-event-postal-code"
+              options={postalCodeOptions}
+              selected={form.postal_code ? [String(form.postal_code)] : []}
+              onChange={(next) => {
+                const code = next[0];
+                if (!code) {
+                  // Street is gated behind the postal code, so clearing the postal
+                  // also clears the street + derived city/region — otherwise a
+                  // now-hidden street_address would still save.
                   setForm({
                     ...form,
                     postal_code: null,
@@ -745,15 +729,18 @@ const EventForm: React.FC<EventFormProps> = ({
                     city: '',
                     region: '',
                   });
-                  setPostalCodeSearch('');
-                }}
-                style={styles.clearButton}
-                accessibilityLabel={t('createEvent.clearPostalCodeAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-              </TouchableOpacity>
-            )}
+                } else {
+                  setForm({ ...form, postal_code: Number(code) });
+                }
+              }}
+              placeholder={
+                postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
+              }
+              resolveSelectedLabel={resolvePostalLabel}
+              leadingIconName="mappin.and.ellipse"
+              minSearchLength={2}
+              singleSelect
+            />
           </ThemedView>
 
           {/* Stepwise reveal: the street field appears only after a postal code
@@ -832,50 +819,22 @@ const EventForm: React.FC<EventFormProps> = ({
           />
         )}
       </ThemedView>
-      <ThemedView style={styles.dropdownWrapper}>
-        <DropdownMultiselect
+      <ThemedView style={styles.controlSpacing}>
+        <SheetSearchMultiSelect
           testID="dropdown-event-co-organizers"
-          items={organizations}
+          options={organizationOptions}
+          selected={form.co_organizers}
+          onChange={(next) => setForm({ ...form, co_organizers: next })}
           placeholder={
             organizationsLoading ? t('common.loading') : t('createEvent.selectCoOrganizers')
           }
-          onValueChange={(value) => setForm({ ...form, co_organizers: value })}
-          value={form.co_organizers}
-          searchable={true}
-          containerStyle={{ marginTop: 8, flex: 1 }}
-          disabled={organizationsLoading}
+          resolveSelectedLabel={resolveOrganizationLabel}
+          leadingIconName="person"
+          minSearchLength={0}
+          maxSelected={MAX_CO_ORGANIZERS}
+          maxSelectedHint={t('createEvent.maxCoOrganizers', { max: MAX_CO_ORGANIZERS })}
         />
-        {form.co_organizers && form.co_organizers.length > 0 && !organizationsLoading && (
-          <TouchableOpacity
-            onPress={() => setForm({ ...form, co_organizers: [] })}
-            style={styles.clearButton}
-            accessibilityLabel={t('createEvent.clearCoOrganizersAccessibilityLabel')}
-            accessibilityRole="button"
-          >
-            <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-          </TouchableOpacity>
-        )}
       </ThemedView>
-
-      {form.co_organizers && form.co_organizers.length > 0 && (
-        <ThemedView style={styles.selectedChipsContainer}>
-          <ThemedText style={styles.selectedChipsLabel}>
-            {t('createEvent.selected')} ({form.co_organizers.length}):
-          </ThemedText>
-          <ThemedView style={styles.chipsWrapper}>
-            {form.co_organizers.map((value) => (
-              <RemovableChip
-                key={value}
-                label={orgLookup.get(value) || value}
-                value={value}
-                onRemove={handleRemoveCoOrganizer}
-                disabled={organizationsLoading}
-                accessibilityContext="co-organizers"
-              />
-            ))}
-          </ThemedView>
-        </ThemedView>
-      )}
 
       <HelperText text={t('createEvent.coOrganizersHelper')} isDark={isDark} />
 
@@ -1072,39 +1031,19 @@ const styles = StyleSheet.create({
   conditionalFieldGroup: {
     marginTop: 0,
   },
-  dropdownWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  clearButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  postalCodeWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  controlSpacing: {
     marginTop: 8,
   },
-  inputPostalCode: {
-    flex: 1,
-    maxWidth: '100%',
-  },
-  selectedChipsContainer: {
-    marginTop: Spacing.md,
-  },
-  selectedChipsLabel: {
-    fontSize: Typography.sizes.sm,
-    fontFamily: Typography.families.semiBold,
-    marginBottom: Spacing.sm,
-    opacity: 0.7,
-  },
-  chipsWrapper: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
+    marginTop: 8,
+  },
+  categoryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   checkboxContainer: {
     flexDirection: 'row',

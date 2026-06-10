@@ -561,6 +561,7 @@ const en: LocaleData = {
     imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',
+    maxCoOrganizers: 'You can add up to {{max}} co-organizers.',
     volunteerHelper: 'Let volunteers know how they can support your event',
     disclaimerHelper:
       'Important information attendees should know (safety, accessibility, requirements, etc.)',

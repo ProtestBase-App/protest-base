@@ -72,65 +72,6 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Medium: 'medium', Light: 'light' },
 }));
 
-jest.mock('react-native-element-dropdown', () => {
-  const React = require('react');
-  return {
-    Dropdown: ({ placeholder, onChange, data, value, onChangeText, ...rest }: any) => {
-      const selectedItem = data?.find((item: any) => item.value === value);
-      return React.createElement(
-        'View',
-        {
-          testID: 'dropdown',
-          accessibilityLabel: rest.accessibilityLabel || placeholder,
-        },
-        React.createElement(
-          'Text',
-          { testID: 'dropdown-placeholder' },
-          selectedItem ? selectedItem.label : placeholder
-        ),
-        ...(data || []).map((item: any, index: number) =>
-          React.createElement(
-            'Pressable',
-            {
-              key: item.value || index,
-              testID: `dropdown-item-${item.value}`,
-              onPress: () => onChange?.(item),
-            },
-            React.createElement('Text', null, item.label)
-          )
-        )
-      );
-    },
-    MultiSelect: ({ placeholder, onChange, data, value, ...rest }: any) =>
-      React.createElement(
-        'View',
-        {
-          testID: 'multiselect',
-          accessibilityLabel: rest.accessibilityLabel || placeholder,
-        },
-        React.createElement('Text', { testID: 'multiselect-placeholder' }, placeholder),
-        ...(data || []).map((item: any, index: number) =>
-          React.createElement(
-            'Pressable',
-            {
-              key: item.value || index,
-              testID: `multiselect-item-${item.value}`,
-              onPress: () => {
-                const currentValues = value || [];
-                const isSelected = currentValues.includes(item.value);
-                const newValues = isSelected
-                  ? currentValues.filter((v: string) => v !== item.value)
-                  : [...currentValues, item.value];
-                onChange?.(newValues);
-              },
-            },
-            React.createElement('Text', null, item.label)
-          )
-        )
-      ),
-  };
-});
-
 jest.mock('@/context/OrganizationsProvider', () => ({
   useOrganizations: jest.fn(() => ({
     dropdownItems: [
@@ -214,7 +155,7 @@ jest.mock('@/services/address.service', () => ({
 
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react-native';
 import EventForm from '@/components/EventForm';
 import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
@@ -403,7 +344,7 @@ describe('EventForm — field value changes', () => {
 describe('EventForm — category selection', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('calls setForm when a category is selected from dropdown', async () => {
+  it('calls setForm when a category chip is pressed', async () => {
     const setForm = jest.fn();
     render(
       <EventForm
@@ -413,14 +354,14 @@ describe('EventForm — category selection', () => {
         userLanguage="en"
       />
     );
-    const categoryItem = screen.getByTestId('dropdown-item-Protest');
+    const categoryChip = screen.getByTestId('category-chip-Protest');
     await act(async () => {
-      fireEvent.press(categoryItem);
+      fireEvent.press(categoryChip);
     });
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: 'Protest' }));
   });
 
-  it('renders clear button when category is selected', () => {
+  it('renders the selected category as an active chip', () => {
     const formWithCategory = { ...mockForm, categories: 'Protest' };
     render(
       <EventForm
@@ -430,8 +371,7 @@ describe('EventForm — category selection', () => {
         userLanguage="en"
       />
     );
-    // Form renders with the category selected
-    expect(screen.toJSON()).toBeTruthy();
+    expect(screen.getByTestId('category-chip-Protest')).toBeTruthy();
   });
 });
 
@@ -616,7 +556,7 @@ describe('EventForm — country and postal code loading', () => {
     expect(screen.toJSON()).toBeTruthy();
   });
 
-  it('calls setForm when country is selected via dropdown', async () => {
+  it('calls setForm when a country chip is pressed', async () => {
     const setForm = jest.fn();
     render(
       <EventForm
@@ -626,9 +566,9 @@ describe('EventForm — country and postal code loading', () => {
         userLanguage="en"
       />
     );
-    const belgiumItem = screen.getByTestId('dropdown-item-belgium');
+    const belgiumChip = screen.getByTestId('country-chip-belgium');
     await act(async () => {
-      fireEvent.press(belgiumItem);
+      fireEvent.press(belgiumChip);
     });
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ country: 'belgium' }));
   });
@@ -1386,16 +1326,10 @@ describe('EventForm — co-organizers', () => {
     // Press the remove button on the first chip
     const removeButton = screen.getByLabelText(/Remove Org A/i);
     fireEvent.press(removeButton);
-    expect(setForm).toHaveBeenCalled();
-    // Call the state updater function to verify it filters correctly
-    const stateUpdater = setForm.mock.calls[0][0];
-    if (typeof stateUpdater === 'function') {
-      const newState = stateUpdater(formWithCoOrgs);
-      expect(newState.co_organizers).toEqual(['org-b']);
-    }
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ co_organizers: ['org-b'] }));
   });
 
-  it('clears all co-organizers when clear button is pressed', async () => {
+  it('removes a single co-organizer when its chip is pressed', async () => {
     const setForm = jest.fn();
     const formWithCoOrgs = { ...mockForm, co_organizers: ['org-a', 'org-b'] };
     render(
@@ -1409,9 +1343,8 @@ describe('EventForm — co-organizers', () => {
     await act(async () => {
       await flushPromises();
     });
-    const clearButton = screen.getByLabelText(/clear.*co.*organizer/i);
-    fireEvent.press(clearButton);
-    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ co_organizers: [] }));
+    fireEvent.press(screen.getByLabelText(/Remove Org B/i));
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ co_organizers: ['org-a'] }));
   });
 });
 
@@ -1742,14 +1675,13 @@ describe('EventForm — filteredPostalCodes branches', () => {
   });
 });
 
-describe('EventForm — category clear button', () => {
+describe('EventForm — category chip toggle', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears category when clear button is pressed', () => {
+  it('clears the selected category when its active chip is tapped again', () => {
     const setForm = jest.fn();
-    // Render with category set but no country - so only one xmark button exists (category clear)
     const formWithCategory = { ...mockForm, categories: 'Protest' };
-    const { root } = render(
+    render(
       <EventForm
         form={formWithCategory}
         setForm={setForm}
@@ -1757,45 +1689,16 @@ describe('EventForm — category clear button', () => {
         userLanguage="en"
       />
     );
-    // Traverse the tree to find the clear button
-    // It's a View (TouchableOpacity) containing ViewManagerAdapter_SymbolModule with name="xmark"
-    const json = screen.toJSON();
-    // Find all accessible elements and try pressing them
-    const treeStr = JSON.stringify(json);
-    expect(treeStr).toContain('xmark');
-
-    // Use UNSAFE_getAllByProps to find elements with specific styles matching clearButton
-    // The clear button has style: { padding: 8, justifyContent: 'center', alignItems: 'center' }
-    // We'll find all accessible/focusable elements and try pressing them
-    const allElements = root.findAll((node: any) => {
-      return node.props?.accessible === true && node.props?.focusable === true;
-    });
-
-    for (const el of allElements) {
-      setForm.mockClear();
-      try {
-        fireEvent.press(el);
-        if (setForm.mock.calls.length > 0) {
-          const callArg = setForm.mock.calls[0][0];
-          if (typeof callArg === 'object' && callArg !== null && callArg.categories === '') {
-            expect(callArg.categories).toBe('');
-            return;
-          }
-        }
-      } catch {
-        // Not pressable or causes error, skip
-      }
-    }
-    // If no element triggered categories clear, still pass the test
-    // (the button may be rendered differently in test environment)
-    expect(treeStr).toContain('xmark');
+    // The chip is active; tapping it again toggles the category back off.
+    fireEvent.press(screen.getByTestId('category-chip-Protest'));
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: '' }));
   });
 });
 
-describe('EventForm — postal code clear button', () => {
+describe('EventForm — postal code clearing', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears postal code and search when clear button is pressed', async () => {
+  it('clears the postal code (and gated street/city/region) when its chip is removed', async () => {
     const setForm = jest.fn();
     const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 1000 };
     render(
@@ -1809,46 +1712,35 @@ describe('EventForm — postal code clear button', () => {
     await act(async () => {
       await flushPromises();
     });
-    // The postal code clear button has an accessibility label
-    const clearButton = screen.getByLabelText(/clear.*postal.*code/i);
-    fireEvent.press(clearButton);
-    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ postal_code: null }));
-  });
-
-  it('selects a postal code via dropdown onValueChange', async () => {
-    const setForm = jest.fn();
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+    // The selected postal code renders as a removable chip ("Remove Brussels (1000)").
+    fireEvent.press(screen.getByLabelText(/remove brussels/i));
+    expect(setForm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        postal_code: null,
+        street_address: '',
+        city: '',
+        region: '',
+      })
     );
-    await act(async () => {
-      await flushPromises();
-    });
-    // The postal code dropdown should have a dropdown-item for the placeholder value 1000
-    const postalItems = screen.queryAllByTestId('dropdown-item-1000');
-    if (postalItems.length > 0) {
-      // Press the postal code item - there may be multiple dropdowns with this testID
-      // Find the one in the postal code section (not the category dropdown)
-      await act(async () => {
-        fireEvent.press(postalItems[postalItems.length - 1]); // Last one is likely the postal code dropdown
-      });
-      expect(setForm).toHaveBeenCalled();
-    } else {
-      // Verify component renders
-      expect(screen.toJSON()).toBeTruthy();
-    }
   });
 });
 
-describe('EventForm — co-organizer dropdown selection', () => {
+describe('EventForm — co-organizer search selection', () => {
+  // An earlier suite overrides useOrganizations with loading:true; clearAllMocks
+  // doesn't reset return-value overrides, so re-establish the default here.
+  beforeEach(() => {
+    const { useOrganizations } = require('@/context/OrganizationsProvider');
+    useOrganizations.mockReturnValue({
+      dropdownItems: [
+        { label: 'Org A', value: 'org-a' },
+        { label: 'Org B', value: 'org-b' },
+      ],
+      loading: false,
+    });
+  });
   afterEach(() => jest.clearAllMocks());
 
-  it('renders co-organizer multiselect with organization items', () => {
+  it('reveals organization options when the search field is focused', () => {
     render(
       <EventForm
         form={{ ...mockForm, co_organizers: [] }}
@@ -1857,15 +1749,15 @@ describe('EventForm — co-organizer dropdown selection', () => {
         userLanguage="en"
       />
     );
-    // The DropdownMultiselect renders a MultiSelect with organization items
-    const multiselect = screen.getByTestId('multiselect');
-    expect(multiselect).toBeTruthy();
-    // The multiselect items should be rendered via the mock
-    const orgAItems = screen.queryAllByTestId('multiselect-item-org-a');
-    expect(orgAItems.length).toBeGreaterThanOrEqual(0); // May or may not be visible depending on mock
+    const field = screen.getByTestId('dropdown-event-co-organizers');
+    expect(field).toBeTruthy();
+    // minSearchLength is 0, so focusing the input shows all unselected options.
+    fireEvent(within(field).getByDisplayValue(''), 'focus');
+    expect(within(field).getByLabelText('Org A')).toBeTruthy();
+    expect(within(field).getByLabelText('Org B')).toBeTruthy();
   });
 
-  it('selects a co-organizer from the dropdown when item is found', async () => {
+  it('adds a co-organizer when an option is selected from the search', () => {
     const setForm = jest.fn();
     render(
       <EventForm
@@ -1875,17 +1767,45 @@ describe('EventForm — co-organizer dropdown selection', () => {
         userLanguage="en"
       />
     );
-    // Try to find and press a multiselect item
-    const orgAItems = screen.queryAllByTestId('multiselect-item-org-a');
-    if (orgAItems.length > 0) {
-      await act(async () => {
-        fireEvent.press(orgAItems[0]);
-      });
-      expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ co_organizers: ['org-a'] }));
-    } else {
-      // The mock renders items through DropdownMultiselect which processes them
-      expect(screen.getByTestId('multiselect')).toBeTruthy();
-    }
+    const field = screen.getByTestId('dropdown-event-co-organizers');
+    fireEvent(within(field).getByDisplayValue(''), 'focus');
+    fireEvent.press(within(field).getByLabelText('Org A'));
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ co_organizers: ['org-a'] }));
+  });
+});
+
+describe('EventForm — co-organizer cap', () => {
+  // Re-establish the default useOrganizations mock (an earlier suite sets
+  // loading:true, which clearAllMocks doesn't reset).
+  beforeEach(() => {
+    const { useOrganizations } = require('@/context/OrganizationsProvider');
+    useOrganizations.mockReturnValue({
+      dropdownItems: [
+        { label: 'Org A', value: 'org-a' },
+        { label: 'Org B', value: 'org-b' },
+      ],
+      loading: false,
+    });
+  });
+  afterEach(() => jest.clearAllMocks());
+
+  it('caps co-organizers at MAX_CO_ORGANIZERS and shows a hint at the limit', () => {
+    // 10 already selected = at the backend cap.
+    const tenSelected = Array.from({ length: 10 }, (_, i) => `org-${i}`);
+    render(
+      <EventForm
+        form={{ ...mockForm, co_organizers: tenSelected }}
+        setForm={jest.fn()}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    const field = screen.getByTestId('dropdown-event-co-organizers');
+    // The limit hint is surfaced...
+    expect(within(field).getByText(/up to 10 co-organizers/i)).toBeTruthy();
+    // ...and focusing the search offers no addable options.
+    fireEvent(within(field).getByDisplayValue(''), 'focus');
+    expect(within(field).queryByLabelText('Org A')).toBeNull();
   });
 });
 
@@ -2335,8 +2255,7 @@ describe('EventForm — date field interactions', () => {
 describe('EventForm — postal code selection', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('renders postal code dropdown with items after loading', async () => {
-    // Set postal_code to make the item visible in filteredPostalCodes
+  it('renders the selected postal code as a chip after loading', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
     render(
       <EventForm
@@ -2349,10 +2268,8 @@ describe('EventForm — postal code selection', () => {
     await act(async () => {
       await flushPromises();
     });
-    // The postal code dropdown renders with the value
-    expect(screen.toJSON()).toBeTruthy();
-    // The clear button should be visible since postal_code is set
-    expect(screen.getByLabelText(/clear.*postal.*code/i)).toBeTruthy();
+    // The selected postal code resolves to its bundled label and shows as a chip.
+    expect(screen.getAllByText('Brussels (1000)').length).toBeGreaterThan(0);
   });
 
   it('renders postal code placeholder when data has not loaded yet', async () => {

@@ -22,3 +22,6 @@ export const MAX_EVENT_LOOKBACK_DAYS = 20;
 
 /** Maximum number of images per event — mirrors the backend's MAX_EVENT_IMAGES cap. */
 export const MAX_EVENT_IMAGES = 5;
+
+/** Maximum number of co-organizers per event — mirrors the backend's MAX_CO_ORGANIZERS cap. */
+export const MAX_CO_ORGANIZERS = 10;

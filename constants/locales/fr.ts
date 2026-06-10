@@ -565,6 +565,7 @@ const fr: LocaleData = {
     eventLinkHelper:
       "Partagez un lien vers la page de votre événement, le formulaire d'inscription ou plus d'informations",
     coOrganizersHelper: 'Organisations qui collaborent sur cet événement',
+    maxCoOrganizers: "Vous pouvez ajouter jusqu'à {{max}} co-organisateurs.",
     volunteerHelper:
       'Informez les bénévoles de la manière dont ils peuvent soutenir votre événement',
     disclaimerHelper:

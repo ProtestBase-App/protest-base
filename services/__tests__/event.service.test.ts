@@ -511,7 +511,7 @@ describe('event.service', () => {
       expect(mockApi.post).toHaveBeenCalledTimes(1);
     });
 
-    it('appends each categories item as a separate FormData field', async () => {
+    it('encodes categories as a single JSON-array string in FormData', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-4' } },
       });
@@ -526,8 +526,8 @@ describe('event.service', () => {
 
       const [, payload] = mockApi.post.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
-      const values = (payload as FormData).getAll('categories');
-      expect(values).toEqual(['Protest', 'Strike']);
+      // Backend contract: one field holding a JSON-array string, not one part per item.
+      expect((payload as FormData).getAll('categories')).toEqual(['["Protest","Strike"]']);
     });
 
     it('omits postal_code from JSON payload when null', async () => {
@@ -552,7 +552,7 @@ describe('event.service', () => {
       expect(payload.postal_code).toBe('1000');
     });
 
-    it('wraps a single-string categories into a 1-element FormData array', async () => {
+    it('encodes a single-string categories as a 1-element JSON-array string in FormData', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-cat-str' } },
       });
@@ -567,8 +567,8 @@ describe('event.service', () => {
 
       const [, payload] = mockApi.post.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
-      // The string should have been normalized into a single repeated field.
-      expect((payload as FormData).getAll('categories')).toEqual(['Protest']);
+      // The string is normalized to a 1-element array, then sent as a JSON-array string.
+      expect((payload as FormData).getAll('categories')).toEqual(['["Protest"]']);
     });
 
     it('omits categories from FormData when the form sent an empty string', async () => {
@@ -614,7 +614,7 @@ describe('event.service', () => {
       expect(payload.categories).toBeUndefined();
     });
 
-    it('appends each co_organizers item as a separate FormData field', async () => {
+    it('encodes co_organizers as a single JSON-array string in FormData', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-co' } },
       });
@@ -629,8 +629,8 @@ describe('event.service', () => {
 
       const [, payload] = mockApi.post.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
-      const values = (payload as FormData).getAll('co_organizers');
-      expect(values).toEqual(['user-1', 'user-2']);
+      // One field holding a JSON-array string — fixes the TOO_MANY_CO_ORGANIZERS cap bug.
+      expect((payload as FormData).getAll('co_organizers')).toEqual(['["user-1","user-2"]']);
     });
 
     it('appends postal_code to FormData when provided', async () => {
@@ -741,7 +741,7 @@ describe('event.service', () => {
       expect(payload.postal_code).toBeUndefined();
     });
 
-    it('wraps single-string categories into a 1-element FormData array in updateEvent', async () => {
+    it('encodes a single-string categories as a 1-element JSON-array string in updateEvent', async () => {
       mockApi.put.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'evt-1' } },
       });
@@ -753,7 +753,7 @@ describe('event.service', () => {
 
       const [, payload] = mockApi.put.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
-      expect((payload as FormData).getAll('categories')).toEqual(['Protest']);
+      expect((payload as FormData).getAll('categories')).toEqual(['["Protest"]']);
     });
 
     it('wraps single-string categories in the JSON payload of updateEvent', async () => {
@@ -767,7 +767,7 @@ describe('event.service', () => {
       expect(payload.categories).toEqual(['Protest']);
     });
 
-    it('appends each co_organizers item as a separate FormData field in updateEvent', async () => {
+    it('encodes co_organizers as a single JSON-array string in updateEvent FormData', async () => {
       mockApi.put.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'evt-1' } },
       });
@@ -779,8 +779,7 @@ describe('event.service', () => {
 
       const [, payload] = mockApi.put.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
-      const values = (payload as FormData).getAll('co_organizers');
-      expect(values).toEqual(['user-1', 'user-2']);
+      expect((payload as FormData).getAll('co_organizers')).toEqual(['["user-1","user-2"]']);
     });
 
     it('appends postal_code to FormData in updateEvent', async () => {

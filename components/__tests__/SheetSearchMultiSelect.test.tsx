@@ -181,4 +181,93 @@ describe('SheetSearchMultiSelect', () => {
       expect(screen.queryByLabelText('Brussels')).toBeNull();
     });
   });
+
+  describe('Single-select mode', () => {
+    it('replaces the selection instead of appending', () => {
+      const onChange = jest.fn();
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          singleSelect
+          selected={['opt-brussels']}
+          onChange={onChange}
+          minSearchLength={2}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'ant');
+      fireEvent.press(screen.getByLabelText('Antwerp'));
+
+      // Single-select replaces the prior value rather than adding to it.
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith(['opt-antwerp']);
+    });
+
+    it('still renders the chosen value as a removable chip', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} singleSelect selected={['opt-brussels']} />);
+
+      expect(screen.getByText('Brussels')).toBeTruthy();
+      expect(screen.getByLabelText('Remove Brussels')).toBeTruthy();
+    });
+  });
+
+  describe('Max selection cap', () => {
+    it('offers options while below maxSelected', () => {
+      render(
+        <SheetSearchMultiSelect {...defaultProps} maxSelected={2} selected={['opt-brussels']} />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      expect(screen.getByLabelText('Bruges')).toBeTruthy();
+      expect(screen.getByLabelText('Antwerp')).toBeTruthy();
+    });
+
+    it('offers no addable options once maxSelected is reached', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          maxSelected={2}
+          selected={['opt-brussels', 'opt-bruges']}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      // At the cap, the remaining unselected option is not offered.
+      expect(screen.queryByLabelText('Antwerp')).toBeNull();
+    });
+
+    it('renders the maxSelectedHint when the cap is reached', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          maxSelected={2}
+          maxSelectedHint="Max 2 reached"
+          selected={['opt-brussels', 'opt-bruges']}
+        />
+      );
+
+      expect(screen.getByText('Max 2 reached')).toBeTruthy();
+    });
+
+    it('does not cap single-select mode', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          singleSelect
+          maxSelected={1}
+          selected={['opt-brussels']}
+          minSearchLength={2}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'ant');
+
+      // singleSelect replaces its value, so the cap is ignored and the option shows.
+      expect(screen.getByLabelText('Antwerp')).toBeTruthy();
+    });
+  });
 });

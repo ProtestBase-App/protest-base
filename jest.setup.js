@@ -282,31 +282,6 @@ jest.mock('@expo/vector-icons/build/vendor/react-native-vector-icons/lib/create-
   };
 });
 
-jest.mock('react-native-element-dropdown', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
-  return {
-    Dropdown: ({ data, value, onChange, placeholder, testID, ...props }) => {
-      return React.createElement(
-        View,
-        { testID: testID || 'dropdown' },
-        React.createElement(Text, { key: 'placeholder' }, value || placeholder || 'Select...')
-      );
-    },
-    MultiSelect: ({ data, value, onChange, placeholder, testID, ...props }) => {
-      return React.createElement(
-        View,
-        { testID: testID || 'multiselect' },
-        React.createElement(
-          Text,
-          { key: 'placeholder' },
-          value?.length ? `${value.length} selected` : placeholder || 'Select...'
-        )
-      );
-    },
-  };
-});
-
 jest.mock('@react-native-community/datetimepicker', () => {
   const React = require('react');
   const { View } = require('react-native');
