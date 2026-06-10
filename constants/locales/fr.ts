@@ -791,6 +791,37 @@ const fr: LocaleData = {
   },
 
   // ============================================
+  // Notifications - Saved-event day-of reminders
+  // ============================================
+  notifications: {
+    channelName: 'Événements sauvegardés',
+    actions: {
+      directions: 'Itinéraire',
+      remind1h: 'Me rappeler 1 h avant',
+      viewEvent: "Voir l'événement",
+      viewAgenda: 'Voir mon agenda du jour',
+      remindEach1h: 'Me rappeler 1 h avant chaque',
+    },
+    dayOf: {
+      title: "C'est aujourd'hui",
+      digestTitle: "{{count}} manifestations aujourd'hui",
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} à {{time}}',
+      more: {
+        one: '· et {{count}} autre',
+        other: '· et {{count}} autres',
+      },
+    },
+    remind1h: {
+      title: 'Dans 1 heure',
+      body: '{{name}} commence dans 1 heure — {{place}}.',
+      bodyNoPlace: '{{name}} commence dans 1 heure.',
+    },
+    permissionNotice: 'Activez les notifications pour être prévenu·e le jour J',
+  },
+
+  // ============================================
   // Search - Search functionality
   // ============================================
   search: {

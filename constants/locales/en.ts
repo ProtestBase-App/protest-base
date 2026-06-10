@@ -781,6 +781,37 @@ const en: LocaleData = {
   },
 
   // ============================================
+  // Notifications - Saved-event day-of reminders
+  // ============================================
+  notifications: {
+    channelName: 'Saved events',
+    actions: {
+      directions: 'Directions',
+      remind1h: 'Remind me 1 hr before',
+      viewEvent: 'View event',
+      viewAgenda: 'View my agenda for today',
+      remindEach1h: 'Remind me 1 hr before each',
+    },
+    dayOf: {
+      title: "It's today",
+      digestTitle: '{{count}} protests today',
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} at {{time}}',
+      more: {
+        one: '· and {{count}} more',
+        other: '· and {{count}} more',
+      },
+    },
+    remind1h: {
+      title: 'In 1 hour',
+      body: '{{name}} starts in 1 hour — {{place}}.',
+      bodyNoPlace: '{{name}} starts in 1 hour.',
+    },
+    permissionNotice: 'Enable notifications to be reminded on the day',
+  },
+
+  // ============================================
   // Search - Search functionality
   // ============================================
   search: {

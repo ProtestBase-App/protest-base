@@ -1111,31 +1111,34 @@ const nl = {
   },
 
   // ============================================
-  // Notifications
+  // Notifications - Saved-event day-of reminders
   // ============================================
   notifications: {
-    title: 'Meldingen',
-    empty: 'Geen meldingen',
-    emptyMessage: 'Je hebt geen nieuwe meldingen',
-    markAsRead: 'Markeren als gelezen',
-    markAllAsRead: 'Alles markeren als gelezen',
-    delete: 'Verwijderen',
-    deleteAll: 'Alles verwijderen',
-    types: {
-      eventReminder: 'Evenement herinnering',
-      eventUpdate: 'Evenement bijgewerkt',
-      eventCancelled: 'Evenement geannuleerd',
-      newEvent: 'Nieuw evenement',
-      organizerMessage: 'Bericht van organisator',
+    channelName: 'Opgeslagen evenementen',
+    actions: {
+      directions: 'Routebeschrijving',
+      remind1h: 'Herinnering 1 u vooraf',
+      viewEvent: 'Evenement bekijken',
+      viewAgenda: 'Mijn agenda van vandaag bekijken',
+      remindEach1h: 'Herinnering 1 u voor elk',
     },
-    settings: {
-      title: 'Meldingsinstellingen',
-      enable: 'Meldingen inschakelen',
-      eventReminders: 'Evenement herinneringen',
-      eventUpdates: 'Evenement updates',
-      newEvents: 'Nieuwe evenementen',
-      messages: 'Berichten',
+    dayOf: {
+      title: 'Het is vandaag',
+      digestTitle: '{{count}} protesten vandaag',
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} om {{time}}',
+      more: {
+        one: '· en {{count}} andere',
+        other: '· en {{count}} andere',
+      },
     },
+    remind1h: {
+      title: 'Over 1 uur',
+      body: '{{name}} begint over 1 uur — {{place}}.',
+      bodyNoPlace: '{{name}} begint over 1 uur.',
+    },
+    permissionNotice: 'Schakel meldingen in om op de dag zelf een herinnering te krijgen',
   },
 
   // ============================================

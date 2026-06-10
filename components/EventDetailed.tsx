@@ -32,6 +32,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useLogoScheme } from '@/hooks/useLogoScheme';
+import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 
 // Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
 // import time, which throws when the native modules are missing (Expo Go,
@@ -128,6 +129,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const { getSubMunicipalityName, loadPostalCodesForCountry } = usePostalCodes();
   const { organizations } = useOrganizations();
+  const { isDenied: notificationsDenied } = useNotificationPermissionStatus();
 
   const country = countries.find((c) => c.value === event.country);
   const countryLabel = country
@@ -442,6 +444,32 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               </ThemedText>
             </View>
           )}
+
+          {/* Saved-event reminders can't fire while the permission is denied;
+              the contextual ask only happens once, so settings is the way back.
+              Past/cancelled events never get reminders — no notice for them. */}
+          {isEventSaved &&
+            notificationsDenied &&
+            event.status !== 'past' &&
+            event.status !== 'cancelled' && (
+              <TouchableOpacity
+                style={[
+                  styles.notificationNotice,
+                  {
+                    backgroundColor: themeColors.warningBg,
+                    borderColor: themeColors.warning,
+                  },
+                ]}
+                onPress={() => Linking.openSettings()}
+                accessibilityRole="button"
+                accessibilityLabel={t('notifications.permissionNotice')}
+              >
+                <IconSymbol name="bell.badge" size={IconSizes.md} color={themeColors.warning} />
+                <ThemedText style={[styles.notificationNoticeText, { color: themeColors.text }]}>
+                  {t('notifications.permissionNotice')}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
 
           {isCreator && (
             <View
@@ -953,6 +981,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginBottom: Spacing.md,
     alignSelf: 'flex-start',
+  },
+  notificationNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  notificationNoticeText: {
+    flex: 1,
+    fontFamily: Typography.families.medium,
+    fontSize: Typography.sizes.sm,
   },
   pastBannerText: {
     fontFamily: Typography.families.semiBold,

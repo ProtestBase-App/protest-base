@@ -29,6 +29,10 @@ import {
 } from '@/services/localStorageService';
 import { Event, EventNotFoundError, getEventByIdBackend } from '@/services/event.service';
 import { saveEventOnServer, unsaveEventOnServer } from '@/services/engagement.service';
+import {
+  requestNotificationPermissionsOnFirstSave,
+  requestSavedDayReconcile,
+} from '@/services/notifications.service';
 import { logger } from '@/utils/logger';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
 import { pruneStaleEntries, RETENTION_DAYS } from '@/utils/listCleanup';
@@ -71,7 +75,8 @@ interface SavedEventsContextType {
 const SavedEventsContext = createContext<SavedEventsContextType | undefined>(undefined);
 
 export function SavedEventsProvider({ children }: { children: ReactNode }) {
-  const { eventsCache, eventsLoading, upsertEventInCache } = useGlobalContext();
+  const { eventsCache, eventsLoading, upsertEventInCache, userLanguage, isLogged } =
+    useGlobalContext();
   const [savedEventIds, setSavedEventIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -188,6 +193,38 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
     }
   }, [savedEventIds, eventsCache, eventsLoading, upsertEventInCache]);
 
+  // On logout / account deletion the in-memory saved set would otherwise stay
+  // populated (this provider never remounts), and a later cache refresh would
+  // re-schedule the previous user's reminders. clearAuthState wipes storage
+  // BEFORE flipping isLogged, so re-reading here yields the post-wipe truth.
+  // Guests (never logged in) see no true→false transition and are unaffected.
+  const wasLoggedRef = useRef(false);
+  useEffect(() => {
+    const wasLogged = wasLoggedRef.current;
+    wasLoggedRef.current = isLogged;
+    if (!wasLogged || isLogged) return;
+    fetchSavedEntriesLocally()
+      .then((entries) => {
+        if (!isMountedRef.current) return;
+        setSavedEventIds(entries.map((e) => e.id));
+      })
+      .catch((error) => {
+        logger.warn('[SavedEvents] post-logout reload failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }, [isLogged]);
+
+  // Keep the OS-scheduled day-of reminders in sync with the saved set. Keyed
+  // on state rather than called imperatively from saveEvent/unsaveEvent so
+  // the rollback paths and the hydration 404-removal reconcile automatically.
+  // Also runs once on launch (when both loading flags settle) and after a
+  // device-language change.
+  useEffect(() => {
+    if (loading || eventsLoading) return;
+    requestSavedDayReconcile({ savedEventIds, eventsCache, language: userLanguage });
+  }, [savedEventIds, eventsCache, eventsLoading, loading, userLanguage]);
+
   // The local bookmark is the authoritative "is this saved?" state and works
   // offline regardless of the network call.
   const saveEvent = useCallback(
@@ -208,6 +245,10 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
         const current = await fetchSavedEntriesLocally();
         setSavedEventIds(current.map((e) => e.id));
       }
+
+      // Contextual permission ask on the first save ever. Deliberately not
+      // awaited: the OS dialog must not suspend or fail the save flow.
+      void requestNotificationPermissionsOnFirstSave();
 
       try {
         return await saveEventOnServer(eventId);

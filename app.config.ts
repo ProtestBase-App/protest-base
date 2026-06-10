@@ -152,6 +152,13 @@ export default (): ExpoConfig => {
       'expo-image',
       '@maplibre/maplibre-react-native',
       [
+        'expo-notifications',
+        {
+          icon: './assets/images/icons/notification-icon.png',
+          color: '#E8445A',
+        },
+      ],
+      [
         'expo-build-properties',
         {
           android: {

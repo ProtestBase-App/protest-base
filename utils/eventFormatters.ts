@@ -333,6 +333,20 @@ export function formatEventTime(isoDateString: string, locale: string = 'en'): s
 }
 
 /**
+ * Format the clock time as 24-hour HH:mm in the Belgium timezone for every
+ * language. Notification copy uses the 24h format regardless of locale
+ * (unlike `formatEventTime`, which is 12-hour for English).
+ */
+export function formatEventTime24h(isoDateString: string): string {
+  const date = parseAsUTC(isoDateString);
+  return formatInBelgiumTimezone(date, 'en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/**
  * Format event date and time for card display, e.g. "Sunday July 14 at 10:00 AM".
  */
 export function formatEventDateTime(isoDateString: string, locale: string = 'en'): string {

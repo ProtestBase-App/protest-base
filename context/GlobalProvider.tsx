@@ -135,9 +135,9 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   const userLanguage = localeCode && supportedLanguages.includes(localeCode) ? localeCode : 'en';
 
   const clearAuthState = useCallback(async (): Promise<void> => {
-    setIsLogged(false);
-    setUser(null);
-    setUserEventCounts(null);
+    // Wipe storage BEFORE flipping auth state so consumers reacting to
+    // isLogged (e.g. SavedEventsProvider's logout reload) observe the
+    // post-wipe contents, never the pre-logout data.
     try {
       await clearAllUserData();
       await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
@@ -146,6 +146,9 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     } catch (error) {
       logger.error('Failed to clear user data from storage:', { error });
     }
+    setIsLogged(false);
+    setUser(null);
+    setUserEventCounts(null);
   }, []);
 
   const refreshUserEventCounts = useCallback(async (organizationIds?: string[]): Promise<void> => {

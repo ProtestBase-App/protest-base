@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '@/utils/logger';
 import { DRAFT_CONFIG, STORAGE_KEYS, SECURE_LIST_KEYS } from '@/constants/StorageConfig';
+import { cancelAllSavedEventNotifications } from '@/services/notifications.service';
 import { readList, writeList, clearList } from '@/services/secureListStorage';
 
 const EVENT_DRAFT_KEY = STORAGE_KEYS.EVENT_DRAFT;
@@ -57,6 +58,9 @@ export const clearAllUserData = async (): Promise<void> => {
   await clearList(SECURE_LIST_KEYS.SAVED_EVENT_IDS);
   await clearList(SECURE_LIST_KEYS.LIKED_EVENT_IDS);
   await clearList(SECURE_LIST_KEYS.FOLLOWED_ORG_IDS);
+  // OS-scheduled saved-event reminders are user data too: without this they
+  // keep firing at 08:30 after logout/account deletion. Never throws.
+  await cancelAllSavedEventNotifications();
 };
 
 function isLegacyStringArray(value: unknown[]): value is string[] {
