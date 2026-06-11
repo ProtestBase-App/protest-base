@@ -74,10 +74,22 @@ export function getCategoryColors(category: string | undefined | null): Category
 }
 
 /**
- * Resolve the color set for an event's primary (first) category.
+ * Category to surface for an event while category filters are active.
+ *
+ * Filters match events on ANY of their categories (calendar and map tabs,
+ * plus the backend's explore filter), so a multi-category event can match
+ * through a non-primary category. Surfacing the primary one would then look
+ * like a foreign result — e.g. filtering "Learn" while a ['Strike', 'Learn']
+ * event shows a Strike-colored pin and badge. Prefer the primary category
+ * whenever no category filter is active or it matches the filter; otherwise
+ * fall back to the first event category that does match.
  */
-export function getPrimaryCategoryColors(
-  categories: string[] | undefined | null
-): CategoryColorSet {
-  return getCategoryColors(categories?.[0]);
+export function getDisplayCategory(
+  categories: string[] | undefined | null,
+  selectedCategories: string[]
+): string | undefined {
+  const primary = categories?.[0];
+  if (!categories || selectedCategories.length === 0) return primary;
+  if (primary && selectedCategories.includes(primary)) return primary;
+  return categories.find((category) => selectedCategories.includes(category)) ?? primary;
 }

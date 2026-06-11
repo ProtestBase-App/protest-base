@@ -32,6 +32,8 @@ function singleDayEntry(event: Event): CalendarDayEntry {
 
 describe('CalendarEventRow', () => {
   const defaultProps = {
+    // Matches the fake system time pinned in beforeEach (Belgium day).
+    todayKey: '2026-05-12',
     isSaved: false,
     onPress: jest.fn(),
     onToggleSave: jest.fn(),
@@ -198,7 +200,7 @@ describe('CalendarEventRow', () => {
       expect(queryByText('createEvent.helpNeeded')).toBeNull();
     });
 
-    it('renders the first category badge', () => {
+    it('renders the first category badge by default', () => {
       const event = buildEvent({ categories: ['Protest', 'Strike'] });
       const { getByText, queryByText } = renderWithProviders(
         <CalendarEventRow {...defaultProps} entry={singleDayEntry(event)} />
@@ -206,6 +208,62 @@ describe('CalendarEventRow', () => {
 
       expect(getByText('categories.protest')).toBeTruthy();
       expect(queryByText('categories.strike')).toBeNull();
+    });
+
+    it('renders the displayCategory badge instead of the primary one when provided', () => {
+      const event = buildEvent({ categories: ['Strike', 'Learn'] });
+      const { getByText, queryByText } = renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={singleDayEntry(event)} displayCategory="Learn" />
+      );
+
+      expect(getByText('categories.learn')).toBeTruthy();
+      expect(queryByText('categories.strike')).toBeNull();
+    });
+
+    it('shows the in-progress badge for a multi-day event spanning today', () => {
+      const event = buildEvent({
+        start_time: '2026-05-10T11:00:00Z',
+        end_time: '2026-05-14T16:00:00Z',
+      });
+      const entry: CalendarDayEntry = { event, dayIndex: 3, totalDays: 5 };
+      const { getByText } = renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={entry} />
+      );
+
+      expect(getByText('home.inProgressBadge')).toBeTruthy();
+    });
+
+    it('shows the in-progress badge on the same event rendered under a future day', () => {
+      // The badge states a fact about NOW, not about the displayed day.
+      const event = buildEvent({
+        start_time: '2026-05-10T11:00:00Z',
+        end_time: '2026-05-14T16:00:00Z',
+      });
+      const entry: CalendarDayEntry = { event, dayIndex: 5, totalDays: 5 };
+      const { getByText } = renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={entry} />
+      );
+
+      expect(getByText('home.inProgressBadge')).toBeTruthy();
+    });
+
+    it('does not show the in-progress badge for a single-day event today', () => {
+      const event = buildEvent(); // starts 2026-05-12 — today
+      const { queryByText } = renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={singleDayEntry(event)} />
+      );
+
+      expect(queryByText('home.inProgressBadge')).toBeNull();
+    });
+
+    it('does not show the in-progress badge for a multi-day event starting today', () => {
+      const event = buildEvent({ end_time: '2026-05-15T16:00:00Z' });
+      const entry: CalendarDayEntry = { event, dayIndex: 1, totalDays: 4 };
+      const { queryByText } = renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={entry} />
+      );
+
+      expect(queryByText('home.inProgressBadge')).toBeNull();
     });
 
     it('renders the multi-day badge only for multi-day entries', () => {

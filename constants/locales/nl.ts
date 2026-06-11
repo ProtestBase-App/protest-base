@@ -298,6 +298,7 @@ const nl = {
       other: '{{count}} dagen',
     },
     dayProgress: 'Dag {{index}}/{{total}}',
+    inProgressBadge: 'Bezig',
     going: 'gaan',
     typesCount: '{{count}} types',
     savedOnlyTitle: 'Alleen opgeslagen',

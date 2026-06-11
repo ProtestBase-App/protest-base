@@ -60,6 +60,10 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
     warning: '#F59E0B',
     warningBg: 'rgba(245, 158, 11, 0.15)',
 
+    // "En cours" (in-progress) badge — live green, identical in both themes.
+    live: '#3DBE7B',
+    liveBg: 'rgba(61, 190, 123, 0.14)',
+
     icon: c.icon,
 
     link: c.link,

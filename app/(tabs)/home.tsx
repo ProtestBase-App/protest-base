@@ -22,7 +22,7 @@ import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useHomeViewPreference } from '@/hooks/useHomeViewPreference';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { DynamicRoutes } from '@/constants/Routes';
-import { getPrimaryCategoryColors } from '@/constants/CategoryColors';
+import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColors';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -139,16 +139,18 @@ export default function HomeTab() {
   // One entry per Belgium-TZ day each event spans (multi-day events expand).
   const eventsByDay = useMemo(() => expandEventsByDay(filteredEvents), [filteredEvents]);
 
-  // Category dot colors per day for the month grid markers.
+  // Category dot colors per day for the month grid markers (filter-matched
+  // category when category filters are active, primary otherwise).
   const dayMarkers = useMemo(() => {
     const markers: Record<string, string[]> = {};
     for (const [dateKey, entries] of Object.entries(eventsByDay)) {
       markers[dateKey] = entries.map(
-        (entry) => getPrimaryCategoryColors(entry.event.categories).color
+        (entry) =>
+          getCategoryColors(getDisplayCategory(entry.event.categories, filters.categories)).color
       );
     }
     return markers;
-  }, [eventsByDay]);
+  }, [eventsByDay, filters.categories]);
 
   const selectedDayEntries = useMemo(
     () => eventsByDay[selectedDateKey] ?? [],
@@ -369,11 +371,13 @@ export default function HomeTab() {
         <CalendarEventRow
           key={`${entry.event.$id}-${entry.dayIndex}`}
           entry={entry}
+          todayKey={todayKey}
           isSaved={isSaved(entry.event.$id)}
           onPress={handleEventPress}
           onToggleSave={handleToggleSave}
           userLanguage={userLanguage}
           cityLabel={resolveCityLabel(entry.event)}
+          displayCategory={getDisplayCategory(entry.event.categories, filters.categories)}
         />
       ))}
     </View>

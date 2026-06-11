@@ -164,6 +164,20 @@ export function expandEventsByDay(events: Event[]): EventsByDay {
 }
 
 /**
+ * Whether an event is currently in progress: it started on an earlier
+ * Belgium-TZ day and ends today or later. Single-day events today never
+ * qualify (their start day IS today), so only multi-day events can show the
+ * "in progress" badge — which states a fact about NOW, not about the
+ * displayed day.
+ */
+export function isEventInProgress(event: Event, todayKey: string): boolean {
+  if (!event.start_time) return false;
+  const startKey = getEventDateKeyInBelgium(event.start_time);
+  const endKey = event.end_time ? getEventDateKeyInBelgium(event.end_time) : startKey;
+  return startKey < todayKey && endKey >= todayKey;
+}
+
+/**
  * Find the next day key with events strictly after (or from, when
  * `inclusive`) the given key. Returns null when none exists.
  */

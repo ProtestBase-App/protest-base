@@ -280,6 +280,7 @@ const en: LocaleData = {
       other: '{{count}} days',
     },
     dayProgress: 'Day {{index}}/{{total}}',
+    inProgressBadge: 'Ongoing',
     going: 'going',
     typesCount: '{{count}} types',
     savedOnlyTitle: 'Saved only',

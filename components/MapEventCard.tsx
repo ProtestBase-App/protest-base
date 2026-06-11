@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { getPrimaryCategoryColors } from '@/constants/CategoryColors';
+import { getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { Event } from '@/types/event.types';
 import { formatCompactCount } from '@/utils/calendarTabUtils';
@@ -25,6 +25,13 @@ export interface MapEventCardProps {
   userLanguage: string;
   /** Belgium-TZ YYYY-MM-DD for today, for the "Today" date label. */
   todayKey: string;
+  /**
+   * Category to surface on the card (icon tint + badge), kept in sync with
+   * the event's pin. Defaults to the event's primary category; pass the
+   * filter-matched category (`getDisplayCategory`) while category filters
+   * are active.
+   */
+  displayCategory?: string;
   /** Push the event detail screen. */
   onPress: () => void;
   /** Toggle the bookmark; must not trigger navigation. */
@@ -37,15 +44,18 @@ function MapEventCard({
   saved,
   userLanguage,
   todayKey,
+  displayCategory,
   onPress,
   onToggleSave,
 }: MapEventCardProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  const categoryColors = getPrimaryCategoryColors(event.categories);
-  const primaryCategory = event.categories?.[0];
-  const categoryLabel = primaryCategory ? t('categories.' + primaryCategory.toLowerCase()) : null;
+  const displayedCategory = displayCategory ?? event.categories?.[0];
+  const categoryColors = getCategoryColors(displayedCategory);
+  const categoryLabel = displayedCategory
+    ? t('categories.' + displayedCategory.toLowerCase())
+    : null;
 
   const dateLabel = formatMapCardDateLabel(event, userLanguage, todayKey, t('maps.today'));
   const timeLabel = formatEventTime(event.start_time, userLanguage);
@@ -210,6 +220,7 @@ export default memo(MapEventCard, (prev, next) => {
     prev.active === next.active &&
     prev.saved === next.saved &&
     prev.userLanguage === next.userLanguage &&
-    prev.todayKey === next.todayKey
+    prev.todayKey === next.todayKey &&
+    prev.displayCategory === next.displayCategory
   );
 });

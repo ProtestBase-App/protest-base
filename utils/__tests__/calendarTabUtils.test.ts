@@ -10,6 +10,7 @@ import {
   findNextEventDayKey,
   formatCompactCount,
   hasActiveCalendarFilters,
+  isEventInProgress,
   matchesCalendarFilters,
 } from '../calendarTabUtils';
 
@@ -360,6 +361,85 @@ describe('calendarTabUtils', () => {
       const allEntries = Object.values(byDay).flat();
       expect(allEntries).toHaveLength(1);
       expect(allEntries[0].event.$id).toBe(valid.$id);
+    });
+  });
+
+  // ==========================================================================
+  // isEventInProgress
+  // ==========================================================================
+
+  describe('isEventInProgress', () => {
+    const todayKey = '2026-06-10';
+
+    it('returns true for a multi-day event that started before today and ends after today', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-08T10:00:00Z',
+        end_time: '2026-06-12T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(true);
+    });
+
+    it('returns true when the event ends today', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-08T10:00:00Z',
+        end_time: '2026-06-10T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(true);
+    });
+
+    it('returns false for a single-day event today (start day IS today)', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-10T10:00:00Z',
+        end_time: '2026-06-10T14:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('returns false for a multi-day event starting today', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-10T10:00:00Z',
+        end_time: '2026-06-14T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('returns false for a future multi-day event', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-12T10:00:00Z',
+        end_time: '2026-06-15T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('returns false for an event that already ended', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-05T10:00:00Z',
+        end_time: '2026-06-08T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('returns false for an event without end_time that started on an earlier day', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-08T10:00:00Z',
+        end_time: undefined,
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('returns false when start_time is missing', () => {
+      const event = createMockEvent({ start_time: '' });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
+    });
+
+    it('uses Belgium-TZ day boundaries (late-UTC start counts as the next Brussels day)', () => {
+      // 23:00 UTC on June 9 = 01:00 CEST June 10 in Brussels — the event
+      // starts TODAY in Belgium, so it is not "in progress".
+      const event = createMockEvent({
+        start_time: '2026-06-09T23:00:00Z',
+        end_time: '2026-06-12T16:00:00Z',
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(false);
     });
   });
 

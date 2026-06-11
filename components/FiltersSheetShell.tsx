@@ -1,14 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, { Easing, SlideInDown } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -16,8 +21,6 @@ import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface FiltersSheetShellProps {
   visible: boolean;
@@ -43,21 +46,46 @@ export function FiltersSheetShell({
 }: FiltersSheetShellProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
+  const { height: windowHeight } = useWindowDimensions();
+
+  // Slide-up entrance driven as a plain style animation rather than a
+  // reanimated `entering` layout animation: layout animations on views inside
+  // an Android Modal are known to break touch handling for descendants on the
+  // new architecture (presses get cancelled on the slightest finger movement).
+  const translateY = useSharedValue(windowHeight);
+  useEffect(() => {
+    if (visible) {
+      translateY.value = windowHeight;
+      translateY.value = withTiming(0, {
+        duration: 320,
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+      });
+    }
+  }, [visible, windowHeight, translateY]);
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   return (
     // The modal fades (scrim) while the sheet itself slides up with the
     // handoff's 0.32s cubic-bezier curve.
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <Pressable style={styles.scrim} onPress={onClose}>
-          {/* Sheet container doubles as the tap-catcher so inner taps don't close. */}
-          <AnimatedPressable
-            entering={SlideInDown.duration(320).easing(Easing.bezier(0.32, 0.72, 0, 1).factory())}
-            style={[styles.sheet, { backgroundColor: themeColors.cardBackground }]}
-            onPress={(e) => e.stopPropagation()}
+      {/* The Android Modal window doesn't resize for the soft keyboard, so the
+          KAV must pad on both platforms or inputs end up hidden behind it. */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
+        <View style={styles.scrim}>
+          {/* Dismissal backdrop sits BEHIND the sheet as a sibling, never as an
+              ancestor: wrapping the sheet in Pressables makes Android cancel
+              child presses on the slightest finger movement (taps inside the
+              sheet stop registering). */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+            accessible={false}
+            importantForAccessibility="no"
+          />
+          <Animated.View
+            style={[styles.sheet, slideStyle, { backgroundColor: themeColors.cardBackground }]}
             testID={testID}
           >
             <View style={[styles.handle, { backgroundColor: themeColors.separator }]} />
@@ -86,8 +114,8 @@ export function FiltersSheetShell({
 
               {children}
             </ScrollView>
-          </AnimatedPressable>
-        </Pressable>
+          </Animated.View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );

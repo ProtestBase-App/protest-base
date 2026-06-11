@@ -25,7 +25,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
-import { getCategoryColors, getPrimaryCategoryColors } from '@/constants/CategoryColors';
+import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColors';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { eventCategories } from '@/constants/EventCategories';
 import { useGlobalContext } from '@/context/GlobalProvider';
@@ -290,11 +290,20 @@ export default function MapsScreen() {
         saved={isSaved(item.$id)}
         userLanguage={userLanguage}
         todayKey={todayKey}
+        displayCategory={getDisplayCategory(item.categories, filters.categories)}
         onPress={() => handleCardPress(item)}
         onToggleSave={() => void handleToggleSave(item)}
       />
     ),
-    [selectedId, isSaved, userLanguage, todayKey, handleCardPress, handleToggleSave]
+    [
+      selectedId,
+      isSaved,
+      userLanguage,
+      todayKey,
+      filters.categories,
+      handleCardPress,
+      handleToggleSave,
+    ]
   );
 
   const activeFilterCount = countActiveMapFilters(filters);
@@ -358,7 +367,9 @@ export default function MapsScreen() {
               onPress={handleSelect}
             >
               <MapEventPin
-                color={getPrimaryCategoryColors(event.categories).color}
+                color={
+                  getCategoryColors(getDisplayCategory(event.categories, filters.categories)).color
+                }
                 selected={event.$id === selectedId}
                 onPress={handleSelect}
                 accessibilityLabel={event.title}
