@@ -456,6 +456,12 @@ const fr: LocaleData = {
     alreadyCancelled: 'Cet événement a déjà été annulé.',
     cancelError: "Impossible d'annuler l'événement. Veuillez réessayer.",
 
+    // Event detail loading
+    detailNotFound: 'Événement introuvable. Il a peut-être été supprimé.',
+    detailNetworkError:
+      'Impossible de joindre le serveur. Vérifiez votre connexion internet et réessayez.',
+    detailLoadError: "L'événement n'a pas pu être chargé. Veuillez réessayer.",
+
     // Like
     likeEvent: "J'aime",
     likedEvent: 'Aimé',

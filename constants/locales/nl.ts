@@ -491,6 +491,12 @@ const nl = {
     alreadyCancelled: 'Dit evenement is al geannuleerd.',
     cancelError: 'Het evenement kon niet worden geannuleerd. Probeer opnieuw.',
 
+    // Event detail loading
+    detailNotFound: 'Evenement niet gevonden. Mogelijk is het verwijderd.',
+    detailNetworkError:
+      'Kan de server niet bereiken. Controleer je internetverbinding en probeer opnieuw.',
+    detailLoadError: 'Het evenement kon niet worden geladen. Probeer opnieuw.',
+
     // Like
     likeEvent: 'Vind ik leuk',
     likedEvent: 'Vind ik leuk',

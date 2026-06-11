@@ -10,6 +10,7 @@ import {
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { isEventOngoing } from '@/utils/eventStatus';
+import { isNetworkError } from '@/utils/networkError';
 import { logger } from '@/utils/logger';
 
 export type {
@@ -293,12 +294,27 @@ export class EventNotFoundError extends Error {
 }
 
 /**
+ * Thrown when GET /events/:id failed at the network level (timeout, DNS, no
+ * connectivity) — the event may well exist, we just couldn't reach the backend.
+ * Lets the detail screen show a connectivity message instead of the misleading
+ * "event not found" one.
+ */
+export class EventNetworkError extends Error {
+  code = 'EVENT_NETWORK_ERROR' as const;
+  constructor(eventId: string) {
+    super(`Network failure while loading event ${eventId}`);
+    this.name = 'EventNetworkError';
+  }
+}
+
+/**
  * Get a single event by ID
  *
  * @param eventId - The ID of the event to fetch
  * @param includeAvatars - Whether to include organizer and co-organizer avatars (default: false)
  * @returns The event object
  * @throws EventNotFoundError on 404
+ * @throws EventNetworkError when the backend is unreachable
  */
 export async function getEventByIdBackend(
   eventId: string,
@@ -320,6 +336,10 @@ export async function getEventByIdBackend(
   } catch (error: any) {
     if (error.response?.status === 404) {
       throw new EventNotFoundError(eventId);
+    }
+
+    if (isNetworkError(error)) {
+      throw new EventNetworkError(eventId);
     }
 
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch event');
