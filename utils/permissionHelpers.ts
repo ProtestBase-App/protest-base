@@ -7,6 +7,7 @@
 
 import * as ImagePicker from 'expo-image-picker';
 import * as Calendar from 'expo-calendar';
+import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 import { logger } from '@/utils/logger';
 
@@ -60,6 +61,38 @@ export async function getCalendarStatus(): Promise<PermissionStatus> {
 }
 
 /**
+ * Get notification permission status without prompting
+ * Used for day-of saved-event reminders.
+ *
+ * Notifications are a real OS-level permission on both iOS and Android
+ * (Android 13+ requires runtime POST_NOTIFICATIONS), so this is shown on
+ * both platforms. The permission object has a different shape than
+ * ImagePicker/Calendar, so it gets its own mapping. iOS provisional
+ * authorization delivers quietly and is treated as 'granted', matching
+ * hooks/useNotificationPermissionStatus.ts.
+ */
+export async function getNotificationsStatus(): Promise<PermissionStatus> {
+  try {
+    const settings = await Notifications.getPermissionsAsync();
+    if (settings.granted) {
+      return 'granted';
+    }
+    if (settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+      return 'granted';
+    }
+    if (settings.status === Notifications.PermissionStatus.UNDETERMINED) {
+      return 'undetermined';
+    }
+    return 'denied';
+  } catch (error) {
+    logger.warn('Failed to get notification permission status', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return 'undetermined';
+  }
+}
+
+/**
  * Open the app's settings page
  * Allows users to modify permissions from within the app
  */
@@ -101,14 +134,17 @@ function mapPermissionStatus(
 export async function getAllPermissionStatuses(): Promise<{
   photoLibraryRead: PermissionStatus;
   calendar: PermissionStatus;
+  notifications: PermissionStatus;
 }> {
-  const [photoLibraryRead, calendar] = await Promise.all([
+  const [photoLibraryRead, calendar, notifications] = await Promise.all([
     getPhotoLibraryReadStatus(),
     getCalendarStatus(),
+    getNotificationsStatus(),
   ]);
 
   return {
     photoLibraryRead,
     calendar,
+    notifications,
   };
 }
