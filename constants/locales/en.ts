@@ -454,6 +454,11 @@ const en: LocaleData = {
     alreadyCancelled: 'This event has already been cancelled.',
     cancelError: 'Could not cancel the event. Please try again.',
 
+    // Event detail loading
+    detailNotFound: 'Event not found. It may have been deleted.',
+    detailNetworkError: 'Could not reach the server. Check your internet connection and try again.',
+    detailLoadError: 'The event could not be loaded. Please try again.',
+
     // Like
     likeEvent: 'Like',
     likedEvent: 'Liked',

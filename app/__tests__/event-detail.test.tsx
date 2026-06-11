@@ -7,10 +7,21 @@ jest.mock('@/utils/i18n', () => ({
   t: jest.fn((key) => key),
 }));
 
-jest.mock('@/services/event.service', () => ({
-  getEventByIdBackend: jest.fn(),
-  deleteEvent: jest.fn(),
-}));
+jest.mock('@/services/event.service', () => {
+  // Real error classes so the screen's `instanceof` branching works against
+  // rejections created in these tests.
+  class EventNotFoundError extends Error {}
+  class EventNetworkError extends Error {}
+  class EventAlreadyCancelledError extends Error {}
+  return {
+    getEventByIdBackend: jest.fn(),
+    deleteEvent: jest.fn(),
+    cancelEvent: jest.fn(),
+    EventNotFoundError,
+    EventNetworkError,
+    EventAlreadyCancelledError,
+  };
+});
 
 jest.mock('@/services/eventView.service', () => ({
   trackEventView: jest.fn(),

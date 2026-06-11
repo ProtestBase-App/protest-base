@@ -10,6 +10,8 @@ import {
   getEventByIdBackend,
   cancelEvent,
   EventAlreadyCancelledError,
+  EventNotFoundError,
+  EventNetworkError,
 } from '@/services/event.service';
 import type { Event } from '@/services/event.service';
 import { trackEventView } from '@/services/eventView.service';
@@ -71,7 +73,7 @@ export default function EventDetails() {
 
   useEffect(() => {
     if (!eventId) {
-      setError('No event ID provided.');
+      setError(t('events.detailLoadError'));
       setLoading(false);
       return;
     }
@@ -110,7 +112,16 @@ export default function EventDetails() {
         if (!isMounted) return;
         logger.error('Failed to load event:', { eventId, error: err });
         setRawEvent(null);
-        setError('Event not found or could not be loaded.');
+        // Only a confirmed backend 404 may claim the event doesn't exist —
+        // an unreachable backend (e.g. deep-link open without connectivity)
+        // must surface as a connectivity problem instead.
+        if (err instanceof EventNotFoundError) {
+          setError(t('events.detailNotFound'));
+        } else if (err instanceof EventNetworkError) {
+          setError(t('events.detailNetworkError'));
+        } else {
+          setError(t('events.detailLoadError'));
+        }
       } finally {
         if (isMounted) setLoading(false);
       }

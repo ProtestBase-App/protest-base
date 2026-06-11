@@ -45,6 +45,7 @@ import {
   publishDraft,
   EventIncompleteError,
   EventNotFoundError,
+  EventNetworkError,
 } from '@/services/event.service';
 import type { Event } from '@/types/event.types';
 
@@ -449,6 +450,17 @@ describe('event.service', () => {
       mockApi.get.mockRejectedValueOnce({ message: 'Network Error' });
 
       await expect(getEventByIdBackend('evt-1')).rejects.toThrow('Network Error');
+    });
+
+    it('throws EventNetworkError when the backend is unreachable', async () => {
+      // Axios-shaped network failure: no response, network error code.
+      mockApi.get.mockRejectedValueOnce({
+        isAxiosError: true,
+        code: 'ERR_NETWORK',
+        message: 'Network Error',
+      });
+
+      await expect(getEventByIdBackend('evt-1')).rejects.toBeInstanceOf(EventNetworkError);
     });
   });
 

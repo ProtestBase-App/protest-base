@@ -46,7 +46,11 @@ export default (): ExpoConfig => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: bundleIdentifier,
-      associatedDomains: ['applinks:protestbase.be'],
+      // Only production claims protestbase.be universal links. Preview/dev
+      // builds talk to non-production APIs, so letting them intercept
+      // production website links renders a broken event screen on tester
+      // devices (June 2026 deep-link incident).
+      ...(appEnv === 'production' ? { associatedDomains: ['applinks:protestbase.be'] } : {}),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
@@ -72,10 +76,15 @@ export default (): ExpoConfig => {
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.SYSTEM_ALERT_WINDOW',
       ],
+      // App Links verification is production-only: a verified preview build
+      // would auto-open production protestbase.be/event/* links but query a
+      // non-production API, showing a broken event screen (June 2026 deep-link
+      // incident). Preview/dev keep the unverified filter so testers can still
+      // opt in manually via system settings ("Open supported links").
       intentFilters: [
         {
           action: 'VIEW',
-          autoVerify: true,
+          autoVerify: appEnv === 'production',
           data: [
             {
               scheme: 'https',
