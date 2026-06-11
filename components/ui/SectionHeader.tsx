@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, StyleProp, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
@@ -12,6 +12,8 @@ interface SectionHeaderProps {
   variant?: 'primary' | 'secondary';
   actionLabel?: string;
   onActionPress?: () => void;
+  /** Container style override (e.g. margins/padding when the screen owns the inset). */
+  style?: StyleProp<ViewStyle>;
 }
 
 export function SectionHeader({
@@ -20,6 +22,7 @@ export function SectionHeader({
   variant = 'secondary',
   actionLabel,
   onActionPress,
+  style,
 }: SectionHeaderProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -34,7 +37,7 @@ export function SectionHeader({
 
   return (
     <ThemedView
-      style={isPrimary ? styles.sectionHeaderPrimary : styles.sectionHeader}
+      style={[isPrimary ? styles.sectionHeaderPrimary : styles.sectionHeader, style]}
       accessibilityRole="header"
     >
       <View style={styles.headerRow}>

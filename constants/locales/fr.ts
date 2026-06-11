@@ -331,25 +331,19 @@ const fr: LocaleData = {
   // ============================================
   more: {
     // Section Headers
-    myOrganization: 'Mon Organisation',
-    tools: 'Outils',
     resources: 'Ressources',
     account: 'Compte',
     settings: 'Paramètres',
-    accountResources: 'Compte et Ressources',
     devTools: 'Outils de développement',
 
     // Action Buttons
     createEvent: 'Créer un événement',
     createNewEvent: 'Créer un nouvel événement',
     myEvents: 'Mes événements',
-    myUpcomingEvents: 'Mes événements à venir',
-    myPastEvents: 'Mes événements passés',
     draftEvents: 'Événements brouillons',
     draftEventsEmpty: 'Aucun événement brouillon pour le moment',
     eventTemplates: "Modèles d'événements",
     becomeOrganizer: 'Devenir organisateur',
-    signInToManageEvents: 'Connectez-vous pour gérer les événements',
     giveFeedback: 'Donner un avis',
     about: 'À propos',
     termsAndConditions: 'Conditions générales',
@@ -359,6 +353,21 @@ const fr: LocaleData = {
     logout: 'Déconnexion',
     createFakeEventDev: 'Créer un faux événement (Dev)',
     creating: 'Création...',
+
+    // Organizer hub (More tab redesign)
+    upcoming: 'À venir',
+    past: 'Passés',
+    drafts: 'Brouillons',
+    templates: 'Modèles',
+    identitySubtitleOrganizer: 'Organisateur · Compte et profil',
+    identitySubtitle: 'Compte et profil',
+    becomeOrganizerBody:
+      'Créez des actions, mobilisez des sympathisant·es et gérez vos événements — gratuit pour les organisations de terrain.',
+    alreadyOrganizing: 'Déjà organisateur ?',
+    signIn: 'Se connecter',
+    logoutConfirmTitle: 'Déconnexion',
+    logoutConfirmMessage: 'Voulez-vous vraiment vous déconnecter ?',
+    versionLabel: 'Protestbase v{{version}}',
 
     // Alerts
     logoutSuccess: 'Vous avez été déconnecté avec succès.',

@@ -325,34 +325,43 @@ const en: LocaleData = {
   // ============================================
   more: {
     // Section Headers
-    myOrganization: 'My Organization',
-    tools: 'Tools',
     resources: 'Resources',
     account: 'Account',
     settings: 'Settings',
-    accountResources: 'Account & Resources',
     devTools: 'Dev Tools',
 
     // Action Buttons
     createEvent: 'Create Event',
     createNewEvent: 'Create New Event',
     myEvents: 'My Events',
-    myUpcomingEvents: 'My Upcoming Events',
-    myPastEvents: 'My Past Events',
     draftEvents: 'Draft Events',
     draftEventsEmpty: 'No draft events yet',
     eventTemplates: 'Event Templates',
     becomeOrganizer: 'Become an Organizer',
-    signInToManageEvents: 'Sign In to Manage Events',
     giveFeedback: 'Give Feedback',
     about: 'About',
     termsAndConditions: 'Terms & Conditions',
     termsPrivacy: 'Terms & Privacy',
     accountInfo: 'Account Information',
     deleteAccount: 'Delete Account',
-    logout: 'Logout',
+    logout: 'Log Out',
     createFakeEventDev: 'Create Fake Event (Dev)',
     creating: 'Creating...',
+
+    // Organizer hub (More tab redesign)
+    upcoming: 'Upcoming',
+    past: 'Past',
+    drafts: 'Drafts',
+    templates: 'Templates',
+    identitySubtitleOrganizer: 'Organizer · Account & profile',
+    identitySubtitle: 'Account & profile',
+    becomeOrganizerBody:
+      'Create actions, rally supporters and manage your events — free for grassroots organizations.',
+    alreadyOrganizing: 'Already organizing?',
+    signIn: 'Sign in',
+    logoutConfirmTitle: 'Log Out',
+    logoutConfirmMessage: 'Are you sure you want to log out?',
+    versionLabel: 'Protestbase v{{version}}',
 
     // Alerts
     logoutSuccess: 'You have been logged out successfully.',
