@@ -1515,6 +1515,8 @@ const nl = {
     photoReadDescription: "Om foto's toe te voegen aan events die je maakt",
     calendarPermission: 'Kalender',
     calendarDescription: 'Om events aan je kalender toe te voegen',
+    notificationsPermission: 'Meldingen',
+    notificationsDescription: 'Om je te herinneren op de dag van events die je hebt opgeslagen',
 
     // Permission status labels
     statusGranted: 'Toegestaan',

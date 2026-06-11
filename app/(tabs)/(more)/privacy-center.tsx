@@ -26,6 +26,7 @@ const SemanticColors = {
 interface PermissionStatuses {
   photoLibraryRead: PermissionStatus;
   calendar: PermissionStatus;
+  notifications: PermissionStatus;
 }
 
 // Tab bar height constant for bottom padding
@@ -39,6 +40,7 @@ export default function PrivacyCenterScreen() {
   const [permissionStatuses, setPermissionStatuses] = useState<PermissionStatuses>({
     photoLibraryRead: 'undetermined',
     calendar: 'undetermined',
+    notifications: 'undetermined',
   });
 
   // Load permission statuses
@@ -202,6 +204,15 @@ export default function PrivacyCenterScreen() {
                 name={t('privacyCenter.calendarPermission')}
                 description={t('privacyCenter.calendarDescription')}
                 status={permissionStatuses.calendar}
+                statusLabels={statusLabels}
+                onOpenSettings={openAppSettings}
+                openSettingsLabel={t('privacyCenter.openSettings')}
+              />
+
+              <PermissionStatusItem
+                name={t('privacyCenter.notificationsPermission')}
+                description={t('privacyCenter.notificationsDescription')}
+                status={permissionStatuses.notifications}
                 statusLabels={statusLabels}
                 onOpenSettings={openAppSettings}
                 openSettingsLabel={t('privacyCenter.openSettings')}

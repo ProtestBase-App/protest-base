@@ -1237,6 +1237,8 @@ const fr: LocaleData = {
     photoReadDescription: 'Pour ajouter des images aux events que tu crées',
     calendarPermission: 'Agenda',
     calendarDescription: 'Pour ajouter des events à ton agenda',
+    notificationsPermission: 'Notifications',
+    notificationsDescription: 'Pour te rappeler le jour J des events que tu as enregistrés',
 
     // Permission status labels
     statusGranted: 'Autorisé',
