@@ -305,7 +305,7 @@ export default function SignIn() {
                 textContentType="emailAddress"
                 hasError={emptyFields.email}
                 autoCapitalize="none"
-                autocomplete="email"
+                autoComplete="email"
                 autoCorrect={false}
                 testID="input-sign-in-email"
               />

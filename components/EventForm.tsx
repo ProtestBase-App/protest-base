@@ -3,6 +3,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  View,
+  ScrollView,
   Alert,
   ActivityIndicator,
   LayoutAnimation,
@@ -17,18 +19,25 @@ import { ThemedView } from '@/components/ThemedView';
 import FormField from '@/components/FormField';
 import FormDateField from '@/components/FormDateField';
 import FormLongText from '@/components/FormLongText';
-import { DropdownCustom } from '@/components/DropdownCustom';
-import { DropdownMultiselect } from '@/components/DropdownMultiselect';
+import {
+  SheetSearchMultiSelect,
+  SheetSearchMultiSelectOption,
+} from '@/components/SheetSearchMultiSelect';
+import AddressAutocompleteField from '@/components/AddressAutocompleteField';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { RemovableChip } from '@/components/RemovableChip';
+import { FilterChip } from '@/components/ui/FilterChip';
 import { eventCategories } from '@/constants/EventCategories';
+import { getCategoryColors } from '@/constants/CategoryColors';
+import { MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
 import type { EventFormProps } from '@/types/eventForm.types';
+import type { PickedImage } from '@/types/event.types';
+import type { AddressSuggestion, AddressCountryCode, AddressLang } from '@/types/address.types';
 import { SectionHeader, HelperText } from '@/utils/formHelpers';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
-import { Spacing, Typography } from '@/constants/DesignTokens';
+import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { optimizeImageForUpload } from '@/utils/imageOptimization';
 
@@ -63,7 +72,6 @@ const EventForm: React.FC<EventFormProps> = ({
   // Template mode hides date/time and image fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
   const { dropdownItems: organizations, loading: organizationsLoading } = useOrganizations();
-  const [postalCodeSearch, setPostalCodeSearch] = React.useState('');
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
   const [isPickingImage, setIsPickingImage] = React.useState(false);
@@ -72,16 +80,30 @@ const EventForm: React.FC<EventFormProps> = ({
 
   React.useEffect(() => {
     const loadPostalCodes = async () => {
-      // Only clear postal code when the user explicitly changes country —
-      // not on initial mount or draft restore.
+      // Only clear the location fields when the user explicitly changes country —
+      // not on initial mount or async hydration. The truthy check on
+      // previousCountry is load-bearing: on an edit/draft screen the form first
+      // mounts with country='' and the real country arrives in a *later* setForm
+      // (unbatched), re-running this effect. A `!== null` guard would treat that
+      // ''→'belgium' transition as a user change and wipe the just-loaded address;
+      // requiring a truthy previousCountry (a real prior country code) skips it
+      // while still firing on genuine 'belgium'→'netherlands' switches. The
+      // accepted street + its synced city/region belong to the previous country,
+      // so they're cleared alongside the postal code; the autocomplete field
+      // re-syncs to the now-empty value via its reset effect.
       if (
         !isInitialMount.current &&
-        previousCountry.current !== null &&
+        previousCountry.current &&
         previousCountry.current !== form.country &&
-        form.postal_code
+        (form.postal_code || form.street_address || form.city || form.region)
       ) {
-        setForm((prev) => ({ ...prev, postal_code: null }));
-        setPostalCodeSearch('');
+        setForm((prev) => ({
+          ...prev,
+          postal_code: null,
+          street_address: '',
+          city: '',
+          region: '',
+        }));
       }
       previousCountry.current = form.country;
       isInitialMount.current = false;
@@ -163,26 +185,30 @@ const EventForm: React.FC<EventFormProps> = ({
     return [];
   }, [postalCodesData, userLang, form.country]);
 
-  const filteredPostalCodes = useMemo(() => {
-    if (postalCodeSearch.length >= 2) {
-      return listPostalCodes;
-    }
+  const postalCodeOptions = useMemo<SheetSearchMultiSelectOption[]>(
+    () =>
+      listPostalCodes.map((item) => ({
+        value: item.value,
+        label: item.label,
+        searchText: item.label.toLowerCase(),
+      })),
+    [listPostalCodes]
+  );
 
-    if (form.postal_code) {
-      const selectedItem = listPostalCodes.find((item) => item.value === String(form.postal_code));
-      if (selectedItem) {
-        return [selectedItem];
-      }
-      // Postal codes data hasn't loaded yet — return a placeholder so the
-      // dropdown can display the saved value while loading.
-      if (listPostalCodes.length === 0) {
-        return [{ label: String(form.postal_code), value: String(form.postal_code) }];
-      }
-      return [];
-    }
+  // value → label for the selected chip; SheetSearchMultiSelect filters the full
+  // option list internally, so no pre-filtering is needed here.
+  const postalLabelMap = useMemo(
+    () => new Map(listPostalCodes.map((item) => [item.value, item.label])),
+    [listPostalCodes]
+  );
 
-    return [];
-  }, [postalCodeSearch, listPostalCodes, form.postal_code]);
+  // Resolve a postal code to its display label, falling back to the synced city
+  // for NL/edge codes absent from the bundled dataset (or still loading) — the
+  // same synthesized label the old dropdown showed.
+  const resolvePostalLabel = useCallback(
+    (code: string) => postalLabelMap.get(code) ?? (form.city ? `${form.city} (${code})` : code),
+    [postalLabelMap, form.city]
+  );
 
   const getFormProgress = useMemo(() => {
     // Templates don't require start_time; only title is "recommended" for templates.
@@ -194,22 +220,62 @@ const EventForm: React.FC<EventFormProps> = ({
     return { completed, total, percentage: Math.round((completed / total) * 100) };
   }, [form.title, form.description, form.start_time, isTemplateMode]);
 
-  // O(1) lookup when rendering chips.
+  // O(1) lookup when resolving co-organizer chip labels.
   const orgLookup = useMemo(
     () => new Map(organizations.map((o) => [o.value, o.label])),
     [organizations]
   );
 
-  const handleRemoveCoOrganizer = useCallback(
-    (valueToRemove: string) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setForm((prev) => ({
-        ...prev,
-        co_organizers: prev.co_organizers.filter((v) => v !== valueToRemove),
-      }));
+  const organizationOptions = useMemo<SheetSearchMultiSelectOption[]>(
+    () => organizations.map((o) => ({ value: o.value, label: o.label })),
+    [organizations]
+  );
+
+  const resolveOrganizationLabel = useCallback(
+    (id: string) => orgLookup.get(id) ?? id,
+    [orgLookup]
+  );
+
+  // Map the form's country value to the address endpoint's lowercase ISO code.
+  // null when no (or an unsupported) country is selected — gates the autocomplete.
+  const addressCountryCode: AddressCountryCode | null =
+    form.country === 'belgium' ? 'be' : form.country === 'netherlands' ? 'nl' : null;
+
+  // userLanguage is en/fr/nl in this app; pass it through only when it's a value
+  // the endpoint accepts (it 400s on unknown langs).
+  const addressLang: AddressLang | undefined =
+    userLang === 'en' || userLang === 'fr' || userLang === 'nl' ? userLang : undefined;
+
+  // Commit a chosen suggestion. postal_code is the field that drives the
+  // *displayed* city on mobile (via getSubMunicipalityName), so it must stay
+  // consistent with the city/region we store:
+  //  - Suggestion carries a postal → take postal+city+region together from it
+  //    (NL "1234 AB" → 1234; the numeric part still resolves the municipality).
+  //  - Sparse POI with no postal → keep the prior postal/city/region as a
+  //    consistent set and change only the street, rather than clearing city while
+  //    leaving a now-mismatched stale postal behind.
+  const handleAddressSelect = useCallback(
+    (s: AddressSuggestion) => {
+      setForm((f) => {
+        if (!s.postal_code) {
+          return { ...f, street_address: s.street_address };
+        }
+        const parsed = parseInt(s.postal_code, 10);
+        return {
+          ...f,
+          street_address: s.street_address,
+          city: s.city ?? '',
+          region: s.region ?? '',
+          postal_code: Number.isNaN(parsed) ? f.postal_code : parsed,
+        };
+      });
     },
     [setForm]
   );
+
+  const handleAddressClear = useCallback(() => {
+    setForm((f) => ({ ...f, street_address: '' }));
+  }, [setForm]);
 
   // Scroll to end when the disclaimer focuses; delay lets the keyboard appear first.
   const handleDisclaimerFocus = useCallback(() => {
@@ -281,31 +347,62 @@ const EventForm: React.FC<EventFormProps> = ({
         return;
       }
 
+      const remaining = MAX_EVENT_IMAGES - form.images.length;
+      if (remaining <= 0) {
+        Alert.alert(
+          t('common.error'),
+          t('createEvent.maxImagesReached', { max: MAX_EVENT_IMAGES }),
+          [{ text: t('common.ok') }]
+        );
+        return;
+      }
+
+      // allowsEditing (single-image crop) is unavailable with multiple selection,
+      // so picks are uploaded uncropped. orderedSelection keeps the user's tap
+      // order as the display order on iOS.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        orderedSelection: true,
         quality: 1,
       });
 
-      if (!result.canceled && result.assets?.[0]) {
-        const selectedAsset = result.assets[0];
-        if (selectedAsset.type === 'image' || selectedAsset.uri) {
-          // Backend rejects multipart > 15 MB. Resize/compress before storing on the form
-          // so users with high-res phone cameras (HEIC > 18 MB) can still upload.
-          const optimized = await optimizeImageForUpload({
-            uri: selectedAsset.uri,
-            mimeType: selectedAsset.mimeType,
-            fileName: selectedAsset.fileName,
-            width: selectedAsset.width,
-            height: selectedAsset.height,
-            fileSize: selectedAsset.fileSize,
-          });
-          setForm({
-            ...form,
-            image: optimized,
-          });
+      if (!result.canceled && result.assets?.length) {
+        // selectionLimit is best-effort on some Android pickers — enforce the cap.
+        const selectedAssets = result.assets.slice(0, remaining);
+
+        // Backend rejects multipart > 15 MB. Resize/compress before storing on
+        // the form so users with high-res phone cameras (HEIC > 18 MB) can
+        // still upload. Sequential on purpose: decoding 5 full-resolution
+        // photos at once can spike memory on older devices.
+        const optimized: PickedImage[] = [];
+        for (const asset of selectedAssets) {
+          optimized.push(
+            await optimizeImageForUpload({
+              uri: asset.uri,
+              mimeType: asset.mimeType,
+              fileName: asset.fileName,
+              width: asset.width,
+              height: asset.height,
+              fileSize: asset.fileSize,
+            })
+          );
         }
+
+        if (result.assets.length > remaining) {
+          Alert.alert(
+            t('common.error'),
+            t('createEvent.maxImagesReached', { max: MAX_EVENT_IMAGES }),
+            [{ text: t('common.ok') }]
+          );
+        }
+
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setForm((prev) => ({
+          ...prev,
+          images: [...prev.images, ...optimized].slice(0, MAX_EVENT_IMAGES),
+        }));
       }
     } catch (error) {
       logger.warn('Image picker failed', {
@@ -314,6 +411,31 @@ const EventForm: React.FC<EventFormProps> = ({
       Alert.alert(t('common.error'), t('createEvent.imagePickerError'), [{ text: t('common.ok') }]);
     }
   };
+
+  const handleRemoveImage = useCallback(
+    (index: number) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setForm((prev) => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index),
+      }));
+    },
+    [setForm]
+  );
+
+  const handleMoveImage = useCallback(
+    (index: number, direction: -1 | 1) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setForm((prev) => {
+        const target = index + direction;
+        if (target < 0 || target >= prev.images.length) return prev;
+        const reordered = [...prev.images];
+        [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+        return { ...prev, images: reordered };
+      });
+    },
+    [setForm]
+  );
 
   const handleStartTimeChange = (isoString: string) => {
     const newStartTime = safeParseDate(isoString);
@@ -330,33 +452,103 @@ const EventForm: React.FC<EventFormProps> = ({
     }
   };
 
-  const renderImage = () => {
-    if (!form.image) {
+  const renderImages = () => {
+    if (form.images.length === 0) {
       return (
-        <ThemedView style={styles.uploadImageBoxSection}>
-          <ThemedView style={styles.uploadImageBox}>
-            <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
+        <TouchableOpacity
+          onPress={pickImage}
+          accessibilityLabel={t('createEvent.addImageAccessibilityLabel')}
+          accessibilityHint={t('createEvent.imageAccessibilityHint')}
+          accessibilityRole="button"
+        >
+          <ThemedView style={styles.uploadImageBoxSection}>
+            <ThemedView style={styles.uploadImageBox}>
+              {isPickingImage ? (
+                <ActivityIndicator color={themeColors.tint} />
+              ) : (
+                <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
+              )}
+            </ThemedView>
           </ThemedView>
-        </ThemedView>
+        </TouchableOpacity>
       );
     }
 
-    // Image-picker result object.
-    if (typeof form.image === 'object' && form.image.uri) {
-      return <Image source={{ uri: form.image.uri }} style={styles.imagePreview} />;
-    }
-
-    // URL string (from an existing event).
-    if (typeof form.image === 'string' && form.image.length > 0) {
-      return <Image source={{ uri: form.image }} style={styles.imagePreview} />;
-    }
-
     return (
-      <ThemedView style={styles.uploadImageBoxSection}>
-        <ThemedView style={styles.uploadImageBox}>
-          <IconSymbol name="photo.badge.plus" size={60} color={iconColor} />
-        </ThemedView>
-      </ThemedView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        // Nested ScrollViews don't inherit the parent's setting; without this
+        // the first tap on remove/reorder/add only dismisses the keyboard.
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.imageThumbRow}
+      >
+        {form.images.map((img, index) => {
+          const uri = typeof img === 'string' ? img : img.uri;
+          return (
+            // Plain Views: ThemedView would paint the theme background over the image.
+            <View key={`${uri}-${index}`} style={styles.imageThumbWrapper}>
+              <Image source={{ uri }} style={styles.imageThumb} />
+              {index === 0 && (
+                <View style={[styles.mainImageBadge, { backgroundColor: themeColors.tint }]}>
+                  <ThemedText style={styles.mainImageBadgeText}>
+                    {t('createEvent.mainImageBadge')}
+                  </ThemedText>
+                </View>
+              )}
+              <TouchableOpacity
+                onPress={() => handleRemoveImage(index)}
+                style={styles.imageThumbRemove}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={t('createEvent.removeImageAccessibilityLabel')}
+                accessibilityRole="button"
+              >
+                <IconSymbol name="xmark" size={12} color="white" />
+              </TouchableOpacity>
+              {form.images.length > 1 && (
+                <View style={styles.imageThumbActions}>
+                  <TouchableOpacity
+                    onPress={() => handleMoveImage(index, -1)}
+                    disabled={index === 0}
+                    style={[styles.imageMoveButton, index === 0 && styles.imageMoveButtonDisabled]}
+                    accessibilityLabel={t('createEvent.moveImageLeftAccessibilityLabel')}
+                    accessibilityRole="button"
+                  >
+                    <IconSymbol name="chevron.left" size={16} color={themeColors.icon} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleMoveImage(index, 1)}
+                    disabled={index === form.images.length - 1}
+                    style={[
+                      styles.imageMoveButton,
+                      index === form.images.length - 1 && styles.imageMoveButtonDisabled,
+                    ]}
+                    accessibilityLabel={t('createEvent.moveImageRightAccessibilityLabel')}
+                    accessibilityRole="button"
+                  >
+                    <IconSymbol name="chevron.right" size={16} color={themeColors.icon} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
+        {form.images.length < MAX_EVENT_IMAGES && (
+          <TouchableOpacity
+            onPress={pickImage}
+            style={[styles.imageAddTile, { borderColor: themeColors.inputBorder }]}
+            accessibilityLabel={t('createEvent.addImageAccessibilityLabel')}
+            accessibilityHint={t('createEvent.imageAccessibilityHint')}
+            accessibilityRole="button"
+          >
+            {isPickingImage ? (
+              <ActivityIndicator color={themeColors.tint} />
+            ) : (
+              <IconSymbol name="photo.badge.plus" size={28} color={iconColor} />
+            )}
+          </TouchableOpacity>
+        )}
+      </ScrollView>
     );
   };
 
@@ -429,30 +621,30 @@ const EventForm: React.FC<EventFormProps> = ({
       <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>
         {t('createEvent.category')} ({t('common.optional')})
       </ThemedText>
-      <ThemedView style={styles.dropdownWrapper}>
-        <DropdownCustom
-          testID="dropdown-event-category"
-          items={eventCategories.map((cat) => ({
-            label: t(`categories.${cat.value.toLowerCase()}`),
-            value: cat.value,
-          }))}
-          placeholder={t('createEvent.selectCategory')}
-          onValueChange={(value) => setForm({ ...form, categories: value })}
-          value={form.categories}
-          containerStyle={{ marginTop: 8, flex: 1 }}
-          searchable={false}
-          excludeSearchField={true}
-          maxHeight={200}
-          mode="auto"
-        />
-        {form.categories && (
-          <TouchableOpacity
-            onPress={() => setForm({ ...form, categories: '' })}
-            style={styles.clearButton}
-          >
-            <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-          </TouchableOpacity>
-        )}
+      <ThemedView style={styles.chipRow}>
+        {eventCategories.map(({ value }) => {
+          const categoryColors = getCategoryColors(value);
+          const active = form.categories === value;
+          return (
+            <FilterChip
+              key={value}
+              testID={`category-chip-${value}`}
+              label={t(`categories.${value.toLowerCase()}`)}
+              active={active}
+              activeColor={categoryColors.color}
+              activeBackground={categoryColors.bg}
+              leading={
+                <View
+                  style={[
+                    styles.categoryDot,
+                    { backgroundColor: categoryColors.color, opacity: active ? 1 : 0.6 },
+                  ]}
+                />
+              }
+              onPress={() => setForm({ ...form, categories: active ? '' : value })}
+            />
+          );
+        })}
       </ThemedView>
       <HelperText text={t('createEvent.categoryHelper')} isDark={isDark} />
 
@@ -489,19 +681,20 @@ const EventForm: React.FC<EventFormProps> = ({
       <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>
         {t('createEvent.country')} ({t('common.optional')})
       </ThemedText>
-      <DropdownCustom
-        testID="dropdown-event-country"
-        items={countries.map((c) => ({
-          label: c.label[userLang as keyof typeof c.label] || c.label.en,
-          value: c.value,
-        }))}
-        placeholder={t('createEvent.selectCountry')}
-        onValueChange={(value) => setForm({ ...form, country: value })}
-        value={form.country}
-        containerStyle={{ marginTop: 8 }}
-        searchable={false}
-        excludeSearchField={true}
-      />
+      <ThemedView style={styles.chipRow}>
+        {countries.map((c) => {
+          const active = form.country === c.value;
+          return (
+            <FilterChip
+              key={c.value}
+              testID={`country-chip-${c.value}`}
+              label={c.label[userLang as keyof typeof c.label] || c.label.en}
+              active={active}
+              onPress={() => setForm({ ...form, country: active ? '' : c.value })}
+            />
+          );
+        })}
+      </ThemedView>
 
       {form.country && (
         <ThemedView style={styles.nestedFieldGroup}>
@@ -518,52 +711,61 @@ const EventForm: React.FC<EventFormProps> = ({
             )}
           </ThemedView>
 
-          <ThemedView style={styles.postalCodeWrapper}>
-            <ThemedView style={styles.inputPostalCode}>
-              <DropdownCustom
-                testID="dropdown-event-postal-code"
-                items={filteredPostalCodes}
-                placeholder={
-                  postalCodesLoading ? t('common.loading') : t('createEvent.postalCodePlaceholder')
+          <ThemedView style={styles.controlSpacing}>
+            <SheetSearchMultiSelect
+              testID="dropdown-event-postal-code"
+              options={postalCodeOptions}
+              selected={form.postal_code ? [String(form.postal_code)] : []}
+              onChange={(next) => {
+                const code = next[0];
+                if (!code) {
+                  // Street is gated behind the postal code, so clearing the postal
+                  // also clears the street + derived city/region — otherwise a
+                  // now-hidden street_address would still save.
+                  setForm({
+                    ...form,
+                    postal_code: null,
+                    street_address: '',
+                    city: '',
+                    region: '',
+                  });
+                } else {
+                  setForm({ ...form, postal_code: Number(code) });
                 }
-                onValueChange={(value) =>
-                  setForm({ ...form, postal_code: value ? Number(value) : null })
-                }
-                value={form.postal_code ? String(form.postal_code) : undefined}
-                searchable={true}
-                searchPlaceholder={t('createEvent.searchPostalCode')}
-                inputSearchStyle={{ fontSize: Typography.sizes.xs }}
-                onChangeSearchText={(text) => setPostalCodeSearch(text)}
-                mode="auto"
-                dropdownPosition="auto"
-                containerStyle={{ flex: 1 }}
-                disabled={postalCodesLoading}
-              />
-            </ThemedView>
-            {form.postal_code && !postalCodesLoading && (
-              <TouchableOpacity
-                onPress={() => {
-                  setForm({ ...form, postal_code: null });
-                  setPostalCodeSearch('');
-                }}
-                style={styles.clearButton}
-                accessibilityLabel={t('createEvent.clearPostalCodeAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-              </TouchableOpacity>
-            )}
+              }}
+              placeholder={
+                postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
+              }
+              resolveSelectedLabel={resolvePostalLabel}
+              leadingIconName="mappin.and.ellipse"
+              minSearchLength={2}
+              singleSelect
+            />
           </ThemedView>
 
-          <FormField
-            testID="input-event-street-address"
-            title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
-            value={form.street_address}
-            placeholder={t('createEvent.streetAddressPlaceholder')}
-            handleChangeText={(value) => setForm({ ...form, street_address: value })}
-            otherStyles={styles.fieldSpacingNested}
-            maxLength={75}
-          />
+          {/* Stepwise reveal: the street field appears only after a postal code
+              is picked (country → postal → street). The `|| street_address`
+              guard keeps an already-saved street visible when editing a legacy
+              event that has no postal code, so existing data is never hidden. */}
+          {(form.postal_code || form.street_address) && (
+            <AddressAutocompleteField
+              testID="input-event-street-address"
+              title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
+              value={form.street_address}
+              countryCode={addressCountryCode}
+              lang={addressLang}
+              postalCode={form.postal_code ? String(form.postal_code) : undefined}
+              onSelect={handleAddressSelect}
+              onClear={handleAddressClear}
+              placeholder={t('createEvent.addressSearchPlaceholder')}
+              searchingText={t('createEvent.addressSearching')}
+              noResultsText={t('createEvent.addressNoResults')}
+              errorText={t('createEvent.addressError')}
+              unavailableText={t('createEvent.addressUnavailable')}
+              clearAccessibilityLabel={t('createEvent.clearStreetAddressAccessibilityLabel')}
+              otherStyles={styles.fieldSpacingNested}
+            />
+          )}
           <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
         </ThemedView>
       )}
@@ -581,31 +783,14 @@ const EventForm: React.FC<EventFormProps> = ({
         <ThemedView style={styles.uploadImageContainer}>
           <ThemedView style={styles.imageTitleWrapper}>
             <ThemedText style={styles.imageTitle}>
-              {t('createEvent.uploadImage')} ({t('common.optional')})
+              {t('createEvent.uploadImage')} (
+              {form.images.length > 0
+                ? `${form.images.length}/${MAX_EVENT_IMAGES}`
+                : t('common.optional')}
+              )
             </ThemedText>
-            {form.image && (
-              <TouchableOpacity
-                onPress={() => setForm({ ...form, image: null })}
-                style={styles.clearImageButton}
-                accessibilityLabel={t('createEvent.removeImageAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-              </TouchableOpacity>
-            )}
           </ThemedView>
-          <TouchableOpacity
-            onPress={pickImage}
-            accessibilityLabel={
-              form.image
-                ? t('createEvent.changeImageAccessibilityLabel')
-                : t('createEvent.addImageAccessibilityLabel')
-            }
-            accessibilityHint={t('createEvent.imageAccessibilityHint')}
-            accessibilityRole="button"
-          >
-            {renderImage()}
-          </TouchableOpacity>
+          {renderImages()}
           <HelperText text={t('createEvent.imageHelper')} isDark={isDark} />
         </ThemedView>
       )}
@@ -634,50 +819,22 @@ const EventForm: React.FC<EventFormProps> = ({
           />
         )}
       </ThemedView>
-      <ThemedView style={styles.dropdownWrapper}>
-        <DropdownMultiselect
+      <ThemedView style={styles.controlSpacing}>
+        <SheetSearchMultiSelect
           testID="dropdown-event-co-organizers"
-          items={organizations}
+          options={organizationOptions}
+          selected={form.co_organizers}
+          onChange={(next) => setForm({ ...form, co_organizers: next })}
           placeholder={
             organizationsLoading ? t('common.loading') : t('createEvent.selectCoOrganizers')
           }
-          onValueChange={(value) => setForm({ ...form, co_organizers: value })}
-          value={form.co_organizers}
-          searchable={true}
-          containerStyle={{ marginTop: 8, flex: 1 }}
-          disabled={organizationsLoading}
+          resolveSelectedLabel={resolveOrganizationLabel}
+          leadingIconName="person"
+          minSearchLength={0}
+          maxSelected={MAX_CO_ORGANIZERS}
+          maxSelectedHint={t('createEvent.maxCoOrganizers', { max: MAX_CO_ORGANIZERS })}
         />
-        {form.co_organizers && form.co_organizers.length > 0 && !organizationsLoading && (
-          <TouchableOpacity
-            onPress={() => setForm({ ...form, co_organizers: [] })}
-            style={styles.clearButton}
-            accessibilityLabel={t('createEvent.clearCoOrganizersAccessibilityLabel')}
-            accessibilityRole="button"
-          >
-            <IconSymbol name="xmark" size={20} color={themeColors.secondaryText} />
-          </TouchableOpacity>
-        )}
       </ThemedView>
-
-      {form.co_organizers && form.co_organizers.length > 0 && (
-        <ThemedView style={styles.selectedChipsContainer}>
-          <ThemedText style={styles.selectedChipsLabel}>
-            {t('createEvent.selected')} ({form.co_organizers.length}):
-          </ThemedText>
-          <ThemedView style={styles.chipsWrapper}>
-            {form.co_organizers.map((value) => (
-              <RemovableChip
-                key={value}
-                label={orgLookup.get(value) || value}
-                value={value}
-                onRemove={handleRemoveCoOrganizer}
-                disabled={organizationsLoading}
-                accessibilityContext="co-organizers"
-              />
-            ))}
-          </ThemedView>
-        </ThemedView>
-      )}
 
       <HelperText text={t('createEvent.coOrganizersHelper')} isDark={isDark} />
 
@@ -786,16 +943,65 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontFamily: Typography.families.medium,
   },
-  clearImageButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  imageThumbRow: {
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
-  imagePreview: {
-    width: '100%',
-    height: 158,
-    borderRadius: 12,
+  imageThumbWrapper: {
+    width: 96,
+  },
+  imageThumb: {
+    width: 96,
+    height: 96,
+    borderRadius: BorderRadius.lg,
     resizeMode: 'cover',
+  },
+  imageThumbRemove: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    // Constant dark overlay so the white xmark stays readable on any photo.
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainImageBadge: {
+    position: 'absolute',
+    top: Spacing.xs,
+    left: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  mainImageBadgeText: {
+    color: 'white',
+    fontSize: Typography.sizes.xxs,
+    fontFamily: Typography.families.semiBold,
+  },
+  imageThumbActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  imageMoveButton: {
+    padding: Spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageMoveButtonDisabled: {
+    opacity: 0.3,
+  },
+  imageAddTile: {
+    width: 96,
+    height: 96,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   uploadImageBoxSection: {
     width: '100%',
@@ -825,39 +1031,19 @@ const styles = StyleSheet.create({
   conditionalFieldGroup: {
     marginTop: 0,
   },
-  dropdownWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  clearButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  postalCodeWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  controlSpacing: {
     marginTop: 8,
   },
-  inputPostalCode: {
-    flex: 1,
-    maxWidth: '100%',
-  },
-  selectedChipsContainer: {
-    marginTop: Spacing.md,
-  },
-  selectedChipsLabel: {
-    fontSize: Typography.sizes.sm,
-    fontFamily: Typography.families.semiBold,
-    marginBottom: Spacing.sm,
-    opacity: 0.7,
-  },
-  chipsWrapper: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
+    marginTop: 8,
+  },
+  categoryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   checkboxContainer: {
     flexDirection: 'row',

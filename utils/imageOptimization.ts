@@ -11,6 +11,10 @@ import type { PickedImage } from '@/types/event.types';
  *
  * The result is reliably well under the limit while still looking sharp on phones
  * and tablets (event images are displayed at most ~1200px wide in the UI).
+ *
+ * Re-encoding also strips EXIF/GPS metadata (expo-image-manipulator does not copy
+ * source metadata into its output), so we re-encode even already-small images to
+ * avoid leaking the uploader's location — a privacy requirement for a protest app.
  */
 
 const MAX_DIMENSION = 1920;
@@ -25,7 +29,11 @@ export interface OptimizableImage extends PickedImage {
 }
 
 /**
- * Resize and compress a picked image so it fits the backend upload limit.
+ * Resize and compress a picked image so it fits the backend upload limit, and
+ * strip its EXIF/GPS metadata.
+ *
+ * The image is re-encoded in EVERY case — including when it is already small
+ * enough to skip resizing — because re-encoding is what removes the metadata.
  * Falls back to the original asset if manipulation fails — the upload may still
  * succeed if the original is small enough, and we log the failure for diagnosis.
  */
@@ -37,17 +45,21 @@ export async function optimizeImageForUpload(image: OptimizableImage): Promise<P
     longEdge > 0 &&
     longEdge <= MAX_DIMENSION;
 
-  if (alreadySmall) {
-    return image;
+  // Resize only when the image exceeds the limits; an empty action list still
+  // re-encodes (stripping metadata) without changing dimensions.
+  // Only specify the longer dimension so aspect is preserved automatically.
+  // If we don't know the dimensions, resize by width — the manipulator keeps ratio.
+  const actions: ImageManipulator.Action[] = [];
+  if (!alreadySmall) {
+    const resizeBy: ImageManipulator.ActionResize['resize'] =
+      (image.height ?? 0) > (image.width ?? 0)
+        ? { height: MAX_DIMENSION }
+        : { width: MAX_DIMENSION };
+    actions.push({ resize: resizeBy });
   }
 
-  // Only specify the longer dimension so aspect is preserved automatically.
-  // If we don't know the dimensions, resize by width — the manipulator will keep ratio.
-  const resizeBy: ImageManipulator.ActionResize['resize'] =
-    (image.height ?? 0) > (image.width ?? 0) ? { height: MAX_DIMENSION } : { width: MAX_DIMENSION };
-
   try {
-    const result = await ImageManipulator.manipulateAsync(image.uri, [{ resize: resizeBy }], {
+    const result = await ImageManipulator.manipulateAsync(image.uri, actions, {
       compress: COMPRESSION_QUALITY,
       format: ImageManipulator.SaveFormat.JPEG,
     });

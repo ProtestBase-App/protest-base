@@ -22,12 +22,24 @@ import { VersionGate } from '@/components/version';
 import { IntegrityProvider } from '@/context/IntegrityProvider';
 import { IntegrityGate } from '@/components/integrity';
 import { ConnectionGate } from '@/components/connection';
+import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
 import * as NavigationBar from 'expo-navigation-bar';
+import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 SplashScreen.preventAutoHideAsync();
+
+// Foreground notifications: silent banner (iOS) + notification list, no sound/badge.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -91,6 +103,7 @@ export default function RootLayout() {
                                     value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
                                   >
                                     <ExploreTabProvider>
+                                      <NotificationsBootstrap />
                                       <RootNavigator />
                                       <StatusBar
                                         style={colorScheme === 'dark' ? 'light' : 'dark'}

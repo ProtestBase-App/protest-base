@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { DropdownCustom } from '@/components/DropdownCustom';
+import {
+  SheetSearchMultiSelect,
+  SheetSearchMultiSelectOption,
+} from '@/components/SheetSearchMultiSelect';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { getThemeColors } from '@/utils/themeColors';
 import { t } from '@/utils/i18n';
 import { Typography } from '@/constants/DesignTokens';
 
@@ -21,8 +26,8 @@ interface OrganizationPickerProps {
 /**
  * OrganizationPicker Component
  *
- * Renders an organization dropdown for multi-org users.
- * For single-org users, renders nothing (auto-selected in context).
+ * Renders an organization picker for multi-org users using the filter-style
+ * searchable field. For single-org users, renders nothing (auto-selected in context).
  *
  * Usage:
  * ```tsx
@@ -40,15 +45,26 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
   error = false,
   errorMessage,
 }) => {
-  const { dropdownItems, hasSingleOrganization, hasMultipleOrganizations, loading } =
-    useUserOrganizations();
+  const { dropdownItems, hasSingleOrganization, hasMultipleOrganizations } = useUserOrganizations();
+  const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
+
+  const options = useMemo<SheetSearchMultiSelectOption[]>(
+    () => dropdownItems.map((item) => ({ value: item.value, label: item.label })),
+    [dropdownItems]
+  );
+
+  const resolveLabel = useCallback(
+    (id: string) => dropdownItems.find((item) => item.value === id)?.label ?? id,
+    [dropdownItems]
+  );
 
   // Single organization users: render nothing (auto-selected)
   if (hasSingleOrganization) {
     return null;
   }
 
-  // No organizations or still loading: don't render dropdown
+  // No organizations or still loading: don't render the picker
   if (!hasMultipleOrganizations) {
     return null;
   }
@@ -56,21 +72,22 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.label}>{t('createEvent.organization')} *</ThemedText>
-      <DropdownCustom
+      <SheetSearchMultiSelect
         testID="dropdown-organization"
-        items={dropdownItems}
+        options={options}
+        selected={value ? [value] : []}
+        onChange={(next) => onValueChange(next[0] ?? '')}
         placeholder={t('createEvent.selectOrganization')}
-        value={value}
-        onValueChange={onValueChange}
-        searchable={dropdownItems.length > 5}
-        excludeSearchField={dropdownItems.length <= 5}
-        disabled={loading}
-        error={error}
-        errorMessage={errorMessage}
-        containerStyle={styles.dropdown}
-        maxHeight={250}
-        mode="auto"
+        resolveSelectedLabel={resolveLabel}
+        leadingIconName="person"
+        minSearchLength={0}
+        singleSelect
       />
+      {error && errorMessage ? (
+        <ThemedText style={[styles.errorText, { color: themeColors.error }]}>
+          {errorMessage}
+        </ThemedText>
+      ) : null}
     </ThemedView>
   );
 };
@@ -82,10 +99,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.base,
     fontFamily: Typography.families.medium,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  dropdown: {
-    marginTop: 8,
+  errorText: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    marginTop: 6,
   },
 });
 

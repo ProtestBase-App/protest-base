@@ -7,8 +7,8 @@ export interface HkaNativeModule {
    * Generate a fresh hardware-backed EC P-256 keypair under the given alias
    * with `setAttestationChallenge(utf8Bytes(nonce))`. Any pre-existing entry
    * under the alias is wiped first. Returns the leaf-first base64-DER cert
-   * chain and the SPKI hash (lowercase hex) of the leaf certificate's public
-   * key — both shapes the backend expects.
+   * chain and the SPKI hash (base64url, no padding) of the leaf certificate's
+   * public key — both shapes the backend expects.
    */
   attest(alias: string, nonce: string): Promise<{ keyId: string; certChain: string[] }>;
   /**

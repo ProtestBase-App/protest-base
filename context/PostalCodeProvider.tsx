@@ -10,6 +10,14 @@ import React, {
 } from 'react';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { logger } from '@/utils/logger';
+import {
+  buildLocationFilterOptions,
+  expandLocationTokens,
+  isLocationSelectionTooBroad,
+  resolveLocationLabel,
+  type Lang,
+  type LocationFilterOption,
+} from '@/utils/locationFilterOptions';
 
 export type Country = 'belgium' | 'netherlands';
 
@@ -18,12 +26,33 @@ const isValidCountry = (country: string): country is Country => {
 };
 
 interface PostalCodeContextType {
-  getSubMunicipalityName: (postalCode: string, country: string) => string;
+  /**
+   * Resolve a postal code to its localized municipality name from the bundled
+   * dataset. `fallbackCity` (e.g. the event's stored `city`) is returned when the
+   * code isn't in the static set — common for NL and edge OSM postcodes sourced
+   * from address autocomplete — so the location still displays instead of blank.
+   */
+  getSubMunicipalityName: (
+    postalCode: string,
+    country: string,
+    fallbackCity?: string | null
+  ) => string;
   loading: boolean;
   loadPostalCodesForCountry: (country: string) => Promise<void>;
   /** Bumped when the cache updates so consumers can re-render. */
   cacheVersion: number;
   getPostalCodeData: (country: string) => any[];
+  /**
+   * Administrative-hierarchy options (region/province/municipality) for the
+   * explore location filter, in the user's language. Empty until data loads.
+   */
+  locationFilterOptions: LocationFilterOption[];
+  /** Expand hierarchy tokens (or raw codes) to deduped postal codes for the backend. */
+  expandLocationTokens: (values: string[]) => { codes: string[]; truncated: boolean };
+  /** Resolve a token or raw postal code to a display label. */
+  resolveLocationLabel: (value: string) => string;
+  /** True when a selection would expand past the backend-safe postal-code limit. */
+  isLocationSelectionTooBroad: (values: string[]) => boolean;
 }
 
 const PostalCodeContext = createContext<PostalCodeContextType>({
@@ -32,6 +61,10 @@ const PostalCodeContext = createContext<PostalCodeContextType>({
   loadPostalCodesForCountry: async () => {},
   cacheVersion: 0,
   getPostalCodeData: () => [],
+  locationFilterOptions: [],
+  expandLocationTokens: () => ({ codes: [], truncated: false }),
+  resolveLocationLabel: (value) => value,
+  isLocationSelectionTooBroad: () => false,
 });
 
 interface PostalCodeProviderProps {
@@ -115,27 +148,29 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
   }, [loadPostalCodesForCountry]);
 
   const getSubMunicipalityName = useCallback(
-    (postalCode: string, country: string): string => {
+    (postalCode: string, country: string, fallbackCity?: string | null): string => {
+      const fallback = (fallbackCity ?? '').trim();
+
       if (!isValidCountry(country)) {
-        return '';
+        return fallback;
       }
 
       const codes = postalCodesCache[country];
-      if (!codes || !postalCode) return '';
+      if (!codes || !postalCode) return fallback;
 
       // Postal codes are stored as numbers in the data set.
       const postalCodeNum = parseInt(postalCode, 10);
-      if (isNaN(postalCodeNum)) return '';
+      if (isNaN(postalCodeNum)) return fallback;
 
       const postalCodeData = codes.find((pc: any) => pc.post_code === postalCodeNum);
-      if (!postalCodeData) return '';
+      if (!postalCodeData) return fallback;
 
       // Pick the locale-specific 'sub_municipality_name_*' field at runtime.
       const subMunicipalityKey = Object.keys(postalCodeData).find((key) =>
         key.startsWith('sub_municipality_name')
       );
 
-      return subMunicipalityKey ? postalCodeData[subMunicipalityKey] : '';
+      return subMunicipalityKey ? postalCodeData[subMunicipalityKey] : fallback;
     },
     [postalCodesCache]
   );
@@ -151,6 +186,42 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
     [postalCodesCache]
   );
 
+  // Build hierarchy options + lookup maps once per (data, language) change.
+  // Tokens are language-independent, so building from the single loaded BE file
+  // is correct; the language only selects region/province display labels.
+  const locationData = useMemo(() => {
+    const lang: Lang = userLanguage === 'fr' || userLanguage === 'nl' ? userLanguage : 'en';
+    return buildLocationFilterOptions({
+      belgiumRows: postalCodesCache.belgium,
+      netherlandsRows: postalCodesCache.netherlands,
+      lang,
+    });
+  }, [postalCodesCache, userLanguage]);
+
+  const resolveRawCode = useCallback(
+    (code: string): string => {
+      const city =
+        getSubMunicipalityName(code, 'belgium') || getSubMunicipalityName(code, 'netherlands');
+      return city ? `${city} (${code})` : code;
+    },
+    [getSubMunicipalityName]
+  );
+
+  const expandLocationTokensCb = useCallback(
+    (values: string[]) => expandLocationTokens(values, locationData.tokenToCodes),
+    [locationData]
+  );
+
+  const resolveLocationLabelCb = useCallback(
+    (value: string) => resolveLocationLabel(value, locationData.tokenToLabel, resolveRawCode),
+    [locationData, resolveRawCode]
+  );
+
+  const isLocationSelectionTooBroadCb = useCallback(
+    (values: string[]) => isLocationSelectionTooBroad(values, locationData.tokenToCodes),
+    [locationData]
+  );
+
   const contextValue = useMemo(
     () => ({
       getSubMunicipalityName,
@@ -158,8 +229,22 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       loadPostalCodesForCountry,
       cacheVersion,
       getPostalCodeData,
+      locationFilterOptions: locationData.options,
+      expandLocationTokens: expandLocationTokensCb,
+      resolveLocationLabel: resolveLocationLabelCb,
+      isLocationSelectionTooBroad: isLocationSelectionTooBroadCb,
     }),
-    [getSubMunicipalityName, loading, loadPostalCodesForCountry, cacheVersion, getPostalCodeData]
+    [
+      getSubMunicipalityName,
+      loading,
+      loadPostalCodesForCountry,
+      cacheVersion,
+      getPostalCodeData,
+      locationData,
+      expandLocationTokensCb,
+      resolveLocationLabelCb,
+      isLocationSelectionTooBroadCb,
+    ]
   );
 
   return <PostalCodeContext.Provider value={contextValue}>{children}</PostalCodeContext.Provider>;

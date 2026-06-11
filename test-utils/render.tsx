@@ -19,6 +19,7 @@
 import React from 'react';
 import { render, RenderOptions } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import type { LocationFilterOption } from '@/utils/locationFilterOptions';
 
 // Re-export everything from testing library
 export * from '@testing-library/react-native';
@@ -85,27 +86,22 @@ export interface MockPostalCodeContext {
   loadPostalCodesForCountry?: jest.Mock;
   cacheVersion?: number;
   getPostalCodeData?: jest.Mock;
+  locationFilterOptions?: LocationFilterOption[];
+  expandLocationTokens?: jest.Mock;
+  resolveLocationLabel?: jest.Mock;
+  isLocationSelectionTooBroad?: jest.Mock;
 }
 
 export interface MockExploreTabContext {
-  valueCategoryOpeningModal?: string | null;
-  setValueCategoryOpeningModal?: jest.Mock;
-  valueDateOpeningModal?: string | null;
-  setValueDateOpeningModal?: jest.Mock;
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
-  locationFilter?: string[];
-  setLocationFilter?: jest.Mock;
-  valueLocationOpeningModal?: string[];
-  setValueLocationOpeningModal?: jest.Mock;
-  globalLocationFilterValue?: string[];
-  setGlobalLocationFilterValue?: jest.Mock;
-  organizationFilter?: string[];
-  setOrganizationFilter?: jest.Mock;
-  valueOrganizationOpeningModal?: string[];
-  setValueOrganizationOpeningModal?: jest.Mock;
-  globalOrganizationFilterValue?: string[];
-  setGlobalOrganizationFilterValue?: jest.Mock;
+  appliedFilters?: {
+    category: string | null;
+    dateFilter: string | null;
+    locations: string[];
+    organizations: string[];
+  };
+  setAppliedFilters?: jest.Mock;
   shouldScrollToTop?: boolean;
   setShouldScrollToTop?: jest.Mock;
 }
@@ -235,27 +231,17 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
   loadPostalCodesForCountry: jest.fn().mockResolvedValue(undefined),
   cacheVersion: 0,
   getPostalCodeData: jest.fn().mockReturnValue([]),
+  locationFilterOptions: [],
+  expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
+  resolveLocationLabel: jest.fn((value: string) => value),
+  isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
 };
 
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
-  valueCategoryOpeningModal: 'allCategories',
-  setValueCategoryOpeningModal: jest.fn(),
-  valueDateOpeningModal: 'allDates',
-  setValueDateOpeningModal: jest.fn(),
   searchQuery: '',
   setSearchQuery: jest.fn(),
-  locationFilter: [],
-  setLocationFilter: jest.fn(),
-  valueLocationOpeningModal: [],
-  setValueLocationOpeningModal: jest.fn(),
-  globalLocationFilterValue: [],
-  setGlobalLocationFilterValue: jest.fn(),
-  organizationFilter: [],
-  setOrganizationFilter: jest.fn(),
-  valueOrganizationOpeningModal: [],
-  setValueOrganizationOpeningModal: jest.fn(),
-  globalOrganizationFilterValue: [],
-  setGlobalOrganizationFilterValue: jest.fn(),
+  appliedFilters: { category: null, dateFilter: null, locations: [], organizations: [] },
+  setAppliedFilters: jest.fn(),
   shouldScrollToTop: false,
   setShouldScrollToTop: jest.fn(),
 };

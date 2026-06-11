@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   View,
-  Linking,
   Image as RNImage,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,13 +18,14 @@ import { OrganizerAvatar } from '@/components/OrganizerAvatar';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useFollowedOrgs } from '@/context/FollowedOrgsProvider';
-import { useExploreTabContext } from '@/context/ExploreTabProvider';
+import { DEFAULT_EXPLORE_FILTERS, useExploreTabContext } from '@/context/ExploreTabProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { getEventsBackend } from '@/services/event.service';
 import { getOrganizationById } from '@/services/organizer.service';
 import { OrganizationDetail } from '@/types/organization.types';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
+import { openExternalUrlSafely } from '@/utils/urlSafety';
 import { DynamicRoutes, Routes } from '@/constants/Routes';
 import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
@@ -61,18 +61,7 @@ export default function OrganizerProfile() {
     isFollowing: isFollowingOrg,
   } = useFollowedOrgs();
   const { getSubMunicipalityName } = usePostalCodes();
-  const {
-    setGlobalOrganizationFilterValue,
-    setOrganizationFilter,
-    setValueOrganizationOpeningModal,
-    setGlobalLocationFilterValue,
-    setLocationFilter,
-    setValueLocationOpeningModal,
-    setValueCategoryOpeningModal,
-    setValueDateOpeningModal,
-    setSearchQuery,
-    setShouldScrollToTop,
-  } = useExploreTabContext();
+  const { setAppliedFilters, setSearchQuery, setShouldScrollToTop } = useExploreTabContext();
 
   // Listing cache supplies Name/$createdAt without waiting for the detail fetch.
   const cachedOrg = organizations.find((o) => o.$id === orgId);
@@ -171,14 +160,7 @@ export default function OrganizerProfile() {
   const handleSeeAllEvents = () => {
     if (!orgId) return;
     const orgArr = [orgId];
-    setGlobalOrganizationFilterValue(orgArr);
-    setOrganizationFilter(orgArr);
-    setValueOrganizationOpeningModal(orgArr);
-    setGlobalLocationFilterValue([]);
-    setLocationFilter([]);
-    setValueLocationOpeningModal([]);
-    setValueCategoryOpeningModal('allCategories');
-    setValueDateOpeningModal('allDates');
+    setAppliedFilters({ ...DEFAULT_EXPLORE_FILTERS, organizations: orgArr });
     setSearchQuery('');
     setShouldScrollToTop(true);
     router.push(Routes.EXPLORE);
@@ -205,7 +187,7 @@ export default function OrganizerProfile() {
   const formatEventLocation = (ev: FormattedEvent): string => {
     const city =
       ev.postal_code && ev.country
-        ? getSubMunicipalityName(String(ev.postal_code), ev.country)
+        ? getSubMunicipalityName(String(ev.postal_code), ev.country, ev.city)
         : ev.city;
     return ev.street_address || city || '';
   };
@@ -447,12 +429,10 @@ export default function OrganizerProfile() {
                         style={styles.aboutRow}
                         onPress={() => {
                           if (!websiteUrl) return;
-                          Linking.openURL(websiteUrl).catch((err) =>
-                            logger.warn('[OrganizerProfile] Failed to open website', {
-                              error: err,
-                              url: websiteUrl,
-                            })
-                          );
+                          // website_url is organizer-supplied (untrusted); only
+                          // open plain http(s) links so a crafted value cannot
+                          // trigger arbitrary scheme handling on the device.
+                          void openExternalUrlSafely(websiteUrl, 'organizer-website');
                         }}
                         accessibilityRole="link"
                       >

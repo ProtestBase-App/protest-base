@@ -1,7 +1,7 @@
 {
   "name": "protest-base",
   "main": "expo-router/entry",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "scripts": {
     "start": "expo start",
     "start:mcp": "EXPO_UNSTABLE_MCP_SERVER=1 expo start",
@@ -18,7 +18,7 @@
   "dependencies": {
     "@expo/app-integrity": "^55.0.13",
     "@expo/vector-icons": "^15.0.3",
-    "@maplibre/maplibre-react-native": "^10.4.2",
+    "@maplibre/maplibre-react-native": "^11.3.4",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
@@ -41,6 +41,7 @@
     "expo-linking": "~55.0.15",
     "expo-localization": "~55.0.15",
     "expo-navigation-bar": "~55.0.13",
+    "expo-notifications": "~55.0.23",
     "expo-router": "~55.0.16",
     "expo-secure-store": "~55.0.14",
     "expo-splash-screen": "~55.0.21",
@@ -52,7 +53,6 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
-    "react-native-element-dropdown": "^2.12.4",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-image-viewing": "^0.2.2",
     "react-native-reanimated": "4.2.1",

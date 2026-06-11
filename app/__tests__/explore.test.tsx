@@ -2,6 +2,7 @@ jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockRetur
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
 jest.mock('@/services/event.service', () => ({
   getEventByIdBackend: jest.fn(),
+  getEventsBackend: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
 }));
 jest.mock('@/hooks/useDebouncedValue', () => ({
   useDebouncedValue: jest.fn((value) => value),
@@ -19,10 +20,9 @@ jest.mock('@/hooks/useExplorePagination', () => ({
 }));
 
 import React from 'react';
-import { router } from 'expo-router';
-import { renderWithProviders, fireEvent, waitFor, createMockEvent } from '@/test-utils/render';
+import { renderWithProviders, fireEvent, waitFor, act, createMockEvent } from '@/test-utils/render';
 import ExploreTab from '@/app/(tabs)/(explore)/explore';
-import { getEventByIdBackend } from '@/services/event.service';
+import { getEventByIdBackend, getEventsBackend } from '@/services/event.service';
 import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
@@ -255,8 +255,8 @@ describe('Explore Screen', () => {
     });
   });
 
-  describe('Filter Modal Navigation', () => {
-    it('navigates to filters screen when filter button is pressed', () => {
+  describe('Filters Sheet', () => {
+    beforeEach(() => {
       (useExplorePagination as jest.Mock).mockReturnValue({
         events: [],
         loading: false,
@@ -266,16 +266,175 @@ describe('Explore Screen', () => {
         handleRefresh: jest.fn(),
         handleEndReached: jest.fn(),
       });
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
+    });
 
-      const { UNSAFE_getAllByType } = renderWithProviders(<ExploreTab />);
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
-      const touchables = UNSAFE_getAllByType(require('react-native').TouchableOpacity);
-      // Find the filter button (last TouchableOpacity in the search container)
-      const filterButton = touchables[touchables.length - 1];
+    it('opens the filters sheet when the filter button is pressed', async () => {
+      const { getByLabelText, getByText, queryByText } = renderWithProviders(<ExploreTab />);
 
-      fireEvent.press(filterButton);
+      // Sheet content is not rendered until the filter button is pressed
+      expect(queryByText('filters.title')).toBeNull();
+      expect(queryByText('filters.category')).toBeNull();
 
-      expect(router.push).toHaveBeenCalledWith(expect.stringContaining('filters'));
+      fireEvent.press(getByLabelText('filters.title'));
+
+      expect(getByText('filters.title')).toBeTruthy();
+      expect(getByText('filters.category')).toBeTruthy();
+
+      // Flush the debounced live-count fetch fired on open
+      await act(async () => {
+        jest.advanceTimersByTime(400);
+      });
+
+      expect(getEventsBackend).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 1, offset: 0, includeEnded: false })
+      );
+      // Mock returns total: 0 -> "no events" apply label
+      expect(getByText('home.filterApplyNone')).toBeTruthy();
+    });
+
+    it('applies draft filters and triggers scroll to top', () => {
+      const mockSetAppliedFilters = jest.fn();
+      const mockSetShouldScrollToTop = jest.fn();
+
+      const { getByLabelText, getByText, queryByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            setAppliedFilters: mockSetAppliedFilters,
+            setShouldScrollToTop: mockSetShouldScrollToTop,
+          },
+        },
+      });
+
+      fireEvent.press(getByLabelText('filters.title'));
+
+      // Toggle a category in the sheet's draft
+      fireEvent.press(getByText('categories.protest'));
+
+      // Apply (label is the fallback while the debounced count is still pending)
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(mockSetAppliedFilters).toHaveBeenCalledWith({
+        category: 'Protest',
+        dateFilter: null,
+        locations: [],
+        organizations: [],
+      });
+      expect(mockSetShouldScrollToTop).toHaveBeenCalledWith(true);
+      // Sheet closes after apply
+      expect(queryByText('filters.category')).toBeNull();
+    });
+  });
+
+  describe('Active Filters', () => {
+    beforeEach(() => {
+      (useExplorePagination as jest.Mock).mockReturnValue({
+        events: [],
+        loading: false,
+        refreshing: false,
+        loadingMore: false,
+        hasMore: false,
+        handleRefresh: jest.fn(),
+        handleEndReached: jest.fn(),
+      });
+    });
+
+    it('shows the badge with the total number of applied filters', () => {
+      const { getByLabelText, getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: 'Protest',
+              dateFilter: null,
+              locations: ['m:be:1000', 'm:be:2000'],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(getByLabelText('filters.title (3)')).toBeTruthy();
+      expect(getByText('3')).toBeTruthy();
+    });
+
+    it('renders a chip for each active filter', () => {
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: 'Protest',
+              dateFilter: 'today',
+              locations: ['m:be:1000'],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(getByText('categories.protest')).toBeTruthy();
+      expect(getByText('filters.today')).toBeTruthy();
+      // Default resolveLocationLabel mock is identity
+      expect(getByText('m:be:1000')).toBeTruthy();
+    });
+
+    it('clears the category filter when its chip is pressed', () => {
+      const mockSetAppliedFilters = jest.fn();
+      const applied = { category: 'Protest', dateFilter: null, locations: [], organizations: [] };
+
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: applied,
+            setAppliedFilters: mockSetAppliedFilters,
+          },
+        },
+      });
+
+      fireEvent.press(getByText('categories.protest'));
+
+      expect(mockSetAppliedFilters).toHaveBeenCalledTimes(1);
+      const updater = mockSetAppliedFilters.mock.calls[0][0];
+      expect(updater(applied)).toEqual({
+        category: null,
+        dateFilter: null,
+        locations: [],
+        organizations: [],
+      });
+    });
+
+    it('removes a single location token when its chip is pressed', () => {
+      const mockSetAppliedFilters = jest.fn();
+      const applied = {
+        category: null,
+        dateFilter: null,
+        locations: ['m:be:1000', 'm:be:2000'],
+        organizations: [],
+      };
+
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: applied,
+            setAppliedFilters: mockSetAppliedFilters,
+          },
+        },
+      });
+
+      fireEvent.press(getByText('m:be:1000'));
+
+      expect(mockSetAppliedFilters).toHaveBeenCalledTimes(1);
+      const updater = mockSetAppliedFilters.mock.calls[0][0];
+      expect(updater(applied)).toEqual({
+        category: null,
+        dateFilter: null,
+        locations: ['m:be:2000'],
+        organizations: [],
+      });
     });
   });
 

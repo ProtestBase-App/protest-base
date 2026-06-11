@@ -49,7 +49,7 @@ export default function EditEvent() {
     organization_id: '',
     title: '',
     description: '',
-    image: '',
+    images: [],
     street_address: '',
     city: '',
     region: '',
@@ -127,7 +127,7 @@ export default function EditEvent() {
         ...prevForm,
         title: eventDetail[0].title || '',
         description: eventDetail[0].description || '',
-        image: eventDetail[0].image || '',
+        images: eventDetail[0].images || [],
         street_address: eventDetail[0].street_address || '',
         city: eventDetail[0].city || '',
         region: eventDetail[0].region || '',
@@ -216,7 +216,9 @@ export default function EditEvent() {
         region: form.region || undefined,
         country: form.country || undefined,
         postal_code: form.postal_code || undefined,
-        image: form.image || undefined,
+        // Authoritative full ordered list (kept URLs + new files); an emptied
+        // list is an explicit removal of every image.
+        images: form.images.length ? form.images : null,
         website_url: form.website_url || undefined,
         categories: form.categories,
         disclaimer: form.disclaimer || undefined,

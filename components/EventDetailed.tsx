@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Alert,
   View,
-  NativeModules,
+  FlatList,
+  TurboModuleRegistry,
   ActivityIndicator,
   Image as RNImage,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import ImageView from 'react-native-image-viewing';
@@ -32,20 +34,23 @@ import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useLogoScheme } from '@/hooks/useLogoScheme';
+import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 
-// Dynamically load MapLibre to avoid dual CJS/ESM module instantiation.
-let MapView: any = null;
+// Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
+// import time, which throws when the native modules are missing (Expo Go,
+// Jest) — so probe non-throwingly first and require behind a guard.
+let MapLibreMap: any = null;
 let Camera: any = null;
 let MapMarker: any = null;
 let isMapAvailable = false;
 
-if (NativeModules.MLRNModule) {
+if (TurboModuleRegistry.get('MLRNMapViewModule')) {
   try {
     const MC = require('@/components/MapComponents');
-    MapView = MC.MapView;
+    MapLibreMap = MC.MapLibreMap;
     Camera = MC.Camera;
     MapMarker = MC.MapMarker;
-    isMapAvailable = !!(MapView && Camera && MapMarker);
+    isMapAvailable = !!(MapLibreMap && Camera && MapMarker);
     logger.info('[EventDetailed] Map components loaded', { isMapAvailable });
   } catch (error) {
     logger.warn('[EventDetailed] MapLibre failed to load', {
@@ -124,8 +129,12 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [heroIndex, setHeroIndex] = useState(0);
+  const { width: windowWidth } = useWindowDimensions();
   const { getSubMunicipalityName, loadPostalCodesForCountry } = usePostalCodes();
   const { organizations } = useOrganizations();
+  const { isDenied: notificationsDenied } = useNotificationPermissionStatus();
 
   const country = countries.find((c) => c.value === event.country);
   const countryLabel = country
@@ -140,7 +149,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
   const cityLabel =
     event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country)
+      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
       : '';
 
   const fullAddress = [event.street_address, event.postal_code, cityLabel, countryLabel]
@@ -260,7 +269,16 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     }
   };
 
-  const viewerImages = event.image ? [{ uri: event.image }] : [];
+  // images is normalized by formatEventForDisplay; the fallbacks keep partial
+  // objects (tests, older cache entries) from crashing the hero.
+  const heroImages = event.images?.length ? event.images : event.image ? [event.image] : [];
+  const hasMultipleImages = heroImages.length > 1;
+  const viewerImages = heroImages.map((uri) => ({ uri }));
+
+  const openViewerAt = (index: number) => {
+    setViewerIndex(index);
+    setIsImageViewerVisible(true);
+  };
 
   return (
     <>
@@ -278,25 +296,63 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         }
       >
         <View style={styles.hero}>
-          <TouchableOpacity
-            activeOpacity={0.95}
-            style={styles.heroImage}
-            onPress={() => {
-              if (event.image) setIsImageViewerVisible(true);
-            }}
-            disabled={!event.image}
-            accessibilityRole="imagebutton"
-            accessibilityLabel={t('events.viewImage')}
-          >
-            <Image
-              source={event.image || require('@/assets/images/event-image-default.png')}
-              placeholder={require('@/assets/images/event-image-default.png')}
-              contentFit="cover"
-              transition={200}
-              cachePolicy="memory-disk"
+          {hasMultipleImages ? (
+            <FlatList
+              data={heroImages}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
               style={styles.heroImage}
+              keyExtractor={(uri, index) => `${uri}-${index}`}
+              getItemLayout={(_, index) => ({
+                length: windowWidth,
+                offset: windowWidth * index,
+                index,
+              })}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
+                setHeroIndex(Math.max(0, Math.min(index, heroImages.length - 1)));
+              }}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  activeOpacity={0.95}
+                  onPress={() => openViewerAt(index)}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={t('events.viewImage')}
+                >
+                  <Image
+                    source={item}
+                    placeholder={require('@/assets/images/event-image-default.png')}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                    style={{ width: windowWidth, height: HERO_HEIGHT }}
+                  />
+                </TouchableOpacity>
+              )}
             />
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.95}
+              style={styles.heroImage}
+              onPress={() => {
+                if (heroImages.length > 0) openViewerAt(0);
+              }}
+              disabled={heroImages.length === 0}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={t('events.viewImage')}
+            >
+              <Image
+                source={heroImages[0] || require('@/assets/images/event-image-default.png')}
+                placeholder={require('@/assets/images/event-image-default.png')}
+                contentFit="cover"
+                transition={200}
+                cachePolicy="memory-disk"
+                style={styles.heroImage}
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Dark scrim behind the title — keeps white text readable on any
             image regardless of theme (the fade-to-background gradient below
@@ -383,9 +439,31 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             )}
           </View>
 
-          <ThemedText style={styles.heroTitle} numberOfLines={3} pointerEvents="none">
+          <ThemedText
+            style={[styles.heroTitle, hasMultipleImages && styles.heroTitleWithDots]}
+            numberOfLines={3}
+            pointerEvents="none"
+          >
             {event.title}
           </ThemedText>
+
+          {hasMultipleImages && (
+            <View style={styles.heroDots} pointerEvents="none">
+              {heroImages.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.heroDot,
+                    // Sits on the fade-to-background gradient, so the dots must
+                    // be theme-aware rather than white-on-image.
+                    index === heroIndex
+                      ? { backgroundColor: themeColors.tint }
+                      : { backgroundColor: themeColors.subtleText, opacity: 0.45 },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.content}>
@@ -440,6 +518,32 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               </ThemedText>
             </View>
           )}
+
+          {/* Saved-event reminders can't fire while the permission is denied;
+              the contextual ask only happens once, so settings is the way back.
+              Past/cancelled events never get reminders — no notice for them. */}
+          {isEventSaved &&
+            notificationsDenied &&
+            event.status !== 'past' &&
+            event.status !== 'cancelled' && (
+              <TouchableOpacity
+                style={[
+                  styles.notificationNotice,
+                  {
+                    backgroundColor: themeColors.warningBg,
+                    borderColor: themeColors.warning,
+                  },
+                ]}
+                onPress={() => Linking.openSettings()}
+                accessibilityRole="button"
+                accessibilityLabel={t('notifications.permissionNotice')}
+              >
+                <IconSymbol name="bell.badge" size={IconSizes.md} color={themeColors.warning} />
+                <ThemedText style={[styles.notificationNoticeText, { color: themeColors.text }]}>
+                  {t('notifications.permissionNotice')}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
 
           {isCreator && (
             <View
@@ -657,31 +761,33 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <ThemedText style={styles.sectionTitle}>{t('events.location')}</ThemedText>
 
               <View style={[styles.mapContainer, { borderColor: themeColors.cardBorder }]}>
-                {isMapAvailable && MapView && Camera && MapMarker && (
+                {isMapAvailable && MapLibreMap && Camera && MapMarker && (
                   <>
-                    <MapView
+                    <MapLibreMap
                       style={styles.map}
                       mapStyle={OPENFREEMAP_STYLE}
-                      attributionEnabled={true}
-                      logoEnabled={false}
-                      scrollEnabled={false}
-                      zoomEnabled={false}
-                      rotateEnabled={false}
-                      pitchEnabled={false}
+                      attribution={true}
+                      logo={false}
+                      dragPan={false}
+                      touchZoom={false}
+                      doubleTapZoom={false}
+                      doubleTapHoldZoom={false}
+                      touchRotate={false}
+                      touchPitch={false}
                       onDidFinishLoadingMap={() => setMapLoaded(true)}
                     >
                       <Camera
-                        centerCoordinate={[event.geocod_lng!, event.geocod_lat!]}
-                        zoomLevel={13}
-                        animationMode="moveTo"
-                        animationDuration={0}
+                        initialViewState={{
+                          center: [event.geocod_lng!, event.geocod_lat!],
+                          zoom: 13,
+                        }}
                       />
                       <MapMarker
                         coordinate={[event.geocod_lng!, event.geocod_lat!]}
                         markerWidth={40}
                         markerHeight={22}
                       />
-                    </MapView>
+                    </MapLibreMap>
                     {!mapLoaded && (
                       <View
                         style={[
@@ -723,13 +829,28 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         </View>
       </ScrollView>
       <ImageView
+        // The library keeps its current index in internal state that survives
+        // close (it stays mounted, returning null) — remount on every open so
+        // the footer counter starts at the tapped image, not the last-swiped one.
+        key={`viewer-${viewerIndex}-${isImageViewerVisible}`}
         images={viewerImages}
-        imageIndex={0}
+        imageIndex={viewerIndex}
         visible={isImageViewerVisible}
         onRequestClose={() => setIsImageViewerVisible(false)}
         swipeToCloseEnabled
         doubleTapToZoomEnabled
         backgroundColor="#000"
+        FooterComponent={
+          hasMultipleImages
+            ? ({ imageIndex }) => (
+                <View style={styles.viewerFooter}>
+                  <ThemedText style={styles.viewerCounter}>
+                    {`${imageIndex + 1} / ${viewerImages.length}`}
+                  </ThemedText>
+                </View>
+              )
+            : undefined
+        }
         HeaderComponent={() => (
           <View style={[styles.viewerHeader, { paddingTop: topInset + 8 }]}>
             <TouchableOpacity
@@ -909,6 +1030,33 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
+  heroTitleWithDots: {
+    bottom: 28,
+  },
+  heroDots: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  heroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  viewerFooter: {
+    alignItems: 'center',
+    paddingBottom: Spacing['2xl'],
+  },
+  viewerCounter: {
+    // The viewer background is constant #000 regardless of theme.
+    color: 'white',
+    fontFamily: Typography.families.semiBold,
+    fontSize: Typography.sizes.sm,
+  },
 
   content: {
     paddingHorizontal: Spacing.lg,
@@ -949,6 +1097,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginBottom: Spacing.md,
     alignSelf: 'flex-start',
+  },
+  notificationNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  notificationNoticeText: {
+    flex: 1,
+    fontFamily: Typography.families.medium,
+    fontSize: Typography.sizes.sm,
   },
   pastBannerText: {
     fontFamily: Typography.families.semiBold,

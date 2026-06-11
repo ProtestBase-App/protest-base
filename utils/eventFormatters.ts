@@ -77,6 +77,7 @@ export interface FormattedEvent {
   title: string;
   description: string;
   image: string;
+  images: string[];
   street_address: string | null;
   city: string | null;
   region: string | null;
@@ -170,6 +171,8 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     title: event.title,
     description: event.description,
     image: event.image || '',
+    // Heal pre-multi-image responses: surface the legacy single image as slot 0.
+    images: event.images?.length ? event.images : event.image ? [event.image] : [],
     street_address: event.street_address || null,
     city: event.city || null,
     region: event.region || null,
@@ -306,6 +309,44 @@ export function formatTodayDate(locale: string = 'en'): string {
     return `${month} ${dayOfMonth}, ${year}`;
   }
   return `${dayOfMonth} ${month} ${year}`;
+}
+
+/**
+ * Format just the clock time of an event for compact display, e.g. "6:00 PM"
+ * (en) or "18:00" (fr/nl), in the Belgium timezone.
+ */
+export function formatEventTime(isoDateString: string, locale: string = 'en'): string {
+  const date = parseAsUTC(isoDateString);
+
+  const localeMap: Record<string, string> = {
+    en: 'en-US',
+    fr: 'fr-FR',
+    nl: 'nl-NL',
+  };
+
+  const resolvedLocale = localeMap[locale] || 'en-US';
+
+  // 12-hour with AM/PM for English; 24-hour for French/Dutch.
+  const timeOptions: Intl.DateTimeFormatOptions =
+    locale === 'en'
+      ? { hour: 'numeric', minute: '2-digit', hour12: true }
+      : { hour: '2-digit', minute: '2-digit', hour12: false };
+
+  return formatInBelgiumTimezone(date, resolvedLocale, timeOptions);
+}
+
+/**
+ * Format the clock time as 24-hour HH:mm in the Belgium timezone for every
+ * language. Notification copy uses the 24h format regardless of locale
+ * (unlike `formatEventTime`, which is 12-hour for English).
+ */
+export function formatEventTime24h(isoDateString: string): string {
+  const date = parseAsUTC(isoDateString);
+  return formatInBelgiumTimezone(date, 'en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 /**

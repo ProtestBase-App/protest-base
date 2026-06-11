@@ -14,7 +14,39 @@ const en: LocaleData = {
   tabs: {
     home: 'Calendar',
     explore: 'Explore',
+    map: 'Map',
     more: 'More',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Map',
+    actionCount: {
+      one: '1 action',
+      other: '{{count}} actions',
+    },
+    actionCountNone: 'No actions',
+    timeAll: 'All',
+    timeToday: 'Today',
+    timeWeek: '7 days',
+    today: 'Today',
+    actionType: 'Action type',
+    country: 'Country',
+    countryAll: 'All',
+    postalCode: 'Postal code',
+    searchPostalCode: 'Search a postal code...',
+    filterApplyCount: {
+      one: 'See 1 action',
+      other: 'See {{count}} actions',
+    },
+    filterApplyNone: 'No results',
+    emptyTitle: 'No actions with these filters',
+    resetFilters: 'Reset filters',
+    mapUnavailable: 'The map is not available on this device',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
   },
 
   // ============================================
@@ -26,25 +58,16 @@ const en: LocaleData = {
     date: 'Date',
     organization: 'Organization',
     category: 'Category',
-    allLocations: 'All Locations',
-    allDates: 'All dates',
-    allOrganizations: 'All organizations',
-    allCategories: 'All categories',
     today: 'Today',
     tomorrow: 'Tomorrow',
     thisWeek: 'This Week',
     thisWeekend: 'This Weekend',
+    thisMonth: 'This Month',
     confirmFilters: 'Confirm Filters',
-    loadingLocations: 'Loading locations...',
-    locationPlaceholder: 'City, postal code, ...',
     searchPlaceholder: 'Type at least 2 characters to search...',
-    locationError: 'Please select a valid location.',
-    organizationPlaceholder: 'Organizers, ...',
     searchOrganizations: 'Search organizations...',
-    organizationError: 'Please select a valid organization.',
-    selected: 'Selected:',
-    clearAllOrganizations: 'Clear all selected organizations',
-    clearAllLocations: 'Clear all selected locations',
+    postalCodesCount: '{{count}} postal codes',
+    selectionTooBroad: 'Selection too broad — pick fewer or smaller areas.',
   },
 
   // ============================================
@@ -241,19 +264,37 @@ const en: LocaleData = {
   // Home - Calendar/saved events screen
   // ============================================
   home: {
-    title: 'My Calendar',
-    emptyTitle: 'No Upcoming Events',
-    emptySubtitle: 'Discover and save events from the Explore tab to see them here.',
-    emptyButton: 'Explore Events',
     refreshFailed: 'Refresh Failed',
     refreshFailedMessage: 'Unable to refresh events. Please check your connection and try again.',
-    noEvents: 'No events',
-    viewToggleCalendar: 'Calendar',
-    viewToggleList: 'List',
-    listSectionUpcoming: 'Upcoming',
-    listSectionPast: 'Past',
-    listEmptyTitle: 'No saved events',
-    listEmptySubtitle: 'Events you save will show up here.',
+    viewToggleMonth: 'Month',
+    viewToggleAgenda: 'Agenda',
+    dayEventCount: {
+      one: '1 protest',
+      other: '{{count}} protests',
+    },
+    emptyDayTitle: 'No protests on this day',
+    emptyFilteredTitle: 'No results with these filters',
+    nextEventPill: 'Next: {{date}}',
+    multiDayBadge: {
+      one: '{{count}} day',
+      other: '{{count}} days',
+    },
+    dayProgress: 'Day {{index}}/{{total}}',
+    inProgressBadge: 'Ongoing',
+    going: 'going',
+    typesCount: '{{count}} types',
+    savedOnlyTitle: 'Saved only',
+    savedOnlySubtitle: 'My personal calendar',
+    savedChip: 'Saved',
+    helpNeededSubtitle: 'Actions looking for volunteers',
+    filterApplyCount: {
+      one: 'See 1 protest',
+      other: 'See {{count}} protests',
+    },
+    filterApplyNone: 'No results',
+    openFilters: 'Open filters',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
   },
 
   // ============================================
@@ -498,6 +539,13 @@ const en: LocaleData = {
     postalCodePlaceholder: 'Postal code',
     searchPostalCode: 'Search by postal code or municipality...',
     streetAddressPlaceholder: 'Street name and number',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Search for an address…',
+    addressSearching: 'Searching…',
+    addressNoResults: 'No matching addresses found',
+    addressError: 'Could not search addresses. Please try again.',
+    addressUnavailable: 'Address search is unavailable right now. You can still save.',
+    clearStreetAddressAccessibilityLabel: 'Clear street address',
     organizerNamePlaceholder: 'Your organization name',
     contactEmailPlaceholder: 'contact@example.com',
     helpDescriptionPlaceholder: 'Describe what volunteers or help you need...',
@@ -511,9 +559,10 @@ const en: LocaleData = {
     categoryHelper: 'Helps people discover your event through filters',
     endTimeHelper: 'Leave blank if the event duration is flexible',
     locationHelper: 'Provide a specific location so attendees can find the event easily',
-    imageHelper: 'Add a compelling image to attract more attendees',
+    imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',
+    maxCoOrganizers: 'You can add up to {{max}} co-organizers.',
     volunteerHelper: 'Let volunteers know how they can support your event',
     disclaimerHelper:
       'Important information attendees should know (safety, accessibility, requirements, etc.)',
@@ -523,6 +572,7 @@ const en: LocaleData = {
 
     // Labels
     selected: 'Selected',
+    mainImageBadge: 'Main',
 
     // Validation Messages
     titleRequired: 'Event title is required',
@@ -557,9 +607,10 @@ const en: LocaleData = {
     closeAccessibilityLabel: 'Close create event screen',
     progressAccessibilityLabel: 'Form progress: {{percentage}}% complete',
     removeImageAccessibilityLabel: 'Remove selected image',
-    changeImageAccessibilityLabel: 'Change selected image',
     addImageAccessibilityLabel: 'Add an image to your event',
     imageAccessibilityHint: 'Opens photo library to select an image',
+    moveImageLeftAccessibilityLabel: 'Move image earlier',
+    moveImageRightAccessibilityLabel: 'Move image later',
     clearPostalCodeAccessibilityLabel: 'Clear postal code selection',
     clearCoOrganizersAccessibilityLabel: 'Clear co-organizers selection',
 
@@ -568,6 +619,7 @@ const en: LocaleData = {
     permissionRequired: 'Permission Required',
     photoPermissionMessage: 'Please grant photo library access to add images to your event.',
     imagePickerError: 'Failed to select image. Please try again.',
+    maxImagesReached: 'You can add up to {{max}} images per event.',
     missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 
@@ -731,6 +783,37 @@ const en: LocaleData = {
     whatsNeeded: "What's Needed",
     noDetails: 'No additional details provided. Please contact the organizer for more information.',
     gotIt: 'Got It',
+  },
+
+  // ============================================
+  // Notifications - Saved-event day-of reminders
+  // ============================================
+  notifications: {
+    channelName: 'Saved events',
+    actions: {
+      directions: 'Directions',
+      remind1h: 'Remind me 1 hr before',
+      viewEvent: 'View event',
+      viewAgenda: 'View my agenda for today',
+      remindEach1h: 'Remind me 1 hr before each',
+    },
+    dayOf: {
+      title: "It's today",
+      digestTitle: '{{count}} protests today',
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} at {{time}}',
+      more: {
+        one: '· and {{count}} more',
+        other: '· and {{count}} more',
+      },
+    },
+    remind1h: {
+      title: 'In 1 hour',
+      body: '{{name}} starts in 1 hour — {{place}}.',
+      bodyNoPlace: '{{name}} starts in 1 hour.',
+    },
+    permissionNotice: 'Enable notifications to be reminded on the day',
   },
 
   // ============================================

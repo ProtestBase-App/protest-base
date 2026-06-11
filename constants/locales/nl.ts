@@ -12,7 +12,39 @@ const nl = {
   tabs: {
     home: 'Kalender',
     explore: 'Ontdekken',
+    map: 'Kaart',
     more: 'Meer',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Kaart',
+    actionCount: {
+      one: '1 actie',
+      other: '{{count}} acties',
+    },
+    actionCountNone: 'Geen acties',
+    timeAll: 'Alles',
+    timeToday: 'Vandaag',
+    timeWeek: '7 dagen',
+    today: 'Vandaag',
+    actionType: 'Soort actie',
+    country: 'Land',
+    countryAll: 'Alle',
+    postalCode: 'Postcode',
+    searchPostalCode: 'Zoek een postcode...',
+    filterApplyCount: {
+      one: 'Bekijk 1 actie',
+      other: 'Bekijk {{count}} acties',
+    },
+    filterApplyNone: 'Geen resultaten',
+    emptyTitle: 'Geen acties met deze filters',
+    resetFilters: 'Filters herstellen',
+    mapUnavailable: 'De kaart is niet beschikbaar op dit apparaat',
+    zoomIn: 'Inzoomen',
+    zoomOut: 'Uitzoomen',
   },
 
   // ============================================
@@ -24,40 +56,16 @@ const nl = {
     date: 'Datum',
     organization: 'Organisatie',
     category: 'Categorie',
-    allLocations: 'Alle locaties',
-    allDates: 'Alle datums',
-    allOrganizations: 'Alle organisaties',
-    allCategories: 'Alle categorieën',
     today: 'Vandaag',
     tomorrow: 'Morgen',
     thisWeek: 'Deze week',
     thisWeekend: 'Dit weekend',
     thisMonth: 'Deze maand',
-    custom: 'Aangepast',
-    startDate: 'Startdatum',
-    endDate: 'Einddatum',
-    nearMe: 'Bij mij in de buurt',
-    selectLocation: 'Selecteer locatie',
-    distance: 'Afstand',
-    selectOrganization: 'Selecteer organisatie',
     confirmFilters: 'Filters bevestigen',
-    loadingLocations: 'Locaties laden...',
-    locationPlaceholder: 'Stad, postcode, ...',
     searchPlaceholder: 'Typ minstens 2 tekens om te zoeken...',
-    locationError: 'Selecteer een geldige locatie.',
-    organizationPlaceholder: 'Organisatoren, ...',
     searchOrganizations: 'Zoek organisaties...',
-    organizationError: 'Selecteer een geldige organisatie.',
-    selected: 'Geselecteerd:',
-    clearAllOrganizations: 'Alle geselecteerde organisaties wissen',
-    clearAllLocations: 'Alle geselecteerde locaties wissen',
-    apply: 'Toepassen',
-    clear: 'Wissen',
-    reset: 'Herstellen',
-    activeFilters: {
-      one: '{{count}} actief filter',
-      other: '{{count}} actieve filters',
-    },
+    postalCodesCount: '{{count}} postcodes',
+    selectionTooBroad: 'Selectie te breed — kies minder of kleinere gebieden.',
   },
 
   // ============================================
@@ -274,21 +282,37 @@ const nl = {
   // Home / My Calendar Screen
   // ============================================
   home: {
-    title: 'Mijn Kalender',
-    emptyTitle: 'Nog geen evenementen',
-    emptySubtitle: 'Ontdek en bewaar aankomende protesten!',
-    emptyButton: 'Protesten verkennen',
     refreshFailed: 'Vernieuwen mislukt',
     refreshFailedMessage: 'Kan evenementen niet vernieuwen. Controleer je verbinding.',
-    loadingEvents: 'Evenementen laden...',
-    noUpcomingEvents: 'Geen aankomende evenementen',
-    noEvents: 'Geen evenementen',
-    viewToggleCalendar: 'Kalender',
-    viewToggleList: 'Lijst',
-    listSectionUpcoming: 'Aankomend',
-    listSectionPast: 'Voorbij',
-    listEmptyTitle: 'Geen opgeslagen evenementen',
-    listEmptySubtitle: 'Evenementen die je opslaat verschijnen hier.',
+    viewToggleMonth: 'Maand',
+    viewToggleAgenda: 'Agenda',
+    dayEventCount: {
+      one: '1 protest',
+      other: '{{count}} protesten',
+    },
+    emptyDayTitle: 'Geen protesten op deze dag',
+    emptyFilteredTitle: 'Geen resultaten met deze filters',
+    nextEventPill: 'Volgende: {{date}}',
+    multiDayBadge: {
+      one: '{{count}} dag',
+      other: '{{count}} dagen',
+    },
+    dayProgress: 'Dag {{index}}/{{total}}',
+    inProgressBadge: 'Bezig',
+    going: 'gaan',
+    typesCount: '{{count}} types',
+    savedOnlyTitle: 'Alleen opgeslagen',
+    savedOnlySubtitle: 'Mijn persoonlijke kalender',
+    savedChip: 'Opgeslagen',
+    helpNeededSubtitle: 'Acties die vrijwilligers zoeken',
+    filterApplyCount: {
+      one: 'Bekijk 1 protest',
+      other: 'Bekijk {{count}} protesten',
+    },
+    filterApplyNone: 'Geen resultaten',
+    openFilters: 'Filters openen',
+    previousMonth: 'Vorige maand',
+    nextMonth: 'Volgende maand',
   },
 
   // ============================================
@@ -556,6 +580,13 @@ const nl = {
     postalCodePlaceholder: 'Postcode',
     searchPostalCode: 'Zoek op postcode of gemeente...',
     streetAddressPlaceholder: 'Straat en huisnummer',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Zoek een adres…',
+    addressSearching: 'Zoeken…',
+    addressNoResults: 'Geen overeenkomende adressen gevonden',
+    addressError: 'Adressen zoeken mislukt. Probeer opnieuw.',
+    addressUnavailable: 'Adres zoeken is momenteel niet beschikbaar. Je kunt nog steeds opslaan.',
+    clearStreetAddressAccessibilityLabel: 'Adres wissen',
     cityPlaceholder: 'Stad',
     eventLinkPlaceholder: 'https://www.voorbeeld.com',
     selectCoOrganizers: 'Selecteer mede-organiserende groepen',
@@ -570,9 +601,10 @@ const nl = {
     endTimeHelper: 'Laat leeg als de duur van het evenement flexibel is',
     locationHelper:
       'Geef een specifieke locatie zodat deelnemers het evenement gemakkelijk kunnen vinden',
-    imageHelper: 'Voeg een aantrekkelijke afbeelding toe om meer deelnemers aan te trekken',
+    imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',
+    maxCoOrganizers: 'Je kunt maximaal {{max}} mede-organisatoren toevoegen.',
     volunteerHelper: 'Laat vrijwilligers weten hoe ze je evenement kunnen ondersteunen',
     disclaimerHelper:
       'Belangrijke informatie die deelnemers moeten weten (veiligheid, toegankelijkheid, vereisten, etc.)',
@@ -582,6 +614,7 @@ const nl = {
 
     // Labels
     selected: 'Geselecteerd',
+    mainImageBadge: 'Hoofd',
 
     // Progress & Actions
     requiredFieldsProgress: 'Verplichte velden ingevuld: {{completed}}/{{total}}',
@@ -623,9 +656,10 @@ const nl = {
     closeAccessibilityLabel: 'Sluit evenement aanmaken scherm',
     progressAccessibilityLabel: 'Formuliervoortgang: {{percentage}}% voltooid',
     removeImageAccessibilityLabel: 'Geselecteerde afbeelding verwijderen',
-    changeImageAccessibilityLabel: 'Geselecteerde afbeelding wijzigen',
     addImageAccessibilityLabel: 'Een afbeelding toevoegen aan je evenement',
     imageAccessibilityHint: 'Opent fotobibliotheek om een afbeelding te selecteren',
+    moveImageLeftAccessibilityLabel: 'Afbeelding naar voren verplaatsen',
+    moveImageRightAccessibilityLabel: 'Afbeelding naar achteren verplaatsen',
     clearPostalCodeAccessibilityLabel: 'Postcodeselectie wissen',
     clearCoOrganizersAccessibilityLabel: 'Mede-organisatoren selectie wissen',
 
@@ -635,6 +669,7 @@ const nl = {
     photoPermissionMessage:
       'Geef toegang tot de fotobibliotheek om afbeeldingen aan je evenement toe te voegen.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
+    maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen per evenement toevoegen.',
     missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
   },
 
@@ -1081,31 +1116,34 @@ const nl = {
   },
 
   // ============================================
-  // Notifications
+  // Notifications - Saved-event day-of reminders
   // ============================================
   notifications: {
-    title: 'Meldingen',
-    empty: 'Geen meldingen',
-    emptyMessage: 'Je hebt geen nieuwe meldingen',
-    markAsRead: 'Markeren als gelezen',
-    markAllAsRead: 'Alles markeren als gelezen',
-    delete: 'Verwijderen',
-    deleteAll: 'Alles verwijderen',
-    types: {
-      eventReminder: 'Evenement herinnering',
-      eventUpdate: 'Evenement bijgewerkt',
-      eventCancelled: 'Evenement geannuleerd',
-      newEvent: 'Nieuw evenement',
-      organizerMessage: 'Bericht van organisator',
+    channelName: 'Opgeslagen evenementen',
+    actions: {
+      directions: 'Routebeschrijving',
+      remind1h: 'Herinnering 1 u vooraf',
+      viewEvent: 'Evenement bekijken',
+      viewAgenda: 'Mijn agenda van vandaag bekijken',
+      remindEach1h: 'Herinnering 1 u voor elk',
     },
-    settings: {
-      title: 'Meldingsinstellingen',
-      enable: 'Meldingen inschakelen',
-      eventReminders: 'Evenement herinneringen',
-      eventUpdates: 'Evenement updates',
-      newEvents: 'Nieuwe evenementen',
-      messages: 'Berichten',
+    dayOf: {
+      title: 'Het is vandaag',
+      digestTitle: '{{count}} protesten vandaag',
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} om {{time}}',
+      more: {
+        one: '· en {{count}} andere',
+        other: '· en {{count}} andere',
+      },
     },
+    remind1h: {
+      title: 'Over 1 uur',
+      body: '{{name}} begint over 1 uur — {{place}}.',
+      bodyNoPlace: '{{name}} begint over 1 uur.',
+    },
+    permissionNotice: 'Schakel meldingen in om op de dag zelf een herinnering te krijgen',
   },
 
   // ============================================

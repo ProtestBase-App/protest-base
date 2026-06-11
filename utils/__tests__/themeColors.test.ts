@@ -36,6 +36,10 @@ describe('getThemeColors', () => {
       expect(colors.icon).toBe(Colors.light.icon);
       expect(colors.icon).toBe('#687076');
 
+      // Surface backgrounds
+      expect(colors.surfaceAltBackground).toBe(Colors.light.surfaceAltBackground);
+      expect(colors.surfaceAltBackground).toBe('#ECECEC');
+
       // Interactive element backgrounds
       expect(colors.shareButtonBg).toBe('rgba(0, 0, 0, 0.05)');
     });
@@ -91,6 +95,10 @@ describe('getThemeColors', () => {
       expect(colors.icon).toBe(Colors.dark.icon);
       expect(colors.icon).toBe('#CDCDE0');
 
+      // Surface backgrounds
+      expect(colors.surfaceAltBackground).toBe(Colors.dark.surfaceAltBackground);
+      expect(colors.surfaceAltBackground).toBe('#252537');
+
       // Interactive element backgrounds
       expect(colors.shareButtonBg).toBe('rgba(255, 255, 255, 0.1)');
     });
@@ -143,6 +151,7 @@ describe('getThemeColors', () => {
       expect(colors).toHaveProperty('warning');
       expect(colors).toHaveProperty('warningBg');
       expect(colors).toHaveProperty('icon');
+      expect(colors).toHaveProperty('surfaceAltBackground');
       expect(colors).toHaveProperty('shareButtonBg');
     });
 
@@ -151,7 +160,9 @@ describe('getThemeColors', () => {
       const propertyCount = Object.keys(colors).length;
 
       // Dynamically validate against actual source — count should stay in sync
-      expect(propertyCount).toBe(33);
+      // 45 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
+      //    + 8 map overlay tokens (maps tab) + live/liveBg ("En cours" badge)
+      expect(propertyCount).toBe(45);
     });
 
     it('should have all properties as strings', () => {
@@ -243,6 +254,13 @@ describe('getThemeColors', () => {
 
       expect(lightColors.shareButtonBg).not.toBe(darkColors.shareButtonBg);
     });
+
+    it('should have different surfaceAltBackground colors between light and dark modes', () => {
+      const lightColors = getThemeColors('light');
+      const darkColors = getThemeColors('dark');
+
+      expect(lightColors.surfaceAltBackground).not.toBe(darkColors.surfaceAltBackground);
+    });
   });
 
   describe('Color format validation', () => {
@@ -256,6 +274,7 @@ describe('getThemeColors', () => {
       expect(colors.warning).toMatch(/^#[0-9A-F]{6}$/i);
       expect(colors.icon).toMatch(/^#[0-9A-F]{6}$/i);
       expect(colors.subtleText).toMatch(/^#[0-9A-F]{6}$/i);
+      expect(colors.surfaceAltBackground).toMatch(/^#[0-9A-F]{6}$/i);
     });
 
     it('should return valid rgba color codes for translucent colors in light mode', () => {
@@ -279,6 +298,7 @@ describe('getThemeColors', () => {
       expect(colors.warning).toMatch(/^#[0-9A-F]{6}$/i);
       expect(colors.icon).toMatch(/^#[0-9A-F]{6}$/i);
       expect(colors.subtleText).toMatch(/^#[0-9A-F]{6}$/i);
+      expect(colors.surfaceAltBackground).toMatch(/^#[0-9A-F]{6}$/i);
     });
 
     it('should return valid rgba color codes for translucent colors in dark mode', () => {

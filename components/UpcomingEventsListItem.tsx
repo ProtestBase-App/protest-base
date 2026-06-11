@@ -24,7 +24,7 @@ export default function UpcomingEventsListItem({ event }: UpcomingEventsListItem
 
   const cityLabel =
     event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country)
+      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
       : '';
 
   return (

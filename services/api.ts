@@ -14,6 +14,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { logger } from '@/utils/logger';
 import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
+import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { isNetworkError } from '@/utils/networkError';
 import { getInstalledAppVersion } from '@/utils/appVersion';
 
@@ -306,8 +307,16 @@ api.interceptors.response.use(
 
           const { accessToken, refreshToken: newRefreshToken } = responseData;
 
-          await SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, accessToken);
-          await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, newRefreshToken);
+          await SecureStore.setItemAsync(
+            SECURE_STORE_KEYS.ACCESS_TOKEN,
+            accessToken,
+            SECURE_STORE_OPTIONS
+          );
+          await SecureStore.setItemAsync(
+            SECURE_STORE_KEYS.REFRESH_TOKEN,
+            newRefreshToken,
+            SECURE_STORE_OPTIONS
+          );
 
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
 

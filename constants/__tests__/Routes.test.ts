@@ -87,18 +87,6 @@ describe('Routes', () => {
       expect(Routes.MY_EVENTS_PAST).toBe('/past');
     });
 
-    it('should define FILTERS as /filters', () => {
-      expect(Routes.FILTERS).toBe('/filters');
-    });
-
-    it('should define LOCATION_FILTER as /location-filter', () => {
-      expect(Routes.LOCATION_FILTER).toBe('/location-filter');
-    });
-
-    it('should define ORG_FILTER as /org-filter', () => {
-      expect(Routes.ORG_FILTER).toBe('/org-filter');
-    });
-
     it('should define REPORT_EVENT as /report-event', () => {
       expect(Routes.REPORT_EVENT).toBe('/report-event');
     });
@@ -107,8 +95,8 @@ describe('Routes', () => {
       expect(Routes.DRAFT_EVENTS).toBe('/draft-events');
     });
 
-    it('should have 24 static route definitions', () => {
-      expect(Object.keys(Routes)).toHaveLength(24);
+    it('should have 21 static route definitions', () => {
+      expect(Object.keys(Routes)).toHaveLength(21);
     });
 
     it('should have all route values starting with /', () => {

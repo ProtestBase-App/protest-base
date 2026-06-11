@@ -1,5 +1,18 @@
 import { ExpoConfig } from 'expo/config';
+import { withAndroidManifest, AndroidConfig, type ConfigPlugin } from 'expo/config-plugins';
 import { version } from './package.json';
+
+// Disable Android backup so the app's local data (plaintext AsyncStorage:
+// event drafts, cached lists, selected-org id) cannot be exfiltrated via
+// Google cloud Auto Backup or `adb backup`. With allowBackup=false the older
+// fullBackupContent and the Android 12+ dataExtractionRules are both moot, so
+// removing the data is enough. Requires a fresh native build to take effect.
+const withDisabledAndroidBackup: ConfigPlugin = (config) =>
+  withAndroidManifest(config, (cfg) => {
+    const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults);
+    app.$['android:allowBackup'] = 'false';
+    return cfg;
+  });
 
 // EAS project identifiers — set via environment variables or replace the defaults below.
 // You can find them at https://expo.dev/accounts/[account]/projects/[project].
@@ -22,7 +35,7 @@ export default (): ExpoConfig => {
   const { name, bundleIdentifier, icon, adaptiveIcon, packageName, scheme } =
     getDynamicAppConfig(appEnv);
 
-  return {
+  const config: ExpoConfig = {
     name: name,
     version: version,
     slug: PROJECT_SLUG,
@@ -90,7 +103,15 @@ export default (): ExpoConfig => {
       // Surfaced to runtime via Constants.expoConfig?.extra so services can
       // branch on environment and read integrity-related build params.
       appEnv,
-      devIntegrityBypass: process.env.EXPO_PUBLIC_DEV_INTEGRITY_BYPASS,
+      // Only embed the dev-bypass secret in development bundles. The runtime
+      // consumers (services/api.ts, services/integrity.service.ts) already send
+      // it only in bypass mode, and the backend honors it only when its own
+      // NODE_ENV !== 'production'. Gating the embed here adds defense in depth:
+      // the secret can never be serialized into a preview/production JS bundle —
+      // and read out of it by anyone who unzips the binary — even if the EAS
+      // environment variable is accidentally scoped to those profiles.
+      devIntegrityBypass:
+        appEnv === 'development' ? process.env.EXPO_PUBLIC_DEV_INTEGRITY_BYPASS : undefined,
     },
     plugins: [
       'expo-router',
@@ -131,6 +152,13 @@ export default (): ExpoConfig => {
       'expo-image',
       '@maplibre/maplibre-react-native',
       [
+        'expo-notifications',
+        {
+          icon: './assets/images/icons/notification-icon.png',
+          color: '#E8445A',
+        },
+      ],
+      [
         'expo-build-properties',
         {
           android: {
@@ -144,6 +172,11 @@ export default (): ExpoConfig => {
     },
     owner: OWNER,
   };
+
+  // Apply the manifest mod here rather than via the typed `plugins` array
+  // (ExpoConfig['plugins'] does not accept inline function plugins). Expo runs
+  // the attached mod during prebuild.
+  return withDisabledAndroidBackup(config) as ExpoConfig;
 };
 
 // Dynamically configure the app based on the environment.

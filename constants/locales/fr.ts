@@ -14,7 +14,39 @@ const fr: LocaleData = {
   tabs: {
     home: 'Calendrier',
     explore: 'Explorer',
+    map: 'Carte',
     more: 'Plus',
+  },
+
+  // ============================================
+  // Maps - Map tab (events on a map)
+  // ============================================
+  maps: {
+    title: 'Carte',
+    actionCount: {
+      one: '1 action',
+      other: '{{count}} actions',
+    },
+    actionCountNone: 'Aucune action',
+    timeAll: 'Tout',
+    timeToday: "Aujourd'hui",
+    timeWeek: '7 jours',
+    today: "Aujourd'hui",
+    actionType: "Type d'action",
+    country: 'Pays',
+    countryAll: 'Tous',
+    postalCode: 'Code postal',
+    searchPostalCode: 'Rechercher un code postal...',
+    filterApplyCount: {
+      one: 'Voir 1 action',
+      other: 'Voir {{count}} actions',
+    },
+    filterApplyNone: 'Aucun résultat',
+    emptyTitle: 'Aucune action avec ces filtres',
+    resetFilters: 'Réinitialiser les filtres',
+    mapUnavailable: "La carte n'est pas disponible sur cet appareil",
+    zoomIn: 'Zoom avant',
+    zoomOut: 'Zoom arrière',
   },
 
   // ============================================
@@ -26,25 +58,17 @@ const fr: LocaleData = {
     date: 'Date',
     organization: 'Organisation',
     category: 'Catégorie',
-    allLocations: 'Tous les lieux',
-    allDates: 'Toutes les dates',
-    allOrganizations: 'Toutes les organisations',
-    allCategories: 'Toutes les catégories',
     today: "Aujourd'hui",
     tomorrow: 'Demain',
     thisWeek: 'Cette semaine',
     thisWeekend: 'Ce week-end',
+    thisMonth: 'Ce mois-ci',
     confirmFilters: 'Confirmer les filtres',
-    loadingLocations: 'Chargement des lieux...',
-    locationPlaceholder: 'Ville, code postal, ...',
     searchPlaceholder: 'Tapez au moins 2 caractères pour rechercher...',
-    locationError: 'Veuillez sélectionner un lieu valide.',
-    organizationPlaceholder: 'Organisateurs, ...',
     searchOrganizations: 'Rechercher des organisations...',
-    organizationError: 'Veuillez sélectionner une organisation valide.',
-    selected: 'Sélectionné :',
-    clearAllOrganizations: 'Effacer toutes les organisations sélectionnées',
-    clearAllLocations: 'Effacer tous les lieux sélectionnés',
+    postalCodesCount: '{{count}} codes postaux',
+    selectionTooBroad:
+      'Sélection trop large — choisissez moins de zones ou des zones plus petites.',
   },
 
   // ============================================
@@ -243,21 +267,38 @@ const fr: LocaleData = {
   // Home - Calendar/saved events screen
   // ============================================
   home: {
-    title: 'Mon Calendrier',
-    emptyTitle: 'Aucun événement à venir',
-    emptySubtitle:
-      "Découvrez et sauvegardez des événements depuis l'onglet Explorer pour les voir ici.",
-    emptyButton: 'Explorer les événements',
     refreshFailed: "Échec de l'actualisation",
     refreshFailedMessage:
       "Impossible d'actualiser les événements. Vérifiez votre connexion et réessayez.",
-    noEvents: 'Aucun événement',
-    viewToggleCalendar: 'Calendrier',
-    viewToggleList: 'Liste',
-    listSectionUpcoming: 'À venir',
-    listSectionPast: 'Passés',
-    listEmptyTitle: 'Aucun événement enregistré',
-    listEmptySubtitle: 'Les événements que vous enregistrez apparaîtront ici.',
+    viewToggleMonth: 'Mois',
+    viewToggleAgenda: 'Agenda',
+    dayEventCount: {
+      one: '1 manifestation',
+      other: '{{count}} manifestations',
+    },
+    emptyDayTitle: 'Aucune manifestation ce jour',
+    emptyFilteredTitle: 'Aucun résultat avec ces filtres',
+    nextEventPill: 'Prochaine : {{date}}',
+    multiDayBadge: {
+      one: '{{count}} jour',
+      other: '{{count}} jours',
+    },
+    dayProgress: 'Jour {{index}}/{{total}}',
+    inProgressBadge: 'En cours',
+    going: 'y vont',
+    typesCount: '{{count}} types',
+    savedOnlyTitle: 'Sauvegardés uniquement',
+    savedOnlySubtitle: 'Mon calendrier personnel',
+    savedChip: 'Sauvegardés',
+    helpNeededSubtitle: 'Actions qui cherchent des bénévoles',
+    filterApplyCount: {
+      one: 'Voir 1 manifestation',
+      other: 'Voir {{count}} manifestations',
+    },
+    filterApplyNone: 'Aucun résultat',
+    openFilters: 'Ouvrir les filtres',
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
   },
 
   // ============================================
@@ -497,6 +538,14 @@ const fr: LocaleData = {
     postalCodePlaceholder: 'Code postal',
     searchPostalCode: 'Rechercher par code postal ou commune...',
     streetAddressPlaceholder: 'Nom et numéro de rue',
+    // Address autocomplete
+    addressSearchPlaceholder: 'Rechercher une adresse…',
+    addressSearching: 'Recherche…',
+    addressNoResults: 'Aucune adresse correspondante',
+    addressError: 'Échec de la recherche d’adresses. Veuillez réessayer.',
+    addressUnavailable:
+      'La recherche d’adresses est indisponible pour le moment. Vous pouvez quand même enregistrer.',
+    clearStreetAddressAccessibilityLabel: 'Effacer l’adresse',
     organizerNamePlaceholder: 'Nom de votre organisation',
     contactEmailPlaceholder: 'contact@exemple.com',
     helpDescriptionPlaceholder: "Décrivez les bénévoles ou l'aide dont vous avez besoin...",
@@ -512,10 +561,12 @@ const fr: LocaleData = {
     endTimeHelper: "Laissez vide si la durée de l'événement est flexible",
     locationHelper:
       "Indiquez un lieu précis pour que les participants puissent trouver l'événement facilement",
-    imageHelper: 'Ajoutez une image attrayante pour attirer plus de participants',
+    imageHelper:
+      "Ajoutez jusqu'à 5 images — la première est la photo de couverture de votre événement",
     eventLinkHelper:
       "Partagez un lien vers la page de votre événement, le formulaire d'inscription ou plus d'informations",
     coOrganizersHelper: 'Organisations qui collaborent sur cet événement',
+    maxCoOrganizers: "Vous pouvez ajouter jusqu'à {{max}} co-organisateurs.",
     volunteerHelper:
       'Informez les bénévoles de la manière dont ils peuvent soutenir votre événement',
     disclaimerHelper:
@@ -526,6 +577,7 @@ const fr: LocaleData = {
 
     // Labels
     selected: 'Sélectionné',
+    mainImageBadge: 'Principale',
 
     // Validation Messages
     titleRequired: "Le titre de l'événement est obligatoire",
@@ -560,9 +612,10 @@ const fr: LocaleData = {
     closeAccessibilityLabel: "Fermer l'écran de création d'événement",
     progressAccessibilityLabel: 'Progression du formulaire : {{percentage}}% complété',
     removeImageAccessibilityLabel: "Supprimer l'image sélectionnée",
-    changeImageAccessibilityLabel: "Changer l'image sélectionnée",
     addImageAccessibilityLabel: 'Ajouter une image à votre événement',
     imageAccessibilityHint: 'Ouvre la bibliothèque photo pour sélectionner une image',
+    moveImageLeftAccessibilityLabel: "Déplacer l'image vers l'avant",
+    moveImageRightAccessibilityLabel: "Déplacer l'image vers l'arrière",
     clearPostalCodeAccessibilityLabel: 'Effacer la sélection du code postal',
     clearCoOrganizersAccessibilityLabel: 'Effacer la sélection des co-organisateurs',
 
@@ -572,6 +625,7 @@ const fr: LocaleData = {
     photoPermissionMessage:
       "Veuillez autoriser l'accès à la bibliothèque photo pour ajouter des images à votre événement.",
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
+    maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images par événement.",
     missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
   },
 
@@ -740,6 +794,37 @@ const fr: LocaleData = {
     noDetails:
       "Aucun détail supplémentaire fourni. Veuillez contacter l'organisateur pour plus d'informations.",
     gotIt: "J'ai compris",
+  },
+
+  // ============================================
+  // Notifications - Saved-event day-of reminders
+  // ============================================
+  notifications: {
+    channelName: 'Événements sauvegardés',
+    actions: {
+      directions: 'Itinéraire',
+      remind1h: 'Me rappeler 1 h avant',
+      viewEvent: "Voir l'événement",
+      viewAgenda: 'Voir mon agenda du jour',
+      remindEach1h: 'Me rappeler 1 h avant chaque',
+    },
+    dayOf: {
+      title: "C'est aujourd'hui",
+      digestTitle: "{{count}} manifestations aujourd'hui",
+      body: '{{name}} · {{time}} — {{place}}.',
+      bodyNoPlace: '{{name}} · {{time}}.',
+      digestItem: '{{name}} à {{time}}',
+      more: {
+        one: '· et {{count}} autre',
+        other: '· et {{count}} autres',
+      },
+    },
+    remind1h: {
+      title: 'Dans 1 heure',
+      body: '{{name}} commence dans 1 heure — {{place}}.',
+      bodyNoPlace: '{{name}} commence dans 1 heure.',
+    },
+    permissionNotice: 'Activez les notifications pour être prévenu·e le jour J',
   },
 
   // ============================================

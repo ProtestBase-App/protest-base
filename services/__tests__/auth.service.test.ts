@@ -73,9 +73,21 @@ describe('auth.service', () => {
         email: 'user@example.com',
         password: 'password123',
       });
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('access_token', 'access-tok');
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('refresh_token', 'refresh-tok');
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('session_id', 'sess-1');
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'access-tok',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh-tok',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'session_id',
+        'sess-1',
+        expect.any(Object)
+      );
     });
 
     it('throws "Login failed" when accessToken is missing (internal error caught by outer catch)', async () => {

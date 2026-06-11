@@ -15,7 +15,8 @@ const mockManipulate = ImageManipulator.manipulateAsync as jest.Mock;
 describe('optimizeImageForUpload', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('returns the original asset untouched when it is already small', async () => {
+  it('re-encodes already-small images with no resize action to strip EXIF/GPS metadata', async () => {
+    mockManipulate.mockResolvedValue({ uri: 'file:///stripped.jpg', width: 1200, height: 800 });
     const result = await optimizeImageForUpload({
       uri: 'file:///small.jpg',
       width: 1200,
@@ -24,8 +25,15 @@ describe('optimizeImageForUpload', () => {
       mimeType: 'image/jpeg',
       fileName: 'small.jpg',
     });
-    expect(mockManipulate).not.toHaveBeenCalled();
-    expect(result.uri).toBe('file:///small.jpg');
+    // Re-encode happens (empty action list = no resize) so metadata is dropped.
+    expect(mockManipulate).toHaveBeenCalledWith(
+      'file:///small.jpg',
+      [],
+      expect.objectContaining({ format: 'jpeg', compress: 0.85 })
+    );
+    expect(result.uri).toBe('file:///stripped.jpg');
+    expect(result.mimeType).toBe('image/jpeg');
+    expect(result.fileName).toBe('small.jpg');
   });
 
   it('resizes large images by the longer edge (landscape)', async () => {

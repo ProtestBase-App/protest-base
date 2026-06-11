@@ -10,18 +10,6 @@ export default function ExploreLayout() {
     <>
       <Stack>
         <Stack.Screen name="explore" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="filters"
-          options={{ presentation: 'fullScreenModal', headerShown: false }}
-        />
-        <Stack.Screen
-          name="location-filter"
-          options={{ presentation: 'fullScreenModal', headerShown: false }}
-        />
-        <Stack.Screen
-          name="org-filter"
-          options={{ presentation: 'fullScreenModal', headerShown: false }}
-        />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>

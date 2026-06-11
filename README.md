@@ -63,7 +63,7 @@ Our source code is publicly available so anyone can audit how we handle data. Tr
 
 ## Security & App Integrity
 
-Authentication runs on on-device attestation, not floating API keys. Every API call after the initial bootstrap is signed by a hardware-backed key on the device.
+Authentication runs on on-device attestation, not floating API keys. At enrollment the app proves possession of a hardware-backed key by signing a server challenge (App Attest on iOS, AndroidKeyStore attestation on Android); the backend verifies it and issues a short-lived per-install token. Each subsequent API call carries that install token, so backend access stays bound to an attested install rather than a shared, copyable API key.
 
 | Platform | Mechanism                           |
 | -------- | ----------------------------------- |

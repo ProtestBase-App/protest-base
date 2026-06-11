@@ -38,6 +38,7 @@ export const STORAGE_KEYS = {
   USER_EVENT_COUNTS: 'userEventCounts',
   API_PREFIX: 'apiPrefix',
   HOME_VIEW_PREFERENCE: 'homeViewPreference',
+  NOTIFICATION_PERMISSION_REQUESTED: 'notificationPermissionRequested',
 } as const;
 
 /**

@@ -30,10 +30,6 @@ export const Routes = {
   MY_EVENTS_UPCOMING: '/upcoming',
   MY_EVENTS_PAST: '/past',
 
-  FILTERS: '/filters',
-  LOCATION_FILTER: '/location-filter',
-  ORG_FILTER: '/org-filter',
-
   REPORT_EVENT: '/report-event',
 } as const;
 

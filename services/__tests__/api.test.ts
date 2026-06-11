@@ -304,10 +304,15 @@ describe('services/api.ts', () => {
         { refreshToken: 'old-refresh-token' },
         expect.any(Object)
       );
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('access_token', 'new-access-token');
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'new-access-token',
+        expect.any(Object)
+      );
       expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
         'refresh_token',
-        'new-refresh-token'
+        'new-refresh-token',
+        expect.any(Object)
       );
     });
 
@@ -420,7 +425,11 @@ describe('services/api.ts', () => {
       // Both requests should resolve successfully
       await Promise.all([promise1, promise2]);
 
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('access_token', 'new-access-token');
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'new-access-token',
+        expect.any(Object)
+      );
     });
 
     it('clears tokens and invokes callback when refresh fails (never-settling promise)', async () => {

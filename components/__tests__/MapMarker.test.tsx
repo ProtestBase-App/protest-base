@@ -4,7 +4,7 @@ jest.mock('@maplibre/maplibre-react-native', () => {
   return {
     __esModule: true,
     default: {},
-    MarkerView: ({ children, ...props }: any) => React.createElement('MarkerView', props, children),
+    Marker: ({ children, ...props }: any) => React.createElement('Marker', props, children),
   };
 });
 
@@ -39,7 +39,7 @@ describe('MapMarker', () => {
       expect(toJSON()).toBeTruthy();
     });
 
-    it('passes additional marker props through to MarkerView', () => {
+    it('passes additional marker props through to Marker', () => {
       const { toJSON } = render(<MapMarker {...defaultProps} calloutText="Event Location" />);
       expect(toJSON()).toBeTruthy();
     });
@@ -58,16 +58,22 @@ describe('MapMarker', () => {
   });
 
   describe('Props forwarding', () => {
-    it('sets anchor to bottom-center (0.5, 1)', () => {
+    it('anchors the marker at the bottom', () => {
       const { toJSON } = render(<MapMarker {...defaultProps} />);
-      const markerView = toJSON() as any;
-      expect(markerView.props.anchor).toEqual({ x: 0.5, y: 1 });
+      const marker = toJSON() as any;
+      expect(marker.props.anchor).toBe('bottom');
     });
 
-    it('passes coordinate prop through', () => {
+    it('passes the coordinate through as lngLat', () => {
       const { toJSON } = render(<MapMarker {...defaultProps} />);
-      const markerView = toJSON() as any;
-      expect(markerView.props.coordinate).toEqual([4.3517, 50.8503]);
+      const marker = toJSON() as any;
+      expect(marker.props.lngLat).toEqual([4.3517, 50.8503]);
+    });
+
+    it('passes the id through', () => {
+      const { toJSON } = render(<MapMarker {...defaultProps} />);
+      const marker = toJSON() as any;
+      expect(marker.props.id).toBe('marker-1');
     });
   });
 

@@ -82,7 +82,7 @@ export function useExplorePagination({
         includeEnded: false,
       };
 
-      if (filters.dateFilter && filters.dateFilter !== 'allDates') {
+      if (filters.dateFilter) {
         params.dateFilter = filters.dateFilter as EventFilterParams['dateFilter'];
       }
 
@@ -94,7 +94,7 @@ export function useExplorePagination({
         params.organizers = filters.organizers;
       }
 
-      if (filters.category && filters.category !== 'allCategories') {
+      if (filters.category) {
         params.category = filters.category;
       }
 

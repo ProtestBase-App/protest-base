@@ -11,7 +11,7 @@ import { Platform } from 'react-native';
 import { getHkaNativeModule } from './ExpoHkaModule';
 
 export interface HkaAttestation {
-  /** Lowercase hex SHA-256 of the leaf certificate's SubjectPublicKeyInfo DER. */
+  /** base64url(SHA-256(...)) of the leaf certificate's SubjectPublicKeyInfo DER — URL-safe, no padding. */
   keyId: string;
   /** Leaf-first, base64-DER, no line wrapping. */
   certChain: string[];

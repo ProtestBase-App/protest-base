@@ -13,17 +13,6 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Medium: 'medium' },
 }));
 
-jest.mock('react-native-element-dropdown', () => {
-  const React = require('react');
-  return {
-    Dropdown: ({ placeholder, ...rest }: any) =>
-      React.createElement('View', {
-        testID: 'dropdown',
-        accessibilityLabel: rest.accessibilityLabel || placeholder,
-      }),
-  };
-});
-
 jest.mock('@/context/UserOrganizationsProvider', () => ({
   useUserOrganizations: jest.fn(() => ({
     dropdownItems: [
@@ -72,7 +61,7 @@ describe('OrganizationPicker', () => {
     expect(toJSON()).toBeNull();
   });
 
-  it('passes error props to dropdown', () => {
+  it('shows the error message when error is set', () => {
     (useUserOrganizations as jest.Mock).mockReturnValue({
       dropdownItems: [
         { label: 'Org A', value: 'org-a' },
@@ -84,5 +73,6 @@ describe('OrganizationPicker', () => {
     });
     render(<OrganizationPicker onValueChange={jest.fn()} error={true} errorMessage="Required" />);
     expect(screen.getByText(/Organization/)).toBeTruthy();
+    expect(screen.getByText('Required')).toBeTruthy();
   });
 });

@@ -18,6 +18,8 @@ export interface Event {
   title: string;
   description: string;
   image?: string;
+  // Ordered image URLs (max 5). The legacy `image` always equals `images[0] ?? null`.
+  images?: string[];
 
   street_address?: string | null;
   city?: string | null;
@@ -97,6 +99,10 @@ export interface CreateEventRequest {
   // Either a picked image or omitted (backend supplies a default).
   image?: PickedImage;
 
+  // Ordered list of new images (max 5). Authoritative when present — the legacy
+  // `image` field is then ignored. Empty/omitted → backend assigns the default.
+  images?: PickedImage[];
+
   website_url?: string;
   categories?: string | string[];
   disclaimer?: string;
@@ -127,8 +133,17 @@ export type CreateDraftRequest = Omit<CreateEventRequest, 'description' | 'start
  * Request body for updating an event. All fields are optional; image can be a
  * new file upload or an existing URL string (to keep the current image).
  */
-export type UpdateEventRequest = Partial<Omit<CreateEventRequest, 'organization_id' | 'image'>> & {
+export type UpdateEventRequest = Partial<
+  Omit<CreateEventRequest, 'organization_id' | 'image' | 'images'>
+> & {
   image?: PickedImage | string;
+
+  /**
+   * Authoritative ordered final list (max 5): strings are kept existing URLs,
+   * PickedImages are new uploads. `null` removes all images; omitted leaves
+   * them unchanged. When present, the legacy `image` field is ignored.
+   */
+  images?: (PickedImage | string)[] | null;
 };
 
 /**

@@ -241,10 +241,15 @@ describe('integrity.service', () => {
       expect(nonceCall[0]).toContain('/auth/integrity/nonce');
       expect(nonceCall[2].headers['X-App-Version']).toBe('1.2.3');
 
-      expect(mockSetItem).toHaveBeenCalledWith(SECURE_STORE_KEYS.INSTALL_TOKEN, 'new-token');
+      expect(mockSetItem).toHaveBeenCalledWith(
+        SECURE_STORE_KEYS.INSTALL_TOKEN,
+        'new-token',
+        expect.any(Object)
+      );
       expect(mockSetItem).toHaveBeenCalledWith(
         SECURE_STORE_KEYS.INSTALL_TOKEN_EXPIRES_AT,
-        '1234567'
+        '1234567',
+        expect.any(Object)
       );
     });
 
@@ -322,7 +327,11 @@ describe('integrity.service', () => {
       expect(mockGenerateKeyAsync).toHaveBeenCalledTimes(1);
       expect(mockAttestKeyAsync).toHaveBeenCalledWith('new-key-id', 'abc123');
       expect(mockGenerateAssertionAsync).not.toHaveBeenCalled();
-      expect(mockSetItem).toHaveBeenCalledWith(SECURE_STORE_KEYS.INTEGRITY_KEY_ID, 'new-key-id');
+      expect(mockSetItem).toHaveBeenCalledWith(
+        SECURE_STORE_KEYS.INTEGRITY_KEY_ID,
+        'new-key-id',
+        expect.any(Object)
+      );
 
       const attestCall = mockPost.mock.calls[1];
       expect(attestCall[1]).toMatchObject({
@@ -438,7 +447,8 @@ describe('integrity.service', () => {
       // keyId persisted only after backend ACK.
       expect(mockSetItem).toHaveBeenCalledWith(
         SECURE_STORE_KEYS.INTEGRITY_KEY_ID,
-        'spki-hash-leaf'
+        'spki-hash-leaf',
+        expect.any(Object)
       );
 
       const attestCall = mockPost.mock.calls[1];
@@ -497,7 +507,11 @@ describe('integrity.service', () => {
       expect(mockHkaAttest).toHaveBeenCalled();
       expect(mockHkaSign).not.toHaveBeenCalled();
       // The fresh keyId replaces the stale one in SecureStore.
-      expect(mockSetItem).toHaveBeenCalledWith(SECURE_STORE_KEYS.INTEGRITY_KEY_ID, 'fresh-key-id');
+      expect(mockSetItem).toHaveBeenCalledWith(
+        SECURE_STORE_KEYS.INTEGRITY_KEY_ID,
+        'fresh-key-id',
+        expect.any(Object)
+      );
     });
 
     it('throws unsupported_device when Hka.isSupported() is false', async () => {
