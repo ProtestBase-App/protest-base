@@ -21,8 +21,10 @@ jest.mock('@/context/PostalCodeProvider', () => ({
 
 jest.mock('@/utils/eventFormatters', () => ({
   formatEventDateTime: jest.fn(() => 'Mar 15, 2025 14:00'),
-  // Real implementation needed because getEffectiveEndTime() (called from
-  // onSave) parses end_time via parseAsUTC.
+  // Real implementations needed: getEffectiveEndTime() (called from onSave)
+  // parses end_time via parseAsUTC, and isEventInProgress() resolves Belgium
+  // day keys via EVENT_TIMEZONE.
+  EVENT_TIMEZONE: 'Europe/Brussels',
   parseAsUTC: (iso: string) =>
     iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso) ? new Date(iso) : new Date(iso + 'Z'),
 }));
@@ -32,17 +34,20 @@ jest.mock('@/utils/i18n', () => ({
     const translations: Record<string, string> = {
       'categories.climate': 'Climate',
       'categories.education': 'Education',
+      'categories.protest': 'Protest',
       'events.save': 'Save',
       'events.saved': 'Saved',
       'events.unsave': 'Unsave',
       'events.share': 'Share',
       'createEvent.helpNeeded': 'Help Needed',
+      'home.inProgressBadge': 'Ongoing',
     };
     return translations[key] || key;
   },
 }));
 
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import ExploreEventCard from '@/components/ExploreEventCard';
 import { router } from 'expo-router';
@@ -79,6 +84,8 @@ const mockEvent: Event = {
 describe('ExploreEventCard', () => {
   const defaultProps = {
     event: mockEvent,
+    // Belgium-TZ day of the mock event's start — single-day today, no badge.
+    todayKey: '2025-03-15',
     isSaved: false,
     onSave: jest.fn(),
     onShare: jest.fn(),
@@ -204,6 +211,73 @@ describe('ExploreEventCard', () => {
     expect(screen.getByText('Education')).toBeTruthy();
   });
 
+  describe('Ongoing badge', () => {
+    // 09:00/18:00 UTC are safely inside the same Belgium-TZ day.
+    const ongoingEvent = {
+      ...mockEvent,
+      start_time: '2025-03-14T09:00:00.000Z',
+      end_time: '2025-03-16T18:00:00.000Z',
+    };
+
+    it('shows the badge for a multi-day event spanning today', () => {
+      render(<ExploreEventCard {...defaultProps} event={ongoingEvent} />);
+      expect(screen.getByText('Ongoing')).toBeTruthy();
+    });
+
+    it('shows the badge for a multi-day event ending today', () => {
+      const endsToday = {
+        ...mockEvent,
+        start_time: '2025-03-14T09:00:00.000Z',
+        end_time: '2025-03-15T18:00:00.000Z',
+      };
+      render(<ExploreEventCard {...defaultProps} event={endsToday} />);
+      expect(screen.getByText('Ongoing')).toBeTruthy();
+    });
+
+    it('does not show the badge for a single-day event today', () => {
+      render(<ExploreEventCard {...defaultProps} />);
+      expect(screen.queryByText('Ongoing')).toBeNull();
+    });
+
+    it('does not show the badge for a multi-day event starting today', () => {
+      const startsToday = {
+        ...mockEvent,
+        start_time: '2025-03-15T09:00:00.000Z',
+        end_time: '2025-03-17T18:00:00.000Z',
+      };
+      render(<ExploreEventCard {...defaultProps} event={startsToday} />);
+      expect(screen.queryByText('Ongoing')).toBeNull();
+    });
+
+    it('renders the badge even when the event has no categories', () => {
+      const noCatOngoing = { ...ongoingEvent, categories: [] as string[] };
+      render(<ExploreEventCard {...defaultProps} event={noCatOngoing} />);
+      expect(screen.getByText('Ongoing')).toBeTruthy();
+    });
+
+    it('renders the badge text in the live color', () => {
+      render(<ExploreEventCard {...defaultProps} event={ongoingEvent} />);
+      const badgeText = screen.getByText('Ongoing');
+      expect(StyleSheet.flatten(badgeText.props.style).color).toBe('#3DBE7B');
+    });
+  });
+
+  describe('Category badge colors', () => {
+    it('uses the per-category color for known categories', () => {
+      const protestEvent = { ...mockEvent, categories: ['Protest'] };
+      render(<ExploreEventCard {...defaultProps} event={protestEvent} />);
+      const badgeText = screen.getByText('Protest');
+      expect(StyleSheet.flatten(badgeText.props.style).color).toBe('#F94460');
+    });
+
+    it('falls back to the neutral grey for unknown categories', () => {
+      // 'Climate' is not a backend category, so it resolves to the fallback.
+      render(<ExploreEventCard {...defaultProps} />);
+      const badgeText = screen.getByText('Climate');
+      expect(StyleSheet.flatten(badgeText.props.style).color).toBe('#8E8E93');
+    });
+  });
+
   describe('memo comparator (re-render behavior)', () => {
     it('re-renders when isSaved changes (memo returns false)', () => {
       const { rerender } = render(<ExploreEventCard {...defaultProps} isSaved={false} />);
@@ -223,6 +297,23 @@ describe('ExploreEventCard', () => {
       const { rerender } = render(<ExploreEventCard {...defaultProps} />);
       rerender(<ExploreEventCard {...defaultProps} />);
       expect(screen.getByLabelText(/Event: Climate March/)).toBeTruthy();
+    });
+
+    it('re-renders when todayKey changes so the Ongoing badge can appear', () => {
+      const multiDayEvent = {
+        ...mockEvent,
+        start_time: '2025-03-15T09:00:00.000Z',
+        end_time: '2025-03-17T18:00:00.000Z',
+      };
+      // On the start day the event is not yet "ongoing"...
+      const { rerender } = render(
+        <ExploreEventCard {...defaultProps} event={multiDayEvent} todayKey="2025-03-15" />
+      );
+      expect(screen.queryByText('Ongoing')).toBeNull();
+
+      // ...after the Belgium-TZ day flips, the same props must show the badge.
+      rerender(<ExploreEventCard {...defaultProps} event={multiDayEvent} todayKey="2025-03-16" />);
+      expect(screen.getByText('Ongoing')).toBeTruthy();
     });
   });
 

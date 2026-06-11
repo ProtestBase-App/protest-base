@@ -23,6 +23,7 @@ import EmptyEventMyEvents from '@/components/EmptyEventMyEvents';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
 import { Typography } from '@/constants/DesignTokens';
+import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { shareEventWithAlert } from '@/utils/shareHelpers';
 import { Event, getEventByIdBackend } from '@/services/event.service';
 import { logger } from '@/utils/logger';
@@ -71,6 +72,10 @@ export default function ExploreTab() {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const flatListRef = useRef<FlatList>(null);
+
+  // Recomputed on every render, like the calendar tab — the value only
+  // changes when the Belgium-TZ day flips.
+  const todayKey = getTodayDateKeyInBelgium();
 
   // Hierarchy tokens (e.g. r:be:brussels) are expanded to their member postal
   // codes here; the backend receives the comma-joined code list. Raw codes pass
@@ -273,6 +278,7 @@ export default function ExploreTab() {
       return (
         <ExploreEventCard
           event={eventForCard}
+          todayKey={todayKey}
           isSaved={isSavedRef.current(item.$id)}
           onSave={handleSaveEvent}
           onShare={handleShareEvent}
@@ -281,7 +287,9 @@ export default function ExploreTab() {
         />
       );
     },
-    [handleSaveEvent, handleShareEvent]
+    // todayKey is a dep (not a ref) so a day flip invalidates renderItem and
+    // re-renders the memoized cards; within a day it's a stable string.
+    [handleSaveEvent, handleShareEvent, todayKey]
   );
 
   const keyExtractor = useCallback((item: FormattedEventListItem, index: number) => {
