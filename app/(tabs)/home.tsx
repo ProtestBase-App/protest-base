@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import { StyleSheet, Alert, Platform, View, ScrollView, RefreshControl } from 'react-native';
 import Animated, { Easing, FadeIn, withTiming } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,6 +40,7 @@ import {
   matchesCalendarFilters,
 } from '@/utils/calendarTabUtils';
 import { parseAsUTC } from '@/utils/eventFormatters';
+import { hasEventEnded } from '@/utils/eventStatus';
 import { logger } from '@/utils/logger';
 
 const LOCALE_MAP: Record<string, string> = { en: 'en-US', fr: 'fr-FR', nl: 'nl-NL' };
@@ -111,6 +112,21 @@ export default function HomeTab() {
 
   const todayKey = getTodayDateKeyInBelgium();
   const belgiumToday = dateKeyToDate(todayKey);
+
+  // Clock value the ended-event cutoff is evaluated against. Refreshed when
+  // the tab regains focus (and on pull-to-refresh) so events that ended in
+  // the meantime drop off the list. The functional updater keeps the previous
+  // Date when the time hasn't advanced (also protects tests, where the focus
+  // callback runs during render under fake timers).
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(
+    useCallback(() => {
+      setNow((prev) => {
+        const next = new Date();
+        return next.getTime() === prev.getTime() ? prev : next;
+      });
+    }, [])
+  );
   const [displayYear, setDisplayYear] = useState(() => getBelgiumToday().getFullYear());
   const [displayMonth, setDisplayMonth] = useState(() => getBelgiumToday().getMonth());
   // Belgium-TZ selection key so the highlight lines up with event keys (also
@@ -123,6 +139,14 @@ export default function HomeTab() {
 
   const allEvents = useMemo(() => Object.values(eventsCache), [eventsCache]);
 
+  // Time-granular cutoff: an event is gone as soon as its effective end time
+  // passes (a 6–7 PM event disappears at 7 PM, not at midnight), matching the
+  // explore feed's includeEnded=false semantics.
+  const upcomingEvents = useMemo(
+    () => allEvents.filter((event) => !hasEventEnded(event, now)),
+    [allEvents, now]
+  );
+
   const postalCodeSet = useMemo(
     () =>
       filters.locations.length > 0 ? new Set(expandLocationTokens(filters.locations).codes) : null,
@@ -132,8 +156,8 @@ export default function HomeTab() {
   const filterContext = useMemo(() => ({ isSaved, postalCodeSet }), [isSaved, postalCodeSet]);
 
   const filteredEvents = useMemo(
-    () => allEvents.filter((event) => matchesCalendarFilters(event, filters, filterContext)),
-    [allEvents, filters, filterContext]
+    () => upcomingEvents.filter((event) => matchesCalendarFilters(event, filters, filterContext)),
+    [upcomingEvents, filters, filterContext]
   );
 
   // One entry per Belgium-TZ day each event spans (multi-day events expand).
@@ -254,6 +278,7 @@ export default function HomeTab() {
   const onRefresh = useCallback(async () => {
     logger.info('[HomeTab] Pull to refresh triggered');
     setRefreshing(true);
+    setNow(new Date());
     try {
       await refetchEvents();
     } catch (error) {
@@ -315,14 +340,16 @@ export default function HomeTab() {
     (draft: CalendarFilters) => {
       const draftPostalCodes =
         draft.locations.length > 0 ? new Set(expandLocationTokens(draft.locations).codes) : null;
+      // upcomingEvents (not allEvents) so the "See N protests" label matches
+      // the time-granular cutoff applied to the rendered list.
       return countUpcomingCalendarMatches(
-        allEvents,
+        upcomingEvents,
         draft,
         { isSaved, postalCodeSet: draftPostalCodes },
         getTodayDateKeyInBelgium()
       );
     },
-    [allEvents, isSaved, expandLocationTokens]
+    [upcomingEvents, isSaved, expandLocationTokens]
   );
 
   const removeCategoriesFilter = useCallback(

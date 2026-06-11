@@ -147,6 +147,43 @@ describe('Home Screen (calendar tab)', () => {
     });
   });
 
+  describe('Ended Events (time-granular cutoff)', () => {
+    // Pinned "now" is 2026-05-12T10:00:00Z = 12:00 in Belgium (CEST).
+    it('hides a today event whose end time has already passed', () => {
+      const endedToday = createMockEvent({
+        $id: 'event-ended',
+        title: 'Ended Morning Event',
+        start_time: '2026-05-12T06:00:00Z', // 08:00 Belgium
+        end_time: '2026-05-12T07:00:00Z', // 09:00 Belgium — over by noon
+      });
+
+      const { queryByText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-ended': endedToday } },
+        },
+      });
+
+      expect(queryByText('Ended Morning Event')).toBeNull();
+    });
+
+    it('keeps a today event that is still running', () => {
+      const runningEvent = createMockEvent({
+        $id: 'event-running',
+        title: 'Running Event',
+        start_time: '2026-05-12T08:00:00Z', // 10:00 Belgium
+        end_time: '2026-05-12T11:00:00Z', // 13:00 Belgium — spans noon
+      });
+
+      const { getByText } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { eventsCache: { 'event-running': runningEvent } },
+        },
+      });
+
+      expect(getByText('Running Event')).toBeTruthy();
+    });
+  });
+
   describe('Day Markers', () => {
     it('marks days with events in the day-cell accessibility labels', () => {
       const todayEvent = createMockEvent({

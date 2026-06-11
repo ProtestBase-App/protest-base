@@ -2,7 +2,6 @@
  * Helpers for event timing status (ongoing, ended, active during a date range).
  */
 
-import { Event } from '@/types/event.types';
 import { parseAsUTC } from './eventFormatters';
 import { DEFAULT_EVENT_DURATION_MS } from '@/constants/EventConfig';
 
@@ -18,15 +17,24 @@ export function getEffectiveEndTime(event: { start_time: string; end_time?: stri
   return new Date(startTime.getTime() + DEFAULT_EVENT_DURATION_MS);
 }
 
-/** True when the event's effective end time is in the future. */
-export function isEventOngoing(event: { start_time: string; end_time?: string }): boolean {
-  const now = new Date();
+/**
+ * True when the event's effective end time is in the future. Pass `now` to
+ * evaluate against a render-stable clock value (screens refresh it on focus);
+ * it defaults to the current time.
+ */
+export function isEventOngoing(
+  event: { start_time: string; end_time?: string },
+  now: Date = new Date()
+): boolean {
   const effectiveEndTime = getEffectiveEndTime(event);
   return effectiveEndTime > now;
 }
 
-export function hasEventEnded(event: { start_time: string; end_time?: string }): boolean {
-  return !isEventOngoing(event);
+export function hasEventEnded(
+  event: { start_time: string; end_time?: string },
+  now: Date = new Date()
+): boolean {
+  return !isEventOngoing(event, now);
 }
 
 /**

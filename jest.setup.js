@@ -108,7 +108,14 @@ jest.mock('expo-router', () => ({
     goBack: jest.fn(),
     navigate: jest.fn(),
   }),
-  useFocusEffect: jest.fn((callback) => callback()),
+  useFocusEffect: jest.fn((callback) => {
+    // Faithful to @react-navigation: the focus callback runs as an effect
+    // after commit (never during render — a render-phase setState inside it
+    // would loop), re-runs when the callback identity changes, and its
+    // return value is treated as cleanup.
+    const React = require('react');
+    React.useEffect(() => callback(), [callback]);
+  }),
   Redirect: ({ href }) => {
     const React = require('react');
     const { Text } = require('react-native');
@@ -317,7 +324,14 @@ jest.mock('@react-navigation/native', () => ({
     goBack: jest.fn(),
     navigate: jest.fn(),
   }),
-  useFocusEffect: jest.fn((callback) => callback()),
+  useFocusEffect: jest.fn((callback) => {
+    // Faithful to @react-navigation: the focus callback runs as an effect
+    // after commit (never during render — a render-phase setState inside it
+    // would loop), re-runs when the callback identity changes, and its
+    // return value is treated as cleanup.
+    const React = require('react');
+    React.useEffect(() => callback(), [callback]);
+  }),
 }));
 
 // ============================================================================
