@@ -17,7 +17,7 @@ import { Image } from 'expo-image';
 import ImageView from 'react-native-image-viewing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -947,7 +947,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   heroImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   heroGradient: {
     position: 'absolute',
@@ -1286,7 +1286,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   mapLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
   },

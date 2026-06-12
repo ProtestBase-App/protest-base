@@ -272,7 +272,7 @@ describe('i18n initializeI18n error handling', () => {
     jest.isolateModules(() => {
       // Mock @/constants/locales to throw a non-Error (e.g., a plain string)
       jest.doMock('@/constants/locales', () => {
-        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw 'string error — not an Error object';
       });
 
@@ -316,7 +316,7 @@ describe('i18n initializeI18n error handling', () => {
     const originalT = freshI18n.t.bind(freshI18n);
     // Force i18n.t to throw a non-Error value
     freshI18n.t = () => {
-      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw 'a plain string error';
     };
 

@@ -254,7 +254,7 @@ export function buildLocationFilterOptions({
     for (const [muni, codes] of muniCodes) {
       const minCode = Math.min(...codes);
       const provSlug = muniProvinceSlug.get(muni);
-      const provLabel = provSlug ? BE_PROVINCE_LABEL[provSlug]?.[lang] ?? '' : '';
+      const provLabel = provSlug ? (BE_PROVINCE_LABEL[provSlug]?.[lang] ?? '') : '';
       register(`m:be:${minCode}`, muni, 'municipality', codes, provLabel);
     }
   }

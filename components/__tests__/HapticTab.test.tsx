@@ -3,7 +3,7 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
 }));
 
-jest.mock('@react-navigation/elements', () => ({
+jest.mock('expo-router/react-navigation', () => ({
   PlatformPressable: ({ onPressIn, children, ...props }: any) => {
     const React = require('react');
     const { TouchableOpacity } = require('react-native');

@@ -12,6 +12,7 @@ import { countries } from '@/constants/Countries';
 import { Event } from '@/types/event.types';
 import { getEventDateKeyInBelgium } from '@/utils/calendarUtils';
 import { EVENT_TIMEZONE, parseAsUTC } from '@/utils/eventFormatters';
+import { isEventOngoing } from '@/utils/eventStatus';
 
 export type MapTimeFilter = 'all' | 'today' | 'week';
 
@@ -67,22 +68,28 @@ export function addDaysToDateKey(dateKey: string, days: number): string {
   return `${date.getFullYear()}-${m}-${d}`;
 }
 
-/** Past events (ended before today in Belgium) never appear on the map. */
-export function isNotEnded(event: Event, todayKey: string): boolean {
+/**
+ * Past events never appear on the map. Time-granular: an event is "ended" as
+ * soon as its effective end time passes (a 6–7 PM event disappears at 7 PM,
+ * not at midnight). Events without `end_time` use the default duration.
+ */
+export function isNotEnded(event: Event, now: Date): boolean {
   if (!event.start_time) return false;
-  return eventEndDateKey(event) >= todayKey;
+  return isEventOngoing(event, now);
 }
 
 /**
  * Quick time chips. 'today' includes multi-day events spanning today;
  * 'week' = events starting within the next 7 days (ongoing ones included).
+ * Ended events (per `isNotEnded`) match no window.
  */
 export function matchesTimeWindow(
   event: Event,
   timeFilter: MapTimeFilter,
-  todayKey: string
+  todayKey: string,
+  now: Date
 ): boolean {
-  if (!isNotEnded(event, todayKey)) return false;
+  if (!isNotEnded(event, now)) return false;
   if (timeFilter === 'all') return true;
 
   const startKey = getEventDateKeyInBelgium(event.start_time);

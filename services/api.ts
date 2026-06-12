@@ -368,8 +368,8 @@ api.interceptors.response.use(
             errorCode === 'TOKEN_REUSE_DETECTED'
               ? 'token_reuse'
               : errorCode === 'SESSION_REPLACED'
-              ? 'session_replaced'
-              : undefined;
+                ? 'session_replaced'
+                : undefined;
           tokenExpirationCallback(reason);
         }
 

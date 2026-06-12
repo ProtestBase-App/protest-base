@@ -49,12 +49,14 @@ function OverlayChip({
   activeTextColor,
   dotColor,
 }: OverlayChipProps) {
-  const backgroundColor = active ? activeBackground ?? TIME_CHIP_ACTIVE_BG : themeColors.mapOverlay;
+  const backgroundColor = active
+    ? (activeBackground ?? TIME_CHIP_ACTIVE_BG)
+    : themeColors.mapOverlay;
   const borderColor = active
-    ? activeColor ?? TIME_CHIP_ACTIVE_BORDER
+    ? (activeColor ?? TIME_CHIP_ACTIVE_BORDER)
     : themeColors.mapOverlayBorder;
   const textColor = active
-    ? activeTextColor ?? activeColor ?? themeColors.mapAccentSoftText
+    ? (activeTextColor ?? activeColor ?? themeColors.mapAccentSoftText)
     : themeColors.mapChipText;
 
   return (

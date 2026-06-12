@@ -1,14 +1,25 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
+import { getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, BorderRadius, Shadows } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
+import { isEventInProgress } from '@/utils/calendarTabUtils';
 import { formatEventDateTime } from '@/utils/eventFormatters';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
 import { Event } from '@/types/event.types';
@@ -16,6 +27,8 @@ import { t } from '@/utils/i18n';
 
 export interface ExploreEventCardProps {
   event: Event;
+  /** Belgium-TZ YYYY-MM-DD for today — drives the "Ongoing" badge. */
+  todayKey: string;
   isSaved: boolean;
   /**
    * Toggle the saved state. `endsAt` is the event's effective end time in ms,
@@ -30,6 +43,7 @@ export interface ExploreEventCardProps {
 
 function ExploreEventCard({
   event,
+  todayKey,
   isSaved,
   onSave,
   onShare,
@@ -39,6 +53,30 @@ function ExploreEventCard({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const themeColors = getThemeColors(colorScheme);
+  const reducedMotion = useReducedMotion();
+
+  const inProgress = isEventInProgress(event, todayKey);
+
+  // "Ongoing" dot pulse: opacity 1 → 0.3 → 1 over 1.6s, ease-in-out, forever —
+  // kept in sync with CalendarEventRow. With Reduce Motion enabled the dot
+  // stays static at full opacity.
+  const pulseOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (!inProgress || reducedMotion) {
+      cancelAnimation(pulseOpacity);
+      pulseOpacity.value = 1;
+      return;
+    }
+    pulseOpacity.value = withRepeat(
+      withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+    return () => cancelAnimation(pulseOpacity);
+  }, [inProgress, reducedMotion, pulseOpacity]);
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
+
+  const hasCategories = Boolean(event.categories && event.categories.length > 0);
 
   const handleCardPress = () => {
     router.push(`/event/${event.$id}` as any);
@@ -64,23 +102,38 @@ function ExploreEventCard({
         />
 
         <ThemedView style={styles.content}>
-          {event.categories && event.categories.length > 0 && (
-            <ThemedView style={styles.categoryContainer}>
-              {event.categories.map((category, index) => (
+          {(inProgress || hasCategories) && (
+            <ThemedView style={styles.badgeContainer}>
+              {inProgress && (
                 <ThemedView
-                  key={index}
-                  style={[styles.categoryBadge, { backgroundColor: colors.tint }]}
+                  style={[styles.badge, styles.liveBadge, { backgroundColor: themeColors.liveBg }]}
                 >
-                  <ThemedText
-                    type="categoryBadge"
-                    style={styles.categoryText}
-                    accessibilityRole="text"
-                    accessibilityLabel={`Category: ${t(`categories.${category.toLowerCase()}`)}`}
-                  >
-                    {t(`categories.${category.toLowerCase()}`)}
+                  <Animated.View
+                    style={[styles.liveDot, { backgroundColor: themeColors.live }, pulseStyle]}
+                  />
+                  <ThemedText type="categoryBadge" style={{ color: themeColors.live }}>
+                    {t('home.inProgressBadge')}
                   </ThemedText>
                 </ThemedView>
-              ))}
+              )}
+              {event.categories?.map((category, index) => {
+                const categoryColors = getCategoryColors(category);
+                return (
+                  <ThemedView
+                    key={index}
+                    style={[styles.badge, { backgroundColor: categoryColors.badgeBg }]}
+                  >
+                    <ThemedText
+                      type="categoryBadge"
+                      style={{ color: categoryColors.color }}
+                      accessibilityRole="text"
+                      accessibilityLabel={`Category: ${t(`categories.${category.toLowerCase()}`)}`}
+                    >
+                      {t(`categories.${category.toLowerCase()}`)}
+                    </ThemedText>
+                  </ThemedView>
+                );
+              })}
             </ThemedView>
           )}
 
@@ -188,20 +241,27 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },
-  categoryContainer: {
+  badgeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: Spacing.md,
   },
-  categoryBadge: {
+  badge: {
     borderRadius: BorderRadius.sm,
     paddingVertical: Spacing.xs,
     paddingHorizontal: 10,
     marginRight: Spacing.sm,
     marginBottom: Spacing.sm,
   },
-  categoryText: {
-    color: '#FFF',
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   metadataRow: {
     flexDirection: 'row',
@@ -243,8 +303,13 @@ const styles = StyleSheet.create({
 });
 
 export default memo(ExploreEventCard, (prevProps, nextProps) => {
+  // start_time/end_time are compared because they drive the "Ongoing" badge —
+  // a refetch can shift an event's times without changing its id.
   return (
     prevProps.event.$id === nextProps.event.$id &&
+    prevProps.event.start_time === nextProps.event.start_time &&
+    prevProps.event.end_time === nextProps.event.end_time &&
+    prevProps.todayKey === nextProps.todayKey &&
     prevProps.isSaved === nextProps.isSaved &&
     prevProps.userLanguage === nextProps.userLanguage &&
     prevProps.cityLabel === nextProps.cityLabel

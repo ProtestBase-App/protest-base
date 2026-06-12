@@ -156,6 +156,7 @@ export default (): ExpoConfig => {
         },
       ],
       'expo-localization',
+      'expo-status-bar',
       'expo-web-browser',
       '@react-native-community/datetimepicker',
       'expo-image',

@@ -348,23 +348,17 @@ const nl = {
   // ============================================
   more: {
     title: 'Meer',
-    myOrganization: 'Mijn Organisatie',
-    tools: 'Hulpmiddelen',
     resources: 'Bronnen',
     account: 'Account',
     settings: 'Instellingen',
-    accountResources: 'Account en Bronnen',
     devTools: 'Ontwikkeltools',
     createEvent: 'Evenement aanmaken',
     createNewEvent: 'Nieuw evenement aanmaken',
     myEvents: 'Mijn evenementen',
-    myUpcomingEvents: 'Mijn aankomende evenementen',
-    myPastEvents: 'Mijn afgelopen evenementen',
     draftEvents: 'Concept-evenementen',
     draftEventsEmpty: 'Nog geen concept-evenementen',
     eventTemplates: 'Evenementsjablonen',
     becomeOrganizer: 'Word organisator',
-    signInToManageEvents: 'Log in om evenementen te beheren',
     giveFeedback: 'Feedback geven',
     about: 'Over',
     termsAndConditions: 'Algemene voorwaarden',
@@ -377,6 +371,21 @@ const nl = {
     feedback: 'Feedback geven',
     help: 'Hulp',
     version: 'Versie',
+
+    // Organizer hub (More tab redesign)
+    upcoming: 'Aankomend',
+    past: 'Afgelopen',
+    drafts: 'Concepten',
+    templates: 'Sjablonen',
+    identitySubtitleOrganizer: 'Organisator · Account en profiel',
+    identitySubtitle: 'Account en profiel',
+    becomeOrganizerBody:
+      'Creëer acties, mobiliseer supporters en beheer je evenementen — gratis voor grassroots-organisaties.',
+    alreadyOrganizing: 'Al organisator?',
+    signIn: 'Inloggen',
+    logoutConfirmTitle: 'Afmelden',
+    logoutConfirmMessage: 'Weet je zeker dat je je wilt afmelden?',
+    versionLabel: 'Protestbase v{{version}}',
 
     // Alerts
     logoutSuccess: 'Je bent succesvol afgemeld.',

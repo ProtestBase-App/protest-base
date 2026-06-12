@@ -181,8 +181,8 @@ export function ExploreFiltersSheet({
     matchCount === null
       ? t('filters.confirmFilters')
       : matchCount === 0
-      ? t('home.filterApplyNone')
-      : t('home.filterApplyCount', { count: matchCount });
+        ? t('home.filterApplyNone')
+        : t('home.filterApplyCount', { count: matchCount });
 
   const handleApply = () => {
     onApply(draft);

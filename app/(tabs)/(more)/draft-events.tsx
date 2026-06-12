@@ -1,8 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { StyleSheet, ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { Redirect, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useGlobalContext } from '@/context/GlobalProvider';

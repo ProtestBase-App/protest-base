@@ -24,6 +24,8 @@ import {
 // ============================================================================
 
 const TODAY_KEY = '2026-06-10';
+// 14:00 Belgium (CEST) on TODAY_KEY — the clock the ended cutoff runs against.
+const NOW = new Date('2026-06-10T12:00:00.000Z');
 
 function filtersWith(overrides: Partial<MapFilters> = {}): MapFilters {
   return { ...DEFAULT_MAP_FILTERS, ...overrides };
@@ -87,17 +89,40 @@ describe('mapTabUtils', () => {
   // ==========================================================================
 
   describe('isNotEnded', () => {
-    it('keeps events starting today or later', () => {
-      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-10T16:00:00.000Z' }), TODAY_KEY)).toBe(
-        true
-      );
-      expect(isNotEnded(geocodedEvent({ start_time: '2026-07-01T10:00:00.000Z' }), TODAY_KEY)).toBe(
-        true
+    it('keeps events starting later today or in the future', () => {
+      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-10T16:00:00.000Z' }), NOW)).toBe(true);
+      expect(isNotEnded(geocodedEvent({ start_time: '2026-07-01T10:00:00.000Z' }), NOW)).toBe(true);
+    });
+
+    it('drops events that ended on an earlier day', () => {
+      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-09T10:00:00.000Z' }), NOW)).toBe(
+        false
       );
     });
 
-    it('drops events that ended before today', () => {
-      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-09T10:00:00.000Z' }), TODAY_KEY)).toBe(
+    it('drops a today event whose end time has already passed', () => {
+      // 09:00–10:00 Belgium; "now" is 14:00 Belgium the same day.
+      const endedToday = geocodedEvent({
+        start_time: '2026-06-10T07:00:00.000Z',
+        end_time: '2026-06-10T08:00:00.000Z',
+      });
+      expect(isNotEnded(endedToday, NOW)).toBe(false);
+    });
+
+    it('keeps a today event that is currently in progress', () => {
+      // 13:00–15:00 Belgium spans "now" (14:00 Belgium).
+      const inProgress = geocodedEvent({
+        start_time: '2026-06-10T11:00:00.000Z',
+        end_time: '2026-06-10T13:00:00.000Z',
+      });
+      expect(isNotEnded(inProgress, NOW)).toBe(true);
+    });
+
+    it('uses the default duration for events without an end time', () => {
+      // Effective end = start + 2h: 11:00Z ends 13:00Z (after NOW), 09:00Z
+      // ends 11:00Z (before NOW).
+      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-10T11:00:00.000Z' }), NOW)).toBe(true);
+      expect(isNotEnded(geocodedEvent({ start_time: '2026-06-10T09:00:00.000Z' }), NOW)).toBe(
         false
       );
     });
@@ -107,11 +132,11 @@ describe('mapTabUtils', () => {
         start_time: '2026-06-08T10:00:00.000Z',
         end_time: '2026-06-12T18:00:00.000Z',
       });
-      expect(isNotEnded(event, TODAY_KEY)).toBe(true);
+      expect(isNotEnded(event, NOW)).toBe(true);
     });
 
     it('drops events without a start time', () => {
-      expect(isNotEnded(geocodedEvent({ start_time: '' }), TODAY_KEY)).toBe(false);
+      expect(isNotEnded(geocodedEvent({ start_time: '' }), NOW)).toBe(false);
     });
   });
 
@@ -125,26 +150,36 @@ describe('mapTabUtils', () => {
     });
 
     it("'all' keeps every upcoming event", () => {
-      expect(matchesTimeWindow(today, 'all', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(inTenDays, 'all', TODAY_KEY)).toBe(true);
+      expect(matchesTimeWindow(today, 'all', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(inTenDays, 'all', TODAY_KEY, NOW)).toBe(true);
     });
 
     it("'all' still drops past events", () => {
       const past = geocodedEvent({ start_time: '2026-06-01T10:00:00.000Z' });
-      expect(matchesTimeWindow(past, 'all', TODAY_KEY)).toBe(false);
+      expect(matchesTimeWindow(past, 'all', TODAY_KEY, NOW)).toBe(false);
+    });
+
+    it('a today event whose end time has passed matches no window', () => {
+      const endedToday = geocodedEvent({
+        start_time: '2026-06-10T07:00:00.000Z',
+        end_time: '2026-06-10T08:00:00.000Z',
+      });
+      expect(matchesTimeWindow(endedToday, 'all', TODAY_KEY, NOW)).toBe(false);
+      expect(matchesTimeWindow(endedToday, 'today', TODAY_KEY, NOW)).toBe(false);
+      expect(matchesTimeWindow(endedToday, 'week', TODAY_KEY, NOW)).toBe(false);
     });
 
     it("'today' keeps events starting today and multi-day events spanning today", () => {
-      expect(matchesTimeWindow(today, 'today', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(ongoingMultiDay, 'today', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(inFiveDays, 'today', TODAY_KEY)).toBe(false);
+      expect(matchesTimeWindow(today, 'today', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(ongoingMultiDay, 'today', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(inFiveDays, 'today', TODAY_KEY, NOW)).toBe(false);
     });
 
     it("'week' keeps events starting within the next 7 days, including ongoing ones", () => {
-      expect(matchesTimeWindow(today, 'week', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(inFiveDays, 'week', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(ongoingMultiDay, 'week', TODAY_KEY)).toBe(true);
-      expect(matchesTimeWindow(inTenDays, 'week', TODAY_KEY)).toBe(false);
+      expect(matchesTimeWindow(today, 'week', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(inFiveDays, 'week', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(ongoingMultiDay, 'week', TODAY_KEY, NOW)).toBe(true);
+      expect(matchesTimeWindow(inTenDays, 'week', TODAY_KEY, NOW)).toBe(false);
     });
   });
 

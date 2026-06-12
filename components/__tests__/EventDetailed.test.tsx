@@ -24,7 +24,7 @@ jest.mock('expo-blur', () => {
   };
 });
 
-jest.mock('expo-calendar', () => ({
+jest.mock('expo-calendar/legacy', () => ({
   getCalendarPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'undetermined' })),
   requestCalendarPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
   createEventInCalendarAsync: jest.fn(() => Promise.resolve({ action: 'saved' })),
@@ -69,7 +69,7 @@ import { Linking, Alert } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import EventDetailed from '@/components/EventDetailed';
 import type { FormattedEvent } from '@/utils/eventFormatters';
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 
 beforeEach(() => {
   global.alert = jest.fn();

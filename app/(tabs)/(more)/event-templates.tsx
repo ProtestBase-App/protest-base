@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
-import { router, useLocalSearchParams, Stack } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { router, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';

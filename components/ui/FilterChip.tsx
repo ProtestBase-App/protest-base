@@ -51,7 +51,7 @@ export function FilterChip({
 
   const accent = activeColor ?? themeColors.tint;
   const backgroundColor = active
-    ? activeBackground ?? themeColors.categoryBadgeBg
+    ? (activeBackground ?? themeColors.categoryBadgeBg)
     : themeColors.surfaceAltBackground;
   const borderColor = active ? accent : themeColors.cardBorder;
   const textColor = active ? accent : themeColors.secondaryText;

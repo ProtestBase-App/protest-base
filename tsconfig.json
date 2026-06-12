@@ -2,10 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    // TS 6.0 no longer auto-includes global @types packages; jest test globals
+    // (describe/it/expect) and Node globals (process) need explicit inclusion.
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["./*"]
     }

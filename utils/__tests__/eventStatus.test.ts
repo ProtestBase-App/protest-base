@@ -111,6 +111,24 @@ describe('eventStatus utilities', () => {
     });
   });
 
+  describe('explicit `now` argument', () => {
+    // No fake timers — the explicit argument bypasses the system clock.
+    const event = {
+      start_time: '2025-01-15T16:00:00.000Z',
+      end_time: '2025-01-15T17:00:00.000Z',
+    };
+
+    it('isEventOngoing evaluates against the provided time', () => {
+      expect(isEventOngoing(event, new Date('2025-01-15T16:30:00.000Z'))).toBe(true);
+      expect(isEventOngoing(event, new Date('2025-01-15T19:00:00.000Z'))).toBe(false);
+    });
+
+    it('hasEventEnded evaluates against the provided time', () => {
+      expect(hasEventEnded(event, new Date('2025-01-15T16:30:00.000Z'))).toBe(false);
+      expect(hasEventEnded(event, new Date('2025-01-15T19:00:00.000Z'))).toBe(true);
+    });
+  });
+
   describe('isEventActiveDuringDate', () => {
     it('should return true for event that starts and ends on target date', () => {
       const event = {

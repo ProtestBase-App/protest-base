@@ -1,6 +1,6 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -124,13 +124,28 @@ export default function MapsScreen() {
 
   const todayKey = getTodayDateKeyInBelgium();
 
+  // Clock value the ended-event cutoff is evaluated against. Refreshed when
+  // the tab regains focus so events that ended in the meantime drop off the
+  // map without waiting for a cache refresh. The functional updater keeps the
+  // previous Date when the time hasn't advanced (also protects tests, where
+  // the focus callback runs during render under fake timers).
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(
+    useCallback(() => {
+      setNow((prev) => {
+        const next = new Date();
+        return next.getTime() === prev.getTime() ? prev : next;
+      });
+    }, [])
+  );
+
   // Upcoming events with coordinates — online/ungeocoded events never appear.
   const geocodedEvents = useMemo(
     () =>
       Object.values(eventsCache).filter(
-        (event) => hasMapCoordinates(event) && isNotEnded(event, todayKey)
+        (event) => hasMapCoordinates(event) && isNotEnded(event, now)
       ),
-    [eventsCache, todayKey]
+    [eventsCache, now]
   );
 
   const filterContext = useMemo(() => ({ isSaved }), [isSaved]);
@@ -140,11 +155,11 @@ export default function MapsScreen() {
       sortEventsChronologically(
         geocodedEvents.filter(
           (event) =>
-            matchesTimeWindow(event, timeFilter, todayKey) &&
+            matchesTimeWindow(event, timeFilter, todayKey, now) &&
             matchesMapFilters(event, filters, filterContext)
         )
       ),
-    [geocodedEvents, timeFilter, todayKey, filters, filterContext]
+    [geocodedEvents, timeFilter, todayKey, now, filters, filterContext]
   );
 
   // Latest-value refs so the camera effect below can depend on selectedId only
@@ -271,10 +286,10 @@ export default function MapsScreen() {
     (draft: MapFilters) =>
       geocodedEvents.filter(
         (event) =>
-          matchesTimeWindow(event, timeFilter, todayKey) &&
+          matchesTimeWindow(event, timeFilter, todayKey, now) &&
           matchesMapFilters(event, draft, filterContext)
       ).length,
-    [geocodedEvents, timeFilter, todayKey, filterContext]
+    [geocodedEvents, timeFilter, todayKey, now, filterContext]
   );
 
   const handleResetAll = useCallback(() => {
@@ -584,7 +599,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 10,
     alignItems: 'center',
     justifyContent: 'center',
