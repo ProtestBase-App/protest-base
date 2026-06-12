@@ -162,6 +162,16 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     event.geocod_lng !== null &&
     event.geocod_lng !== undefined;
 
+  // The address card must not depend on coordinates: the backend only geocodes
+  // events that have a street address, so postal-code-only events (and failed
+  // geocodes) have lat/lng null but still carry a displayable address. Only the
+  // map and its open-in-maps affordances require coordinates (hasMap).
+  const streetAndPostal = [event.street_address, event.postal_code].filter(Boolean).join(', ');
+  const hasAddress = !!(streetAndPostal || cityLabel || event.city);
+  const locationSecondary = [streetAndPostal, hasMap ? t('events.viewOnMap') : '']
+    .filter(Boolean)
+    .join(' · ');
+
   const org = event.organization_id
     ? organizations.find((o) => o.$id === event.organization_id)
     : null;
@@ -199,7 +209,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           startDate: startDateObj,
           endDate: endDateObj,
           timeZone,
-          location: `${address ?? ''}, ${postalCode ?? ''}, ${city ?? ''}`,
+          location: [address, postalCode, city].filter(Boolean).join(', '),
           notes,
         });
         if (
@@ -614,9 +624,14 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             )}
           </TouchableOpacity>
 
-          {hasMap && (
+          {(hasAddress || hasMap) && (
             <TouchableOpacity
-              onPress={() => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)}
+              onPress={
+                hasMap
+                  ? () => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)
+                  : undefined
+              }
+              disabled={!hasMap}
               style={[
                 styles.actionCard,
                 {
@@ -639,14 +654,17 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 <ThemedText style={styles.actionCardPrimary}>
                   {cityLabel || event.city || event.street_address || t('events.location')}
                 </ThemedText>
-                <ThemedText style={[styles.actionCardSecondary, { color: themeColors.subtleText }]}>
-                  {event.street_address}
-                  {event.postal_code ? `, ${event.postal_code}` : ''}
-                  {' · '}
-                  {t('events.viewOnMap')}
-                </ThemedText>
+                {locationSecondary ? (
+                  <ThemedText
+                    style={[styles.actionCardSecondary, { color: themeColors.subtleText }]}
+                  >
+                    {locationSecondary}
+                  </ThemedText>
+                ) : null}
               </View>
-              <IconSymbol name="chevron.right" size={IconSizes.md} color={themeColors.chevron} />
+              {hasMap && (
+                <IconSymbol name="chevron.right" size={IconSizes.md} color={themeColors.chevron} />
+              )}
             </TouchableOpacity>
           )}
 
