@@ -477,16 +477,52 @@ describe('EventDetailed — map and location', () => {
     expect(screen.getAllByText('Brussels').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('does not render location card when no geocoordinates', () => {
-    const noGeoEvent = { ...mockEvent, geocod_lat: undefined as any, geocod_lng: undefined as any };
+  it('renders the address card without map affordances when no geocoordinates', () => {
+    const noGeoEvent = { ...mockEvent, geocod_lat: null, geocod_lng: null };
     render(<EventDetailed {...defaultProps} event={noGeoEvent} />);
-    expect(screen.getByText('Climate March 2025')).toBeTruthy();
+    expect(screen.getByText('123 Main St, 1000')).toBeTruthy();
+    expect(screen.queryByText(/View on map/)).toBeNull();
+  });
+
+  it('renders the address card for a postal-code-only event', () => {
+    const postalOnlyEvent = {
+      ...mockEvent,
+      street_address: null,
+      city: null,
+      geocod_lat: null,
+      geocod_lng: null,
+    };
+    render(<EventDetailed {...defaultProps} event={postalOnlyEvent} />);
+    // City label resolved from the postal code (mocked getSubMunicipalityName).
+    expect(screen.getAllByText('Brussels').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('1000')).toBeTruthy();
+    expect(screen.queryByText(/View on map/)).toBeNull();
+  });
+
+  it('does not open the map when pressing the address card without coordinates', async () => {
+    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const noGeoEvent = { ...mockEvent, geocod_lat: null, geocod_lng: null };
+    render(<EventDetailed {...defaultProps} event={noGeoEvent} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('123 Main St, 1000'));
+    });
+
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('renders secondary line without a leading comma when street is missing but coordinates exist', () => {
+    const noStreetEvent = { ...mockEvent, street_address: null };
+    render(<EventDetailed {...defaultProps} event={noStreetEvent} />);
+    expect(screen.getByText('1000 · View on map')).toBeTruthy();
   });
 
   it('renders without postal_code', () => {
     const eventNoPostal = { ...mockEvent, postal_code: null };
     render(<EventDetailed {...defaultProps} event={eventNoPostal} />);
     expect(screen.getByText('Climate March 2025')).toBeTruthy();
+    expect(screen.getByText('123 Main St · View on map')).toBeTruthy();
   });
 });
 
