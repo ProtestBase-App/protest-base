@@ -39,4 +39,6 @@ export type CreateTemplateSearchParams = {
   sourceEventId?: string;
   /** Pre-fill template name suggestion (e.g., "From: Monthly Meetup") */
   suggestedName?: string;
+  /** JSON stringified array of hosted image URLs from the source event */
+  sourceImages?: string;
 };

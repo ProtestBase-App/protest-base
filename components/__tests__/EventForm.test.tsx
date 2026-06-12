@@ -1260,7 +1260,7 @@ describe('EventForm — date and time fields', () => {
     expect(screen.toJSON()).toBeTruthy();
   });
 
-  it('hides date fields in template mode', () => {
+  it('hides date fields but shows the image picker in template mode', () => {
     render(
       <EventForm
         form={mockForm}
@@ -1270,7 +1270,8 @@ describe('EventForm — date and time fields', () => {
         mode="create-template"
       />
     );
-    expect(screen.queryByLabelText(/add.*image/i)).toBeNull();
+    expect(screen.queryByTestId('form-date-field-Pick start date/time')).toBeNull();
+    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
   });
 });
 

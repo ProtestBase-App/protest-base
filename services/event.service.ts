@@ -463,8 +463,13 @@ function buildEventFormData(
  * The backend handles image upload, geocoding, URL validation and category
  * formatting, and fills in organizer_id and organizer_name from the JWT.
  *
- * @param eventData - Event data object (images: up to 5 picked files, sent as
- *   ordered multipart parts; falls back to the legacy single image field)
+ * `images` (max 5) may mix new picked files with already-hosted URL strings —
+ * the latter are attached verbatim (create-from-template), leaving the source
+ * template's own images untouched. Lists with at least one new file go as
+ * ordered multipart parts; all-URL lists go as plain JSON. Falls back to the
+ * legacy single image field when `images` is absent.
+ *
+ * @param eventData - Event data object
  * @returns The created event object from the backend
  */
 export async function createEventBackend(eventData: CreateEventRequest): Promise<Event> {
@@ -476,20 +481,29 @@ export async function createEventBackend(eventData: CreateEventRequest): Promise
     });
     const normalized = normalizeEventPayload(eventData as unknown as Record<string, unknown>);
     const hasImagesList = Array.isArray(eventData.images) && eventData.images.length > 0;
+    const imagesHasNewFile = hasImagesList && eventData.images!.some(isPickedImage);
     const hasImageFile = !!eventData.image?.uri;
 
     let payload: FormData | Record<string, unknown>;
     let headers: Record<string, string> = {};
 
-    if (hasImagesList) {
+    if (imagesHasNewFile) {
       ({ payload, headers } = buildEventFormData(normalized, null, eventData.images));
-    } else if (hasImageFile) {
+    } else if (!hasImagesList && hasImageFile) {
       ({ payload, headers } = buildEventFormData(normalized, eventData.image!));
     } else {
+      // JSON path: images is either absent/empty or an all-URL kept list
+      // (create-from-template) — both are JSON-safe.
       payload = normalized;
-      // An empty images list is the same as absent (backend default image) —
-      // drop it so the JSON body never carries a redundant [].
-      delete (payload as Record<string, unknown>).images;
+      if (hasImagesList) {
+        // images is authoritative — drop the legacy field so a file object
+        // never leaks into the JSON body.
+        delete (payload as Record<string, unknown>).image;
+      } else {
+        // An empty images list is the same as absent (backend default image) —
+        // drop it so the JSON body never carries a redundant [].
+        delete (payload as Record<string, unknown>).images;
+      }
       headers['Content-Type'] = 'application/json';
     }
 

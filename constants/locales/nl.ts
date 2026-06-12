@@ -164,6 +164,8 @@ const nl = {
     eventDetailsSection: 'Evenementdetails om op te slaan',
     eventDetailsHelper:
       'Vul de evenementdetails in die je wilt hergebruiken. Alle velden zijn optioneel.',
+    imageHelper:
+      'Voeg tot 5 afbeeldingen toe — ze worden bij dit sjabloon opgeslagen en toegevoegd aan evenementen die je ermee aanmaakt',
 
     // Field labels
     nameLabel: 'Sjabloonnaam *',
@@ -554,7 +556,6 @@ const nl = {
     locationSection: 'LOCATIE',
     additionalInfo: 'Aanvullende informatie',
     mediaAndAdditionalDetails: 'MEDIA EN AANVULLENDE DETAILS',
-    additionalDetails: 'AANVULLENDE DETAILS',
 
     // Field Labels
     eventTitle: 'Titel',
@@ -684,7 +685,7 @@ const nl = {
     photoPermissionMessage:
       'Geef toegang tot de fotobibliotheek om afbeeldingen aan je evenement toe te voegen.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
-    maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen per evenement toevoegen.',
+    maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen toevoegen.',
     missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
   },
 

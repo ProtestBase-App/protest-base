@@ -99,9 +99,11 @@ export interface CreateEventRequest {
   // Either a picked image or omitted (backend supplies a default).
   image?: PickedImage;
 
-  // Ordered list of new images (max 5). Authoritative when present — the legacy
-  // `image` field is then ignored. Empty/omitted → backend assigns the default.
-  images?: PickedImage[];
+  // Ordered list of images (max 5): PickedImages are new uploads, strings are
+  // already-hosted https URLs attached verbatim (e.g. template images on
+  // create-from-template). Authoritative when present — the legacy `image`
+  // field is then ignored. Empty/omitted → backend assigns the default.
+  images?: (PickedImage | string)[];
 
   website_url?: string;
   categories?: string | string[];

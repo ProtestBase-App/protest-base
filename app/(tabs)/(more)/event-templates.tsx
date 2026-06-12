@@ -150,6 +150,7 @@ export default function EventTemplatesScreen() {
       city: event.city,
       firstCategory: event.categories?.[0],
       templateData: extractTemplateData(event),
+      images: event.images?.length ? event.images : undefined,
     }));
   }, [pastEvents]);
 
@@ -193,6 +194,8 @@ export default function EventTemplatesScreen() {
         sourceEventData: JSON.stringify(event.templateData),
         sourceEventId: event.$id,
         suggestedName: `Template: ${event.title}`,
+        // The event's hosted image URLs become editable template images.
+        ...(event.images?.length ? { sourceImages: JSON.stringify(event.images) } : {}),
       },
     });
   }, []);

@@ -1,6 +1,9 @@
 /**
  * CreateEventRequest fields that can be stored in a template.
  * Mirrors the create-event payload from event.service.ts.
+ *
+ * Template images are NOT part of event_data — they live in the template's
+ * top-level `image_urls` column so the backend can reference-count them.
  */
 export interface TemplateEventData {
   organization_id?: string;
@@ -37,6 +40,10 @@ export interface EventTemplate {
   description?: string;
   organizer_id: string;
   event_data: string;
+  /** Legacy single image — always mirrors image_urls[0] ?? null. */
+  image_url?: string | null;
+  /** Ordered hosted image URLs (max 5). */
+  image_urls?: string[];
 }
 
 /**
@@ -50,6 +57,10 @@ export interface ParsedEventTemplate {
   description?: string;
   organizer_id: string;
   event_data: TemplateEventData;
+  /** Legacy single image — always mirrors image_urls[0] ?? null. */
+  image_url?: string | null;
+  /** Ordered hosted image URLs (max 5). */
+  image_urls?: string[];
 }
 
 export interface CreateTemplateRequest {
@@ -58,12 +69,19 @@ export interface CreateTemplateRequest {
   name: string;
   description?: string;
   event_data: TemplateEventData;
+  /** Ordered hosted https URLs (max 5). Omitted/empty → template has no images. */
+  image_urls?: string[];
 }
 
 export interface UpdateTemplateRequest {
   name?: string;
   description?: string;
   event_data?: TemplateEventData;
+  /**
+   * Authoritative ordered final list of hosted https URLs (max 5); `[]` (or
+   * `null`) clears all images; omitted leaves them unchanged.
+   */
+  image_urls?: string[] | null;
 }
 
 export interface GetTemplatesQuery {
@@ -96,4 +114,6 @@ export interface PastEventForTemplate {
   // First category for badge display.
   firstCategory?: string;
   templateData: TemplateEventData;
+  // Hosted image URLs from the source event, offered as template images.
+  images?: string[];
 }

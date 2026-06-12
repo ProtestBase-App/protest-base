@@ -149,6 +149,8 @@ const fr: LocaleData = {
     eventDetailsSection: "Détails de l'événement à enregistrer",
     eventDetailsHelper:
       "Remplissez les détails de l'événement que vous souhaitez réutiliser. Tous les champs sont facultatifs.",
+    imageHelper:
+      "Ajoutez jusqu'à 5 images — elles sont enregistrées avec ce modèle et ajoutées aux événements créés à partir de celui-ci",
 
     // Field labels
     nameLabel: 'Nom du modèle *',
@@ -517,7 +519,6 @@ const fr: LocaleData = {
     locationSection: 'LIEU',
     additionalInfo: 'Informations supplémentaires',
     mediaAndAdditionalDetails: 'MÉDIAS ET DÉTAILS SUPPLÉMENTAIRES',
-    additionalDetails: 'DÉTAILS SUPPLÉMENTAIRES',
 
     // Field Labels
     title: 'Titre',
@@ -640,7 +641,7 @@ const fr: LocaleData = {
     photoPermissionMessage:
       "Veuillez autoriser l'accès à la bibliothèque photo pour ajouter des images à votre événement.",
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
-    maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images par événement.",
+    maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
     missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
   },
 

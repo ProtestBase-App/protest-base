@@ -243,6 +243,22 @@ describe('template.service', () => {
       expect(mockApi.post).toHaveBeenCalledWith('/templates', createRequest);
     });
 
+    it('passes image_urls through to the POST body and back out parsed', async () => {
+      const imageUrls = ['https://cdn.example.com/1.jpg', 'https://cdn.example.com/2.jpg'];
+      const raw = makeTemplate({ image_urls: imageUrls });
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: raw },
+      });
+
+      const result = await createTemplate({ ...createRequest, image_urls: imageUrls });
+
+      expect(mockApi.post).toHaveBeenCalledWith('/templates', {
+        ...createRequest,
+        image_urls: imageUrls,
+      });
+      expect(result.image_urls).toEqual(imageUrls);
+    });
+
     it('throws when success is false', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: false, data: null },
@@ -311,6 +327,20 @@ describe('template.service', () => {
 
       expect(result.name).toBe('Updated Name');
       expect(mockApi.put).toHaveBeenCalledWith('/templates/tmpl-1', updates);
+    });
+
+    it('passes an authoritative empty image_urls list through to the PUT body', async () => {
+      const raw = makeTemplate({ image_urls: [] });
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: raw },
+      });
+
+      await updateTemplate('tmpl-1', { name: 'Updated Name', image_urls: [] });
+
+      expect(mockApi.put).toHaveBeenCalledWith('/templates/tmpl-1', {
+        name: 'Updated Name',
+        image_urls: [],
+      });
     });
 
     it('throws when success is false', async () => {

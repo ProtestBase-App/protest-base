@@ -24,6 +24,8 @@ import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
+import { resolveImageUrls } from '@/services/storage.service';
+import { MAX_EVENT_IMAGES } from '@/constants/EventConfig';
 import type { FormState } from '@/types/eventForm.types';
 import type { TemplateEventData } from '@/types/template.types';
 import type { CreateTemplateSearchParams } from '@/types/navigation.types';
@@ -43,6 +45,24 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
 
+// Order-sensitive (reorder counts as a change); entries compare by reference
+// (string equality for kept URLs).
+const areImageListsEqual = (a: FormState['images'], b: FormState['images']): boolean =>
+  a.length === b.length && a.every((img, idx) => img === b[idx]);
+
+/** Parse the sourceImages navigation param (JSON string[] of hosted URLs). */
+const parseSourceImages = (raw: string | undefined): string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((u): u is string => typeof u === 'string').slice(0, MAX_EVENT_IMAGES)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
 const hasTemplateFormChanges = (
   current: FormState,
   initial: FormState,
@@ -59,6 +79,7 @@ const hasTemplateFormChanges = (
     currentOrgId !== initialOrgId ||
     current.title !== initial.title ||
     current.description !== initial.description ||
+    !areImageListsEqual(current.images, initial.images) ||
     current.street_address !== initial.street_address ||
     current.city !== initial.city ||
     current.region !== initial.region ||
@@ -168,6 +189,7 @@ export default function CreateTemplateScreen() {
         ...initialFormState,
         title: eventData.title || '',
         description: eventData.description || '',
+        images: parseSourceImages(params.sourceImages),
         street_address: eventData.street_address || '',
         city: eventData.city || '',
         region: eventData.region || '',
@@ -185,7 +207,7 @@ export default function CreateTemplateScreen() {
     } catch {
       return initialFormState;
     }
-  }, [params.sourceEventData, initialFormState]);
+  }, [params.sourceEventData, params.sourceImages, initialFormState]);
 
   const formHasChanges = useMemo(
     () =>
@@ -256,6 +278,7 @@ export default function CreateTemplateScreen() {
           ...prev,
           title: eventData.title || '',
           description: eventData.description || '',
+          images: parseSourceImages(params.sourceImages),
           street_address: eventData.street_address || '',
           city: eventData.city || '',
           region: eventData.region || '',
@@ -274,7 +297,7 @@ export default function CreateTemplateScreen() {
         logger.error('Failed to parse sourceEventData:', { error: e });
       }
     }
-  }, [params.sourceEventData, params.suggestedName]);
+  }, [params.sourceEventData, params.sourceImages, params.suggestedName]);
 
   const handleBackPress = () => {
     handleCloseAttempt();
@@ -305,8 +328,9 @@ export default function CreateTemplateScreen() {
 
     setSubmitting(true);
     try {
-      // Build event_data from form (date/time/image/organizer fields are excluded
-      // — templates only carry static event metadata).
+      // Build event_data from form (date/time/organizer fields are excluded —
+      // templates only carry static event metadata; images are stored on the
+      // template record itself as image_urls, not inside event_data).
       const eventData: TemplateEventData = {};
 
       // organization_id is stored in event_data so it can pre-fill when creating events.
@@ -328,11 +352,16 @@ export default function CreateTemplateScreen() {
         if (form.help_description) eventData.help_description = form.help_description;
       }
 
+      // New picks are uploaded to hosted URLs first (the templates API is
+      // JSON-only); URLs kept from a past event pass through verbatim.
+      const imageUrls = await resolveImageUrls(form.images);
+
       await addTemplate({
         organization_id: effectiveOrgId,
         name: templateName.trim(),
         description: templateDescription.trim() || undefined,
         event_data: eventData,
+        image_urls: imageUrls.length ? imageUrls : undefined,
       });
 
       Alert.alert(t('common.success'), t('template.createdSuccess'));

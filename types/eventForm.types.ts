@@ -33,8 +33,8 @@ export interface EmptyFieldsState {
  * Mode for the EventForm component
  * - 'create-event': Creating a new event (default)
  * - 'edit-event': Editing an existing event
- * - 'create-template': Creating a new template (hides date/time and image)
- * - 'edit-template': Editing an existing template (hides date/time and image)
+ * - 'create-template': Creating a new template (hides date/time)
+ * - 'edit-template': Editing an existing template (hides date/time)
  */
 export type EventFormMode = 'create-event' | 'edit-event' | 'create-template' | 'edit-template';
 

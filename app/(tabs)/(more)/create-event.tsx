@@ -353,6 +353,10 @@ export default function CreateEventModal() {
             eventData.organization_id !== undefined
               ? eventData.organization_id
               : prevForm.organization_id,
+          // Template images are hosted URLs attached verbatim on create — the
+          // event gets its own list entries; the template's images are never
+          // consumed or moved.
+          images: template.image_urls?.length ? template.image_urls : prevForm.images,
           title: eventData.title !== undefined ? eventData.title : prevForm.title,
           description:
             eventData.description !== undefined ? eventData.description : prevForm.description,
@@ -472,14 +476,10 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
-      // On create every entry is a freshly picked file; URL strings can't occur
-      // (there is no existing event to keep images from).
-      const imageFiles = trimmedForm.images.filter(
-        (img): img is PickedImage => typeof img === 'object' && img !== null
-      );
-
       // Backend handles image upload, geocoding, URL validation, category
       // formatting; it also fills in organizer_id and organizer_name from the JWT.
+      // images may mix freshly picked files with hosted URL strings (template
+      // images on create-from-template), attached verbatim by the service.
       const resultCreateEvent = await createEventBackend({
         organization_id: effectiveOrgId,
         title: trimmedForm.title,
@@ -491,7 +491,7 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
-        images: imageFiles.length ? imageFiles : undefined, // Omitted → backend uses default
+        images: trimmedForm.images.length ? trimmedForm.images : undefined, // Omitted → backend uses default
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories, // Service normalizes string -> string[]
         disclaimer: trimmedForm.disclaimer || undefined,
@@ -571,10 +571,6 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
-      const imageFiles = trimmedForm.images.filter(
-        (img): img is PickedImage => typeof img === 'object' && img !== null
-      );
-
       await createDraftEvent({
         organization_id: effectiveOrgId,
         title: trimmedForm.title,
@@ -586,7 +582,7 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
-        images: imageFiles.length ? imageFiles : undefined,
+        images: trimmedForm.images.length ? trimmedForm.images : undefined,
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories,
         disclaimer: trimmedForm.disclaimer || undefined,

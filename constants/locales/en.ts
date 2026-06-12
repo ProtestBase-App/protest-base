@@ -147,6 +147,8 @@ const en: LocaleData = {
       'Save your event details as a reusable template to speed up future event creation.',
     eventDetailsSection: 'Event Details to Save',
     eventDetailsHelper: 'Fill in the event details you want to reuse. All fields are optional.',
+    imageHelper:
+      'Add up to 5 images — they are saved with this template and added to events you create from it',
 
     // Field labels
     nameLabel: 'Template Name *',
@@ -517,7 +519,6 @@ const en: LocaleData = {
     locationSection: 'LOCATION',
     additionalInfo: 'Additional Information',
     mediaAndAdditionalDetails: 'MEDIA & ADDITIONAL DETAILS',
-    additionalDetails: 'ADDITIONAL DETAILS',
 
     // Field Labels
     title: 'Title',
@@ -633,7 +634,7 @@ const en: LocaleData = {
     permissionRequired: 'Permission Required',
     photoPermissionMessage: 'Please grant photo library access to add images to your event.',
     imagePickerError: 'Failed to select image. Please try again.',
-    maxImagesReached: 'You can add up to {{max}} images per event.',
+    maxImagesReached: 'You can add up to {{max}} images.',
     missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 
