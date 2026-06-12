@@ -6,7 +6,7 @@
  */
 
 import * as ImagePicker from 'expo-image-picker';
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 import { logger } from '@/utils/logger';

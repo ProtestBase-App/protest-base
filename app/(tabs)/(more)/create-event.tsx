@@ -369,8 +369,8 @@ export default function CreateEventModal() {
           categories: Array.isArray(eventData.categories)
             ? eventData.categories.join(',')
             : eventData.categories !== undefined
-            ? eventData.categories
-            : prevForm.categories,
+              ? eventData.categories
+              : prevForm.categories,
           disclaimer:
             eventData.disclaimer !== undefined ? eventData.disclaimer : prevForm.disclaimer,
           co_organizers: eventData.co_organizers ?? prevForm.co_organizers,

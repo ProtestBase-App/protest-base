@@ -23,8 +23,8 @@ export default function TemplateCardItem({ template, onPress }: TemplateCardItem
   const categories = Array.isArray(event_data.categories)
     ? event_data.categories
     : event_data.categories
-    ? [event_data.categories]
-    : [];
+      ? [event_data.categories]
+      : [];
   const firstCategory = categories[0];
 
   return (

@@ -66,8 +66,8 @@ function createShareMessage(
     cityLabel && event.postal_code
       ? `📍 ${cityLabel}, ${event.postal_code}`
       : event.postal_code
-      ? `📍 ${event.postal_code}`
-      : '';
+        ? `📍 ${event.postal_code}`
+        : '';
 
   const eventDetails = `📣 ${event.title}\n\n📅 ${formattedEvent.start_time}${
     locationLine ? `\n${locationLine}` : ''

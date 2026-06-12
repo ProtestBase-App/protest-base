@@ -482,8 +482,8 @@ export default function SignIn() {
                               resetCooldownRemaining > 0
                                 ? t('auth.tryAgainIn', { seconds: resetCooldownRemaining })
                                 : isSubmittingReset
-                                ? t('auth.resetPasswordSending')
-                                : t('auth.resetPasswordSend')
+                                  ? t('auth.resetPasswordSending')
+                                  : t('auth.resetPasswordSend')
                             }
                             handlePress={handleResetPassword}
                             containerStyles={styles.modalButtonSendContainer}

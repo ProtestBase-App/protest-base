@@ -192,12 +192,12 @@ export default function CalendarGrid({
                         isSelected
                           ? styles.dayTextSelected
                           : day.isToday
-                          ? [styles.dayTextToday, { color: themeColors.tint }]
-                          : !day.isCurrentMonth
-                          ? [styles.dayTextOutOfMonth, { color: themeColors.placeholder }]
-                          : hasEvents
-                          ? [styles.dayTextHasEvents, { color: themeColors.text }]
-                          : [styles.dayTextDefault, { color: themeColors.secondaryText }],
+                            ? [styles.dayTextToday, { color: themeColors.tint }]
+                            : !day.isCurrentMonth
+                              ? [styles.dayTextOutOfMonth, { color: themeColors.placeholder }]
+                              : hasEvents
+                                ? [styles.dayTextHasEvents, { color: themeColors.text }]
+                                : [styles.dayTextDefault, { color: themeColors.secondaryText }],
                       ]}
                     >
                       {day.day}

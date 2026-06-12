@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { StyleSheet, ScrollView, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useLocalSearchParams, router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { Redirect, useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { usePastEvents } from '@/context/PastEventsProvider';

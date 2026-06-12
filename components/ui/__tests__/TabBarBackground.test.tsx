@@ -1,5 +1,5 @@
 // Mock dependencies BEFORE imports
-jest.mock('@react-navigation/bottom-tabs', () => ({
+jest.mock('expo-router/js-tabs', () => ({
   useBottomTabBarHeight: jest.fn(() => 80),
 }));
 
@@ -28,7 +28,7 @@ const TabBarBackgroundAndroid = require('../TabBarBackground.tsx');
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 describe('TabBarBackground', () => {

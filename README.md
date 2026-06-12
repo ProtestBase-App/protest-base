@@ -1,9 +1,9 @@
 # ProtestBase
 
 [![CI](https://github.com/ProtestBase-App/protest-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ProtestBase-App/protest-base/actions/workflows/ci.yml)
-[![Expo SDK](https://img.shields.io/badge/Expo-SDK%2055-blue)](https://expo.dev)
-[![React Native](https://img.shields.io/badge/React%20Native-0.83-61dafb)](https://reactnative.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6)](https://www.typescriptlang.org)
+[![Expo SDK](https://img.shields.io/badge/Expo-SDK%2056-blue)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.85-61dafb)](https://reactnative.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)](https://www.typescriptlang.org)
 
 A mobile app that helps people discover and organize protest events in Belgium and the Netherlands. Available on iOS and Android.
 
@@ -82,10 +82,10 @@ This is an unusual choice for an app distributed through the Play Store. We made
 
 | Category    | Technology                                                                                                           |
 | ----------- | -------------------------------------------------------------------------------------------------------------------- |
-| Framework   | [Expo SDK 55](https://expo.dev)                                                                                      |
-| UI          | [React Native 0.83](https://reactnative.dev)                                                                         |
-| Navigation  | [Expo Router 6](https://docs.expo.dev/router/introduction/)                                                          |
-| Language    | [TypeScript 5.9](https://www.typescriptlang.org)                                                                     |
+| Framework   | [Expo SDK 56](https://expo.dev)                                                                                      |
+| UI          | [React Native 0.85](https://reactnative.dev)                                                                         |
+| Navigation  | [Expo Router 56](https://docs.expo.dev/router/introduction/) (SDK-aligned versioning)                                |
+| Language    | [TypeScript 6.0](https://www.typescriptlang.org)                                                                     |
 | State       | React Context API                                                                                                    |
 | HTTP        | [Axios](https://axios-http.com) + custom install-token interceptors                                                  |
 | Maps        | [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) + [OpenFreeMap](https://openfreemap.org)  |

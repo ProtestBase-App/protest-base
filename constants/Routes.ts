@@ -56,7 +56,7 @@ export const DynamicRoutes = {
     ({
       pathname: '/organizer/[id]' as '/event/[id]',
       params: { id },
-    } as const),
+    }) as const,
 };
 
 export const RelativeRoutes = {

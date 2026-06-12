@@ -7,6 +7,12 @@
  */
 module.exports = {
   preset: 'jest-expo',
+  // Must match jest.config.js: Jest CONCATENATES preset setupFiles with config
+  // setupFiles, so this APPENDS jest.streams-fix.js after the jest-expo preset
+  // setup. Omitting it made CI run without the axios fetch-adapter workaround
+  // that local runs had — on jest-expo 56 that divergence breaks suites with
+  // partial react-native mocks.
+  setupFiles: ['<rootDir>/jest.streams-fix.js'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
   testMatch: [
@@ -38,7 +44,7 @@ module.exports = {
   testPathIgnorePatterns: ['/node_modules/', '\\.bak'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|i18n-js|make-plural)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|@sentry/react-native|native-base|react-native-svg|i18n-js|make-plural|standard-navigation)',
   ],
 
   // No coverage collection in CI for speed

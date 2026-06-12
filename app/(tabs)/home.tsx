@@ -521,8 +521,8 @@ export default function HomeTab() {
                   const labelColor = isTodayGroup
                     ? themeColors.tint
                     : isWeekend
-                    ? themeColors.text
-                    : themeColors.secondaryText;
+                      ? themeColors.text
+                      : themeColors.secondaryText;
                   return (
                     <View key={dateKey}>
                       <View style={styles.agendaDayHeader}>

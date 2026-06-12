@@ -3,14 +3,14 @@
  */
 
 import * as ImagePicker from 'expo-image-picker';
-import * as Calendar from 'expo-calendar';
+import * as Calendar from 'expo-calendar/legacy';
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 import { logger } from '../logger';
 
 // Mock dependencies
 jest.mock('expo-image-picker');
-jest.mock('expo-calendar');
+jest.mock('expo-calendar/legacy');
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   PermissionStatus: {
