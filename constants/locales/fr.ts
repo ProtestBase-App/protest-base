@@ -344,7 +344,6 @@ const fr: LocaleData = {
     myEvents: 'Mes événements',
     draftEvents: 'Événements brouillons',
     draftEventsEmpty: 'Aucun événement brouillon pour le moment',
-    eventTemplates: "Modèles d'événements",
     becomeOrganizer: 'Devenir organisateur',
     giveFeedback: 'Donner un avis',
     about: 'À propos',
@@ -668,6 +667,36 @@ const fr: LocaleData = {
     listHeaderPast: 'Vos événements passés',
     listHeaderAll: 'Tous vos événements',
 
+    // Upcoming timeline (organizer redesign)
+    today: "Aujourd'hui",
+    nowLabel: 'Live',
+    nextUp: 'À suivre',
+    startsIn: {
+      minutes: 'commence dans {{count}} min',
+      hours: 'commence dans {{count}} h',
+      days: {
+        one: 'commence dans {{count}} jour',
+        other: 'commence dans {{count}} jours',
+      },
+    },
+    nextUpSimultaneous: '{{count}} événements à {{time}}',
+    // French keeps the noun singular after zero, but the default i18n-js
+    // pluralizer maps 0 to 'other' — the explicit 'zero' variant wins.
+    eventCount: {
+      zero: '{{count}} événement',
+      one: '{{count}} événement',
+      other: '{{count}} événements',
+    },
+    noLocationSet: 'aucun lieu défini',
+    addLocation: 'Ajouter un lieu',
+    viewsPill: {
+      zero: '{{formatted}} vue',
+      one: '{{formatted}} vue',
+      other: '{{formatted}} vues',
+    },
+    emptyUpcomingHelp: "Les événements que vous publiez apparaîtront ici jusqu'à leur fin.",
+    viewPastEvents: 'Voir les événements passés',
+
     // Subtitles
     eventsScheduled: '{{count}} événements programmés',
     completedEvents: '{{count}} événements terminés',
@@ -677,26 +706,29 @@ const fr: LocaleData = {
   // Templates - Event template management
   // ============================================
   templates: {
-    title: "Modèles d'événements",
-    emptyTitle: 'Aucun modèle pour le moment',
-    emptyDescription:
-      "Créez des modèles d'événements réutilisables pour gagner du temps lors de l'organisation d'événements similaires.",
-    createButton: 'Créer un modèle',
-    fromPastEvent: "Créer à partir d'un événement passé",
     editTemplate: 'Modifier le modèle',
     deleteTemplate: 'Supprimer le modèle',
-    useTemplate: 'Utiliser le modèle',
     confirmDelete:
       'Êtes-vous sûr de vouloir supprimer ce modèle ? Cette action ne peut pas être annulée.',
-    // Additional keys for event-templates screen
-    noTemplatesAvailable: 'Aucun modèle disponible',
-    selectionEmptyDescription:
-      "Vous n'avez pas encore de modèles. Créez-en un maintenant pour accélérer la création de vos événements.",
-    createNewTemplate: 'Créer un nouveau modèle',
     loadingTemplates: 'Chargement des modèles',
     loadError: 'Échec du chargement des modèles',
-    chooseTemplate: 'Choisir un modèle',
     loadingTemplate: 'Chargement du modèle...',
+
+    // Launchpad redesign (June 2026)
+    subtitle: 'Créez un nouvel événement en quelques secondes',
+    newTemplateTile: 'Nouveau modèle',
+    newTemplateTileSub: 'Enregistrez les détails une fois, réutilisez-les à chaque fois',
+    newEventAction: 'Nouvel événement',
+    duplicate: 'Dupliquer',
+    copySuffix: '{{name}} (copie)',
+    tileMenu: 'Options du modèle',
+    reusePastEvent: 'Réutiliser un événement passé',
+    orReusePastEvent: 'Ou réutilisez un événement passé',
+    use: 'Utiliser',
+    using: 'En cours…',
+    placeholderCard: 'Vos modèles enregistrés apparaîtront ici',
+    hintDefault: 'Touchez un modèle pour créer un événement avec ses détails préremplis.',
+    hintEmpty: 'Utiliser un événement passé crée automatiquement un modèle.',
   },
 
   // ============================================
@@ -1196,6 +1228,42 @@ const fr: LocaleData = {
     deleteConfirmTitle: 'Supprimer le brouillon ?',
     deleteConfirmMessage:
       'Ce brouillon sera définitivement supprimé. Cette action est irréversible.',
+
+    // Drafts list redesign (June 2026)
+    draftCount: {
+      zero: '{{count}} brouillon',
+      one: '{{count}} brouillon',
+      other: '{{count}} brouillons',
+    },
+    // Plural object: the adjective agrees with the draft count ("1 brouillon ·
+    // visible…" / "2 brouillons · visibles…"); en/nl are number-invariant.
+    onlyVisibleToYou: {
+      one: 'visible uniquement par vous',
+      other: 'visibles uniquement par vous',
+    },
+    untitled: 'Brouillon sans titre',
+    editedJustNow: "Modifié à l'instant",
+    editedMinutesAgo: 'Modifié il y a {{count}} min',
+    editedHoursAgo: 'Modifié il y a {{count}} h',
+    editedYesterday: 'Modifié hier',
+    editedDaysAgo: 'Modifié il y a {{count}} jours',
+    editedWeeksAgo: {
+      one: 'Modifié il y a {{count}} semaine',
+      other: 'Modifié il y a {{count}} semaines',
+    },
+    readyToPublish: 'Prêt à publier',
+    missingFields: 'Manquant : {{fields}}',
+    fieldDescription: 'description',
+    fieldCategory: 'catégorie',
+    fieldLocation: 'lieu',
+    fieldDate: 'date',
+    pastDateWarning: 'Date passée — choisissez une nouvelle date pour publier',
+    continueEditing: 'Continuer la modification',
+    sortHint:
+      'Les brouillons sont triés par dernière modification. Balayez une carte pour la supprimer.',
+    emptyTitle: 'Aucun brouillon',
+    emptyHelp:
+      'Commencez à créer un événement et enregistrez-le comme brouillon pour le terminer plus tard.',
   },
 
   // ============================================

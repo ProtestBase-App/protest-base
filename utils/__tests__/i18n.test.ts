@@ -228,6 +228,42 @@ describe('i18n Configuration', () => {
       });
     });
   });
+
+  describe('Upcoming timeline keys (organizer redesign)', () => {
+    it('renders French zero counts in the singular via the zero variant', () => {
+      // The default i18n-js pluralizer maps 0 to 'other' (English rules);
+      // French grammar needs the singular, supplied by an explicit 'zero' key.
+      setLocale('fr');
+      expect(t('myEvents.eventCount', { count: 0 })).toBe('0 événement');
+      expect(t('myEvents.viewsPill', { count: 0, formatted: '0' })).toBe('0 vue');
+    });
+
+    it('pluralizes event counts per locale', () => {
+      setLocale('en');
+      expect(t('myEvents.eventCount', { count: 1 })).toBe('1 event');
+      expect(t('myEvents.eventCount', { count: 33 })).toBe('33 events');
+      setLocale('nl');
+      expect(t('myEvents.eventCount', { count: 2 })).toBe('2 evenementen');
+    });
+
+    it('resolves every startsIn unit key in every locale', () => {
+      const units = ['minutes', 'hours', 'days'] as const;
+      for (const locale of ['en', 'fr', 'nl'] as const) {
+        setLocale(locale);
+        for (const unit of units) {
+          const result = t(`myEvents.startsIn.${unit}`, { count: 2 });
+          expect(result).not.toBe(`myEvents.startsIn.${unit}`);
+          expect(result).toContain('2');
+        }
+      }
+    });
+
+    it('formats the views pill with the compact value', () => {
+      setLocale('en');
+      expect(t('myEvents.viewsPill', { count: 1240, formatted: '1.2k' })).toBe('1.2k views');
+      expect(t('myEvents.viewsPill', { count: 1, formatted: '1' })).toBe('1 view');
+    });
+  });
 });
 
 /**

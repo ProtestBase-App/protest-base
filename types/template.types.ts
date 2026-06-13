@@ -113,6 +113,9 @@ export interface PastEventForTemplate {
   city?: string | null;
   // First category for badge display.
   firstCategory?: string;
+  // Source event's organization, so the auto-created template is attributed to
+  // the right org (extractTemplateData does not carry organization_id).
+  organizationId?: string;
   templateData: TemplateEventData;
   // Hosted image URLs from the source event, offered as template images.
   images?: string[];

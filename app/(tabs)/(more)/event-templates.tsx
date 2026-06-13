@@ -1,307 +1,364 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { router, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedView } from '@/components/ThemedView';
+import { router, useFocusEffect } from 'expo-router';
+
+import TemplateActionsMenu from '@/components/TemplateActionsMenu';
+import TemplatePastEventRow from '@/components/TemplatePastEventRow';
+import {
+  TemplateLaunchTile,
+  TemplateMenuAnchor,
+  TemplateNewTile,
+  TemplatePlaceholderTile,
+} from '@/components/TemplateTiles';
 import { ThemedText } from '@/components/ThemedText';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { ThemedView } from '@/components/ThemedView';
+import { BrandHeader } from '@/components/ui/BrandHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
-import EmptyTemplateState from '@/components/EmptyTemplateState';
-import TemplateList from '@/components/TemplateList';
-import PastEventsCarousel from '@/components/PastEventsCarousel';
-import CustomButton from '@/components/CustomButton';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useTemplates } from '@/context/TemplatesProvider';
+import { GroupLabelRow } from '@/components/ui/GroupLabelRow';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { PillButton } from '@/components/ui/PillButton';
+import { Spacing, Typography } from '@/constants/DesignTokens';
+import { DynamicRoutes, Routes } from '@/constants/Routes';
 import { usePastEvents } from '@/context/PastEventsProvider';
+import { useTemplates } from '@/context/TemplatesProvider';
+import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { ParsedEventTemplate, PastEventForTemplate } from '@/types/template.types';
-import { Spacing, BorderRadius, Typography, IconSizes } from '@/constants/DesignTokens';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { extractTemplateData, formatPastEventDate } from '@/utils/templateUtils';
-import { Routes, DynamicRoutes } from '@/constants/Routes';
+import { getEditedAgoParts, sortDraftsByLastEdited } from '@/utils/draftStatusUtils';
 import { t } from '@/utils/i18n';
+import { extractTemplateData, formatPastEventDate } from '@/utils/templateUtils';
+import { getThemeColors } from '@/utils/themeColors';
 
-type ScreenState = 'loading' | 'error' | 'empty' | 'success';
+/** How many past events the reuse section offers (matches the old carousel). */
+const PAST_EVENTS_SHOWN = 10;
 
-interface SelectionModeEmptyStateProps {
-  onGoBack: () => void;
-  onCreateTemplate: () => void;
-}
+/** Backend caps template names at 100 chars; reserve room for the copy suffix. */
+const TEMPLATE_NAME_MAX = 100;
+const DUPLICATE_SUFFIX_RESERVE = 12;
 
-function SelectionModeEmptyState({ onGoBack, onCreateTemplate }: SelectionModeEmptyStateProps) {
-  const iconContainerBg = useThemeColor({ light: '#F3F4F6', dark: '#27272A' }, 'background');
-  const iconColor = useThemeColor({ light: '#9CA3AF', dark: '#71717A' }, 'icon');
-  const subtitleColor = useThemeColor({ light: '#6B7280', dark: '#9CA3AF' }, 'text');
-  const borderColor = useThemeColor({ light: '#D1D5DB', dark: '#3F3F46' }, 'background');
-
-  return (
-    <ThemedView style={[selectionEmptyStyles.container, { borderColor }]}>
-      <View style={[selectionEmptyStyles.iconContainer, { backgroundColor: iconContainerBg }]}>
-        <IconSymbol name="rectangle.stack" size={IconSizes['2xl']} color={iconColor} />
-      </View>
-
-      <ThemedText type="subtitleBold" style={selectionEmptyStyles.title}>
-        {t('templates.noTemplatesAvailable')}
-      </ThemedText>
-
-      <ThemedText type="default" style={[selectionEmptyStyles.subtitle, { color: subtitleColor }]}>
-        {t('templates.selectionEmptyDescription')}
-      </ThemedText>
-
-      <CustomButton
-        testID="btn-create-template"
-        title={t('templates.createNewTemplate')}
-        handlePress={onCreateTemplate}
-        containerStyles={selectionEmptyStyles.primaryButton}
-        isLoading={false}
-      />
-
-      <CustomButton
-        title={t('common.goBack')}
-        handlePress={onGoBack}
-        containerStyles={[
-          selectionEmptyStyles.secondaryButton,
-          { backgroundColor: 'transparent', borderWidth: 1, borderColor: borderColor },
-        ]}
-        textStyles={{ color: subtitleColor }}
-        isLoading={false}
-      />
-    </ThemedView>
-  );
-}
-
-const selectionEmptyStyles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing['3xl'],
-    paddingHorizontal: Spacing.xl,
-    marginVertical: Spacing.xl,
-    marginHorizontal: Spacing.md,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: BorderRadius.lg,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xl,
-  },
-  title: {
-    fontSize: Typography.sizes.xl,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: Spacing['2xl'],
-    paddingHorizontal: Spacing.lg,
-    opacity: 0.9,
-  },
-  primaryButton: {
-    minWidth: 260,
-    marginBottom: Spacing.md,
-  },
-  secondaryButton: {
-    minWidth: 260,
-  },
-});
+type GridItem =
+  | { kind: 'new'; key: string }
+  | { kind: 'placeholder'; key: string }
+  | { kind: 'spacer'; key: string }
+  | { kind: 'template'; key: string; template: ParsedEventTemplate };
 
 export default function EventTemplatesScreen() {
-  const params = useLocalSearchParams<{ mode?: string }>();
-  const isSelectionMode = params.mode === 'selection';
-
-  // Use cached providers instead of direct API calls
   const {
     templates,
     loading: templatesLoading,
     error: templatesError,
     refreshTemplates,
+    addTemplate,
+    removeTemplate,
     isStale: isTemplatesStale,
   } = useTemplates();
-
   const {
     pastEvents,
     loading: pastEventsLoading,
     refreshPastEvents,
     isStale: isPastEventsStale,
   } = usePastEvents();
+  const { userOrganizations } = useUserOrganizations();
+  const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [menuFor, setMenuFor] = useState<{
+    template: ParsedEventTemplate;
+    anchor: TemplateMenuAnchor;
+  } | null>(null);
+  // One template/use mutation at a time; ref twin guards Alert callbacks.
+  const [usingEventId, setUsingEventId] = useState<string | null>(null);
+  const mutationBusyRef = useRef(false);
+  // Recency labels re-anchor whenever the screen refreshes.
+  const [now, setNow] = useState(() => new Date());
 
-  // Derive screen state from provider states
-  const screenState: ScreenState = useMemo(() => {
-    if (templatesLoading && templates.length === 0) return 'loading';
-    if (templatesError && templates.length === 0) return 'error';
-    if (templates.length === 0) return 'empty';
-    return 'success';
-  }, [templatesLoading, templatesError, templates.length]);
+  // Only refresh stale caches when the screen gains focus (5-minute TTL).
+  useFocusEffect(
+    useCallback(() => {
+      setNow(new Date());
+      if (isTemplatesStale()) {
+        refreshTemplates();
+      }
+      if (isPastEventsStale()) {
+        refreshPastEvents();
+      }
+    }, [isTemplatesStale, isPastEventsStale, refreshTemplates, refreshPastEvents])
+  );
 
-  // Format past events for the carousel (derived from cached data)
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setNow(new Date());
+    try {
+      await Promise.all([refreshTemplates(), refreshPastEvents()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshTemplates, refreshPastEvents]);
+
+  // Design rule: templates sorted by last used. The backend has no usage
+  // tracking yet, so last edited is the closest available recency signal.
+  const gridItems = useMemo((): GridItem[] => {
+    const sorted = sortDraftsByLastEdited(templates);
+    const items: GridItem[] = [{ kind: 'new', key: 'new-template' }];
+    if (sorted.length === 0) {
+      items.push({ kind: 'placeholder', key: 'placeholder' });
+    } else {
+      items.push(
+        ...sorted.map((template) => ({
+          kind: 'template' as const,
+          key: template.$id,
+          template,
+        }))
+      );
+    }
+    // Keep the last tile half-width when the count is odd.
+    if (items.length % 2 === 1) {
+      items.push({ kind: 'spacer', key: 'spacer' });
+    }
+    return items;
+  }, [templates]);
+
   const formattedPastEvents: PastEventForTemplate[] = useMemo(() => {
-    return pastEvents.slice(0, 10).map((event) => ({
+    return pastEvents.slice(0, PAST_EVENTS_SHOWN).map((event) => ({
       $id: event.$id,
       title: event.title,
       formattedDate: formatPastEventDate(event.start_time),
       city: event.city,
       firstCategory: event.categories?.[0],
+      organizationId: event.organization_id,
       templateData: extractTemplateData(event),
       images: event.images?.length ? event.images : undefined,
     }));
   }, [pastEvents]);
 
-  // Only refresh if cache is stale when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      // Only refresh if cache is stale (older than 5 minutes)
-      if (isTemplatesStale()) {
-        refreshTemplates();
-      }
-      if (!isSelectionMode && isPastEventsStale()) {
-        refreshPastEvents();
-      }
-    }, [isTemplatesStale, isPastEventsStale, refreshTemplates, refreshPastEvents, isSelectionMode])
-  );
+  const fallbackOrganizationId = userOrganizations[0]?.$id;
 
-  const handleRetry = () => {
-    refreshTemplates();
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        refreshTemplates(),
-        !isSelectionMode ? refreshPastEvents() : Promise.resolve(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handleCreateTemplate = () => {
-    router.push(Routes.CREATE_TEMPLATE);
-  };
-
-  const handleSelectPastEvent = useCallback((event: PastEventForTemplate) => {
+  const handleLaunchTemplate = useCallback((template: ParsedEventTemplate) => {
     router.push({
-      pathname: Routes.CREATE_TEMPLATE,
-      params: {
-        sourceEventData: JSON.stringify(event.templateData),
-        sourceEventId: event.$id,
-        suggestedName: `Template: ${event.title}`,
-        // The event's hosted image URLs become editable template images.
-        ...(event.images?.length ? { sourceImages: JSON.stringify(event.images) } : {}),
-      },
+      pathname: Routes.CREATE_EVENT,
+      params: { templateId: template.$id, source: 'template' },
     });
   }, []);
 
-  // Footer component for past events carousel
-  const renderFooter = useCallback(() => {
-    if (isSelectionMode) return null;
-    if (formattedPastEvents.length === 0 && !pastEventsLoading) return null;
+  const handleCreateTemplate = useCallback(() => {
+    router.push(Routes.CREATE_TEMPLATE);
+  }, []);
 
-    return (
-      <PastEventsCarousel
-        events={formattedPastEvents}
-        onSelectEvent={handleSelectPastEvent}
-        loading={pastEventsLoading}
-      />
-    );
-  }, [isSelectionMode, formattedPastEvents, pastEventsLoading, handleSelectPastEvent]);
+  const handleOpenMenu = useCallback(
+    (template: ParsedEventTemplate, anchor: TemplateMenuAnchor) => {
+      setMenuFor({ template, anchor });
+    },
+    []
+  );
 
-  const handleTemplatePress = (template: ParsedEventTemplate) => {
-    if (isSelectionMode) {
-      // In selection mode, navigate to create event with template ID
-      router.push({
-        pathname: Routes.CREATE_EVENT,
-        params: {
-          templateId: template.$id,
-          source: 'template',
-        },
-      });
-    } else {
-      // In management mode, navigate to edit template screen
-      router.push(DynamicRoutes.editTemplate(template.$id));
+  const handleMenuEdit = useCallback(() => {
+    if (!menuFor) return;
+    setMenuFor(null);
+    router.push(DynamicRoutes.editTemplate(menuFor.template.$id));
+  }, [menuFor]);
+
+  const handleMenuDuplicate = useCallback(async () => {
+    if (!menuFor || mutationBusyRef.current) return;
+    const { template } = menuFor;
+    setMenuFor(null);
+
+    const organizationId = template.event_data.organization_id ?? fallbackOrganizationId;
+    if (!organizationId) {
+      Alert.alert(t('common.error'), t('templates.loadError'));
+      return;
     }
-  };
 
-  const renderContent = () => {
-    switch (screenState) {
-      case 'loading':
-        return <LoadingState accessibilityLabel={t('templates.loadingTemplates')} />;
+    // Trim the base name so "{name} (copy)" stays under the backend's 100-char
+    // cap (which would otherwise reject the duplicate outright).
+    const baseName =
+      template.name.length > TEMPLATE_NAME_MAX - DUPLICATE_SUFFIX_RESERVE
+        ? template.name.slice(0, TEMPLATE_NAME_MAX - DUPLICATE_SUFFIX_RESERVE).trimEnd()
+        : template.name;
 
-      case 'error':
-        return (
-          <ThemedView style={styles.errorContainer}>
-            <ErrorState message={templatesError || t('templates.loadError')} />
-            <CustomButton
-              title={t('common.tryAgain')}
-              handlePress={handleRetry}
-              isLoading={false}
-              containerStyles={styles.retryButton}
-            />
-          </ThemedView>
-        );
+    mutationBusyRef.current = true;
+    try {
+      await addTemplate({
+        organization_id: organizationId,
+        name: t('templates.copySuffix', { name: baseName }),
+        description: template.description,
+        event_data: template.event_data,
+        image_urls: template.image_urls ?? [],
+      });
+    } catch (err) {
+      Alert.alert(t('common.error'), (err as Error).message);
+    } finally {
+      mutationBusyRef.current = false;
+    }
+  }, [menuFor, fallbackOrganizationId, addTemplate]);
 
-      case 'empty':
-        if (isSelectionMode) {
-          // Show simpler empty state in selection mode with back navigation
+  const handleMenuDelete = useCallback(() => {
+    if (!menuFor) return;
+    const { template } = menuFor;
+    setMenuFor(null);
+    Alert.alert(t('templates.deleteTemplate'), t('templates.confirmDelete'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          if (mutationBusyRef.current) return;
+          mutationBusyRef.current = true;
+          try {
+            await removeTemplate(template.$id);
+          } catch (err) {
+            Alert.alert(t('common.error'), (err as Error).message);
+          } finally {
+            mutationBusyRef.current = false;
+          }
+        },
+      },
+    ]);
+  }, [menuFor, removeTemplate]);
+
+  // Design rule: using a past event creates a template from it automatically,
+  // then opens Create Event pre-filled from that template.
+  const handleUsePastEvent = useCallback(
+    async (event: PastEventForTemplate) => {
+      if (mutationBusyRef.current) return;
+      // Attribute the auto-created template to the source event's own org.
+      const organizationId =
+        event.organizationId ?? event.templateData.organization_id ?? fallbackOrganizationId;
+      if (!organizationId) {
+        Alert.alert(t('common.error'), t('templates.loadError'));
+        return;
+      }
+
+      mutationBusyRef.current = true;
+      setUsingEventId(event.$id);
+      try {
+        const created = await addTemplate({
+          organization_id: organizationId,
+          name: event.title,
+          event_data: event.templateData,
+          image_urls: event.images ?? [],
+        });
+        router.push({
+          pathname: Routes.CREATE_EVENT,
+          params: { templateId: created.$id, source: 'template' },
+        });
+      } catch (err) {
+        Alert.alert(t('common.error'), (err as Error).message);
+      } finally {
+        mutationBusyRef.current = false;
+        setUsingEventId(null);
+      }
+    },
+    [fallbackOrganizationId, addTemplate]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: GridItem }) => {
+      switch (item.kind) {
+        case 'new':
+          return <TemplateNewTile onPress={handleCreateTemplate} />;
+        case 'placeholder':
+          return <TemplatePlaceholderTile />;
+        case 'spacer':
+          return <View style={styles.spacer} />;
+        case 'template': {
+          const editedParts = getEditedAgoParts(item.template, now);
           return (
-            <SelectionModeEmptyState
-              onGoBack={() => router.back()}
-              onCreateTemplate={() => {
-                router.push(Routes.CREATE_TEMPLATE);
-              }}
+            <TemplateLaunchTile
+              template={item.template}
+              editedLabel={editedParts ? t(editedParts.key, { count: editedParts.count }) : ''}
+              onLaunch={() => handleLaunchTemplate(item.template)}
+              onOpenMenu={(anchor) => handleOpenMenu(item.template, anchor)}
+              disabled={usingEventId !== null}
             />
           );
         }
-        return (
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollViewContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <EmptyTemplateState
-              onCreateTemplate={handleCreateTemplate}
-              showFromPastEvent={formattedPastEvents.length > 0}
-            />
-            {renderFooter()}
-          </ScrollView>
-        );
+      }
+    },
+    [handleCreateTemplate, handleLaunchTemplate, handleOpenMenu, now, usingEventId]
+  );
 
-      case 'success':
-        return (
-          <TemplateList
-            templates={templates}
-            onTemplatePress={handleTemplatePress}
-            onCreateTemplate={handleCreateTemplate}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            ListFooterComponent={renderFooter()}
+  const renderFooter = useCallback(() => {
+    const hasTemplates = templates.length > 0;
+    const showPast = formattedPastEvents.length > 0;
+    return (
+      <View>
+        {showPast && (
+          <GroupLabelRow
+            label={hasTemplates ? t('templates.reusePastEvent') : t('templates.orReusePastEvent')}
           />
-        );
+        )}
+        {showPast &&
+          formattedPastEvents.map((event) => (
+            <TemplatePastEventRow
+              key={event.$id}
+              event={event}
+              onUse={() => handleUsePastEvent(event)}
+              using={usingEventId === event.$id}
+              disabled={usingEventId !== null}
+            />
+          ))}
+        {/* "Tap a template…" once templates exist; the past-event hint when
+            there are only past events; nothing when there's neither. */}
+        {(hasTemplates || showPast) && (
+          <ThemedText style={[styles.hint, { color: themeColors.subtleText }]}>
+            {hasTemplates ? t('templates.hintDefault') : t('templates.hintEmpty')}
+          </ThemedText>
+        )}
+      </View>
+    );
+  }, [templates.length, formattedPastEvents, usingEventId, handleUsePastEvent, themeColors]);
 
-      default:
-        return null;
-    }
-  };
+  const showLoading = templatesLoading && templates.length === 0;
+  const showError = !showLoading && !!templatesError && templates.length === 0;
 
   return (
-    <ThemedView style={styles.wrapper} lightColor="#FFFFFF">
-      {/* Dynamic header title based on mode */}
-      <Stack.Screen
-        options={{
-          headerTitle: isSelectionMode ? t('templates.chooseTemplate') : t('templates.title'),
-        }}
-      />
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <ThemedView style={styles.container} lightColor="#FFFFFF">
-          {renderContent()}
+    <ThemedView style={styles.wrapper}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ThemedView style={styles.container}>
+          <BrandHeader title={t('more.templates')} subtitle={t('templates.subtitle')} />
+
+          {showLoading ? (
+            <LoadingState accessibilityLabel={t('templates.loadingTemplates')} />
+          ) : showError ? (
+            <View style={styles.errorContainer}>
+              <ErrorState message={templatesError || t('templates.loadError')} />
+              <PillButton
+                label={t('common.tryAgain')}
+                onPress={refreshTemplates}
+                style={styles.retryButton}
+              />
+            </View>
+          ) : (
+            <FlatList
+              data={gridItems}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.key}
+              numColumns={2}
+              columnWrapperStyle={styles.gridRow}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={themeColors.tint}
+                />
+              }
+              ListFooterComponent={renderFooter}
+              extraData={pastEventsLoading}
+            />
+          )}
+
+          <TemplateActionsMenu
+            visible={menuFor !== null}
+            anchor={menuFor?.anchor ?? null}
+            onClose={() => setMenuFor(null)}
+            onEdit={handleMenuEdit}
+            onDuplicate={handleMenuDuplicate}
+            onDelete={handleMenuDelete}
+          />
         </ThemedView>
       </SafeAreaView>
     </ThemedView>
@@ -318,6 +375,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gridRow: {
+    gap: 10,
+    paddingHorizontal: Spacing.lg,
+  },
+  listContent: {
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing['3xl'] + Spacing.bottomTabOffset,
+    rowGap: 10,
+  },
+  spacer: {
+    flex: 1,
+  },
+  hint: {
+    fontSize: Typography.sizes.xs,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingTop: Spacing.sm,
+    paddingHorizontal: 44,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -328,13 +404,5 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: Spacing.xl,
     minWidth: 150,
-    marginBottom: Spacing.xl,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    paddingBottom: Spacing['3xl'],
   },
 });

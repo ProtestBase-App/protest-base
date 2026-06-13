@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
 import { t } from '@/utils/i18n';
 
 export default function MoreLayout() {
@@ -83,25 +82,10 @@ export default function MoreLayout() {
             headerTitle: t('more.becomeOrganizer'),
           }}
         />
-        <Stack.Screen
-          name="event-templates"
-          options={{
-            headerShown: true,
-            headerBackVisible: true,
-            headerTitle: t('more.eventTemplates'),
-            contentStyle: {
-              backgroundColor: colorScheme === 'dark' ? Colors.dark.background : '#FFFFFF',
-            },
-          }}
-        />
-        <Stack.Screen
-          name="draft-events"
-          options={{
-            headerShown: true,
-            headerBackVisible: true,
-            headerTitle: t('more.draftEvents'),
-          }}
-        />
+        {/* The templates launchpad renders its own brand header (June 2026 redesign). */}
+        <Stack.Screen name="event-templates" options={{ headerShown: false }} />
+        {/* The drafts list renders its own brand header (June 2026 redesign). */}
+        <Stack.Screen name="draft-events" options={{ headerShown: false }} />
         <Stack.Screen
           name="create-template"
           options={{

@@ -1,101 +1,149 @@
 // Mock dependencies BEFORE imports
+
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn().mockReturnValue('light'),
 }));
 
 jest.mock('@/utils/i18n', () => ({
-  t: jest.fn((key) => key),
+  t: jest.fn((key: string, params?: Record<string, unknown>) => {
+    if (params && typeof params.name === 'string') {
+      return `${params.name} (copy)`;
+    }
+    return key;
+  }),
 }));
 
 jest.mock('@/utils/templateUtils', () => ({
-  extractTemplateData: jest.fn(),
-  formatPastEventDate: jest.fn((date) => date),
+  extractTemplateData: jest.fn((event: any) => ({
+    organization_id: event.organization_id,
+    title: event.title,
+    city: event.city,
+  })),
+  formatPastEventDate: jest.fn((date: string) => date),
 }));
 
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
+jest.mock('@/utils/draftStatusUtils', () => ({
+  sortDraftsByLastEdited: jest.fn((items: any[]) =>
+    [...items].sort((a, b) => {
+      const aMs = new Date(a.$updatedAt || a.$createdAt || 0).getTime();
+      const bMs = new Date(b.$updatedAt || b.$createdAt || 0).getTime();
+      return bMs - aMs;
+    })
+  ),
+  getEditedAgoParts: jest.fn(() => null),
+}));
+
+jest.mock('@/utils/themeColors', () => ({
+  getThemeColors: jest.fn(() => ({
+    tint: '#F94460',
+    text: '#000000',
+    secondaryText: '#666666',
+    subtleText: '#999999',
+    cardBackground: '#FFFFFF',
+    cardBorder: '#E5E5E5',
+    inputBorder: '#CCCCCC',
+    surfaceBackground: '#F5F5F5',
+    surfaceAltBackground: '#FFFFFF',
+    separator: '#E5E5E5',
+    border: '#E5E5E5',
+  })),
 }));
 
 import React from 'react';
+import { Alert } from 'react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '@/test-utils/render';
 import EventTemplatesScreen from '../(tabs)/(more)/event-templates';
-import { fireEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
+import { t } from '@/utils/i18n';
 
-// Import router for mock access
-const { useLocalSearchParams, router } = require('expo-router');
+const mockedT = t as jest.MockedFunction<typeof t>;
+const mockedRouter = router as jest.Mocked<typeof router>;
+
+// ---------------------------------------------------------------------------
+// Shared fixtures
+// ---------------------------------------------------------------------------
+
+const makeTemplate = (
+  overrides: Partial<{
+    $id: string;
+    name: string;
+    $updatedAt: string;
+    $createdAt: string;
+    event_data: Record<string, unknown>;
+    image_urls: string[];
+  }> = {}
+) => ({
+  $id: 'template-1',
+  $createdAt: '2025-01-01T10:00:00.000Z',
+  $updatedAt: '2025-01-01T10:00:00.000Z',
+  name: 'Test Template',
+  description: 'A description',
+  organizer_id: 'user-1',
+  event_data: { organization_id: 'org-1', categories: ['protest'], title: 'Test Event' },
+  image_urls: [],
+  ...overrides,
+});
+
+const makePastEvent = (
+  overrides: Partial<{
+    $id: string;
+    title: string;
+    start_time: string;
+    city: string;
+    categories: string[];
+    organization_id: string;
+    images: string[];
+  }> = {}
+) => ({
+  $id: 'past-event-1',
+  title: 'Past Rally',
+  start_time: '2024-06-01T10:00:00.000Z',
+  city: 'Brussels',
+  categories: ['protest'],
+  organization_id: 'org-1',
+  images: [],
+  ...overrides,
+});
 
 describe('EventTemplatesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    useLocalSearchParams.mockReturnValue({});
+    // Default t mock — return the key
+    mockedT.mockImplementation((key: string, params?: Record<string, unknown>) => {
+      if (params && typeof params.name === 'string') {
+        return `${params.name} (copy)`;
+      }
+      return key;
+    });
   });
 
-  describe('Template List Display', () => {
-    it('should render template list when templates exist', () => {
-      const mockTemplates = [
-        {
-          $id: 'template-1',
-          name: 'Test Template 1',
-          description: 'Description 1',
-          organization_id: 'org-1',
-          event_data: { title: 'Event 1' },
-          $createdAt: '2025-01-01',
-          $updatedAt: '2025-01-01',
-        },
-        {
-          $id: 'template-2',
-          name: 'Test Template 2',
-          description: 'Description 2',
-          organization_id: 'org-2',
-          event_data: { title: 'Event 2' },
-          $createdAt: '2025-01-02',
-          $updatedAt: '2025-01-02',
-        },
-      ];
+  // -------------------------------------------------------------------------
+  // Header
+  // -------------------------------------------------------------------------
 
-      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
-          templatesContext: {
-            templates: mockTemplates,
-            loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-        },
-      });
+  describe('Header', () => {
+    it('renders the title from more.templates and subtitle from templates.subtitle', () => {
+      const { getByText } = renderWithProviders(<EventTemplatesScreen />);
 
-      expect(getByText('Test Template 1')).toBeTruthy();
-      expect(getByText('Test Template 2')).toBeTruthy();
+      // t() returns the key for mocked i18n
+      expect(getByText('more.templates')).toBeTruthy();
+      expect(getByText('templates.subtitle')).toBeTruthy();
     });
+  });
 
-    it('should render loading state when loading templates', () => {
+  // -------------------------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------------------------
+
+  describe('Loading state', () => {
+    it('renders LoadingState when templates are loading and list is empty', () => {
       const { getByLabelText } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
           templatesContext: {
             templates: [],
             loading: true,
             error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
           },
         },
       });
@@ -103,304 +151,368 @@ describe('EventTemplatesScreen', () => {
       expect(getByLabelText('templates.loadingTemplates')).toBeTruthy();
     });
 
-    it('should render error state when templates fail to load', () => {
-      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
+    it('does not render LoadingState when templates exist even if still loading', () => {
+      const template = makeTemplate();
+      const { queryByLabelText, getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
           templatesContext: {
-            templates: [],
-            loading: false,
-            error: 'Failed to load templates',
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-        },
-      });
-
-      expect(getByText('Failed to load templates')).toBeTruthy();
-    });
-
-    it('should render empty state when no templates exist', () => {
-      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
-          templatesContext: {
-            templates: [],
-            loading: false,
+            templates: [template],
+            loading: true,
             error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
           },
         },
       });
 
-      // Check for empty state message from EmptyTemplateState component
-      expect(getByText('templates.emptyTitle')).toBeTruthy();
+      expect(queryByLabelText('templates.loadingTemplates')).toBeNull();
+      expect(getByTestId('template-new-tile')).toBeTruthy();
     });
   });
 
-  describe('Selection Mode', () => {
-    beforeEach(() => {
-      useLocalSearchParams.mockReturnValue({ mode: 'selection' });
-    });
+  // -------------------------------------------------------------------------
+  // Error state
+  // -------------------------------------------------------------------------
 
-    it('should render selection mode empty state when no templates', () => {
+  describe('Error state', () => {
+    it('renders the error message when templatesError is set and list is empty', () => {
       const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
           templatesContext: {
             templates: [],
             loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
+            error: 'Network failure',
           },
         },
       });
 
-      expect(getByText('templates.noTemplatesAvailable')).toBeTruthy();
-      expect(getByText('templates.selectionEmptyDescription')).toBeTruthy();
+      expect(getByText('Network failure')).toBeTruthy();
     });
 
-    it('should navigate back when back button pressed in selection mode empty state', () => {
+    it('renders a Try Again button that calls refreshTemplates', () => {
+      const mockRefresh = jest.fn();
       const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
           templatesContext: {
             templates: [],
             loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
+            error: 'Network failure',
+            refreshTemplates: mockRefresh,
           },
         },
       });
 
-      const backButton = getByText('common.goBack');
-      fireEvent.press(backButton);
-
-      expect(router.back).toHaveBeenCalled();
+      fireEvent.press(getByText('common.tryAgain'));
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
 
-    it('should navigate to create template when create button pressed in selection mode', () => {
-      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
+    it('does not render the error panel when templates exist', () => {
+      const template = makeTemplate();
+      const { queryByText } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
           templatesContext: {
-            templates: [],
+            templates: [template],
             loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
+            error: 'Some error',
           },
         },
       });
 
-      const createButton = getByText('templates.createNewTemplate');
-      fireEvent.press(createButton);
-
-      expect(router.push).toHaveBeenCalledWith(expect.stringContaining('create-template'));
+      expect(queryByText('common.tryAgain')).toBeNull();
     });
   });
 
-  describe('Navigation', () => {
-    it('should navigate to edit template when template pressed in management mode', () => {
-      const mockTemplate = {
-        $id: 'template-1',
-        name: 'Test Template',
-        description: 'Description',
+  // -------------------------------------------------------------------------
+  // Grid: New template tile
+  // -------------------------------------------------------------------------
+
+  describe('New template tile', () => {
+    it('always renders the new-template tile (testID template-new-tile)', () => {
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />);
+      expect(getByTestId('template-new-tile')).toBeTruthy();
+    });
+
+    it('navigates to Routes.CREATE_TEMPLATE when the new-template tile is pressed', () => {
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />);
+      fireEvent.press(getByTestId('template-new-tile'));
+      expect(mockedRouter.push).toHaveBeenCalledWith('/create-template');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Grid: Placeholder tile (empty templates)
+  // -------------------------------------------------------------------------
+
+  describe('Placeholder tile (empty templates)', () => {
+    it('renders the placeholder card text when there are no templates', () => {
+      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [], loading: false, error: null },
+        },
+      });
+
+      expect(getByText('templates.placeholderCard')).toBeTruthy();
+    });
+
+    it('does not render the placeholder when templates exist', () => {
+      const template = makeTemplate();
+      const { queryByText } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [template], loading: false, error: null },
+        },
+      });
+
+      expect(queryByText('templates.placeholderCard')).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Grid: Template launch tiles
+  // -------------------------------------------------------------------------
+
+  describe('Template launch tiles', () => {
+    it('renders a tile per template using testID template-tile-<id>', () => {
+      const t1 = makeTemplate({ $id: 'tmpl-1', name: 'Alpha' });
+      const t2 = makeTemplate({ $id: 'tmpl-2', name: 'Beta' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [t1, t2], loading: false, error: null },
+        },
+      });
+
+      expect(getByTestId('template-tile-tmpl-1')).toBeTruthy();
+      expect(getByTestId('template-tile-tmpl-2')).toBeTruthy();
+    });
+
+    it('renders templates sorted by $updatedAt descending (most recent first)', () => {
+      const older = makeTemplate({
+        $id: 'tmpl-older',
+        name: 'Older Template',
+        $updatedAt: '2025-01-01T10:00:00.000Z',
+      });
+      const newer = makeTemplate({
+        $id: 'tmpl-newer',
+        name: 'Newer Template',
+        $updatedAt: '2025-06-01T10:00:00.000Z',
+      });
+
+      const { getAllByText } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          // Pass older first — sort should flip them
+          templatesContext: { templates: [older, newer], loading: false, error: null },
+        },
+      });
+
+      const newerText = getAllByText('Newer Template');
+      const olderText = getAllByText('Older Template');
+      expect(newerText.length).toBeGreaterThan(0);
+      expect(olderText.length).toBeGreaterThan(0);
+    });
+
+    it('navigates to create-event with templateId and source=template when tile body is pressed', () => {
+      const template = makeTemplate({ $id: 'tmpl-abc' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [template], loading: false, error: null },
+        },
+      });
+
+      fireEvent.press(getByTestId('template-tile-tmpl-abc'));
+      expect(mockedRouter.push).toHaveBeenCalledWith({
+        pathname: '/create-event',
+        params: { templateId: 'tmpl-abc', source: 'template' },
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Past-event rows
+  // -------------------------------------------------------------------------
+
+  describe('Past-event rows', () => {
+    it('renders past event rows with testID past-event-row-<id>', () => {
+      const event = makePastEvent({ $id: 'past-1' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          pastEventsContext: {
+            pastEvents: [event as any],
+            loading: false,
+          },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      expect(getByTestId('past-event-row-past-1')).toBeTruthy();
+    });
+
+    it('renders a Use pill with testID past-event-use-<id> for each past event', () => {
+      const event = makePastEvent({ $id: 'past-2' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          pastEventsContext: {
+            pastEvents: [event as any],
+            loading: false,
+          },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      expect(getByTestId('past-event-use-past-2')).toBeTruthy();
+    });
+
+    it('calls addTemplate with correct payload and navigates to create-event on Use press', async () => {
+      const createdTemplate = makeTemplate({ $id: 'created-tmpl-99' });
+      const mockAddTemplate = jest.fn().mockResolvedValue(createdTemplate);
+      const event = makePastEvent({
+        $id: 'past-3',
+        title: 'Past Rally',
         organization_id: 'org-1',
-        event_data: { title: 'Event 1' },
-        $createdAt: '2025-01-01',
-        $updatedAt: '2025-01-01',
-      };
+      });
 
-      const { getByLabelText } = renderWithProviders(<EventTemplatesScreen />, {
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
-          templatesContext: {
-            templates: [mockTemplate],
-            loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
           pastEventsContext: {
-            pastEvents: [],
+            pastEvents: [event as any],
             loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
           },
-        },
-      });
-
-      const templateCard = getByLabelText('Template: Test Template, Description');
-      fireEvent.press(templateCard);
-
-      expect(router.push).toHaveBeenCalledWith({
-        pathname: '/edit-template/[id]',
-        params: { id: 'template-1' },
-      });
-    });
-
-    it('should navigate to create event when template pressed in selection mode', () => {
-      useLocalSearchParams.mockReturnValue({ mode: 'selection' });
-
-      const mockTemplate = {
-        $id: 'template-1',
-        name: 'Test Template',
-        description: 'Description',
-        organization_id: 'org-1',
-        event_data: { title: 'Event 1' },
-        $createdAt: '2025-01-01',
-        $updatedAt: '2025-01-01',
-      };
-
-      const { getByLabelText } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
-          templatesContext: {
-            templates: [mockTemplate],
-            loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-        },
-      });
-
-      const templateCard = getByLabelText('Template: Test Template, Description');
-      fireEvent.press(templateCard);
-
-      expect(router.push).toHaveBeenCalledWith({
-        pathname: expect.stringContaining('create-event'),
-        params: {
-          templateId: 'template-1',
-          source: 'template',
-        },
-      });
-    });
-
-    it('should navigate to create template when create button pressed', () => {
-      const mockTemplates = [
-        {
-          $id: 'template-1',
-          name: 'Test Template 1',
-          description: 'Description 1',
-          organization_id: 'org-1',
-          event_data: { title: 'Event 1' },
-          $createdAt: '2025-01-01',
-          $updatedAt: '2025-01-01',
-        },
-      ];
-
-      const { getByLabelText } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
-          templatesContext: {
-            templates: mockTemplates,
-            loading: false,
-            error: null,
-            refreshTemplates: jest.fn(),
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
-          },
-        },
-      });
-
-      const createButton = getByLabelText('Create new template');
-      fireEvent.press(createButton);
-
-      expect(router.push).toHaveBeenCalledWith(expect.stringContaining('create-template'));
-    });
-  });
-
-  describe('Refresh', () => {
-    it('should call retry when error retry button pressed', () => {
-      const mockRefreshTemplates = jest.fn();
-
-      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
           templatesContext: {
             templates: [],
             loading: false,
-            error: 'Failed to load templates',
-            refreshTemplates: mockRefreshTemplates,
-            addTemplate: jest.fn(),
-            editTemplate: jest.fn(),
-            removeTemplate: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
+            error: null,
+            addTemplate: mockAddTemplate,
           },
-          pastEventsContext: {
-            pastEvents: [],
-            loading: false,
-            refreshPastEvents: jest.fn(),
-            isStale: jest.fn().mockReturnValue(false),
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
           },
         },
       });
 
-      const retryButton = getByText('common.tryAgain');
-      fireEvent.press(retryButton);
+      fireEvent.press(getByTestId('past-event-use-past-3'));
 
-      expect(mockRefreshTemplates).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockAddTemplate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organization_id: 'org-1',
+            name: 'Past Rally',
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(mockedRouter.push).toHaveBeenCalledWith({
+          pathname: '/create-event',
+          params: { templateId: 'created-tmpl-99', source: 'template' },
+        });
+      });
+    });
+
+    it('calls Alert.alert with error message when addTemplate rejects on Use press', async () => {
+      const mockAddTemplate = jest.fn().mockRejectedValue(new Error('Server error'));
+      const event = makePastEvent({ $id: 'past-4', organization_id: 'org-1' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          pastEventsContext: {
+            pastEvents: [event as any],
+            loading: false,
+          },
+          templatesContext: {
+            templates: [],
+            loading: false,
+            error: null,
+            addTemplate: mockAddTemplate,
+          },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      fireEvent.press(getByTestId('past-event-use-past-4'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('common.error', 'Server error');
+      });
+
+      // No navigation should happen
+      expect(mockedRouter.push).not.toHaveBeenCalled();
+    });
+
+    it('does not navigate if addTemplate rejects', async () => {
+      const mockAddTemplate = jest.fn().mockRejectedValue(new Error('Oops'));
+      const event = makePastEvent({ $id: 'past-5', organization_id: 'org-1' });
+
+      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          pastEventsContext: {
+            pastEvents: [event as any],
+            loading: false,
+          },
+          templatesContext: {
+            templates: [],
+            loading: false,
+            error: null,
+            addTemplate: mockAddTemplate,
+          },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      fireEvent.press(getByTestId('past-event-use-past-5'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalled();
+      });
+
+      expect(mockedRouter.push).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Past-event section header label
+  // -------------------------------------------------------------------------
+
+  describe('Past-event section header', () => {
+    it('shows "Or reuse a past event" variant when there are no templates', () => {
+      const event = makePastEvent({ $id: 'past-header-1' });
+
+      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [], loading: false, error: null },
+          pastEventsContext: { pastEvents: [event as any], loading: false },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      // t() returns the key; templates.orReusePastEvent is used when empty
+      expect(getByText('templates.orReusePastEvent')).toBeTruthy();
+    });
+
+    it('shows "Reuse a past event" variant when templates exist', () => {
+      const template = makeTemplate({ $id: 'tmpl-x' });
+      const event = makePastEvent({ $id: 'past-header-2' });
+
+      const { getByText } = renderWithProviders(<EventTemplatesScreen />, {
+        providerOverrides: {
+          templatesContext: { templates: [template], loading: false, error: null },
+          pastEventsContext: { pastEvents: [event as any], loading: false },
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1' }] as any[],
+          },
+        },
+      });
+
+      expect(getByText('templates.reusePastEvent')).toBeTruthy();
     });
   });
 });

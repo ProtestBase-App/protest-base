@@ -64,10 +64,7 @@ export default function CreateEventOptionsScreen() {
   };
 
   const handleUseTemplate = () => {
-    router.push({
-      pathname: Routes.EVENT_TEMPLATES,
-      params: { mode: 'selection' },
-    });
+    router.push(Routes.EVENT_TEMPLATES);
   };
 
   return (

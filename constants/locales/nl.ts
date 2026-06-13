@@ -359,7 +359,6 @@ const nl = {
     myEvents: 'Mijn evenementen',
     draftEvents: 'Concept-evenementen',
     draftEventsEmpty: 'Nog geen concept-evenementen',
-    eventTemplates: 'Evenementsjablonen',
     becomeOrganizer: 'Word organisator',
     giveFeedback: 'Feedback geven',
     about: 'Over',
@@ -718,6 +717,32 @@ const nl = {
     listHeaderPast: 'Jouw afgelopen evenementen',
     listHeaderAll: 'Al jouw evenementen',
 
+    // Upcoming timeline (organizer redesign)
+    today: 'Vandaag',
+    nowLabel: 'Nu',
+    nextUp: 'Hierna',
+    startsIn: {
+      minutes: 'begint over {{count}} min',
+      hours: 'begint over {{count}} u',
+      days: {
+        one: 'begint over {{count}} dag',
+        other: 'begint over {{count}} dagen',
+      },
+    },
+    nextUpSimultaneous: '{{count}} evenementen om {{time}}',
+    eventCount: {
+      one: '{{count}} evenement',
+      other: '{{count}} evenementen',
+    },
+    noLocationSet: 'geen locatie ingesteld',
+    addLocation: 'Locatie toevoegen',
+    viewsPill: {
+      one: '{{formatted}} weergave',
+      other: '{{formatted}} weergaven',
+    },
+    emptyUpcomingHelp: 'Evenementen die je publiceert verschijnen hier totdat ze zijn afgelopen.',
+    viewPastEvents: 'Bekijk afgelopen evenementen',
+
     // Subtitles
     eventsScheduled: '{{count}} evenementen gepland',
     completedEvents: '{{count}} voltooide evenementen',
@@ -727,13 +752,7 @@ const nl = {
   // Event Templates
   // ============================================
   templates: {
-    title: 'Evenementsjablonen',
-    emptyTitle: 'Nog geen sjablonen',
-    emptyDescription: 'Maak herbruikbare sjablonen om sneller evenementen aan te maken',
-    createButton: 'Sjabloon aanmaken',
-    fromPastEvent: 'Van een eerder evenement',
     fromScratch: 'Vanaf nul',
-    useTemplate: 'Sjabloon gebruiken',
     editTemplate: 'Sjabloon bewerken',
     deleteTemplate: 'Sjabloon verwijderen',
     deleteConfirm: 'Weet je zeker dat je dit sjabloon wilt verwijderen?',
@@ -750,14 +769,28 @@ const nl = {
     loadingTemplates: 'Sjablonen laden...',
     createFromEvent: 'Aanmaken van evenement',
     templateSaved: 'Opgeslagen als sjabloon',
-    // Additional keys for event-templates screen
-    noTemplatesAvailable: 'Geen sjablonen beschikbaar',
-    selectionEmptyDescription:
-      'Je hebt nog geen sjablonen. Maak er nu een om sneller evenementen aan te maken.',
-    createNewTemplate: 'Nieuw sjabloon aanmaken',
     loadError: 'Kon sjablonen niet laden',
-    chooseTemplate: 'Kies een sjabloon',
     loadingTemplate: 'Sjabloon laden...',
+    // en/fr use confirmDelete for this dialog; nl only had the shorter
+    // deleteConfirm, which silently fell back to English.
+    confirmDelete:
+      'Weet je zeker dat je dit sjabloon wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.',
+
+    // Launchpad redesign (June 2026)
+    subtitle: 'Start een nieuw evenement in enkele seconden',
+    newTemplateTile: 'Nieuw sjabloon',
+    newTemplateTileSub: 'Sla details één keer op en hergebruik ze elke keer',
+    newEventAction: 'Nieuw evenement',
+    duplicate: 'Dupliceren',
+    copySuffix: '{{name}} (kopie)',
+    tileMenu: 'Sjabloonopties',
+    reusePastEvent: 'Een eerder evenement hergebruiken',
+    orReusePastEvent: 'Of hergebruik een eerder evenement',
+    use: 'Gebruiken',
+    using: 'Bezig…',
+    placeholderCard: 'Je opgeslagen sjablonen verschijnen hier',
+    hintDefault: 'Tik op een sjabloon om een evenement met vooraf ingevulde details aan te maken.',
+    hintEmpty: 'Een eerder evenement gebruiken maakt er automatisch een sjabloon van.',
   },
 
   // ============================================
@@ -1486,6 +1519,34 @@ const nl = {
     deleteConfirmTitle: 'Concept verwijderen?',
     deleteConfirmMessage:
       'Dit concept wordt definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt.',
+
+    // Drafts list redesign (June 2026)
+    draftCount: {
+      one: '{{count}} concept',
+      other: '{{count}} concepten',
+    },
+    onlyVisibleToYou: 'alleen zichtbaar voor jou',
+    untitled: 'Naamloos concept',
+    editedJustNow: 'Zojuist bewerkt',
+    editedMinutesAgo: '{{count}} min geleden bewerkt',
+    editedHoursAgo: '{{count}} u geleden bewerkt',
+    editedYesterday: 'Gisteren bewerkt',
+    editedDaysAgo: '{{count}} dagen geleden bewerkt',
+    editedWeeksAgo: {
+      one: '{{count}} week geleden bewerkt',
+      other: '{{count}} weken geleden bewerkt',
+    },
+    readyToPublish: 'Klaar om te publiceren',
+    missingFields: 'Ontbreekt: {{fields}}',
+    fieldDescription: 'beschrijving',
+    fieldCategory: 'categorie',
+    fieldLocation: 'locatie',
+    fieldDate: 'datum',
+    pastDateWarning: 'Datum is verstreken — kies een nieuwe datum om te publiceren',
+    continueEditing: 'Verder bewerken',
+    sortHint: 'Concepten zijn gesorteerd op laatst bewerkt. Veeg een kaart om te verwijderen.',
+    emptyTitle: 'Geen concepten',
+    emptyHelp: 'Begin een evenement te maken en sla het op als concept om het later af te werken.',
   },
 
   // ============================================
