@@ -63,6 +63,9 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
     // "En cours" (in-progress) badge — live green, identical in both themes.
     live: '#3DBE7B',
     liveBg: 'rgba(61, 190, 123, 0.14)',
+    // Card outline for ongoing rows on the upcoming timeline (~27% alpha,
+    // matching the CategoryColors border convention).
+    liveBorder: 'rgba(61, 190, 123, 0.27)',
 
     icon: c.icon,
 

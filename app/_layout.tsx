@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { logger } from '@/utils/logger';
 import GlobalProvider, { useGlobalContext } from '@/context/GlobalProvider';
@@ -24,7 +25,7 @@ import { ConnectionGate } from '@/components/connection';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -77,54 +78,64 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
-      {/* This ensures version check happens BEFORE authentication */}
-      <VersionCheckProvider>
-        <VersionGate>
-          {/* IntegrityGate runs after the version check (which uses /app/config */}
-          {/* on the bootstrap path) but before GlobalProvider so the install token */}
-          {/* exists for every authenticated request. */}
-          <IntegrityProvider>
-            <IntegrityGate>
-              <GlobalProvider>
-                <ConnectionGate>
-                  <UserOrganizationsProvider>
-                    <SavedEventsProvider>
-                      <LikedEventsProvider>
-                        <FollowedOrgsProvider>
-                          <PastEventsProvider>
-                            <TemplatesProvider>
-                              <OrganizationsProvider>
-                                <PostalCodeProvider>
-                                  <ThemeProvider
-                                    value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-                                  >
-                                    <ExploreTabProvider>
-                                      <NotificationsBootstrap />
-                                      <RootNavigator />
-                                      <StatusBar
-                                        style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                      />
-                                    </ExploreTabProvider>
-                                  </ThemeProvider>
-                                </PostalCodeProvider>
-                              </OrganizationsProvider>
-                            </TemplatesProvider>
-                          </PastEventsProvider>
-                        </FollowedOrgsProvider>
-                      </LikedEventsProvider>
-                    </SavedEventsProvider>
-                  </UserOrganizationsProvider>
-                </ConnectionGate>
-              </GlobalProvider>
-            </IntegrityGate>
-          </IntegrityProvider>
-        </VersionGate>
-      </VersionCheckProvider>
-    </SafeAreaProvider>
+    // Required ancestor for react-native-gesture-handler gestures (e.g. the
+    // drafts list's swipe-to-delete); renders as a plain View otherwise.
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <SafeAreaProvider>
+        {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
+        {/* This ensures version check happens BEFORE authentication */}
+        <VersionCheckProvider>
+          <VersionGate>
+            {/* IntegrityGate runs after the version check (which uses /app/config */}
+            {/* on the bootstrap path) but before GlobalProvider so the install token */}
+            {/* exists for every authenticated request. */}
+            <IntegrityProvider>
+              <IntegrityGate>
+                <GlobalProvider>
+                  <ConnectionGate>
+                    <UserOrganizationsProvider>
+                      <SavedEventsProvider>
+                        <LikedEventsProvider>
+                          <FollowedOrgsProvider>
+                            <PastEventsProvider>
+                              <TemplatesProvider>
+                                <OrganizationsProvider>
+                                  <PostalCodeProvider>
+                                    <ThemeProvider
+                                      value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+                                    >
+                                      <ExploreTabProvider>
+                                        <NotificationsBootstrap />
+                                        <RootNavigator />
+                                        <StatusBar
+                                          style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                        />
+                                      </ExploreTabProvider>
+                                    </ThemeProvider>
+                                  </PostalCodeProvider>
+                                </OrganizationsProvider>
+                              </TemplatesProvider>
+                            </PastEventsProvider>
+                          </FollowedOrgsProvider>
+                        </LikedEventsProvider>
+                      </SavedEventsProvider>
+                    </UserOrganizationsProvider>
+                  </ConnectionGate>
+                </GlobalProvider>
+              </IntegrityGate>
+            </IntegrityProvider>
+          </VersionGate>
+        </VersionCheckProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
+});
 
 function RootNavigator() {
   const { isLogged } = useGlobalContext();

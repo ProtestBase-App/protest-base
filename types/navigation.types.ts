@@ -12,14 +12,6 @@
 export type CreateEventOptionsScreenParams = undefined;
 
 /**
- * Parameters for the Event Templates screen.
- * @property mode - 'management' for viewing/editing templates, 'selection' for picking a template to create an event
- */
-export type EventTemplatesScreenParams = {
-  mode?: 'management' | 'selection';
-};
-
-/**
  * Parameters for the Create Event screen.
  * @property templateId - Optional template ID to pre-fill the form with template data
  * @property source - Indicates how the user arrived at this screen (for analytics/UX)
@@ -39,4 +31,6 @@ export type CreateTemplateSearchParams = {
   sourceEventId?: string;
   /** Pre-fill template name suggestion (e.g., "From: Monthly Meetup") */
   suggestedName?: string;
+  /** JSON stringified array of hosted image URLs from the source event */
+  sourceImages?: string;
 };

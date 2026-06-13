@@ -51,6 +51,8 @@ interface UsePaginatedEventsReturn<T> {
   error: string | null;
   /** True if more items are available to load */
   hasMore: boolean;
+  /** Server-reported total number of matching events (0 until first fetch) */
+  total: number;
   /** Function to trigger pull-to-refresh */
   handleRefresh: () => void;
   /** Function to handle infinite scroll (load more) */
@@ -100,6 +102,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(true);
+  const [total, setTotal] = useState<number>(0);
   const [offset, setOffset] = useState<number>(0);
 
   const loadingRef = useRef<boolean>(false);
@@ -155,6 +158,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
         const formattedEvents = formatFnRef.current(response.events);
 
         setEvents(formattedEvents);
+        setTotal(response.total);
         setOffset(pageSize);
 
         logger.debug(`[usePaginatedEvents] Fetch success`, {
@@ -196,6 +200,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
       });
 
       setEvents((prev) => [...prev, ...formattedEvents]);
+      setTotal(response.total);
       setOffset((prev) => prev + pageSize);
 
       setHasMore(currentOffset + pageSize < response.total);
@@ -244,6 +249,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
     loadingMore,
     error,
     hasMore,
+    total,
     handleRefresh,
     handleEndReached,
   };

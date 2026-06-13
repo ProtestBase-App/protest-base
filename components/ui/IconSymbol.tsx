@@ -58,6 +58,8 @@ const MAPPING = {
   'chart.line.uptrend.xyaxis': 'trending-up',
   'plus.circle': 'add-circle-outline',
   clock: 'schedule',
+  'clock.arrow.circlepath': 'history',
+  'bolt.fill': 'flash-on',
   'doc.text': 'description',
   flag: 'flag',
   'chevron.forward': 'chevron-right',

@@ -69,7 +69,7 @@ const EventForm: React.FC<EventFormProps> = ({
   const iconColor = isDark ? 'white' : 'black';
   const userLang = userLanguage;
 
-  // Template mode hides date/time and image fields.
+  // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
   const { dropdownItems: organizations, loading: organizationsLoading } = useOrganizations();
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
@@ -770,30 +770,24 @@ const EventForm: React.FC<EventFormProps> = ({
         </ThemedView>
       )}
 
-      <SectionHeader
-        title={
-          isTemplateMode
-            ? t('createEvent.additionalDetails')
-            : t('createEvent.mediaAndAdditionalDetails')
-        }
-        isDark={isDark}
-      />
+      <SectionHeader title={t('createEvent.mediaAndAdditionalDetails')} isDark={isDark} />
 
-      {!isTemplateMode && (
-        <ThemedView style={styles.uploadImageContainer}>
-          <ThemedView style={styles.imageTitleWrapper}>
-            <ThemedText style={styles.imageTitle}>
-              {t('createEvent.uploadImage')} (
-              {form.images.length > 0
-                ? `${form.images.length}/${MAX_EVENT_IMAGES}`
-                : t('common.optional')}
-              )
-            </ThemedText>
-          </ThemedView>
-          {renderImages()}
-          <HelperText text={t('createEvent.imageHelper')} isDark={isDark} />
+      <ThemedView style={styles.uploadImageContainer}>
+        <ThemedView style={styles.imageTitleWrapper}>
+          <ThemedText style={styles.imageTitle}>
+            {t('createEvent.uploadImage')} (
+            {form.images.length > 0
+              ? `${form.images.length}/${MAX_EVENT_IMAGES}`
+              : t('common.optional')}
+            )
+          </ThemedText>
         </ThemedView>
-      )}
+        {renderImages()}
+        <HelperText
+          text={isTemplateMode ? t('template.imageHelper') : t('createEvent.imageHelper')}
+          isDark={isDark}
+        />
+      </ThemedView>
 
       <FormField
         testID="input-event-website-url"

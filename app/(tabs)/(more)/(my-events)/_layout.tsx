@@ -13,14 +13,8 @@ export default function MyEventsLayout() {
           headerLeft: () => <HeaderBackButton />,
         }}
       />
-      <Stack.Screen
-        name="upcoming"
-        options={{
-          headerShown: true,
-          headerTitle: t('myEvents.listHeaderUpcoming'),
-          headerLeft: () => <HeaderBackButton />,
-        }}
-      />
+      {/* The upcoming timeline renders its own brand header (June 2026 redesign). */}
+      <Stack.Screen name="upcoming" options={{ headerShown: false }} />
       <Stack.Screen
         name="past"
         options={{

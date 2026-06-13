@@ -17,6 +17,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { getTemplate } from '@/services/template.service';
+import { resolveImageUrls } from '@/services/storage.service';
 import { useTemplates } from '@/context/TemplatesProvider';
 import { TemplateEventData } from '@/types/template.types';
 import CustomButton from '@/components/CustomButton';
@@ -40,6 +41,11 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
 
+// Order-sensitive (reorder counts as a change); entries compare by reference
+// (string equality for kept URLs).
+const areImageListsEqual = (a: FormState['images'], b: FormState['images']): boolean =>
+  a.length === b.length && a.every((img, idx) => img === b[idx]);
+
 const hasTemplateFormChanges = (
   current: FormState,
   initial: FormState,
@@ -53,6 +59,7 @@ const hasTemplateFormChanges = (
     currentTemplateDescription !== initialTemplateDescription ||
     current.title !== initial.title ||
     current.description !== initial.description ||
+    !areImageListsEqual(current.images, initial.images) ||
     current.street_address !== initial.street_address ||
     current.city !== initial.city ||
     current.region !== initial.region ||
@@ -192,7 +199,7 @@ export default function EditTemplateScreen() {
           organization_id: eventData.organization_id || '',
           title: eventData.title || '',
           description: eventData.description || '',
-          images: [],
+          images: fetchedTemplate.image_urls ?? [],
           street_address: eventData.street_address || '',
           city: eventData.city || '',
           region: eventData.region || '',
@@ -269,10 +276,15 @@ export default function EditTemplateScreen() {
         if (form.help_description) eventData.help_description = form.help_description;
       }
 
+      // Authoritative full list: kept URLs verbatim, new picks uploaded first.
+      // An empty array clears all template images.
+      const imageUrls = await resolveImageUrls(form.images);
+
       await editTemplate(templateId, {
         name: templateName.trim(),
         description: templateDescription.trim() || undefined,
         event_data: eventData,
+        image_urls: imageUrls,
       });
 
       Alert.alert(t('common.success'), t('template.updatedSuccess'));

@@ -56,17 +56,22 @@ function hasCategory(categories?: string | string[] | null): boolean {
   return hasNonEmpty(categories);
 }
 
-function isFutureStart(startTime?: string | null): boolean {
+function isFutureStart(startTime: string | null | undefined, now: Date): boolean {
   if (!hasNonEmpty(startTime)) return false;
   const date = parseAsUTC(startTime as string);
   if (Number.isNaN(date.getTime())) return false;
-  return date.getTime() > Date.now();
+  return date.getTime() > now.getTime();
 }
 
 /**
  * Return every publish-blocking issue at once (empty array means ready).
+ * Pass `now` to evaluate the future-start rule against a render-stable clock
+ * (e.g. the drafts list's per-refresh clock); it defaults to the current time.
  */
-export function getPublishIssues(input: PublishReadinessInput): PublishIssue[] {
+export function getPublishIssues(
+  input: PublishReadinessInput,
+  now: Date = new Date()
+): PublishIssue[] {
   const issues: PublishIssue[] = [];
 
   if (!hasNonEmpty(input.description)) {
@@ -93,7 +98,7 @@ export function getPublishIssues(input: PublishReadinessInput): PublishIssue[] {
     });
   }
 
-  if (!isFutureStart(input.start_time)) {
+  if (!isFutureStart(input.start_time, now)) {
     issues.push({
       field: 'start_time',
       code: 'START_TIME_FUTURE_REQUIRED',

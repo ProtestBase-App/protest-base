@@ -910,6 +910,42 @@ describe('event.service', () => {
       expect(payload.images).toBeUndefined();
     });
 
+    it('create: sends an all-URL images list as JSON (create-from-template)', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-tpl' } },
+      });
+
+      await createEventBackend({
+        ...baseCreate,
+        images: ['https://cdn.example.com/tpl1.jpg', 'https://cdn.example.com/tpl2.jpg'],
+      });
+
+      const [, payload, config]: any[] = mockApi.post.mock.calls[0];
+      expect(config.headers['Content-Type']).toBe('application/json');
+      expect(payload.images).toEqual([
+        'https://cdn.example.com/tpl1.jpg',
+        'https://cdn.example.com/tpl2.jpg',
+      ]);
+    });
+
+    it('create: interleaves kept URLs and "new" placeholders when the list mixes both', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-mixed' } },
+      });
+
+      await createEventBackend({
+        ...baseCreate,
+        images: ['https://cdn.example.com/tpl1.jpg', fileA],
+      });
+
+      const [, payload]: any[] = mockApi.post.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+
+      const parts = (payload as FormData).getAll('images');
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toBe('["https://cdn.example.com/tpl1.jpg","new"]');
+    });
+
     it('update: interleaves kept URLs and "new" placeholders in display order', async () => {
       mockApi.put.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'evt-1' } },

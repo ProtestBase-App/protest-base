@@ -147,6 +147,8 @@ const en: LocaleData = {
       'Save your event details as a reusable template to speed up future event creation.',
     eventDetailsSection: 'Event Details to Save',
     eventDetailsHelper: 'Fill in the event details you want to reuse. All fields are optional.',
+    imageHelper:
+      'Add up to 5 images — they are saved with this template and added to events you create from it',
 
     // Field labels
     nameLabel: 'Template Name *',
@@ -336,7 +338,6 @@ const en: LocaleData = {
     myEvents: 'My Events',
     draftEvents: 'Draft Events',
     draftEventsEmpty: 'No draft events yet',
-    eventTemplates: 'Event Templates',
     becomeOrganizer: 'Become an Organizer',
     giveFeedback: 'Give Feedback',
     about: 'About',
@@ -517,7 +518,6 @@ const en: LocaleData = {
     locationSection: 'LOCATION',
     additionalInfo: 'Additional Information',
     mediaAndAdditionalDetails: 'MEDIA & ADDITIONAL DETAILS',
-    additionalDetails: 'ADDITIONAL DETAILS',
 
     // Field Labels
     title: 'Title',
@@ -633,7 +633,7 @@ const en: LocaleData = {
     permissionRequired: 'Permission Required',
     photoPermissionMessage: 'Please grant photo library access to add images to your event.',
     imagePickerError: 'Failed to select image. Please try again.',
-    maxImagesReached: 'You can add up to {{max}} images per event.',
+    maxImagesReached: 'You can add up to {{max}} images.',
     missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 
@@ -647,8 +647,10 @@ const en: LocaleData = {
     all: 'All Events',
 
     // Empty States
-    emptyUpcoming: 'No Upcoming Events',
+    emptyUpcoming: 'No upcoming events',
     emptyUpcomingMessage: "You haven't created any upcoming events yet.",
+    emptyUpcomingHelp: 'Events you publish will show up here until they end.',
+    viewPastEvents: 'View past events',
     emptyPast: 'No Past Events',
     emptyPastMessage: "You don't have any past events.",
     emptyAll: 'No Events',
@@ -659,6 +661,30 @@ const en: LocaleData = {
     listHeaderPast: 'Your Past Events',
     listHeaderAll: 'All Your Events',
 
+    // Upcoming timeline (organizer redesign)
+    today: 'Today',
+    nowLabel: 'Now',
+    nextUp: 'Next up',
+    startsIn: {
+      minutes: 'starts in {{count}} min',
+      hours: 'starts in {{count}} h',
+      days: {
+        one: 'starts in {{count}} day',
+        other: 'starts in {{count}} days',
+      },
+    },
+    nextUpSimultaneous: '{{count}} events at {{time}}',
+    eventCount: {
+      one: '{{count}} event',
+      other: '{{count}} events',
+    },
+    noLocationSet: 'no location set',
+    addLocation: 'Add location',
+    viewsPill: {
+      one: '{{formatted}} view',
+      other: '{{formatted}} views',
+    },
+
     // Subtitles
     eventsScheduled: '{{count}} events scheduled',
     completedEvents: '{{count}} completed events',
@@ -668,25 +694,28 @@ const en: LocaleData = {
   // Templates - Event template management
   // ============================================
   templates: {
-    title: 'Event Templates',
-    emptyTitle: 'No Templates Yet',
-    emptyDescription:
-      'Create reusable event templates to save time when organizing similar events.',
-    createButton: 'Create Template',
-    fromPastEvent: 'Create from Past Event',
     editTemplate: 'Edit Template',
     deleteTemplate: 'Delete Template',
-    useTemplate: 'Use Template',
     confirmDelete: 'Are you sure you want to delete this template? This action cannot be undone.',
-    // Additional keys for event-templates screen
-    noTemplatesAvailable: 'No templates available',
-    selectionEmptyDescription:
-      "You don't have any templates yet. Create one now to speed up your event creation.",
-    createNewTemplate: 'Create new Template',
     loadingTemplates: 'Loading templates',
     loadError: 'Failed to load templates',
-    chooseTemplate: 'Choose a Template',
     loadingTemplate: 'Loading template...',
+
+    // Launchpad redesign (June 2026)
+    subtitle: 'Start a new event in seconds',
+    newTemplateTile: 'New template',
+    newTemplateTileSub: 'Save details once, reuse them every time',
+    newEventAction: 'New event',
+    duplicate: 'Duplicate',
+    copySuffix: '{{name}} (copy)',
+    tileMenu: 'Template options',
+    reusePastEvent: 'Reuse a past event',
+    orReusePastEvent: 'Or reuse a past event',
+    use: 'Use',
+    using: 'Using…',
+    placeholderCard: 'Your saved templates will appear here',
+    hintDefault: 'Tap a template to create an event with its details pre-filled.',
+    hintEmpty: 'Using a past event creates a template from it automatically.',
   },
 
   // ============================================
@@ -1174,6 +1203,34 @@ const en: LocaleData = {
     deleted: 'Draft deleted.',
     deleteConfirmTitle: 'Delete draft?',
     deleteConfirmMessage: 'This draft will be permanently deleted. This action cannot be undone.',
+
+    // Drafts list redesign (June 2026)
+    draftCount: {
+      one: '{{count}} draft',
+      other: '{{count}} drafts',
+    },
+    onlyVisibleToYou: 'only visible to you',
+    untitled: 'Untitled draft',
+    editedJustNow: 'Edited just now',
+    editedMinutesAgo: 'Edited {{count}} min ago',
+    editedHoursAgo: 'Edited {{count}} h ago',
+    editedYesterday: 'Edited yesterday',
+    editedDaysAgo: 'Edited {{count}} days ago',
+    editedWeeksAgo: {
+      one: 'Edited {{count}} week ago',
+      other: 'Edited {{count}} weeks ago',
+    },
+    readyToPublish: 'Ready to publish',
+    missingFields: 'Missing: {{fields}}',
+    fieldDescription: 'description',
+    fieldCategory: 'category',
+    fieldLocation: 'location',
+    fieldDate: 'date',
+    pastDateWarning: 'Date has passed — pick a new date to publish',
+    continueEditing: 'Continue editing',
+    sortHint: 'Drafts are sorted by last edited. Swipe a card to delete.',
+    emptyTitle: 'No drafts',
+    emptyHelp: 'Start creating an event and save it as a draft to finish later.',
   },
 
   // ============================================
