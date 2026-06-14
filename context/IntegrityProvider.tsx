@@ -19,7 +19,13 @@ import React, {
   ReactNode,
 } from 'react';
 import { logger } from '@/utils/logger';
-import { getInstallToken, isBypassMode, IntegrityError } from '@/services/integrity.service';
+import {
+  getInstallToken,
+  isBypassMode,
+  setFallbackMode,
+  IntegrityError,
+} from '@/services/integrity.service';
+import { setIntegrityFallbackRejectedCallback } from '@/services/api';
 import type { IntegrityFailureReason, IntegrityStatus } from '@/types/integrity.types';
 
 interface IntegrityContextType {
@@ -59,22 +65,49 @@ export function IntegrityProvider({ children }: IntegrityProviderProps): React.R
       // services/integrity.service.ts run inline.
       await getInstallToken();
       if (!mounted.current) return;
+      setFallbackMode(false);
       setStatus(isBypassMode() ? 'bypassed' : 'ready');
     } catch (error) {
       if (!mounted.current) return;
       const reason: IntegrityFailureReason =
         error instanceof IntegrityError ? error.reason : 'unknown';
-      logger.warn('[Integrity] Initial attestation failed', {
+
+      // Dev-only: a missing bypass secret keeps the hard dev-setup screen — the
+      // actionable hint beats a silently broken app. Never reached in production.
+      if (reason === 'missing_dev_secret') {
+        logger.warn('[Integrity] Dev bypass secret missing', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        setFailureReason(reason);
+        setStatus('failed');
+        return;
+      }
+
+      // Never hard-block in production: any other failure falls open to
+      // x-api-key auth (api.ts reads isFallbackMode()).
+      logger.warn('[Integrity] Attestation failed; entering API-key fallback', {
         reason,
         error: error instanceof Error ? error.message : String(error),
       });
       setFailureReason(reason);
-      setStatus('failed');
+      setFallbackMode(true);
+      setStatus('fallback');
     }
   }, []);
 
   useEffect(() => {
     mounted.current = true;
+
+    // Off-ramp: api.ts fires this when the backend rejects x-api-key auth (server
+    // kill-switch off). Show the "please update" screen. Deliberately leave
+    // fallbackMode true — clearing it here would let other in-flight 401s slip
+    // past the off-ramp into the token-less retry loop.
+    setIntegrityFallbackRejectedCallback(() => {
+      if (!mounted.current) return;
+      setFailureReason('update_required');
+      setStatus('failed');
+    });
+
     performCheck();
     return () => {
       mounted.current = false;

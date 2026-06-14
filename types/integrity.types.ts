@@ -12,7 +12,20 @@
 
 export type IntegrityPlatform = 'ios' | 'android' | 'bypass';
 
-export type IntegrityStatus = 'pending' | 'ready' | 'bypassed' | 'failed';
+/**
+ * - `pending`: attestation in flight (initial gate loader).
+ * - `ready`: real attestation succeeded (production/preview) — sends X-Install-Token.
+ * - `bypassed`: dev-bypass build — sends X-Dev-Integrity-Bypass.
+ * - `fallback`: attestation could not complete on this device, so we fall open
+ *   to legacy `x-api-key` auth instead of hard-blocking. The app renders
+ *   normally. This is the production-incident safety net — no device is ever
+ *   blocked at launch. See IntegrityProvider + services/api.ts.
+ * - `failed`: hard block. Only reached via the dev-setup off-ramp
+ *   (`missing_dev_secret` in development) or the fallback off-ramp, when the
+ *   backend rejects the API-key fallback (e.g. the server kill-switch is off)
+ *   and retrying would only earn threat violations.
+ */
+export type IntegrityStatus = 'pending' | 'ready' | 'bypassed' | 'fallback' | 'failed';
 
 /**
  * Failure reasons surfaced from the integrity flow.
@@ -33,6 +46,11 @@ export type IntegrityStatus = 'pending' | 'ready' | 'bypassed' | 'failed';
  *   of nonce-mismatch / unknown-key / signature-invalid / counter-replay.
  * - `attestation_failed`: catch-all when the backend reason is missing or
  *   unrecognized.
+ * - `update_required`: not produced by the attestation flow itself. Set when a
+ *   device running in `fallback` mode has its `x-api-key` request rejected by
+ *   the backend (the server kill-switch was turned off). The user must update
+ *   the app; retrying would only re-send a token-less request. See
+ *   IntegrityProvider's fallback off-ramp.
  */
 export type IntegrityFailureReason =
   | 'attestation_failed'
@@ -44,6 +62,7 @@ export type IntegrityFailureReason =
   | 'missing_dev_secret'
   | 'unsupported_platform'
   | 'unsupported_device'
+  | 'update_required'
   | 'unknown';
 
 export interface NonceResponse {

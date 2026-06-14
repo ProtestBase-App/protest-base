@@ -1004,6 +1004,12 @@ const en: LocaleData = {
         "ProtestBase relies on hardware security features that aren't available on this device. iOS 14 or Android 9 (or newer) is required.",
       badge: 'Device not supported',
     },
+    updateRequired: {
+      title: 'Please update ProtestBase',
+      message:
+        'This version of ProtestBase can no longer connect. Please update to the latest version from the App Store or Google Play to keep using the app.',
+      badge: 'Update required',
+    },
   },
 
   // ============================================
