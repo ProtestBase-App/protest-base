@@ -75,10 +75,17 @@ const areImageListsEqual = (a: FormState['images'], b: FormState['images']): boo
  * resuming an old draft doesn't crash on the missing array.
  */
 const migrateDraftFormState = (saved: FormState & { image?: unknown }): FormState => {
-  if (Array.isArray(saved.images)) return saved;
+  // Drafts saved before the address-coordinate fields existed lack them; default
+  // to null so a resumed draft has a well-formed FormState (no live-pick coords).
+  const withCoords: FormState = {
+    ...saved,
+    geocod_lat: saved.geocod_lat ?? null,
+    geocod_lng: saved.geocod_lng ?? null,
+  };
+  if (Array.isArray(withCoords.images)) return withCoords;
   const legacy = saved.image;
   return {
-    ...saved,
+    ...withCoords,
     images: legacy && typeof legacy === 'object' ? [legacy as PickedImage] : [],
   };
 };
@@ -142,6 +149,8 @@ export default function CreateEventModal() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   const [emptyFields, setEmptyFields] = useState({
@@ -172,6 +181,8 @@ export default function CreateEventModal() {
       co_organizers: [],
       help_needed: false,
       help_description: '',
+      geocod_lat: null,
+      geocod_lng: null,
     }),
     [user?.name, user?.email]
   );
@@ -491,6 +502,10 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
+        // Coordinates of an accepted suggestion (this session only) — the backend
+        // adopts the confirmed pin. Omitted when no street was picked this session.
+        geocod_lat: trimmedForm.geocod_lat ?? undefined,
+        geocod_lng: trimmedForm.geocod_lng ?? undefined,
         images: trimmedForm.images.length ? trimmedForm.images : undefined, // Omitted → backend uses default
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories, // Service normalizes string -> string[]
@@ -582,6 +597,10 @@ export default function CreateEventModal() {
         region: trimmedForm.region || undefined,
         country: trimmedForm.country || undefined,
         postal_code: trimmedForm.postal_code || undefined,
+        // Coordinates of an accepted suggestion (this session only) — adopted as
+        // the draft's pin so it stays correct once published.
+        geocod_lat: trimmedForm.geocod_lat ?? undefined,
+        geocod_lng: trimmedForm.geocod_lng ?? undefined,
         images: trimmedForm.images.length ? trimmedForm.images : undefined,
         website_url: trimmedForm.website_url || undefined,
         categories: trimmedForm.categories,

@@ -615,7 +615,7 @@ const nl = {
     categoryHelper: 'Helpt mensen je evenement te ontdekken via filters',
     endTimeHelper: 'Laat leeg als de duur van het evenement flexibel is',
     locationHelper:
-      'Geef een specifieke locatie zodat deelnemers het evenement gemakkelijk kunnen vinden',
+      'Begin met het adres — de postcode wordt automatisch ingevuld. Je kunt deze ook handmatig instellen.',
     imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',

@@ -572,7 +572,8 @@ const en: LocaleData = {
     // Helper text
     categoryHelper: 'Helps people discover your event through filters',
     endTimeHelper: 'Leave blank if the event duration is flexible',
-    locationHelper: 'Provide a specific location so attendees can find the event easily',
+    locationHelper:
+      'Search for the address — the postal code fills in automatically. You can also set it manually.',
     imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',

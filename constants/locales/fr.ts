@@ -575,7 +575,7 @@ const fr: LocaleData = {
     categoryHelper: 'Aide les gens à découvrir votre événement grâce aux filtres',
     endTimeHelper: "Laissez vide si la durée de l'événement est flexible",
     locationHelper:
-      "Indiquez un lieu précis pour que les participants puissent trouver l'événement facilement",
+      "Commencez par l'adresse — le code postal se remplit automatiquement. Vous pouvez aussi le définir manuellement.",
     imageHelper:
       "Ajoutez jusqu'à 5 images — la première est la photo de couverture de votre événement",
     eventLinkHelper:

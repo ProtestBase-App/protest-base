@@ -135,6 +135,8 @@ export default function CreateTemplateScreen() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   // Apply organization_id from context for single-org users.
@@ -171,6 +173,8 @@ export default function CreateTemplateScreen() {
       co_organizers: [],
       help_needed: false,
       help_description: '',
+      geocod_lat: null,
+      geocod_lng: null,
     }),
     []
   );

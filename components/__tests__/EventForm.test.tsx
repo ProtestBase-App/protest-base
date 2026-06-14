@@ -182,6 +182,8 @@ const mockForm: FormState = {
   co_organizers: [],
   help_needed: false,
   help_description: null,
+  geocod_lat: null,
+  geocod_lng: null,
 };
 
 const mockEmptyFields: EmptyFieldsState = {
@@ -766,7 +768,7 @@ describe('EventForm — street address autocomplete', () => {
     );
   });
 
-  it('hides the street field until a postal code is selected', async () => {
+  it('shows the street field as soon as a country is selected (address-first)', async () => {
     const setForm = jest.fn();
     const formNoPostal = {
       ...mockForm,
@@ -774,7 +776,7 @@ describe('EventForm — street address autocomplete', () => {
       postal_code: null,
       street_address: '',
     };
-    const { rerender } = render(
+    render(
       <EventForm
         form={formNoPostal}
         setForm={setForm}
@@ -785,22 +787,28 @@ describe('EventForm — street address autocomplete', () => {
     await act(async () => {
       await flushPromises();
     });
-    // Country chosen but no postal yet → street field is not rendered.
-    expect(screen.queryByTestId('input-event-street-address')).toBeNull();
+    // Address drives the postal code now, so the street field is available
+    // immediately once a country is chosen — no postal code required first.
+    expect(screen.getByTestId('input-event-street-address')).toBeTruthy();
+  });
 
-    // Selecting a postal code reveals the street field.
+  it('does not render the street field until a country is selected', async () => {
+    const setForm = jest.fn();
+    const formNoCountry = { ...mockForm, country: '', postal_code: null, street_address: '' };
+    render(
+      <EventForm
+        form={formNoCountry}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
     await act(async () => {
-      rerender(
-        <EventForm
-          form={{ ...formNoPostal, postal_code: 1000 }}
-          setForm={setForm}
-          emptyFields={mockEmptyFields}
-          userLanguage="en"
-        />
-      );
       await flushPromises();
     });
-    expect(screen.getByTestId('input-event-street-address')).toBeTruthy();
+    // The whole location group (street + postal) is gated on a country.
+    expect(screen.queryByTestId('input-event-street-address')).toBeNull();
+    expect(screen.queryByTestId('dropdown-event-postal-code')).toBeNull();
   });
 
   it('keeps an existing street visible for a legacy event with no postal code', async () => {
@@ -825,6 +833,146 @@ describe('EventForm — street address autocomplete', () => {
     // The `|| street_address` guard shows a saved street even without a postal
     // code, so editing legacy data never hides the existing address.
     expect(screen.getByDisplayValue('Old Street 9')).toBeTruthy();
+  });
+});
+
+describe('EventForm — postal-code lock & suggestion coordinates', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const SUGGESTION = {
+    street_address: 'Rue de la Loi 16',
+    postal_code: '1000',
+    city: 'Brussels',
+    region: 'Brussels-Capital',
+    country: 'belgium',
+    lat: 50.8467,
+    lng: 4.3625,
+    label: 'Rue de la Loi 16, 1000, Brussels',
+  };
+
+  const POI = {
+    street_address: 'Grote Markt',
+    postal_code: null,
+    city: null,
+    region: null,
+    country: 'belgium',
+    lat: 50.85,
+    lng: 4.35,
+    label: 'Grote Markt',
+  };
+
+  const baseForm = {
+    ...mockForm,
+    country: 'belgium',
+    postal_code: 1000,
+    street_address: '',
+  };
+
+  // The single TextInput inside the postal picker; its `editable` prop reflects
+  // the lock (false when locked to an accepted suggestion's postcode).
+  const postalInput = () =>
+    within(screen.getByTestId('dropdown-event-postal-code')).getByDisplayValue('');
+
+  // Apply the latest functional setForm updater to read the resulting state.
+  const latestNext = (setForm: jest.Mock, base: FormState) => {
+    const updater = setForm.mock.calls
+      .map((c) => c[0])
+      .reverse()
+      .find((arg) => typeof arg === 'function');
+    return updater ? updater(base) : undefined;
+  };
+
+  async function pickFirstSuggestion(setForm: jest.Mock, form: FormState) {
+    render(
+      <EventForm form={form} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
+    );
+    fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'rue de la loi');
+    const row = await screen.findByTestId('address-suggestion-0');
+    await act(async () => {
+      fireEvent.press(row);
+    });
+  }
+
+  it('locks the postal picker once a suggestion carrying a postcode is accepted', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+
+    // Before any pick the postal picker is interactive.
+    render(
+      <EventForm
+        form={baseForm}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(postalInput().props.editable).toBe(true);
+    screen.unmount();
+
+    await pickFirstSuggestion(setForm, baseForm);
+    // The accepted suggestion's postcode is authoritative → picker locks.
+    expect(postalInput().props.editable).toBe(false);
+  });
+
+  it('forwards the accepted suggestion coordinates to form state', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+
+    await pickFirstSuggestion(setForm, baseForm);
+
+    const next = latestNext(setForm, baseForm);
+    expect(next).toEqual(
+      expect.objectContaining({
+        street_address: 'Rue de la Loi 16',
+        geocod_lat: 50.8467,
+        geocod_lng: 4.3625,
+      })
+    );
+  });
+
+  it('keeps the postal picker editable for a postal-less POI but still stores its pin', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([POI]);
+
+    await pickFirstSuggestion(setForm, baseForm);
+
+    // A POI carries no postcode, so nothing trustworthy to lock to.
+    expect(postalInput().props.editable).toBe(true);
+    const next = latestNext(setForm, baseForm);
+    expect(next).toEqual(expect.objectContaining({ geocod_lat: 50.85, geocod_lng: 4.35 }));
+  });
+
+  it('unlocks the postal picker when the street text is edited away from the suggestion', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+
+    await pickFirstSuggestion(setForm, baseForm);
+    expect(postalInput().props.editable).toBe(false);
+
+    // Editing the street diverges from the accepted suggestion → re-enable picking.
+    await act(async () => {
+      fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'rue de la loi 1');
+    });
+    expect(postalInput().props.editable).toBe(true);
+  });
+
+  it('clears the pin and unlocks the picker when the street is cleared', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+
+    await pickFirstSuggestion(setForm, baseForm);
+    expect(postalInput().props.editable).toBe(false);
+
+    fireEvent.press(screen.getByLabelText('Clear street address'));
+    expect(postalInput().props.editable).toBe(true);
+
+    const next = latestNext(setForm, baseForm);
+    expect(next).toEqual(
+      expect.objectContaining({ street_address: '', geocod_lat: null, geocod_lng: null })
+    );
   });
 });
 
@@ -1699,9 +1847,18 @@ describe('EventForm — category chip toggle', () => {
 describe('EventForm — postal code clearing', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears the postal code (and gated street/city/region) when its chip is removed', async () => {
+  it('clears only the postal code when its chip is removed, leaving the address intact', async () => {
     const setForm = jest.fn();
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    // Address-first: the street is no longer gated behind the postal, so clearing
+    // the (manual fallback) postal must not touch the street/city/region.
+    const formWithPostalCode = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: 1000,
+      street_address: 'Rue de la Loi 16',
+      city: 'Brussels',
+      region: 'Brussels-Capital',
+    };
     render(
       <EventForm
         form={formWithPostalCode}
@@ -1718,9 +1875,9 @@ describe('EventForm — postal code clearing', () => {
     expect(setForm).toHaveBeenCalledWith(
       expect.objectContaining({
         postal_code: null,
-        street_address: '',
-        city: '',
-        region: '',
+        street_address: 'Rue de la Loi 16',
+        city: 'Brussels',
+        region: 'Brussels-Capital',
       })
     );
   });

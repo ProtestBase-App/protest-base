@@ -64,6 +64,8 @@ export default function EditEvent() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   const [emptyFields, setEmptyFields] = useState({
@@ -216,6 +218,10 @@ export default function EditEvent() {
         region: form.region || undefined,
         country: form.country || undefined,
         postal_code: form.postal_code || undefined,
+        // Re-picking the street this session adopts the confirmed pin (healing a
+        // stale/wrong one); omitted when the street wasn't re-picked.
+        geocod_lat: form.geocod_lat ?? undefined,
+        geocod_lng: form.geocod_lng ?? undefined,
         // Authoritative full ordered list (kept URLs + new files); an emptied
         // list is an explicit removal of every image.
         images: form.images.length ? form.images : null,

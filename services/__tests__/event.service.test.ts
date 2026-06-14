@@ -564,6 +564,52 @@ describe('event.service', () => {
       expect(payload.postal_code).toBe('1000');
     });
 
+    it('appends adopted-suggestion coordinates as decimal strings in FormData', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-geo' } },
+      });
+
+      await createEventBackend({
+        ...baseEventData,
+        image: { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' },
+        geocod_lat: 50.8467,
+        geocod_lng: 4.3625,
+      });
+
+      const [, payload] = mockApi.post.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+      // Multipart carries them as strings; the backend coerces back to numbers.
+      expect((payload as FormData).getAll('geocod_lat')).toEqual(['50.8467']);
+      expect((payload as FormData).getAll('geocod_lng')).toEqual(['4.3625']);
+    });
+
+    it('sends adopted-suggestion coordinates as numbers in the JSON payload', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-geo-json' } },
+      });
+
+      await createEventBackend({ ...baseEventData, geocod_lat: 50.8467, geocod_lng: 4.3625 });
+
+      const [, payload]: any[] = mockApi.post.mock.calls[0];
+      // JSON path is uncoerced — actual numbers, never quoted strings.
+      expect(payload.geocod_lat).toBe(50.8467);
+      expect(payload.geocod_lng).toBe(4.3625);
+    });
+
+    it('omits geocod coordinates from the JSON payload when not provided', async () => {
+      mockApi.post.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'new-evt-no-geo' } },
+      });
+
+      await createEventBackend(baseEventData);
+
+      const [, payload]: any[] = mockApi.post.mock.calls[0];
+      expect(payload.geocod_lat).toBeUndefined();
+      expect(payload.geocod_lng).toBeUndefined();
+      // geocod_status is server-minted and must never be sent.
+      expect(payload.geocod_status).toBeUndefined();
+    });
+
     it('encodes a single-string categories as a 1-element JSON-array string in FormData', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-cat-str' } },
@@ -751,6 +797,27 @@ describe('event.service', () => {
 
       const [, payload]: any[] = mockApi.put.mock.calls[0];
       expect(payload.postal_code).toBeUndefined();
+    });
+
+    it('re-adopts coordinates as decimal strings in multipart, numbers in JSON', async () => {
+      // Multipart (new image): strings.
+      mockApi.put.mockResolvedValueOnce({ data: { success: true, data: { $id: 'evt-1' } } });
+      await updateEvent('evt-1', {
+        image: { uri: 'file:///new-img.jpg', mimeType: 'image/jpeg', fileName: 'new-img.jpg' },
+        geocod_lat: 51.05,
+        geocod_lng: 3.72,
+      });
+      const [, mpPayload] = mockApi.put.mock.calls[0];
+      expect(mpPayload).toBeInstanceOf(FormData);
+      expect((mpPayload as FormData).getAll('geocod_lat')).toEqual(['51.05']);
+      expect((mpPayload as FormData).getAll('geocod_lng')).toEqual(['3.72']);
+
+      // JSON (no new image): numbers.
+      mockApi.put.mockResolvedValueOnce({ data: { success: true, data: { $id: 'evt-1' } } });
+      await updateEvent('evt-1', { geocod_lat: 51.05, geocod_lng: 3.72 });
+      const [, jsonPayload]: any[] = mockApi.put.mock.calls[1];
+      expect(jsonPayload.geocod_lat).toBe(51.05);
+      expect(jsonPayload.geocod_lng).toBe(3.72);
     });
 
     it('encodes a single-string categories as a 1-element JSON-array string in updateEvent', async () => {

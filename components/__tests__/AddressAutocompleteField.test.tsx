@@ -42,6 +42,7 @@ function renderField(
 ) {
   const onSelect = jest.fn();
   const onClear = jest.fn();
+  const onEdit = jest.fn();
   const utils = render(
     <AddressAutocompleteField
       value=""
@@ -49,6 +50,7 @@ function renderField(
       lang="en"
       onSelect={onSelect}
       onClear={onClear}
+      onEdit={onEdit}
       title="Street Address"
       placeholder="Search for an address…"
       searchingText="Searching…"
@@ -60,7 +62,7 @@ function renderField(
       {...overrides}
     />
   );
-  return { onSelect, onClear, ...utils };
+  return { onSelect, onClear, onEdit, ...utils };
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -199,5 +201,62 @@ describe('AddressAutocompleteField', () => {
     renderField({ countryCode: null });
     const input = screen.getByTestId('street-input');
     expect(input.props.editable).toBe(false);
+  });
+
+  it('fires onEdit when the user types (text diverges from the accepted value)', async () => {
+    mockSearchAddress.mockResolvedValue([]);
+    const { onEdit } = renderField();
+
+    fireEvent.changeText(screen.getByTestId('street-input'), 'rue');
+
+    expect(onEdit).toHaveBeenCalled();
+  });
+
+  it('does not fire onEdit on mount or on an upstream value re-sync', async () => {
+    const onEdit = jest.fn();
+    const { rerender } = renderField({ value: '', onEdit });
+    await act(async () => {
+      await flush();
+    });
+    // Mount alone never signals an edit.
+    expect(onEdit).not.toHaveBeenCalled();
+
+    rerender(
+      <AddressAutocompleteField
+        value="Loaded From Draft 3"
+        countryCode="be"
+        lang="en"
+        onSelect={jest.fn()}
+        onClear={jest.fn()}
+        onEdit={onEdit}
+        title="Street Address"
+        placeholder="Search for an address…"
+        searchingText="Searching…"
+        noResultsText="No matching addresses found"
+        errorText="Could not search addresses."
+        unavailableText="Address search is unavailable."
+        clearAccessibilityLabel="Clear street address"
+        testID="street-input"
+      />
+    );
+    await act(async () => {
+      await flush();
+    });
+    // A programmatic re-sync (draft/legacy load) is not a user edit.
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onEdit when a suggestion is selected', async () => {
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
+    const { onEdit } = renderField();
+
+    fireEvent.changeText(screen.getByTestId('street-input'), 'rue de la loi');
+    const row = await screen.findByTestId('address-suggestion-0');
+    onEdit.mockClear(); // ignore the typing that surfaced the row
+    await act(async () => {
+      fireEvent.press(row);
+    });
+
+    expect(onEdit).not.toHaveBeenCalled();
   });
 });

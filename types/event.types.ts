@@ -115,7 +115,11 @@ export interface CreateEventRequest {
   // Create-only: when true the event is born status:'draft'. PUT/PATCH ignore it.
   is_draft?: boolean;
 
-  // Geocoding is filled in server-side; clients should not set these.
+  // Coordinates of an accepted address suggestion. When the client sends both
+  // (and they fall inside the BE/NL bbox) the backend ADOPTS them as the event
+  // pin and skips geocoding; otherwise it silently falls back to Nominatim. Send
+  // them only for a suggestion picked in the current session. `geocod_status` is
+  // minted server-side and must NEVER be sent — a client value is ignored.
   geocod_status?: string;
   geocod_lat?: number;
   geocod_lng?: number;

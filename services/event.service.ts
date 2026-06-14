@@ -436,6 +436,11 @@ function buildEventFormData(
       }
     } else if (key === 'postal_code') {
       formData.append(key, String(value));
+    } else if (key === 'geocod_lat' || key === 'geocod_lng') {
+      // Adopted-suggestion coordinates: multipart carries them as decimal
+      // strings (the server coerces them back to numbers). The JSON path sends
+      // them verbatim as numbers — it does not coerce.
+      formData.append(key, String(value));
     } else if (key === 'help_needed' || key === 'is_draft') {
       formData.append(key, String(value));
     } else if (typeof value === 'string') {
