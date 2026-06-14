@@ -55,6 +55,11 @@ function resolveBucket(
       return { copyKey: 'integrity.deviceStateUnsupported', showRetry: false };
     case 'app_config_issue':
       return { copyKey: 'integrity.appConfig', showRetry: false };
+    case 'update_required':
+      // Fallback off-ramp: the backend stopped honoring x-api-key auth. Retrying
+      // would only re-send a token-less request, so no retry button — the user
+      // must update the app.
+      return { copyKey: 'integrity.updateRequired', showRetry: false };
     case 'attestation_retryable':
     case 'network':
       return { copyKey: 'integrity.retryable', showRetry: true };

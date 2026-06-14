@@ -615,7 +615,7 @@ const nl = {
     categoryHelper: 'Helpt mensen je evenement te ontdekken via filters',
     endTimeHelper: 'Laat leeg als de duur van het evenement flexibel is',
     locationHelper:
-      'Geef een specifieke locatie zodat deelnemers het evenement gemakkelijk kunnen vinden',
+      'Begin met het adres — de postcode wordt automatisch ingevuld. Je kunt deze ook handmatig instellen.',
     imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',
@@ -1106,6 +1106,12 @@ const nl = {
       message:
         'ProtestBase gebruikt hardwarebeveiligingsfuncties die op dit apparaat niet beschikbaar zijn. iOS 14 of Android 9 (of nieuwer) is vereist.',
       badge: 'Apparaat niet ondersteund',
+    },
+    updateRequired: {
+      title: 'Werk ProtestBase bij',
+      message:
+        'Deze versie van ProtestBase kan geen verbinding meer maken. Installeer de nieuwste versie uit de App Store of Google Play om de app te blijven gebruiken.',
+      badge: 'Update vereist',
     },
   },
 

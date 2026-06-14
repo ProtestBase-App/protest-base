@@ -75,6 +75,12 @@ const EventForm: React.FC<EventFormProps> = ({
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
   const [isPickingImage, setIsPickingImage] = React.useState(false);
+  // True once a street suggestion *carrying a postcode* is accepted this session:
+  // the postal picker locks to that suggestion's code. Cleared when the user
+  // edits/clears the street, picks a postal-less POI, or changes country — i.e.
+  // exactly when there is no longer a trusted postcode to lock to. Never seeded
+  // from a loaded event/draft, so an edit screen opens with the picker enabled.
+  const [postalLocked, setPostalLocked] = React.useState(false);
   const previousCountry = React.useRef<string | null>(null);
   const isInitialMount = React.useRef(true);
 
@@ -103,7 +109,11 @@ const EventForm: React.FC<EventFormProps> = ({
           street_address: '',
           city: '',
           region: '',
+          geocod_lat: null,
+          geocod_lng: null,
         }));
+        // The locked suggestion belonged to the previous country — release it.
+        setPostalLocked(false);
       }
       previousCountry.current = form.country;
       isInitialMount.current = false;
@@ -256,9 +266,19 @@ const EventForm: React.FC<EventFormProps> = ({
   //    leaving a now-mismatched stale postal behind.
   const handleAddressSelect = useCallback(
     (s: AddressSuggestion) => {
+      // A live pick carries the pin the user confirmed — store it so the parent
+      // forwards geocod_lat/lng and the backend adopts it instead of re-geocoding.
+      // Lock the postal picker only to a suggestion that carries a postcode; a
+      // postal-less POI keeps manual picking enabled (and the prior postal set).
+      setPostalLocked(s.postal_code != null);
       setForm((f) => {
         if (!s.postal_code) {
-          return { ...f, street_address: s.street_address };
+          return {
+            ...f,
+            street_address: s.street_address,
+            geocod_lat: s.lat,
+            geocod_lng: s.lng,
+          };
         }
         const parsed = parseInt(s.postal_code, 10);
         return {
@@ -267,6 +287,8 @@ const EventForm: React.FC<EventFormProps> = ({
           city: s.city ?? '',
           region: s.region ?? '',
           postal_code: Number.isNaN(parsed) ? f.postal_code : parsed,
+          geocod_lat: s.lat,
+          geocod_lng: s.lng,
         };
       });
     },
@@ -274,8 +296,17 @@ const EventForm: React.FC<EventFormProps> = ({
   );
 
   const handleAddressClear = useCallback(() => {
-    setForm((f) => ({ ...f, street_address: '' }));
+    // Clearing the street drops the confirmed pin and unlocks the postal picker.
+    setPostalLocked(false);
+    setForm((f) => ({ ...f, street_address: '', geocod_lat: null, geocod_lng: null }));
   }, [setForm]);
+
+  // The user is editing the street text away from the accepted suggestion — the
+  // postcode is no longer authoritative, so re-enable manual picking. The still-
+  // committed street_address (and its coordinates) stay until a new pick/clear.
+  const handleAddressEdit = useCallback(() => {
+    setPostalLocked(false);
+  }, []);
 
   // Scroll to end when the disclaimer focuses; delay lets the keyboard appear first.
   const handleDisclaimerFocus = useCallback(() => {
@@ -698,8 +729,33 @@ const EventForm: React.FC<EventFormProps> = ({
 
       {form.country && (
         <ThemedView style={styles.nestedFieldGroup}>
-          <ThemedView style={styles.labelWithLoadingWrapper}>
-            <ThemedText style={[styles.fieldLabel, styles.fieldSpacingNested]}>
+          {/* Address first: the accepted suggestion drives (and locks) the postal
+              code below. Shown as soon as a country is selected — it no longer
+              waits on a postal code. */}
+          <AddressAutocompleteField
+            testID="input-event-street-address"
+            title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
+            value={form.street_address}
+            countryCode={addressCountryCode}
+            lang={addressLang}
+            postalCode={form.postal_code ? String(form.postal_code) : undefined}
+            onSelect={handleAddressSelect}
+            onClear={handleAddressClear}
+            onEdit={handleAddressEdit}
+            placeholder={t('createEvent.addressSearchPlaceholder')}
+            searchingText={t('createEvent.addressSearching')}
+            noResultsText={t('createEvent.addressNoResults')}
+            errorText={t('createEvent.addressError')}
+            unavailableText={t('createEvent.addressUnavailable')}
+            clearAccessibilityLabel={t('createEvent.clearStreetAddressAccessibilityLabel')}
+            otherStyles={styles.fieldSpacingNested}
+          />
+
+          {/* Postal code: auto-filled and locked from the accepted address; the
+              manual picker stays usable as a fallback (no suggestion picked, or
+              the address service is unavailable). One postal per event. */}
+          <ThemedView style={[styles.labelWithLoadingWrapper, styles.fieldSpacingNested]}>
+            <ThemedText style={styles.fieldLabel}>
               {t('createEvent.postalCode')} ({t('common.optional')})
             </ThemedText>
             {postalCodesLoading && (
@@ -716,22 +772,13 @@ const EventForm: React.FC<EventFormProps> = ({
               testID="dropdown-event-postal-code"
               options={postalCodeOptions}
               selected={form.postal_code ? [String(form.postal_code)] : []}
+              disabled={postalLocked}
               onChange={(next) => {
+                // Manual fallback path (only reachable while unlocked). The street
+                // is no longer gated behind the postal, so picking/clearing the
+                // postal here never touches the address or its pin.
                 const code = next[0];
-                if (!code) {
-                  // Street is gated behind the postal code, so clearing the postal
-                  // also clears the street + derived city/region — otherwise a
-                  // now-hidden street_address would still save.
-                  setForm({
-                    ...form,
-                    postal_code: null,
-                    street_address: '',
-                    city: '',
-                    region: '',
-                  });
-                } else {
-                  setForm({ ...form, postal_code: Number(code) });
-                }
+                setForm({ ...form, postal_code: code ? Number(code) : null });
               }}
               placeholder={
                 postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
@@ -743,29 +790,6 @@ const EventForm: React.FC<EventFormProps> = ({
             />
           </ThemedView>
 
-          {/* Stepwise reveal: the street field appears only after a postal code
-              is picked (country → postal → street). The `|| street_address`
-              guard keeps an already-saved street visible when editing a legacy
-              event that has no postal code, so existing data is never hidden. */}
-          {(form.postal_code || form.street_address) && (
-            <AddressAutocompleteField
-              testID="input-event-street-address"
-              title={`${t('createEvent.streetAddress')} (${t('common.optional')})`}
-              value={form.street_address}
-              countryCode={addressCountryCode}
-              lang={addressLang}
-              postalCode={form.postal_code ? String(form.postal_code) : undefined}
-              onSelect={handleAddressSelect}
-              onClear={handleAddressClear}
-              placeholder={t('createEvent.addressSearchPlaceholder')}
-              searchingText={t('createEvent.addressSearching')}
-              noResultsText={t('createEvent.addressNoResults')}
-              errorText={t('createEvent.addressError')}
-              unavailableText={t('createEvent.addressUnavailable')}
-              clearAccessibilityLabel={t('createEvent.clearStreetAddressAccessibilityLabel')}
-              otherStyles={styles.fieldSpacingNested}
-            />
-          )}
           <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
         </ThemedView>
       )}

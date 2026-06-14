@@ -121,6 +121,15 @@ export default (): ExpoConfig => {
       // environment variable is accidentally scoped to those profiles.
       devIntegrityBypass:
         appEnv === 'development' ? process.env.EXPO_PUBLIC_DEV_INTEGRITY_BYPASS : undefined,
+      // Legacy mobile API key, embedded on EVERY build profile (unlike the
+      // dev-bypass secret, which is dev-only). Used solely as the
+      // production-incident fallback when a device can't attest —
+      // services/api.ts attaches it as `x-api-key`. This is a coarse filter, not
+      // a secret, so embedding it in the bundle is acceptable. Must be provided
+      // as an EAS environment variable (EXPO_PUBLIC_API_KEY) for the
+      // development / preview / production environments — EAS does not read
+      // .env.local. The value must equal the backend API_KEY (not WEBSITE_API_KEY).
+      apiKey: process.env.EXPO_PUBLIC_API_KEY,
     },
     plugins: [
       'expo-router',

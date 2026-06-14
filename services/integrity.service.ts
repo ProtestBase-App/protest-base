@@ -87,6 +87,20 @@ export function isProductionBuild(): boolean {
   return getAppEnv() === 'production';
 }
 
+// Set by IntegrityProvider when attestation can't complete: requests fall open
+// to legacy x-api-key auth instead of hard-blocking (see api.ts
+// resolveIntegrityHeaders). Module-level so the api.ts interceptors, which run
+// outside React, can read it per request.
+let fallbackMode = false;
+
+export function isFallbackMode(): boolean {
+  return fallbackMode;
+}
+
+export function setFallbackMode(enabled: boolean): void {
+  fallbackMode = enabled;
+}
+
 /**
  * True when this build runs the dev-bypass flow instead of real native
  * attestation. Bypass is used only for `development` builds on any platform.

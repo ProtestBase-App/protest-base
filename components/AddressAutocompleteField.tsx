@@ -46,6 +46,13 @@ export interface AddressAutocompleteFieldProps {
   onSelect: (suggestion: AddressSuggestion) => void;
   /** Fired when the user clears the field — the parent should reset `street_address`. */
   onClear: () => void;
+  /**
+   * Fired when the user edits the field text, i.e. the displayed query diverges
+   * from the accepted suggestion. Lets the parent release any lock tied to that
+   * suggestion (e.g. re-enable manual postal-code picking). Not fired by the
+   * upstream re-sync (loads/country changes) or by selecting a suggestion.
+   */
+  onEdit?: () => void;
   title: string;
   placeholder: string;
   /** Localized copy for the transient states. */
@@ -78,6 +85,7 @@ export default function AddressAutocompleteField({
   postalCode,
   onSelect,
   onClear,
+  onEdit,
   title,
   placeholder,
   searchingText,
@@ -155,6 +163,9 @@ export default function AddressAutocompleteField({
   const handleChangeText = (text: string) => {
     setQuery(text);
     setDirty(true);
+    // The text now diverges from any accepted suggestion — let the parent unlock
+    // fields derived from it. Idempotent: the parent just clears a flag.
+    onEdit?.();
   };
 
   const handleSelect = (suggestion: AddressSuggestion) => {

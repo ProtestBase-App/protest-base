@@ -32,6 +32,15 @@ function getIntegrityModule(): IntegrityModule {
 
 const DEV_INTEGRITY_BYPASS = Constants.expoConfig?.extra?.devIntegrityBypass as string | undefined;
 
+// Legacy mobile API key, sent as `x-api-key` only in fallback mode (see
+// resolveIntegrityHeaders). Trimmed so a stray newline in the EAS env var can't
+// 401 every fallback request.
+const API_KEY = (
+  ((Constants.expoConfig?.extra?.apiKey as string | undefined) ||
+    process.env.EXPO_PUBLIC_API_KEY) ??
+  ''
+).trim();
+
 interface RateLimitError extends Error {
   code: string;
   isRateLimited: boolean;
@@ -134,6 +143,31 @@ const INTEGRITY_RETRY_401_CODES: ReadonlySet<string> = new Set([
   'INSTALL_TOKEN_MISSING',
 ]);
 
+// Attestation header for an outgoing request, by mode: dev-bypass →
+// X-Dev-Integrity-Bypass, fallback → x-api-key, normal → X-Install-Token.
+// Never throws: on attestation error it returns {} so the backend answers
+// INSTALL_TOKEN_MISSING and the normal 401 retry kicks in.
+async function resolveIntegrityHeaders(): Promise<Record<string, string>> {
+  const integrity = getIntegrityModule();
+
+  if (integrity.isBypassMode()) {
+    return DEV_INTEGRITY_BYPASS ? { 'X-Dev-Integrity-Bypass': DEV_INTEGRITY_BYPASS } : {};
+  }
+
+  if (integrity.isFallbackMode()) {
+    return API_KEY ? { 'x-api-key': API_KEY } : {};
+  }
+
+  try {
+    return { 'X-Install-Token': await integrity.getInstallToken() };
+  } catch (error) {
+    logger.warn('[API] Failed to attach install token; sending request without it', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {};
+  }
+}
+
 // Requests can opt out of the Bearer token by setting `skipAuth: true` on the
 // axios config — used by anonymous endpoints (e.g. view counter) so the JWT
 // never travels with calls that should not be tied to a user.
@@ -155,27 +189,11 @@ api.interceptors.request.use(
       config.headers['X-App-Version'] = appVersion;
     }
 
-    // Attach the integrity header on every API call except the integrity-flow
-    // endpoints themselves and the bootstrap /app/config call. Preview and
-    // production builds send X-Install-Token (a per-install bearer issued by
-    // /auth/integrity/attest after real App Attest / Play Integrity verifies);
-    // development builds send X-Dev-Integrity-Bypass which the backend honors
-    // only when its own NODE_ENV is non-production.
+    // Integrity header on every call except the integrity-flow + bootstrap paths.
     if (!isIntegrityExempt(config.url)) {
-      if (!getIntegrityModule().isBypassMode()) {
-        try {
-          const installToken = await getIntegrityModule().getInstallToken();
-          config.headers['X-Install-Token'] = installToken;
-        } catch (error) {
-          // Don't block the request here — let the backend respond with
-          // INSTALL_TOKEN_MISSING so the response interceptor can trigger a
-          // retry through the normal 401 flow.
-          logger.warn('[API] Failed to attach install token; sending request without it', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      } else if (DEV_INTEGRITY_BYPASS) {
-        config.headers['X-Dev-Integrity-Bypass'] = DEV_INTEGRITY_BYPASS;
+      const integrityHeaders = await resolveIntegrityHeaders();
+      for (const [name, value] of Object.entries(integrityHeaders)) {
+        config.headers[name] = value;
       }
     }
 
@@ -193,6 +211,14 @@ let tokenExpirationCallback: ((reason?: string) => void) | null = null;
 
 export const setTokenExpirationCallback = (callback: (reason?: string) => void) => {
   tokenExpirationCallback = callback;
+};
+
+// Fired when a fallback (x-api-key) request is rejected — the server kill-switch
+// is off. IntegrityProvider uses it to show the "please update" off-ramp.
+let integrityFallbackRejectedCallback: (() => void) | null = null;
+
+export const setIntegrityFallbackRejectedCallback = (callback: () => void) => {
+  integrityFallbackRejectedCallback = callback;
 };
 
 let isRefreshing = false;
@@ -233,12 +259,29 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const errorCode = error.response?.data?.code;
 
+      // Fallback off-ramp: the backend stopped honoring x-api-key. Don't retry —
+      // a token-less replay just earns threat violations (→ IP ban). Show the
+      // off-ramp and never-settle so the error doesn't flash before the gate
+      // unmounts the screen.
+      if (INTEGRITY_RETRY_401_CODES.has(errorCode) && getIntegrityModule().isFallbackMode()) {
+        logger.warn('[API] Fallback API key rejected by backend; surfacing off-ramp', {
+          code: errorCode,
+        });
+        integrityFallbackRejectedCallback?.();
+        return new Promise(() => {});
+      }
+
       // INSTALL_TOKEN_{EXPIRED,INVALID,MISSING} all use the same recovery shape:
       // drop the cached install token and replay the request once. The request
       // interceptor will re-fetch a fresh token via getInstallToken() — either
       // by re-attesting (EXPIRED/INVALID) or by attaching the just-minted
       // token that the interceptor previously failed to attach (MISSING).
-      if (INTEGRITY_RETRY_401_CODES.has(errorCode) && !originalRequest._integrityRetry) {
+      // Never in fallback mode — those 401s take the off-ramp above.
+      if (
+        INTEGRITY_RETRY_401_CODES.has(errorCode) &&
+        !originalRequest._integrityRetry &&
+        !getIntegrityModule().isFallbackMode()
+      ) {
         originalRequest._integrityRetry = true;
         try {
           await getIntegrityModule().clearInstallToken();
@@ -281,18 +324,7 @@ api.interceptors.response.use(
           if (refreshAppVersion) {
             refreshHeaders['X-App-Version'] = refreshAppVersion;
           }
-          if (!getIntegrityModule().isBypassMode()) {
-            try {
-              refreshHeaders['X-Install-Token'] = await getIntegrityModule().getInstallToken();
-            } catch (integrityError) {
-              logger.warn('[API] Failed to attach install token to refresh request', {
-                error:
-                  integrityError instanceof Error ? integrityError.message : String(integrityError),
-              });
-            }
-          } else if (DEV_INTEGRITY_BYPASS) {
-            refreshHeaders['X-Dev-Integrity-Bypass'] = DEV_INTEGRITY_BYPASS;
-          }
+          Object.assign(refreshHeaders, await resolveIntegrityHeaders());
 
           const response = await axios.post(
             `${API_BASE_URL}${apiPrefix}/auth/token/refresh`,
@@ -382,11 +414,13 @@ api.interceptors.response.use(
     // 403 UNTRUSTED_INSTALL — token is structurally valid but the trust level
     // is too low (e.g. dev-bypass token hitting a production-only endpoint, or
     // attestation degraded after issuance). Same recovery as the 401 integrity
-    // codes: drop the cached token, re-attest, retry once.
+    // codes: drop the cached token, re-attest, retry once. Skipped in fallback
+    // mode (no install token to re-attest).
     if (
       error.response?.status === 403 &&
       error.response?.data?.code === 'UNTRUSTED_INSTALL' &&
-      !originalRequest._integrityRetry
+      !originalRequest._integrityRetry &&
+      !getIntegrityModule().isFallbackMode()
     ) {
       originalRequest._integrityRetry = true;
       try {

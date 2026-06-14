@@ -21,6 +21,9 @@ jest.mock('expo-constants', () => {
     expoConfig: {
       extra: {
         apiBaseUrl: 'https://api.example.com',
+        // Captured into API_KEY at api.ts module load — exercised by the
+        // fallback-mode header tests below. Inert for non-fallback tests.
+        apiKey: 'test-api-key',
       },
     },
   };
@@ -107,8 +110,12 @@ jest.mock('axios', () => {
 
 // Import modules AFTER all mocks are declared
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import axios from 'axios';
-import { setTokenExpirationCallback } from '@/services/api';
+import { setTokenExpirationCallback, setIntegrityFallbackRejectedCallback } from '@/services/api';
+// Real integrity.service (only @/modules/expo-hka/src is mocked above) — drives
+// the bypass/fallback/normal header branch the interceptors take.
+import { setFallbackMode } from '@/services/integrity.service';
 
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockAxios = axios as jest.Mocked<typeof axios>;
@@ -631,6 +638,122 @@ describe('services/api.ts', () => {
 
       expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
       expect(getStore().retryFn).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================
+  // Fallback mode — production-incident x-api-key safety net
+  // ============================================================
+  describe('Fallback mode (x-api-key safety net)', () => {
+    // The real integrity.service reads appEnv from this shared mock object;
+    // mutate it per-test and reset afterwards.
+    const extra = (Constants as unknown as { expoConfig: { extra: Record<string, unknown> } })
+      .expoConfig.extra;
+
+    afterEach(() => {
+      setFallbackMode(false);
+      delete extra.appEnv; // back to default (development → bypass mode)
+      setIntegrityFallbackRejectedCallback(() => {});
+    });
+
+    it('attaches x-api-key instead of X-Install-Token in fallback mode', async () => {
+      // Non-bypass build + fallback engaged → resolveIntegrityHeaders picks x-api-key.
+      extra.appEnv = 'production';
+      setFallbackMode(true);
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      const config = { headers: {}, method: 'get', url: '/events' };
+      const result = await getStore().requestFulfilled(config);
+
+      expect(result.headers['x-api-key']).toBe('test-api-key');
+      expect(result.headers['X-Install-Token']).toBeUndefined();
+    });
+
+    it('does not attach any integrity header on exempt paths even in fallback', async () => {
+      extra.appEnv = 'production';
+      setFallbackMode(true);
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      const config = { headers: {}, method: 'get', url: '/app/config' };
+      const result = await getStore().requestFulfilled(config);
+
+      expect(result.headers['x-api-key']).toBeUndefined();
+      expect(result.headers['X-Install-Token']).toBeUndefined();
+    });
+
+    it('off-ramps without retrying on 401 INSTALL_TOKEN_MISSING in fallback mode', async () => {
+      extra.appEnv = 'production';
+      setFallbackMode(true);
+
+      const offRamp = jest.fn();
+      setIntegrityFallbackRejectedCallback(offRamp);
+
+      const originalRequest = { headers: {}, method: 'get', url: '/protected' } as Record<
+        string,
+        unknown
+      >;
+      const error = {
+        config: originalRequest,
+        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
+        message: 'Unauthorized',
+      };
+
+      // The handler returns a never-settling promise; fire-and-forget then
+      // assert side effects after a tick.
+      getStore().responseRejected(error);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(offRamp).toHaveBeenCalledTimes(1);
+      // Must NOT retry or clear a token — repeated token-less requests are
+      // recorded as threat violations.
+      expect(getStore().retryFn).not.toHaveBeenCalled();
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
+      expect(originalRequest._integrityRetry).toBeUndefined();
+    });
+
+    it('off-ramps every concurrent 401 (no retry) while fallback stays engaged', async () => {
+      // Regression guard: as long as fallbackMode stays true, a burst of 401s
+      // all take the off-ramp — none falls through to the token-less retry loop.
+      extra.appEnv = 'production';
+      setFallbackMode(true);
+      const offRamp = jest.fn();
+      setIntegrityFallbackRejectedCallback(offRamp);
+
+      const makeError = (url: string) => ({
+        config: { headers: {}, method: 'get', url } as Record<string, unknown>,
+        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
+        message: 'Unauthorized',
+      });
+
+      getStore().responseRejected(makeError('/a'));
+      getStore().responseRejected(makeError('/b'));
+      getStore().responseRejected(makeError('/c'));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(offRamp).toHaveBeenCalledTimes(3);
+      expect(getStore().retryFn).not.toHaveBeenCalled();
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
+    });
+
+    it('still clears the token and retries on 401 INSTALL_TOKEN_MISSING when NOT in fallback', async () => {
+      setFallbackMode(false);
+      getStore().retryFn.mockResolvedValueOnce({ data: { success: true } });
+
+      const originalRequest = { headers: {}, method: 'get', url: '/protected' } as Record<
+        string,
+        unknown
+      >;
+      const error = {
+        config: originalRequest,
+        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
+        message: 'Unauthorized',
+      };
+
+      await getStore().responseRejected(error);
+
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token');
+      expect(getStore().retryFn).toHaveBeenCalledWith(originalRequest);
+      expect(originalRequest._integrityRetry).toBe(true);
     });
   });
 

@@ -109,6 +109,8 @@ export default function EditTemplateScreen() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   const [emptyFields, setEmptyFields] = useState({
@@ -140,6 +142,8 @@ export default function EditTemplateScreen() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   const formHasChanges = useMemo(
@@ -216,6 +220,10 @@ export default function EditTemplateScreen() {
           co_organizers: eventData.co_organizers || [],
           help_needed: eventData.help_needed || false,
           help_description: eventData.help_description || '',
+          // Templates carry no event pin; coordinates stay null and are never
+          // sent in event_data.
+          geocod_lat: null,
+          geocod_lng: null,
         };
 
         setForm(loadedForm);

@@ -31,9 +31,13 @@ export interface AddressSuggestion {
   region: string | null;
   /** Full name, "belgium" | "netherlands". */
   country: string;
-  /** Latitude — only used for an optional pre-save map preview; NOT sent on save. */
+  /**
+   * Latitude. When the suggestion is accepted via a live pick this session, it
+   * is forwarded on save as `geocod_lat` so the backend adopts the confirmed pin
+   * instead of re-geocoding (see the geocod_* fields on CreateEventRequest).
+   */
   lat: number;
-  /** Longitude — only used for an optional pre-save map preview; NOT sent on save. */
+  /** Longitude — forwarded on save as `geocod_lng` alongside `lat` (see above). */
   lng: number;
   /** Pre-composed display label, e.g. "Rue de la Loi 16, 1000, Brussels". */
   label: string;

@@ -77,6 +77,8 @@ import {
   attestInstall,
   clearInstallToken,
   getInstallToken,
+  isFallbackMode,
+  setFallbackMode,
   IntegrityError,
   mapBackendReason,
 } from '@/services/integrity.service';
@@ -605,6 +607,22 @@ describe('integrity.service', () => {
       const attestCall = mockPost.mock.calls[1];
       expect(attestCall[1].platform).toBe('android');
       expect(attestCall[2].headers['X-Dev-Integrity-Bypass']).toBeUndefined();
+    });
+  });
+
+  describe('fallback mode', () => {
+    // Module-level flag — reset after each test so it can't leak into others.
+    afterEach(() => setFallbackMode(false));
+
+    it('defaults to false', () => {
+      expect(isFallbackMode()).toBe(false);
+    });
+
+    it('reflects setFallbackMode(true) / setFallbackMode(false)', () => {
+      setFallbackMode(true);
+      expect(isFallbackMode()).toBe(true);
+      setFallbackMode(false);
+      expect(isFallbackMode()).toBe(false);
     });
   });
 

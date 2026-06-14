@@ -39,6 +39,13 @@ export interface SheetSearchMultiSelectProps {
   maxSelected?: number;
   /** Hint shown once the maxSelected cap is reached (e.g. "Max 10 co-organizers"). */
   maxSelectedHint?: string;
+  /**
+   * Lock the control: the search input is non-editable, the dropdown never
+   * opens, and the selected chip(s) cannot be removed. Used when the value is
+   * derived from another field (e.g. the postal code is set by an accepted
+   * street suggestion). The selected value still renders, greyed out.
+   */
+  disabled?: boolean;
   testID?: string;
 }
 
@@ -63,6 +70,7 @@ export function SheetSearchMultiSelect({
   singleSelect = false,
   maxSelected,
   maxSelectedHint,
+  disabled = false,
   testID,
 }: SheetSearchMultiSelectProps) {
   const colorScheme = useColorScheme();
@@ -99,7 +107,7 @@ export function SheetSearchMultiSelect({
   const atMax = !singleSelect && maxSelected != null && selected.length >= maxSelected;
 
   const visibleOptions = useMemo(() => {
-    if (!focused || atMax) return [];
+    if (disabled || !focused || atMax) return [];
     if (normalizedQuery.length < minSearchLength) return [];
     const unselected = options.filter((option) => !selected.includes(option.value));
     const matched =
@@ -109,7 +117,16 @@ export function SheetSearchMultiSelect({
             (option.searchText ?? option.label.toLowerCase()).includes(normalizedQuery)
           );
     return matched.slice(0, maxVisibleOptions);
-  }, [focused, atMax, normalizedQuery, options, selected, minSearchLength, maxVisibleOptions]);
+  }, [
+    disabled,
+    focused,
+    atMax,
+    normalizedQuery,
+    options,
+    selected,
+    minSearchLength,
+    maxVisibleOptions,
+  ]);
 
   const dropdownOpen = visibleOptions.length > 0;
 
@@ -147,7 +164,8 @@ export function SheetSearchMultiSelect({
                 label={label}
                 small
                 active
-                removable
+                removable={!disabled}
+                disabled={disabled}
                 leading={<IconSymbol name={leadingIconName} size={11} color={themeColors.tint} />}
                 onPress={() => handleRemove(value)}
                 accessibilityLabel={`Remove ${label}`}
@@ -165,6 +183,7 @@ export function SheetSearchMultiSelect({
             borderColor: focused ? themeColors.inputBorderFocused : themeColors.cardBorder,
           },
           dropdownOpen && styles.inputRowOpen,
+          disabled && styles.inputRowDisabled,
         ]}
       >
         <IconSymbol name="magnifyingglass" size={15} color={themeColors.placeholder} />
@@ -178,10 +197,12 @@ export function SheetSearchMultiSelect({
           placeholder={placeholder}
           placeholderTextColor={themeColors.placeholder}
           autoCorrect={false}
+          editable={!disabled}
           underlineColorAndroid="transparent"
           accessibilityLabel={placeholder}
+          accessibilityState={{ disabled }}
         />
-        {query.length > 0 && (
+        {!disabled && query.length > 0 && (
           <Pressable
             onPress={handleClearQuery}
             accessibilityRole="button"
@@ -261,6 +282,9 @@ const styles = StyleSheet.create({
   inputRowOpen: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+  },
+  inputRowDisabled: {
+    opacity: 0.55,
   },
   input: {
     flex: 1,

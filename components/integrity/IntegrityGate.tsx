@@ -43,7 +43,9 @@ export function IntegrityGate({ children }: IntegrityGateProps): React.ReactElem
     );
   }
 
-  // 'ready' (production) and 'bypassed' (dev/preview) both render normally.
+  // 'ready' (attested), 'bypassed' (dev), and 'fallback' (couldn't attest →
+  // x-api-key safety net) all render normally. Only 'failed' — the dev-setup or
+  // fallback-rejected off-ramp above — blocks.
   return <>{children}</>;
 }
 

@@ -70,6 +70,8 @@ export default function DraftEdit() {
     co_organizers: [],
     help_needed: false,
     help_description: '',
+    geocod_lat: null,
+    geocod_lng: null,
   });
 
   const [emptyFields] = useState({
@@ -141,6 +143,10 @@ export default function DraftEdit() {
       region: form.region || undefined,
       country: form.country || undefined,
       postal_code: form.postal_code || undefined,
+      // Re-picking the street this session adopts the confirmed pin (e.g. setting
+      // it on an automation draft that had none); omitted when not re-picked.
+      geocod_lat: form.geocod_lat ?? undefined,
+      geocod_lng: form.geocod_lng ?? undefined,
       // Authoritative full ordered list (kept URLs + new files); an emptied
       // list is an explicit removal of every image.
       images: form.images.length ? form.images : null,

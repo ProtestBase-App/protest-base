@@ -575,7 +575,7 @@ const fr: LocaleData = {
     categoryHelper: 'Aide les gens à découvrir votre événement grâce aux filtres',
     endTimeHelper: "Laissez vide si la durée de l'événement est flexible",
     locationHelper:
-      "Indiquez un lieu précis pour que les participants puissent trouver l'événement facilement",
+      "Commencez par l'adresse — le code postal se remplit automatiquement. Vous pouvez aussi le définir manuellement.",
     imageHelper:
       "Ajoutez jusqu'à 5 images — la première est la photo de couverture de votre événement",
     eventLinkHelper:
@@ -1023,6 +1023,12 @@ const fr: LocaleData = {
       message:
         'ProtestBase utilise des fonctions de sécurité matérielles qui ne sont pas disponibles sur cet appareil. iOS 14 ou Android 9 (ou plus récent) est requis.',
       badge: 'Appareil non pris en charge',
+    },
+    updateRequired: {
+      title: 'Veuillez mettre à jour ProtestBase',
+      message:
+        "Cette version de ProtestBase ne peut plus se connecter. Veuillez installer la dernière version depuis l'App Store ou Google Play pour continuer à utiliser l'application.",
+      badge: 'Mise à jour requise',
     },
   },
 

@@ -270,4 +270,41 @@ describe('SheetSearchMultiSelect', () => {
       expect(screen.getByLabelText('Antwerp')).toBeTruthy();
     });
   });
+
+  describe('Disabled (locked) state', () => {
+    it('renders the selected value but makes the input non-editable', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} disabled selected={['opt-brussels']} />);
+
+      // The locked value is still shown...
+      expect(screen.getByText('Brussels')).toBeTruthy();
+      // ...but the search input cannot be typed into.
+      expect(getInput().props.editable).toBe(false);
+    });
+
+    it('does not open the dropdown on focus when disabled', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} disabled minSearchLength={0} />);
+
+      fireEvent(getInput(), 'focus');
+
+      // No options offered while locked.
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+      expect(screen.queryByLabelText('Bruges')).toBeNull();
+      expect(screen.queryByLabelText('Antwerp')).toBeNull();
+    });
+
+    it('marks the selected chip non-interactive (not removable) when disabled', () => {
+      const onChange = jest.fn();
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          disabled
+          selected={['opt-brussels']}
+          onChange={onChange}
+        />
+      );
+
+      const chip = screen.getByLabelText('Remove Brussels');
+      expect(chip.props.accessibilityState.disabled).toBe(true);
+    });
+  });
 });
