@@ -6,7 +6,7 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
 });
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import {
   SheetSearchMultiSelect,
   SheetSearchMultiSelectOption,
@@ -268,6 +268,118 @@ describe('SheetSearchMultiSelect', () => {
 
       // singleSelect replaces its value, so the cap is ignored and the option shows.
       expect(screen.getByLabelText('Antwerp')).toBeTruthy();
+    });
+  });
+
+  describe('searchText fallback', () => {
+    it('matches on label when option has no searchText property', () => {
+      // The option is built without searchText (production path for org options).
+      const optionsWithFallback: SheetSearchMultiSelectOption[] = [
+        ...OPTIONS,
+        { value: 'opt-xa', label: 'Xanadu' },
+      ];
+
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          options={optionsWithFallback}
+          minSearchLength={1}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'xan');
+
+      // Xanadu has no searchText so the match falls back to label.toLowerCase()
+      expect(screen.getByLabelText('Xanadu')).toBeTruthy();
+      // Other options should not appear
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+      expect(screen.queryByLabelText('Bruges')).toBeNull();
+      expect(screen.queryByLabelText('Antwerp')).toBeNull();
+    });
+  });
+
+  describe('maxVisibleOptions slicing', () => {
+    it('shows only maxVisibleOptions rows when more options match', () => {
+      const manyOptions: SheetSearchMultiSelectOption[] = [
+        { value: 'opt-a', label: 'Alpha' },
+        { value: 'opt-b', label: 'Beta' },
+        { value: 'opt-c', label: 'Gamma' },
+        { value: 'opt-d', label: 'Delta' },
+        { value: 'opt-e', label: 'Epsilon' },
+        { value: 'opt-f', label: 'Zeta' },
+      ];
+      // All options will match an empty query (minSearchLength=0).
+      // With maxVisibleOptions=2 only the first 2 should render.
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          options={manyOptions}
+          minSearchLength={0}
+          maxVisibleOptions={2}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      // Only the first 2 options (Alpha, Beta) should appear.
+      expect(screen.getByLabelText('Alpha')).toBeTruthy();
+      expect(screen.getByLabelText('Beta')).toBeTruthy();
+      // Options beyond the cap must not render.
+      expect(screen.queryByLabelText('Gamma')).toBeNull();
+      expect(screen.queryByLabelText('Delta')).toBeNull();
+      expect(screen.queryByLabelText('Epsilon')).toBeNull();
+      expect(screen.queryByLabelText('Zeta')).toBeNull();
+    });
+  });
+
+  describe('Blur 120 ms timeout', () => {
+    it('keeps the dropdown open for <120 ms after blur', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} minSearchLength={0} />);
+
+      fireEvent(getInput(), 'focus');
+      // Dropdown is open
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+
+      fireEvent(getInput(), 'blur');
+
+      // Before the 120 ms window elapses, the dropdown should still be visible
+      jest.advanceTimersByTime(119);
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+    });
+
+    it('closes the dropdown after the 120 ms timeout elapses', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} minSearchLength={0} />);
+
+      fireEvent(getInput(), 'focus');
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+
+      fireEvent(getInput(), 'blur');
+
+      // After >=120 ms the timeout fires and focused -> false collapses the dropdown.
+      // Wrap in act so the resulting state update (setFocused) is flushed synchronously.
+      act(() => {
+        jest.advanceTimersByTime(120);
+      });
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+
+    it('cancels the pending close when the input is re-focused within 120 ms', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} minSearchLength={0} />);
+
+      fireEvent(getInput(), 'focus');
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+
+      // Blur starts the 120 ms countdown
+      fireEvent(getInput(), 'blur');
+      jest.advanceTimersByTime(50);
+
+      // Re-focusing before the timeout fires should cancel the close
+      fireEvent(getInput(), 'focus');
+
+      // Advance well past 120 ms — the cancelled timeout must not fire
+      jest.advanceTimersByTime(200);
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
     });
   });
 

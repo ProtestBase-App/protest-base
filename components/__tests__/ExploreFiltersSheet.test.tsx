@@ -302,4 +302,119 @@ describe('ExploreFiltersSheet', () => {
       expect(onApply).not.toHaveBeenCalled();
     });
   });
+
+  describe('Too-broad location selection', () => {
+    it('shows warning banner, keeps Apply disabled, and skips the count fetch', async () => {
+      const onApply = jest.fn();
+      const { getByText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} onApply={onApply} />,
+        {
+          providerOverrides: {
+            postalCodeContext: {
+              isLocationSelectionTooBroad: jest.fn().mockReturnValue(true),
+            },
+          },
+        }
+      );
+
+      // Warning banner must be visible.
+      expect(getByText('filters.selectionTooBroad')).toBeTruthy();
+
+      // Advance past the debounce — the effect must have early-returned without
+      // calling the backend.
+      await settleCount();
+      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+
+      // Apply Pressable is disabled when tooBroad — pressing it is a silent
+      // no-op so onApply is never called.
+      fireEvent.press(getByText('filters.confirmFilters'));
+      expect(onApply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Location selection → count request', () => {
+    it('includes expanded postalCodes in the count request', async () => {
+      const { getByPlaceholderText, getByLabelText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} />,
+        {
+          providerOverrides: {
+            postalCodeContext: {
+              locationFilterOptions: [
+                {
+                  value: 'be-1000',
+                  label: 'Brussels',
+                  tier: 'municipality',
+                  count: 1,
+                  provinceLabel: 'Brussels-Capital',
+                  searchText: 'brussels 1000',
+                },
+              ],
+              expandLocationTokens: jest
+                .fn()
+                .mockReturnValue({ codes: ['1000'], truncated: false }),
+              resolveLocationLabel: jest.fn((v: string) => v),
+              isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+            },
+          },
+        }
+      );
+
+      const locationInput = getByPlaceholderText('filters.searchPlaceholder');
+      fireEvent(locationInput, 'focus');
+      fireEvent.changeText(locationInput, 'brus');
+      fireEvent.press(getByLabelText('Brussels'));
+
+      await settleCount();
+
+      expect(mockGetEventsBackend).toHaveBeenCalledWith(
+        expect.objectContaining({ postalCodes: ['1000'] })
+      );
+    });
+  });
+
+  describe('Organization selection → count request', () => {
+    it('includes the selected organizer in the count request', async () => {
+      const { getByPlaceholderText, getByLabelText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} />,
+        {
+          providerOverrides: {
+            organizationsContext: {
+              dropdownItems: [{ value: 'org-1', label: 'Org One' }],
+            },
+          },
+        }
+      );
+
+      // minSearchLength=0 — shows all options immediately on focus.
+      const orgInput = getByPlaceholderText('filters.searchOrganizations');
+      fireEvent(orgInput, 'focus');
+      fireEvent.press(getByLabelText('Org One'));
+
+      await settleCount();
+
+      expect(mockGetEventsBackend).toHaveBeenCalledWith(
+        expect.objectContaining({ organizers: ['org-1'] })
+      );
+    });
+  });
+
+  describe('Count fetch error path', () => {
+    it('handles a rejected count fetch gracefully and keeps the fallback label', async () => {
+      mockGetEventsBackend.mockRejectedValue(new Error('boom'));
+
+      const { getByText, queryByText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} />
+      );
+
+      // Trigger a draft change so the count effect fires with the rejection mock.
+      fireEvent.press(getByText('categories.protest'));
+
+      // Must not throw; matchCount stays null after the failed fetch.
+      await settleCount();
+
+      // Apply label stays on the fallback (matchCount=null → 'filters.confirmFilters').
+      expect(getByText('filters.confirmFilters')).toBeTruthy();
+      expect(queryByText('home.filterApplyCount')).toBeNull();
+    });
+  });
 });

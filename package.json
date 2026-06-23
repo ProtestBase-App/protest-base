@@ -18,6 +18,7 @@
   "dependencies": {
     "@expo/app-integrity": "^56.0.3",
     "@expo/vector-icons": "^15.0.3",
+    "@gorhom/bottom-sheet": "5.2.14",
     "@maplibre/maplibre-react-native": "^11.3.4",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",

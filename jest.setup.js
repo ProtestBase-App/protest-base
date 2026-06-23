@@ -261,6 +261,65 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
+// ============================================================================
+// @gorhom/bottom-sheet mock
+// ============================================================================
+// BottomSheetModal is imperative (no `visible` prop), so the mock tracks its
+// own shown state via present()/dismiss(): a sheet's visibility in tests then
+// mirrors the real open/close flow that FiltersSheetShell drives through the
+// ref. dismiss()/close()/forceClose() fire onDismiss, matching how swipe-down /
+// backdrop-tap / hardware-back funnel through onClose at runtime. The scrollable
+// and text input map to their RN equivalents; provider/backdrop pass through.
+jest.mock('@gorhom/bottom-sheet', () => {
+  const React = require('react');
+  const { View, ScrollView, TextInput } = require('react-native');
+
+  const BottomSheetModal = React.forwardRef((props, ref) => {
+    const [shown, setShown] = React.useState(false);
+    React.useImperativeHandle(ref, () => ({
+      present: () => setShown(true),
+      expand: () => setShown(true),
+      snapToIndex: () => {},
+      snapToPosition: () => {},
+      collapse: () => {},
+      dismiss: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+      close: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+      forceClose: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+    }));
+    return shown ? React.createElement(View, { testID: props.testID }, props.children) : null;
+  });
+
+  const BottomSheetScrollView = React.forwardRef((props, ref) =>
+    React.createElement(ScrollView, { ...props, ref })
+  );
+  const BottomSheetTextInput = React.forwardRef((props, ref) =>
+    React.createElement(TextInput, { ...props, ref })
+  );
+  const BottomSheetView = ({ children, ...props }) => React.createElement(View, props, children);
+  const BottomSheetBackdrop = (props) => React.createElement(View, props);
+  const BottomSheetModalProvider = ({ children }) => children;
+
+  return {
+    __esModule: true,
+    default: BottomSheetModal,
+    BottomSheetModal,
+    BottomSheetModalProvider,
+    BottomSheetScrollView,
+    BottomSheetTextInput,
+    BottomSheetView,
+    BottomSheetBackdrop,
+  };
+});
+
 jest.mock('@maplibre/maplibre-react-native', () => {
   const React = require('react');
   const { View } = require('react-native');

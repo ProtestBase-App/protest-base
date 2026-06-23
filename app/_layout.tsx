@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { logger } from '@/utils/logger';
 import GlobalProvider, { useGlobalContext } from '@/context/GlobalProvider';
@@ -83,51 +84,55 @@ export default function RootLayout() {
     // drafts list's swipe-to-delete); renders as a plain View otherwise.
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaProvider>
-        {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
-        {/* This ensures version check happens BEFORE authentication */}
-        <VersionCheckProvider>
-          <VersionGate>
-            {/* IntegrityGate runs after the version check (which uses /app/config */}
-            {/* on the bootstrap path) but before GlobalProvider so the install token */}
-            {/* exists for every authenticated request. */}
-            <IntegrityProvider>
-              <IntegrityGate>
-                <GlobalProvider>
-                  <ConnectionGate>
-                    <UserOrganizationsProvider>
-                      <SavedEventsProvider>
-                        <LikedEventsProvider>
-                          <FollowedOrgsProvider>
-                            <PastEventsProvider>
-                              <TemplatesProvider>
-                                <OrganizationsProvider>
-                                  <PostalCodeProvider>
-                                    <ThemeProvider
-                                      value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-                                    >
-                                      <ExploreTabProvider>
-                                        <NotificationsBootstrap />
-                                        <PrivacyScreenGuard />
-                                        <RootNavigator />
-                                        <StatusBar
-                                          style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                        />
-                                      </ExploreTabProvider>
-                                    </ThemeProvider>
-                                  </PostalCodeProvider>
-                                </OrganizationsProvider>
-                              </TemplatesProvider>
-                            </PastEventsProvider>
-                          </FollowedOrgsProvider>
-                        </LikedEventsProvider>
-                      </SavedEventsProvider>
-                    </UserOrganizationsProvider>
-                  </ConnectionGate>
-                </GlobalProvider>
-              </IntegrityGate>
-            </IntegrityProvider>
-          </VersionGate>
-        </VersionCheckProvider>
+        {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
+            pure UI context, so it wraps the data providers harmlessly. */}
+        <BottomSheetModalProvider>
+          {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
+          {/* This ensures version check happens BEFORE authentication */}
+          <VersionCheckProvider>
+            <VersionGate>
+              {/* IntegrityGate runs after the version check (which uses /app/config */}
+              {/* on the bootstrap path) but before GlobalProvider so the install token */}
+              {/* exists for every authenticated request. */}
+              <IntegrityProvider>
+                <IntegrityGate>
+                  <GlobalProvider>
+                    <ConnectionGate>
+                      <UserOrganizationsProvider>
+                        <SavedEventsProvider>
+                          <LikedEventsProvider>
+                            <FollowedOrgsProvider>
+                              <PastEventsProvider>
+                                <TemplatesProvider>
+                                  <OrganizationsProvider>
+                                    <PostalCodeProvider>
+                                      <ThemeProvider
+                                        value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+                                      >
+                                        <ExploreTabProvider>
+                                          <NotificationsBootstrap />
+                                          <PrivacyScreenGuard />
+                                          <RootNavigator />
+                                          <StatusBar
+                                            style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                          />
+                                        </ExploreTabProvider>
+                                      </ThemeProvider>
+                                    </PostalCodeProvider>
+                                  </OrganizationsProvider>
+                                </TemplatesProvider>
+                              </PastEventsProvider>
+                            </FollowedOrgsProvider>
+                          </LikedEventsProvider>
+                        </SavedEventsProvider>
+                      </UserOrganizationsProvider>
+                    </ConnectionGate>
+                  </GlobalProvider>
+                </IntegrityGate>
+              </IntegrityProvider>
+            </VersionGate>
+          </VersionCheckProvider>
+        </BottomSheetModalProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

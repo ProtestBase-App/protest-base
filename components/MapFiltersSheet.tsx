@@ -208,6 +208,7 @@ export function MapFiltersSheet({
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('maps.postalCode')} />
         <SheetSearchMultiSelect
+          inBottomSheet
           options={postalOptions}
           selected={draft.postalCodes}
           onChange={(next) => setDraft((prev) => ({ ...prev, postalCodes: next }))}
@@ -220,6 +221,7 @@ export function MapFiltersSheet({
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.organization')} />
         <SheetSearchMultiSelect
+          inBottomSheet
           options={organizationOptions}
           selected={draft.organizations}
           onChange={(next) => setDraft((prev) => ({ ...prev, organizations: next }))}

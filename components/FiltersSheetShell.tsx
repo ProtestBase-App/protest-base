@@ -1,19 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+  BottomSheetBackdrop,
+  BottomSheetBackdropProps,
+  BottomSheetModal,
+  BottomSheetScrollView,
+} from '@gorhom/bottom-sheet';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -33,9 +25,14 @@ export interface FiltersSheetShellProps {
 }
 
 /**
- * Shared bottom-sheet scaffold for filter editors (calendar + explore).
- * Owns the modal, scrim, slide-up entrance, drag handle, and header row;
- * callers render their filter sections as children.
+ * Shared bottom-sheet scaffold for filter editors (calendar + explore + maps).
+ * Wraps @gorhom/bottom-sheet's BottomSheetModal: owns the modal host, scrim,
+ * native drag handle, slide-up animation and header row; callers render their
+ * filter sections as children.
+ *
+ * The public API stays declarative (`visible` / `onClose`); internally a ref
+ * bridges it onto gorhom's imperative present()/dismiss(), and `onDismiss`
+ * funnels swipe-down / backdrop-tap / hardware-back back through `onClose`.
  */
 export function FiltersSheetShell({
   visible,
@@ -48,76 +45,80 @@ export function FiltersSheetShell({
   const themeColors = getThemeColors(colorScheme);
   const { height: windowHeight } = useWindowDimensions();
 
-  // Slide-up entrance driven as a plain style animation rather than a
-  // reanimated `entering` layout animation: layout animations on views inside
-  // an Android Modal are known to break touch handling for descendants on the
-  // new architecture (presses get cancelled on the slightest finger movement).
-  const translateY = useSharedValue(windowHeight);
+  const sheetRef = useRef<BottomSheetModal>(null);
+  // Only dismiss a sheet that was actually presented, so the first mount with
+  // visible=false can't fire a spurious onDismiss → onClose.
+  const presentedRef = useRef(false);
+
   useEffect(() => {
     if (visible) {
-      translateY.value = windowHeight;
-      translateY.value = withTiming(0, {
-        duration: 320,
-        easing: Easing.bezier(0.32, 0.72, 0, 1),
-      });
+      sheetRef.current?.present();
+      presentedRef.current = true;
+    } else if (presentedRef.current) {
+      sheetRef.current?.dismiss();
+      presentedRef.current = false;
     }
-  }, [visible, windowHeight, translateY]);
-  const slideStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+  }, [visible]);
+
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
 
   return (
-    // The modal fades (scrim) while the sheet itself slides up with the
-    // handoff's 0.32s cubic-bezier curve.
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* The Android Modal window doesn't resize for the soft keyboard, so the
-          KAV must pad on both platforms or inputs end up hidden behind it. */}
-      <KeyboardAvoidingView style={styles.flex} behavior="padding">
-        <View style={styles.scrim}>
-          {/* Dismissal backdrop sits BEHIND the sheet as a sibling, never as an
-              ancestor: wrapping the sheet in Pressables makes Android cancel
-              child presses on the slightest finger movement (taps inside the
-              sheet stop registering). */}
+    <BottomSheetModal
+      ref={sheetRef}
+      onDismiss={onClose}
+      enableDynamicSizing
+      // Preserve the old 78% max-height clamp; the sheet shrinks to its content
+      // below that and the inner ScrollView scrolls once it hits the cap.
+      maxDynamicContentSize={windowHeight * 0.78}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      handleIndicatorStyle={{ backgroundColor: themeColors.separator }}
+      backgroundStyle={{
+        backgroundColor: themeColors.cardBackground,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+      }}
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
+    >
+      {/* keyboardShouldPersistTaps keeps SheetSearchMultiSelect dropdown row
+          taps landing while the keyboard is up. */}
+      <BottomSheetScrollView
+        testID={testID}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: Spacing.sm,
+          paddingBottom: Spacing['2xl'],
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerRow}>
+          <ThemedText style={styles.title}>{title}</ThemedText>
           <Pressable
-            style={StyleSheet.absoluteFill}
+            style={[styles.closeButton, { backgroundColor: themeColors.badgeBg }]}
             onPress={onClose}
-            accessible={false}
-            importantForAccessibility="no"
-          />
-          <Animated.View
-            style={[styles.sheet, slideStyle, { backgroundColor: themeColors.cardBackground }]}
-            testID={testID}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
           >
-            <View style={[styles.handle, { backgroundColor: themeColors.separator }]} />
-
-            {/* keyboardShouldPersistTaps is required so SheetSearchMultiSelect
-                dropdown row taps land while the keyboard is up. flexShrink lets
-                the ScrollView compress when the sheet hits its maxHeight clamp
-                (RN defaults flexShrink to 0) — without it the ScrollView keeps
-                its full content height and can never scroll. */}
-            <ScrollView
-              style={styles.scroll}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.headerRow}>
-                <ThemedText style={styles.title}>{title}</ThemedText>
-                <Pressable
-                  style={[styles.closeButton, { backgroundColor: themeColors.badgeBg }]}
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('common.close')}
-                >
-                  <IconSymbol name="xmark" size={14} color={themeColors.secondaryText} />
-                </Pressable>
-              </View>
-
-              {children}
-            </ScrollView>
-          </Animated.View>
+            <IconSymbol name="xmark" size={14} color={themeColors.secondaryText} />
+          </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        {children}
+      </BottomSheetScrollView>
+    </BottomSheetModal>
   );
 }
 
