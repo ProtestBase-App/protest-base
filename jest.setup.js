@@ -56,6 +56,15 @@ jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn().mockResolvedValue({ type: 'cancel' }),
 }));
 
+jest.mock('expo-screen-capture', () => ({
+  preventScreenCaptureAsync: jest.fn().mockResolvedValue(undefined),
+  allowScreenCaptureAsync: jest.fn().mockResolvedValue(undefined),
+  enableAppSwitcherProtectionAsync: jest.fn().mockResolvedValue(undefined),
+  disableAppSwitcherProtectionAsync: jest.fn().mockResolvedValue(undefined),
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+  usePreventScreenCapture: jest.fn(),
+}));
+
 jest.mock('expo-linking', () => ({
   openURL: jest.fn().mockResolvedValue(undefined),
   createURL: jest.fn((path) => `exp://localhost:8081/${path}`),
