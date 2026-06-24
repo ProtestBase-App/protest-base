@@ -16,6 +16,9 @@ import {
   clearEventDraft,
   hasEventDraft,
   clearAllUserData,
+  getHomeArea,
+  setHomeArea,
+  clearHomeArea,
   SavedEntry,
 } from '../localStorageService';
 
@@ -377,6 +380,56 @@ describe('hasEventDraft', () => {
 // ============================================================================
 // writeSavedEntriesLocally direct API (large payload chunking smoke test)
 // ============================================================================
+
+// ============================================================================
+// Home area (anonymous "near me" preference, AsyncStorage)
+// ============================================================================
+
+describe('home area (get/set/clear)', () => {
+  // Stateful AsyncStorage mock so a set→get round-trip actually persists
+  // (the outer beforeEach stubs getItem to always return null).
+  let asyncMem: Map<string, string>;
+
+  beforeEach(() => {
+    asyncMem = new Map();
+    (AsyncStorage.getItem as jest.Mock).mockImplementation(async (key: string) =>
+      asyncMem.has(key) ? asyncMem.get(key)! : null
+    );
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      asyncMem.set(key, value);
+    });
+    (AsyncStorage.removeItem as jest.Mock).mockImplementation(async (key: string) => {
+      asyncMem.delete(key);
+    });
+  });
+
+  it('round-trips a token via set then get', async () => {
+    await setHomeArea('m:be:7500');
+    expect(asyncMem.get(STORAGE_KEYS.HOME_AREA)).toBe('m:be:7500');
+    expect(await getHomeArea()).toBe('m:be:7500');
+  });
+
+  it('returns null when no home area is stored', async () => {
+    expect(await getHomeArea()).toBeNull();
+  });
+
+  it('clear removes the stored token', async () => {
+    await setHomeArea('p:nl:zuid-holland');
+    await clearHomeArea();
+    expect(asyncMem.has(STORAGE_KEYS.HOME_AREA)).toBe(false);
+    expect(await getHomeArea()).toBeNull();
+  });
+
+  it('returns null and does not throw when getItem fails', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValue(new Error('boom'));
+    await expect(getHomeArea()).resolves.toBeNull();
+  });
+
+  it('does not throw when setItem fails', async () => {
+    (AsyncStorage.setItem as jest.Mock).mockRejectedValue(new Error('boom'));
+    await expect(setHomeArea('m:be:1000')).resolves.toBeUndefined();
+  });
+});
 
 describe('writeSavedEntriesLocally', () => {
   it('chunks large payloads transparently', async () => {

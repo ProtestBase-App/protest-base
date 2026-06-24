@@ -13,6 +13,7 @@ import { SavedEventsProvider } from '@/context/SavedEventsProvider';
 import { LikedEventsProvider } from '@/context/LikedEventsProvider';
 import { FollowedOrgsProvider } from '@/context/FollowedOrgsProvider';
 import { PostalCodeProvider } from '@/context/PostalCodeProvider';
+import { HomeAreaProvider } from '@/context/HomeAreaProvider';
 import { PastEventsProvider } from '@/context/PastEventsProvider';
 import { TemplatesProvider } from '@/context/TemplatesProvider';
 import { OrganizationsProvider } from '@/context/OrganizationsProvider';
@@ -106,18 +107,20 @@ export default function RootLayout() {
                                 <TemplatesProvider>
                                   <OrganizationsProvider>
                                     <PostalCodeProvider>
-                                      <ThemeProvider
-                                        value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-                                      >
-                                        <ExploreTabProvider>
-                                          <NotificationsBootstrap />
-                                          <PrivacyScreenGuard />
-                                          <RootNavigator />
-                                          <StatusBar
-                                            style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                          />
-                                        </ExploreTabProvider>
-                                      </ThemeProvider>
+                                      <HomeAreaProvider>
+                                        <ThemeProvider
+                                          value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+                                        >
+                                          <ExploreTabProvider>
+                                            <NotificationsBootstrap />
+                                            <PrivacyScreenGuard />
+                                            <RootNavigator />
+                                            <StatusBar
+                                              style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                            />
+                                          </ExploreTabProvider>
+                                        </ThemeProvider>
+                                      </HomeAreaProvider>
                                     </PostalCodeProvider>
                                   </OrganizationsProvider>
                                 </TemplatesProvider>

@@ -51,6 +51,14 @@ export default function MoreLayout() {
           }}
         />
         <Stack.Screen
+          name="home-area"
+          options={{
+            headerShown: true,
+            headerBackVisible: true,
+            headerTitle: t('homeArea.title'),
+          }}
+        />
+        <Stack.Screen
           name="account"
           options={{
             headerShown: true,

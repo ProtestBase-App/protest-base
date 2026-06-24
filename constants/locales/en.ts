@@ -47,6 +47,20 @@ const en: LocaleData = {
     mapUnavailable: 'The map is not available on this device',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
+    nearMe: 'Near me',
+  },
+
+  // ============================================
+  // Home area - "Near me" without GPS
+  // ============================================
+  homeArea: {
+    title: 'Home area',
+    settingsRow: 'Home area',
+    scopeChip: 'My area',
+    pickerPlaceholder: 'Search a city, province or region…',
+    clear: 'Clear home area',
+    empty:
+      'Pick your area to sort nearby protests first and center the map there. No GPS — your choice is stored only on this device.',
   },
 
   // ============================================

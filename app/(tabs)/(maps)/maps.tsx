@@ -1,6 +1,6 @@
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -29,11 +29,13 @@ import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColor
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { eventCategories } from '@/constants/EventCategories';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useHomeArea } from '@/context/HomeAreaProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
 import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { parseAsUTC } from '@/utils/eventFormatters';
+import { deriveHomeAreaCenter, sortEventsByHomeArea } from '@/utils/homeArea';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import {
@@ -108,12 +110,19 @@ export default function MapsScreen() {
 
   const { eventsCache, eventsLoading, userLanguage } = useGlobalContext();
   const { isSaved, saveEvent, unsaveEvent, savedEventIds } = useSavedEvents();
+  const { homeAreaToken, homeAreaMatch, loading: homeAreaLoading } = useHomeArea();
+  // Reactive focus: the home area is picked on the More tab (Maps blurred), so
+  // the recenter must fire when Maps regains focus, not silently off-screen.
+  const isFocused = useIsFocused();
 
   const [timeFilter, setTimeFilter] = useState<MapTimeFilter>('all');
   const [filters, setFilters] = useState<MapFilters>(DEFAULT_MAP_FILTERS);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  // "Near me" list sort: opt-in (off by default). The home-area map *recenter*
+  // is the passive default; reordering the carousel stays user-initiated.
+  const [nearMeSort, setNearMeSort] = useState(false);
 
   const mapRef = useRef<any>(null);
   const cameraRef = useRef<any>(null);
@@ -121,6 +130,12 @@ export default function MapsScreen() {
   const selectionSourceRef = useRef<SelectionSource | null>(null);
   /** Timestamp until which carousel scroll events are programmatic. */
   const programmaticScrollUntilRef = useRef(0);
+  /** One-shot guard: the home-area recenter runs once per mount (re-armed on token change). */
+  const hasRecenteredRef = useRef(false);
+  /** Home token at the last recenter; `undefined` until the first recenter runs. */
+  const lastRecenteredTokenRef = useRef<string | null | undefined>(undefined);
+  /** True after the initial home recenter, so the racing auto-select skips its camera fly. */
+  const homeOwnsInitialCameraRef = useRef(false);
 
   const todayKey = getTodayDateKeyInBelgium();
 
@@ -148,19 +163,35 @@ export default function MapsScreen() {
     [eventsCache, now]
   );
 
+  // Latest geocoded set for the recenter effect to read without depending on
+  // eventsCache (which would re-run the camera on every refresh — a yank).
+  const geocodedEventsRef = useRef(geocodedEvents);
+  geocodedEventsRef.current = geocodedEvents;
+
+  const isInitialEventsLoad = eventsLoading && Object.keys(eventsCache).length === 0;
+
   const filterContext = useMemo(() => ({ isSaved }), [isSaved]);
 
-  const mapEvents = useMemo(
-    () =>
-      sortEventsChronologically(
-        geocodedEvents.filter(
-          (event) =>
-            matchesTimeWindow(event, timeFilter, todayKey, now) &&
-            matchesMapFilters(event, filters, filterContext)
-        )
-      ),
-    [geocodedEvents, timeFilter, todayKey, now, filters, filterContext]
-  );
+  const mapEvents = useMemo(() => {
+    const filtered = geocodedEvents.filter(
+      (event) =>
+        matchesTimeWindow(event, timeFilter, todayKey, now) &&
+        matchesMapFilters(event, filters, filterContext)
+    );
+    // "Near me" reorders by home-area rank; otherwise soonest-first.
+    return nearMeSort && homeAreaMatch
+      ? sortEventsByHomeArea(filtered, homeAreaMatch)
+      : sortEventsChronologically(filtered);
+  }, [
+    geocodedEvents,
+    timeFilter,
+    todayKey,
+    now,
+    filters,
+    filterContext,
+    nearMeSort,
+    homeAreaMatch,
+  ]);
 
   // Latest-value refs so the camera effect below can depend on selectedId only
   // (selection changes fly the camera; filter changes alone must not re-fly).
@@ -204,6 +235,40 @@ export default function MapsScreen() {
     });
   }, []);
 
+  // One-shot home-area recenter: once the map + first events batch + stored
+  // token have settled, fly to the derived center (Brussels when no in-area
+  // event has coordinates). Sequenced before the auto-select camera fly via
+  // homeOwnsInitialCameraRef, and re-armed when the home token changes (e.g.
+  // picked in More) so the map recenters on the new area. Reads the event set
+  // through a ref so a cache refresh never re-runs the camera.
+  useEffect(() => {
+    if (hasRecenteredRef.current && homeAreaToken !== lastRecenteredTokenRef.current) {
+      hasRecenteredRef.current = false; // a new home area re-arms the one-shot
+    }
+    if (hasRecenteredRef.current) return;
+    // Recenter only while on-screen so the fly is visible. An off-screen token
+    // change (set in More) re-armed the one-shot above but defers here; the
+    // recenter then fires when Maps regains focus.
+    if (!isFocused) return;
+    if (!mapReady || isInitialEventsLoad || homeAreaLoading) return;
+    // A token is set but its postcode match hasn't resolved yet (postal data
+    // still loading) — wait so we recenter on the area, not the fallback.
+    if (homeAreaToken && !homeAreaMatch) return;
+
+    const isInitialRecenter = lastRecenteredTokenRef.current === undefined;
+    hasRecenteredRef.current = true;
+    lastRecenteredTokenRef.current = homeAreaToken;
+    if (!homeAreaMatch) return; // no home area → the auto-select fly drives the camera
+
+    // Only the very first recenter races a pending auto-selection; suppress
+    // that one fly. Later token-change recenters have no competing auto-fly.
+    if (isInitialRecenter) homeOwnsInitialCameraRef.current = true;
+
+    const center =
+      deriveHomeAreaCenter(geocodedEventsRef.current, homeAreaMatch) ?? BRUSSELS_CENTER;
+    cameraRef.current?.flyTo({ center, zoom: DEFAULT_ZOOM, duration: 700 });
+  }, [isFocused, mapReady, isInitialEventsLoad, homeAreaLoading, homeAreaToken, homeAreaMatch]);
+
   // Selection drives the camera and the carousel position (two-way sync).
   useEffect(() => {
     if (!selectedId || !mapReady) return;
@@ -211,7 +276,12 @@ export default function MapsScreen() {
     const index = events.findIndex((event) => event.$id === selectedId);
     if (index < 0) return;
 
-    void flyToEvent(events[index]);
+    // Skip the initial auto-select fly when the home recenter owns the opening
+    // camera; the carousel still syncs to the selected card.
+    const skipFly = selectionSourceRef.current === 'auto' && homeOwnsInitialCameraRef.current;
+    homeOwnsInitialCameraRef.current = false;
+
+    if (!skipFly) void flyToEvent(events[index]);
 
     if (selectionSourceRef.current !== 'carousel') {
       programmaticScrollUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
@@ -324,7 +394,6 @@ export default function MapsScreen() {
   const activeFilterCount = countActiveMapFilters(filters);
   const anyFilterActive = activeFilterCount > 0;
   const anyResetTarget = hasActiveMapFilters(filters) || timeFilter !== 'all';
-  const isInitialEventsLoad = eventsLoading && Object.keys(eventsCache).length === 0;
   const carouselVisible = mapEvents.length > 0;
   const carouselSidePadding = Math.max(0, (windowWidth - MAP_CARD_WIDTH) / 2);
   const bottomStackOffset = (Platform.OS === 'ios' ? tabBarHeight : 0) + 10;
@@ -459,6 +528,9 @@ export default function MapsScreen() {
           onTimeFilterChange={setTimeFilter}
           selectedCategories={filters.categories}
           onToggleCategory={toggleQuickCategory}
+          showNearMe={!!homeAreaToken}
+          nearMeActive={nearMeSort}
+          onToggleNearMe={() => setNearMeSort((value) => !value)}
         />
       </View>
 

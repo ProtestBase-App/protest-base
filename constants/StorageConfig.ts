@@ -39,6 +39,11 @@ export const STORAGE_KEYS = {
   API_PREFIX: 'apiPrefix',
   HOME_VIEW_PREFERENCE: 'homeViewPreference',
   NOTIFICATION_PERMISSION_REQUESTED: 'notificationPermissionRequested',
+  // Manually-chosen "home area" administrative token (e.g. m:be:7500) for the
+  // privacy-clean "near me" feature. Deliberately NOT in USER_DATA_KEYS below:
+  // it's an anonymous device preference that should survive logout and stay
+  // usable for logged-out browsers (explore/maps are public).
+  HOME_AREA: 'homeArea',
 } as const;
 
 /**

@@ -107,6 +107,84 @@ describe('Explore Screen', () => {
     });
   });
 
+  describe('Home area "My area" chip', () => {
+    const emptyFilters = {
+      category: null,
+      dateFilter: null,
+      locations: [] as string[],
+      organizations: [] as string[],
+    };
+
+    beforeEach(() => {
+      (useExplorePagination as jest.Mock).mockReturnValue({
+        events: [],
+        loading: false,
+        refreshing: false,
+        loadingMore: false,
+        hasMore: false,
+        handleRefresh: jest.fn(),
+        handleEndReached: jest.fn(),
+      });
+    });
+
+    it('appends the home token to the location filter when tapped', () => {
+      const setAppliedFilters = jest.fn();
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: { appliedFilters: emptyFilters, setAppliedFilters },
+        },
+      });
+
+      fireEvent.press(getByText('homeArea.scopeChip'));
+
+      expect(setAppliedFilters).toHaveBeenCalledTimes(1);
+      const updater = setAppliedFilters.mock.calls[0][0];
+      expect(updater(emptyFilters).locations).toEqual(['m:be:7500']);
+    });
+
+    it('hides the chip once the home token is already applied', () => {
+      const { queryByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: {
+            appliedFilters: { ...emptyFilters, locations: ['m:be:7500'] },
+          },
+        },
+      });
+
+      expect(queryByText('homeArea.scopeChip')).toBeNull();
+    });
+
+    it('does not render the chip when no home area is set', () => {
+      const { queryByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: { homeAreaContext: { homeAreaToken: null } },
+      });
+
+      expect(queryByText('homeArea.scopeChip')).toBeNull();
+    });
+
+    it('blocks an over-broad selection with an alert instead of filtering', () => {
+      const { Alert } = require('react-native');
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const setAppliedFilters = jest.fn();
+
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'r:be:wallonia' },
+          postalCodeContext: { isLocationSelectionTooBroad: jest.fn().mockReturnValue(true) },
+          exploreTabContext: { appliedFilters: emptyFilters, setAppliedFilters },
+        },
+      });
+
+      fireEvent.press(getByText('homeArea.scopeChip'));
+
+      expect(alertSpy).toHaveBeenCalled();
+      expect(setAppliedFilters).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+  });
+
   describe('Event List Display', () => {
     it('renders event cards when events are available', () => {
       const mockFormattedEvent = {

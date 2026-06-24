@@ -229,6 +229,11 @@ export default function MoreScreen() {
       <SectionHeader title={t('more.settings')} style={styles.sectionLabel} />
       <GroupCard>
         <GroupRow
+          icon="mappin.and.ellipse"
+          label={t('homeArea.settingsRow')}
+          onPress={() => router.push(Routes.HOME_AREA)}
+        />
+        <GroupRow
           icon="lock.shield"
           label={t('more.privacyCenter')}
           onPress={() => router.push(Routes.PRIVACY_CENTER)}

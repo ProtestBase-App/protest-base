@@ -92,6 +92,14 @@ export interface MockPostalCodeContext {
   isLocationSelectionTooBroad?: jest.Mock;
 }
 
+export interface MockHomeAreaContext {
+  homeAreaToken?: string | null;
+  homeAreaLabel?: string;
+  homeAreaMatch?: any;
+  setHomeArea?: jest.Mock;
+  loading?: boolean;
+}
+
 export interface MockExploreTabContext {
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
@@ -170,6 +178,7 @@ export interface ProviderOverrides {
   likedEventsContext?: MockLikedEventsContext;
   followedOrgsContext?: MockFollowedOrgsContext;
   postalCodeContext?: MockPostalCodeContext;
+  homeAreaContext?: MockHomeAreaContext;
   exploreTabContext?: MockExploreTabContext;
   organizationsContext?: MockOrganizationsContext;
   userOrganizationsContext?: MockUserOrganizationsContext;
@@ -235,6 +244,14 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
   expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
   resolveLocationLabel: jest.fn((value: string) => value),
   isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+};
+
+const defaultHomeAreaContext: Required<MockHomeAreaContext> = {
+  homeAreaToken: null,
+  homeAreaLabel: '',
+  homeAreaMatch: null,
+  setHomeArea: jest.fn().mockResolvedValue(undefined),
+  loading: false,
 };
 
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
@@ -319,6 +336,7 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
   const liked = { ...defaultLikedEventsContext, ...overrides.likedEventsContext };
   const followed = { ...defaultFollowedOrgsContext, ...overrides.followedOrgsContext };
   const postal = { ...defaultPostalCodeContext, ...overrides.postalCodeContext };
+  const homeArea = { ...defaultHomeAreaContext, ...overrides.homeAreaContext };
   const explore = { ...defaultExploreTabContext, ...overrides.exploreTabContext };
   const orgs = { ...defaultOrganizationsContext, ...overrides.organizationsContext };
   const userOrgs = { ...defaultUserOrganizationsContext, ...overrides.userOrganizationsContext };
@@ -342,6 +360,7 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
   jest
     .spyOn(require('@/context/PostalCodeProvider'), 'usePostalCodes')
     .mockReturnValue(postal as any);
+  jest.spyOn(require('@/context/HomeAreaProvider'), 'useHomeArea').mockReturnValue(homeArea as any);
   jest
     .spyOn(require('@/context/ExploreTabProvider'), 'useExploreTabContext')
     .mockReturnValue(explore as any);

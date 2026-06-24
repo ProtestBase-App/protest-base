@@ -45,6 +45,20 @@ const nl = {
     mapUnavailable: 'De kaart is niet beschikbaar op dit apparaat',
     zoomIn: 'Inzoomen',
     zoomOut: 'Uitzoomen',
+    nearMe: 'Bij mij in de buurt',
+  },
+
+  // ============================================
+  // Home area - "Bij mij in de buurt" zonder GPS
+  // ============================================
+  homeArea: {
+    title: 'Mijn gebied',
+    settingsRow: 'Mijn gebied',
+    scopeChip: 'Mijn gebied',
+    pickerPlaceholder: 'Zoek een stad, provincie of regio…',
+    clear: 'Mijn gebied wissen',
+    empty:
+      'Kies je gebied om acties in de buurt eerst te tonen en de kaart daar te centreren. Zonder GPS — je keuze blijft op dit apparaat.',
   },
 
   // ============================================
@@ -1295,13 +1309,8 @@ const nl = {
     currentLocation: 'Huidige locatie',
     useCurrentLocation: 'Gebruik huidige locatie',
     locationPermissionDenied: 'Locatietoegang geweigerd',
-    locationPermissionMessage:
-      'Sta ProtestBase toe om toegang te krijgen tot je locatie om evenementen bij jou in de buurt te vinden.',
-    enableLocation: 'Locatie inschakelen',
     getDirections: 'Routebeschrijving',
     openInMaps: 'Openen in Maps',
-    distance: 'Afstand',
-    nearby: 'Bij jou in de buurt',
     km: 'km',
     meters: 'm',
   },

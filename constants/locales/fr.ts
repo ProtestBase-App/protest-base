@@ -47,6 +47,20 @@ const fr: LocaleData = {
     mapUnavailable: "La carte n'est pas disponible sur cet appareil",
     zoomIn: 'Zoom avant',
     zoomOut: 'Zoom arrière',
+    nearMe: 'Près de moi',
+  },
+
+  // ============================================
+  // Home area - « Près de moi » sans GPS
+  // ============================================
+  homeArea: {
+    title: 'Ma zone',
+    settingsRow: 'Ma zone',
+    scopeChip: 'Ma zone',
+    pickerPlaceholder: 'Rechercher une ville, province ou région…',
+    clear: 'Effacer ma zone',
+    empty:
+      'Choisissez votre zone pour afficher d’abord les actions à proximité et y centrer la carte. Sans GPS — votre choix reste sur cet appareil.',
   },
 
   // ============================================
