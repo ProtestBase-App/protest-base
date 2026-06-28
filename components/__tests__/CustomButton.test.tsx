@@ -37,6 +37,20 @@ describe('CustomButton', () => {
       fireEvent.press(screen.getByText('Sign In'));
       expect(handlePress).not.toHaveBeenCalled();
     });
+
+    it('does not respond to press when disabled', () => {
+      const handlePress = jest.fn();
+      render(<CustomButton {...defaultProps} handlePress={handlePress} disabled={true} />);
+      fireEvent.press(screen.getByText('Sign In'));
+      expect(handlePress).not.toHaveBeenCalled();
+    });
+
+    it('responds to press when disabled is false', () => {
+      const handlePress = jest.fn();
+      render(<CustomButton {...defaultProps} handlePress={handlePress} disabled={false} />);
+      fireEvent.press(screen.getByText('Sign In'));
+      expect(handlePress).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Loading state', () => {

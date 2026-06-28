@@ -23,11 +23,13 @@ import { TemplateEventData } from '@/types/template.types';
 import CustomButton from '@/components/CustomButton';
 import FormField from '@/components/FormField';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -76,6 +78,7 @@ const hasTemplateFormChanges = (
 
 export default function EditTemplateScreen() {
   const { loading: authLoading, isLogged, userLanguage } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { removeTemplate, editTemplate } = useTemplates();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -249,6 +252,7 @@ export default function EditTemplateScreen() {
   };
 
   const handleSave = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     if (!templateName.trim()) {
       setTemplateNameError(true);
       Alert.alert(t('common.error'), t('template.nameMissing'));
@@ -305,6 +309,7 @@ export default function EditTemplateScreen() {
   };
 
   const handleDelete = () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     Alert.alert(
       t('template.deleteConfirmTitle'),
       t('template.deleteConfirmMessage', { name: templateName }),

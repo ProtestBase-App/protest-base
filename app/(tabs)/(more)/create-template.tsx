@@ -21,6 +21,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useTemplates } from '@/context/TemplatesProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
@@ -32,6 +33,7 @@ import type { CreateTemplateSearchParams } from '@/types/navigation.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -96,6 +98,7 @@ const hasTemplateFormChanges = (
 
 export default function CreateTemplateScreen() {
   const { loading, isLogged, userLanguage } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { addTemplate } = useTemplates();
   const {
     selectedOrganizationId,
@@ -308,6 +311,7 @@ export default function CreateTemplateScreen() {
   };
 
   const submit = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     const effectiveOrgId = selectedOrgId || selectedOrganizationId || '';
 
     if (!effectiveOrgId) {

@@ -19,6 +19,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import FormField from '@/components/FormField';
 import CustomButton from '@/components/CustomButton';
@@ -26,9 +27,11 @@ import { deleteAccount } from '@/services/auth.service';
 import { Typography, Spacing } from '@/constants/DesignTokens';
 import { Routes } from '@/constants/Routes';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 export default function DeleteAccountScreen() {
   const { user, clearAuthState } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const [isSubmitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -43,6 +46,7 @@ export default function DeleteAccountScreen() {
 
   // Handle Delete Account
   const handleDeleteAccount = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     const newEmptyFields = {
       email: form.email === '',
       password: form.password === '',

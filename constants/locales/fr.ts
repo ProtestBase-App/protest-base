@@ -149,6 +149,17 @@ const fr: LocaleData = {
   },
 
   // ============================================
+  // Connectivity - Offline awareness
+  // ============================================
+  connectivity: {
+    banner: 'Vous êtes hors ligne. Contenu enregistré affiché.',
+    actionUnavailableOffline:
+      'Vous êtes hors ligne. Connectez-vous à Internet pour effectuer cette action.',
+    cannotRefreshOffline:
+      "Impossible d'actualiser hors ligne. Les événements déjà chargés sont affichés.",
+  },
+
+  // ============================================
   // Template - Event template management
   // ============================================
   template: {

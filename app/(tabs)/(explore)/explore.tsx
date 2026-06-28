@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useExploreTabContext } from '@/context/ExploreTabProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useHomeArea } from '@/context/HomeAreaProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
@@ -44,6 +45,7 @@ function LoadingFooter() {
 export default function ExploreTab() {
   const logo = useLogoScheme();
   const { userLanguage, eventsCache } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { saveEvent, unsaveEvent, isSaved, savedEventIds } = useSavedEvents();
   const {
     getSubMunicipalityName,
@@ -100,6 +102,7 @@ export default function ExploreTab() {
     handleEndReached,
   } = useExplorePagination({
     pageSize: 20,
+    isOffline,
     filters: {
       dateFilter: appliedFilters.dateFilter,
       postalCodes: expandedPostalCodes,

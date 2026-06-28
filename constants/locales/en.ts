@@ -148,6 +148,15 @@ const en: LocaleData = {
   },
 
   // ============================================
+  // Connectivity - Offline awareness
+  // ============================================
+  connectivity: {
+    banner: "You're offline. Showing saved content.",
+    actionUnavailableOffline: "You're offline. Connect to the internet to do this.",
+    cannotRefreshOffline: "Can't refresh while offline. Showing the events you already have.",
+  },
+
+  // ============================================
   // Template - Event template management
   // ============================================
   template: {

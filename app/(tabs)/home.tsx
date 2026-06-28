@@ -16,6 +16,7 @@ import { CalendarEmptyState } from '@/components/CalendarEmptyState';
 import { CalendarFiltersSheet } from '@/components/CalendarFiltersSheet';
 import MonthYearPicker from '@/components/MonthYearPicker';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useOrganizations } from '@/context/OrganizationsProvider';
@@ -100,6 +101,7 @@ export default function HomeTab() {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { userLanguage, eventsCache, eventsLoading, refetchEvents } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { isSaved, saveEvent, unsaveEvent, loading: savedEventsLoading } = useSavedEvents();
   const {
     loading: postalCodesLoading,
@@ -276,6 +278,13 @@ export default function HomeTab() {
   }, []);
 
   const onRefresh = useCallback(async () => {
+    // Offline: don't spin a doomed refetch — the cache is still browsable.
+    if (isOffline) {
+      Alert.alert(t('common.error'), t('connectivity.cannotRefreshOffline'), [
+        { text: t('common.ok') },
+      ]);
+      return;
+    }
     logger.info('[HomeTab] Pull to refresh triggered');
     setRefreshing(true);
     setNow(new Date());
@@ -289,7 +298,7 @@ export default function HomeTab() {
     } finally {
       setRefreshing(false);
     }
-  }, [refetchEvents]);
+  }, [refetchEvents, isOffline]);
 
   const handleEventPress = useCallback((eventId: string) => {
     router.push(DynamicRoutes.event(eventId));

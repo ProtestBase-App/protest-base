@@ -23,7 +23,8 @@ import { VersionCheckProvider } from '@/context/VersionCheckProvider';
 import { VersionGate } from '@/components/version';
 import { IntegrityProvider } from '@/context/IntegrityProvider';
 import { IntegrityGate } from '@/components/integrity';
-import { ConnectionGate } from '@/components/connection';
+import { ConnectionGate, OfflineBanner } from '@/components/connection';
+import { ConnectivityProvider } from '@/context/ConnectivityProvider';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
 import { PrivacyScreenGuard } from '@/components/PrivacyScreenGuard';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -99,36 +100,41 @@ export default function RootLayout() {
                 <IntegrityGate>
                   <GlobalProvider>
                     <ConnectionGate>
-                      <UserOrganizationsProvider>
-                        <SavedEventsProvider>
-                          <LikedEventsProvider>
-                            <FollowedOrgsProvider>
-                              <PastEventsProvider>
-                                <TemplatesProvider>
-                                  <OrganizationsProvider>
-                                    <PostalCodeProvider>
-                                      <HomeAreaProvider>
-                                        <ThemeProvider
-                                          value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-                                        >
-                                          <ExploreTabProvider>
-                                            <NotificationsBootstrap />
-                                            <PrivacyScreenGuard />
-                                            <RootNavigator />
-                                            <StatusBar
-                                              style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                            />
-                                          </ExploreTabProvider>
-                                        </ThemeProvider>
-                                      </HomeAreaProvider>
-                                    </PostalCodeProvider>
-                                  </OrganizationsProvider>
-                                </TemplatesProvider>
-                              </PastEventsProvider>
-                            </FollowedOrgsProvider>
-                          </LikedEventsProvider>
-                        </SavedEventsProvider>
-                      </UserOrganizationsProvider>
+                      <ConnectivityProvider>
+                        <UserOrganizationsProvider>
+                          <SavedEventsProvider>
+                            <LikedEventsProvider>
+                              <FollowedOrgsProvider>
+                                <PastEventsProvider>
+                                  <TemplatesProvider>
+                                    <OrganizationsProvider>
+                                      <PostalCodeProvider>
+                                        <HomeAreaProvider>
+                                          <ThemeProvider
+                                            value={
+                                              colorScheme === 'dark' ? DarkTheme : DefaultTheme
+                                            }
+                                          >
+                                            <ExploreTabProvider>
+                                              <NotificationsBootstrap />
+                                              <PrivacyScreenGuard />
+                                              <RootNavigator />
+                                              <OfflineBanner />
+                                              <StatusBar
+                                                style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                              />
+                                            </ExploreTabProvider>
+                                          </ThemeProvider>
+                                        </HomeAreaProvider>
+                                      </PostalCodeProvider>
+                                    </OrganizationsProvider>
+                                  </TemplatesProvider>
+                                </PastEventsProvider>
+                              </FollowedOrgsProvider>
+                            </LikedEventsProvider>
+                          </SavedEventsProvider>
+                        </UserOrganizationsProvider>
+                      </ConnectivityProvider>
                     </ConnectionGate>
                   </GlobalProvider>
                 </IntegrityGate>

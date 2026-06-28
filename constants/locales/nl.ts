@@ -164,6 +164,16 @@ const nl = {
   },
 
   // ============================================
+  // Connectivity - Offline awareness
+  // ============================================
+  connectivity: {
+    banner: 'Je bent offline. Opgeslagen inhoud wordt getoond.',
+    actionUnavailableOffline: 'Je bent offline. Maak verbinding met internet om dit te doen.',
+    cannotRefreshOffline:
+      'Kan niet vernieuwen zonder verbinding. De reeds geladen evenementen worden getoond.',
+  },
+
+  // ============================================
   // Template - Event template management
   // ============================================
   template: {

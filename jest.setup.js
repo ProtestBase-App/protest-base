@@ -71,6 +71,31 @@ jest.mock('expo-linking', () => ({
   canOpenURL: jest.fn().mockResolvedValue(true),
 }));
 
+// expo-network: default to fully-online so connectivity-aware screens render
+// normally. Tests simulate offline by overriding useNetworkState per-test.
+jest.mock('expo-network', () => ({
+  useNetworkState: jest.fn(() => ({
+    isConnected: true,
+    isInternetReachable: true,
+    type: 'WIFI',
+  })),
+  getNetworkStateAsync: jest
+    .fn()
+    .mockResolvedValue({ isConnected: true, isInternetReachable: true, type: 'WIFI' }),
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+  NetworkStateType: {
+    NONE: 'NONE',
+    UNKNOWN: 'UNKNOWN',
+    CELLULAR: 'CELLULAR',
+    WIFI: 'WIFI',
+    BLUETOOTH: 'BLUETOOTH',
+    ETHERNET: 'ETHERNET',
+    WIMAX: 'WIMAX',
+    VPN: 'VPN',
+    OTHER: 'OTHER',
+  },
+}));
+
 jest.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',

@@ -100,6 +100,12 @@ export interface MockHomeAreaContext {
   loading?: boolean;
 }
 
+export interface MockConnectivityContext {
+  isOffline?: boolean;
+  isConnected?: boolean | undefined;
+  isInternetReachable?: boolean | undefined;
+}
+
 export interface MockExploreTabContext {
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
@@ -179,6 +185,7 @@ export interface ProviderOverrides {
   followedOrgsContext?: MockFollowedOrgsContext;
   postalCodeContext?: MockPostalCodeContext;
   homeAreaContext?: MockHomeAreaContext;
+  connectivityContext?: MockConnectivityContext;
   exploreTabContext?: MockExploreTabContext;
   organizationsContext?: MockOrganizationsContext;
   userOrganizationsContext?: MockUserOrganizationsContext;
@@ -252,6 +259,12 @@ const defaultHomeAreaContext: Required<MockHomeAreaContext> = {
   homeAreaMatch: null,
   setHomeArea: jest.fn().mockResolvedValue(undefined),
   loading: false,
+};
+
+const defaultConnectivityContext: Required<MockConnectivityContext> = {
+  isOffline: false,
+  isConnected: true,
+  isInternetReachable: true,
 };
 
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
@@ -337,6 +350,7 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
   const followed = { ...defaultFollowedOrgsContext, ...overrides.followedOrgsContext };
   const postal = { ...defaultPostalCodeContext, ...overrides.postalCodeContext };
   const homeArea = { ...defaultHomeAreaContext, ...overrides.homeAreaContext };
+  const connectivity = { ...defaultConnectivityContext, ...overrides.connectivityContext };
   const explore = { ...defaultExploreTabContext, ...overrides.exploreTabContext };
   const orgs = { ...defaultOrganizationsContext, ...overrides.organizationsContext };
   const userOrgs = { ...defaultUserOrganizationsContext, ...overrides.userOrganizationsContext };
@@ -361,6 +375,9 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
     .spyOn(require('@/context/PostalCodeProvider'), 'usePostalCodes')
     .mockReturnValue(postal as any);
   jest.spyOn(require('@/context/HomeAreaProvider'), 'useHomeArea').mockReturnValue(homeArea as any);
+  jest
+    .spyOn(require('@/context/ConnectivityProvider'), 'useConnectivity')
+    .mockReturnValue(connectivity as any);
   jest
     .spyOn(require('@/context/ExploreTabProvider'), 'useExploreTabContext')
     .mockReturnValue(explore as any);
