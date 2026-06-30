@@ -72,6 +72,7 @@ coverage-*/
 CLAUDE.md
 .claude
 
-# Internal audit documents
-REVIEW.md
-docs/
+# Local / internal files — consolidated into one folder so this public
+# .gitignore doesn't enumerate individual filenames. Put notes, internal
+# docs (local/docs/), and audit files (e.g. REVIEW.md) in here.
+local/
