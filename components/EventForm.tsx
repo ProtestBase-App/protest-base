@@ -322,62 +322,6 @@ const EventForm: React.FC<EventFormProps> = ({
     setIsPickingImage(true);
 
     try {
-      const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-
-      // Show a pre-permission dialog the first time we'd ask. The alert is
-      // non-blocking, so keep isPickingImage=true until the user responds.
-      if (currentPermission.status === 'undetermined') {
-        Alert.alert(
-          t('permissions.photoLibraryPreTitle'),
-          t('permissions.photoLibraryPreMessage'),
-          [
-            {
-              text: t('permissions.notNow'),
-              style: 'cancel',
-              onPress: () => setIsPickingImage(false),
-            },
-            {
-              text: t('permissions.allowAccess'),
-              onPress: async () => {
-                try {
-                  await proceedWithImagePicker();
-                } finally {
-                  setIsPickingImage(false);
-                }
-              },
-            },
-          ],
-          { cancelable: false }
-        );
-        // The alert callbacks reset isPickingImage; return without touching it here.
-        return;
-      }
-
-      try {
-        await proceedWithImagePicker();
-      } finally {
-        setIsPickingImage(false);
-      }
-    } catch (error) {
-      logger.warn('Image picker failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      Alert.alert(t('common.error'), t('createEvent.imagePickerError'), [{ text: t('common.ok') }]);
-      setIsPickingImage(false);
-    }
-  };
-
-  const proceedWithImagePicker = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permissionResult.granted) {
-        Alert.alert(t('createEvent.permissionRequired'), t('createEvent.photoPermissionMessage'), [
-          { text: t('common.ok') },
-        ]);
-        return;
-      }
-
       const remaining = MAX_EVENT_IMAGES - form.images.length;
       if (remaining <= 0) {
         Alert.alert(
@@ -388,6 +332,10 @@ const EventForm: React.FC<EventFormProps> = ({
         return;
       }
 
+      // launchImageLibraryAsync uses the system photo picker (Android) / PHPicker
+      // (iOS), which return only the chosen images and need no media permission —
+      // so the app never requests READ_MEDIA_*. No pre-permission prompt needed.
+      //
       // allowsEditing (single-image crop) is unavailable with multiple selection,
       // so picks are uploaded uncropped. orderedSelection keeps the user's tap
       // order as the display order on iOS.
@@ -440,6 +388,8 @@ const EventForm: React.FC<EventFormProps> = ({
         error: error instanceof Error ? error.message : String(error),
       });
       Alert.alert(t('common.error'), t('createEvent.imagePickerError'), [{ text: t('common.ok') }]);
+    } finally {
+      setIsPickingImage(false);
     }
   };
 

@@ -661,9 +661,6 @@ const fr: LocaleData = {
 
     // Error messages for data loading
     postalCodeLoadError: 'Échec du chargement des codes postaux. Veuillez réessayer.',
-    permissionRequired: 'Autorisation requise',
-    photoPermissionMessage:
-      "Veuillez autoriser l'accès à la bibliothèque photo pour ajouter des images à votre événement.",
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
     maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
     missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
@@ -1386,9 +1383,6 @@ const fr: LocaleData = {
   // Permissions - Pre-permission dialogs
   // ============================================
   permissions: {
-    photoLibraryPreTitle: 'Ajouter une image',
-    photoLibraryPreMessage:
-      "ProtestBase a besoin d'accéder à tes photos pour ajouter des images à tes événements. Tes photos restent sur ton appareil.",
     calendarPreTitle: 'Ajouter au calendrier',
     calendarPreMessage:
       "ProtestBase a besoin d'accéder à ton calendrier pour ajouter cet événement. On ne peut pas voir tes autres événements.",

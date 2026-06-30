@@ -75,6 +75,15 @@ export default (): ExpoConfig => {
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.SYSTEM_ALERT_WINDOW',
+        // expo-image-picker's launchImageLibraryAsync uses the Android system
+        // photo picker, which returns only the chosen images and needs no broad
+        // media permission. Blocking these keeps READ_MEDIA_* out of the
+        // manifest so Google Play doesn't demand a photo/video permissions
+        // declaration for what is just an attach-a-photo feature.
+        'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.READ_MEDIA_VIDEO',
+        'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+        'android.permission.READ_EXTERNAL_STORAGE',
       ],
       // App Links verification is production-only: a verified preview build
       // would auto-open production protestbase.be/event/* links but query a

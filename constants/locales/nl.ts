@@ -704,9 +704,6 @@ const nl = {
 
     // Error messages for data loading
     postalCodeLoadError: 'Kon postcodes niet laden. Probeer het opnieuw.',
-    permissionRequired: 'Toestemming vereist',
-    photoPermissionMessage:
-      'Geef toegang tot de fotobibliotheek om afbeeldingen aan je evenement toe te voegen.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
     maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen toevoegen.',
     missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
@@ -1651,9 +1648,6 @@ const nl = {
   // Permissions - Pre-permission dialogs
   // ============================================
   permissions: {
-    photoLibraryPreTitle: 'Foto toevoegen',
-    photoLibraryPreMessage:
-      "ProtestBase heeft toegang tot je foto's nodig om afbeeldingen aan je evenementen toe te voegen. Je foto's blijven op je gsm.",
     calendarPreTitle: 'Toevoegen aan kalender',
     calendarPreMessage:
       'ProtestBase heeft toegang tot je kalender nodig om dit evenement toe te voegen. We kunnen je andere afspraken niet zien.',
