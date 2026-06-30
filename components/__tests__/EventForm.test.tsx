@@ -52,9 +52,6 @@ jest.mock('@/components/FormDateField', () => {
 
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
-  MediaTypeOptions: { Images: 'Images' },
-  getMediaLibraryPermissionsAsync: jest.fn(),
-  requestMediaLibraryPermissionsAsync: jest.fn(),
 }));
 
 // Pass-through optimizer in tests; the helper has its own dedicated unit tests.
@@ -1063,14 +1060,10 @@ describe('EventForm — country-change location clearing', () => {
 describe('EventForm — image picking', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('picks an image successfully when permission is already granted', async () => {
+  it('picks an image successfully', async () => {
     const setForm = jest.fn();
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
     const mockLaunchImageLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
 
-    mockGetPermission.mockResolvedValue({ status: 'granted' });
-    mockRequestPermission.mockResolvedValue({ granted: true });
     mockLaunchImageLibrary.mockResolvedValue({
       canceled: false,
       assets: [{ uri: 'file:///test-image.jpg', type: 'image' }],
@@ -1091,8 +1084,7 @@ describe('EventForm — image picking', () => {
       await flushPromises();
     });
 
-    expect(mockGetPermission).toHaveBeenCalled();
-    expect(mockRequestPermission).toHaveBeenCalled();
+    // The system photo picker is launched directly — no permission request.
     expect(mockLaunchImageLibrary).toHaveBeenCalledWith(
       expect.objectContaining({
         allowsMultipleSelection: true,
@@ -1110,12 +1102,6 @@ describe('EventForm — image picking', () => {
   it('appends multiple picked images in order after existing ones', async () => {
     const setForm = jest.fn();
     const formWithImage: FormState = { ...mockForm, images: ['https://example.com/keep.jpg'] };
-    (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'granted',
-    });
-    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
-      granted: true,
-    });
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
       canceled: false,
       assets: [
@@ -1156,12 +1142,6 @@ describe('EventForm — image picking', () => {
       ...mockForm,
       images: ['https://1.jpg', 'https://2.jpg', 'https://3.jpg', 'https://4.jpg'],
     };
-    (ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'granted',
-    });
-    (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockResolvedValue({
-      granted: true,
-    });
     // selectionLimit is best-effort on some Android pickers — simulate overflow.
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
       canceled: false,
@@ -1193,61 +1173,11 @@ describe('EventForm — image picking', () => {
     alertSpy.mockRestore();
   });
 
-  it('shows pre-permission dialog when permission is undetermined', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    mockGetPermission.mockResolvedValue({ status: 'undetermined' });
-
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    expect(alertSpy).toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
   it('shows error alert when image picker throws', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    mockGetPermission.mockRejectedValue(new Error('Picker crashed'));
-
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockRejectedValue(
+      new Error('Gallery unavailable')
     );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    expect(alertSpy).toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
-  it('handles permission denied during image picking', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
-
-    mockGetPermission.mockResolvedValue({ status: 'granted' });
-    mockRequestPermission.mockResolvedValue({ granted: false });
 
     render(
       <EventForm
@@ -1270,13 +1200,10 @@ describe('EventForm — image picking', () => {
 
   it('handles cancelled image selection', async () => {
     const setForm = jest.fn();
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
-    const mockLaunchImageLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
-
-    mockGetPermission.mockResolvedValue({ status: 'granted' });
-    mockRequestPermission.mockResolvedValue({ granted: true });
-    mockLaunchImageLibrary.mockResolvedValue({ canceled: true, assets: [] });
+    (ImagePicker.launchImageLibraryAsync as jest.Mock).mockResolvedValue({
+      canceled: true,
+      assets: [],
+    });
 
     render(
       <EventForm
@@ -2147,166 +2074,6 @@ describe('EventForm — handleStartTimeChange with end_time adjustment', () => {
         end_time: '2025-06-15T18:00:00.000Z',
       })
     );
-  });
-});
-
-describe('EventForm — pre-permission dialog callbacks', () => {
-  afterEach(() => jest.clearAllMocks());
-
-  it('executes "Not Now" callback from pre-permission dialog', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    mockGetPermission.mockResolvedValue({ status: 'undetermined' });
-
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    expect(alertSpy).toHaveBeenCalled();
-    // Extract the "Not Now" button callback (first button, style: 'cancel')
-    const alertButtons = alertSpy.mock.calls[0][2] as any[];
-    const notNowButton = alertButtons.find((b: any) => b.style === 'cancel');
-    expect(notNowButton).toBeTruthy();
-    // Execute the Not Now callback
-    await act(async () => {
-      notNowButton.onPress();
-      await flushPromises();
-    });
-    // Should have completed without error
-    expect(screen.toJSON()).toBeTruthy();
-    alertSpy.mockRestore();
-  });
-
-  it('executes "Allow Access" callback from pre-permission dialog', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
-    const mockLaunchImageLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
-
-    mockGetPermission.mockResolvedValue({ status: 'undetermined' });
-    mockRequestPermission.mockResolvedValue({ granted: true });
-    mockLaunchImageLibrary.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///selected.jpg', type: 'image' }],
-    });
-
-    const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    expect(alertSpy).toHaveBeenCalled();
-    // Extract the "Allow Access" button callback (second button)
-    const alertButtons = alertSpy.mock.calls[0][2] as any[];
-    const allowButton = alertButtons.find((b: any) => b.style !== 'cancel');
-    expect(allowButton).toBeTruthy();
-    // Execute the Allow Access callback
-    await act(async () => {
-      await allowButton.onPress();
-      await flushPromises();
-    });
-    // Image should have been set via the functional updater.
-    expect(setForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
-    expect(updater(mockForm).images).toEqual([
-      expect.objectContaining({ uri: 'file:///selected.jpg' }),
-    ]);
-    alertSpy.mockRestore();
-  });
-
-  it('handles error in Allow Access callback gracefully', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
-
-    mockGetPermission.mockResolvedValue({ status: 'undetermined' });
-    mockRequestPermission.mockRejectedValue(new Error('Permission request failed'));
-
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    expect(alertSpy).toHaveBeenCalled();
-    const alertButtons = alertSpy.mock.calls[0][2] as any[];
-    const allowButton = alertButtons.find((b: any) => b.style !== 'cancel');
-
-    // Execute the Allow Access callback which will throw
-    await act(async () => {
-      await allowButton.onPress();
-      await flushPromises();
-    });
-    // Should handle gracefully without crashing
-    expect(screen.toJSON()).toBeTruthy();
-    alertSpy.mockRestore();
-  });
-});
-
-describe('EventForm — proceedWithImagePicker error', () => {
-  afterEach(() => jest.clearAllMocks());
-
-  it('shows error alert when launchImageLibraryAsync throws inside proceedWithImagePicker', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const mockGetPermission = ImagePicker.getMediaLibraryPermissionsAsync as jest.Mock;
-    const mockRequestPermission = ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock;
-    const mockLaunchImageLibrary = ImagePicker.launchImageLibraryAsync as jest.Mock;
-
-    // Permission flow succeeds
-    mockGetPermission.mockResolvedValue({ status: 'granted' });
-    mockRequestPermission.mockResolvedValue({ granted: true });
-    // But image library itself throws
-    mockLaunchImageLibrary.mockRejectedValue(new Error('Gallery unavailable'));
-
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-
-    const imageButton = screen.getByLabelText(/add.*image/i);
-    await act(async () => {
-      fireEvent.press(imageButton);
-      await flushPromises();
-    });
-
-    // Alert should show the image picker error
-    expect(alertSpy).toHaveBeenCalled();
-    alertSpy.mockRestore();
   });
 });
 
