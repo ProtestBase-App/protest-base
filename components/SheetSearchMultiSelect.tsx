@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import { ThemedText } from '@/components/ThemedText';
 import { FilterChip } from '@/components/ui/FilterChip';
@@ -46,6 +47,14 @@ export interface SheetSearchMultiSelectProps {
    * street suggestion). The selected value still renders, greyed out.
    */
   disabled?: boolean;
+  /**
+   * Render the search box with @gorhom/bottom-sheet's BottomSheetTextInput so
+   * the soft keyboard coordinates with the enclosing sheet. Only set this when
+   * the control is mounted inside a FiltersSheetShell: BottomSheetTextInput
+   * throws when used outside a bottom-sheet context, so non-sheet hosts (the
+   * event form, the organization picker) must keep the default plain TextInput.
+   */
+  inBottomSheet?: boolean;
   testID?: string;
 }
 
@@ -71,10 +80,16 @@ export function SheetSearchMultiSelect({
   maxSelected,
   maxSelectedHint,
   disabled = false,
+  inBottomSheet = false,
   testID,
 }: SheetSearchMultiSelectProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
+
+  // BottomSheetTextInput is a drop-in for TextInput (it extends TextInputProps
+  // and forwards its ref to a focus/blur-capable input); the cast reconciles
+  // gorhom's RNGH-based ref type with the shared RN TextInput ref below.
+  const SearchInput = (inBottomSheet ? BottomSheetTextInput : TextInput) as typeof TextInput;
 
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
@@ -187,7 +202,7 @@ export function SheetSearchMultiSelect({
         ]}
       >
         <IconSymbol name="magnifyingglass" size={15} color={themeColors.placeholder} />
-        <TextInput
+        <SearchInput
           ref={inputRef}
           style={[styles.input, { color: themeColors.text }]}
           value={query}

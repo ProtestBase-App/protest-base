@@ -34,6 +34,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { logger } from '@/utils/logger';
+import { getAppEnv } from '@/utils/featureFlags';
 import { SECURE_STORE_KEYS } from '@/constants/StorageConfig';
 import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { API_BASE_URL, getApiPrefix } from '@/services/api';
@@ -45,13 +46,6 @@ import type {
   InstallTokenResponse,
   NonceResponse,
 } from '@/types/integrity.types';
-
-function getAppEnv(): 'development' | 'preview' | 'production' {
-  return (
-    (Constants.expoConfig?.extra?.appEnv as 'development' | 'preview' | 'production' | undefined) ||
-    'development'
-  );
-}
 
 function getDevBypassSecret(): string | undefined {
   return Constants.expoConfig?.extra?.devIntegrityBypass as string | undefined;

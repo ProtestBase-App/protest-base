@@ -56,10 +56,44 @@ jest.mock('expo-web-browser', () => ({
   openBrowserAsync: jest.fn().mockResolvedValue({ type: 'cancel' }),
 }));
 
+jest.mock('expo-screen-capture', () => ({
+  preventScreenCaptureAsync: jest.fn().mockResolvedValue(undefined),
+  allowScreenCaptureAsync: jest.fn().mockResolvedValue(undefined),
+  enableAppSwitcherProtectionAsync: jest.fn().mockResolvedValue(undefined),
+  disableAppSwitcherProtectionAsync: jest.fn().mockResolvedValue(undefined),
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+  usePreventScreenCapture: jest.fn(),
+}));
+
 jest.mock('expo-linking', () => ({
   openURL: jest.fn().mockResolvedValue(undefined),
   createURL: jest.fn((path) => `exp://localhost:8081/${path}`),
   canOpenURL: jest.fn().mockResolvedValue(true),
+}));
+
+// expo-network: default to fully-online so connectivity-aware screens render
+// normally. Tests simulate offline by overriding useNetworkState per-test.
+jest.mock('expo-network', () => ({
+  useNetworkState: jest.fn(() => ({
+    isConnected: true,
+    isInternetReachable: true,
+    type: 'WIFI',
+  })),
+  getNetworkStateAsync: jest
+    .fn()
+    .mockResolvedValue({ isConnected: true, isInternetReachable: true, type: 'WIFI' }),
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+  NetworkStateType: {
+    NONE: 'NONE',
+    UNKNOWN: 'UNKNOWN',
+    CELLULAR: 'CELLULAR',
+    WIFI: 'WIFI',
+    BLUETOOTH: 'BLUETOOTH',
+    ETHERNET: 'ETHERNET',
+    WIMAX: 'WIMAX',
+    VPN: 'VPN',
+    OTHER: 'OTHER',
+  },
 }));
 
 jest.mock('expo-application', () => ({
@@ -249,6 +283,65 @@ jest.mock('react-native-reanimated', () => {
     ZoomIn: { duration: jest.fn().mockReturnThis() },
     ZoomOut: { duration: jest.fn().mockReturnThis() },
     createAnimatedComponent: animatedComponent,
+  };
+});
+
+// ============================================================================
+// @gorhom/bottom-sheet mock
+// ============================================================================
+// BottomSheetModal is imperative (no `visible` prop), so the mock tracks its
+// own shown state via present()/dismiss(): a sheet's visibility in tests then
+// mirrors the real open/close flow that FiltersSheetShell drives through the
+// ref. dismiss()/close()/forceClose() fire onDismiss, matching how swipe-down /
+// backdrop-tap / hardware-back funnel through onClose at runtime. The scrollable
+// and text input map to their RN equivalents; provider/backdrop pass through.
+jest.mock('@gorhom/bottom-sheet', () => {
+  const React = require('react');
+  const { View, ScrollView, TextInput } = require('react-native');
+
+  const BottomSheetModal = React.forwardRef((props, ref) => {
+    const [shown, setShown] = React.useState(false);
+    React.useImperativeHandle(ref, () => ({
+      present: () => setShown(true),
+      expand: () => setShown(true),
+      snapToIndex: () => {},
+      snapToPosition: () => {},
+      collapse: () => {},
+      dismiss: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+      close: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+      forceClose: () => {
+        setShown(false);
+        if (props.onDismiss) props.onDismiss();
+      },
+    }));
+    return shown ? React.createElement(View, { testID: props.testID }, props.children) : null;
+  });
+
+  const BottomSheetScrollView = React.forwardRef((props, ref) =>
+    React.createElement(ScrollView, { ...props, ref })
+  );
+  const BottomSheetTextInput = React.forwardRef((props, ref) =>
+    React.createElement(TextInput, { ...props, ref })
+  );
+  const BottomSheetView = ({ children, ...props }) => React.createElement(View, props, children);
+  const BottomSheetBackdrop = (props) => React.createElement(View, props);
+  const BottomSheetModalProvider = ({ children }) => children;
+
+  return {
+    __esModule: true,
+    default: BottomSheetModal,
+    BottomSheetModal,
+    BottomSheetModalProvider,
+    BottomSheetScrollView,
+    BottomSheetTextInput,
+    BottomSheetView,
+    BottomSheetBackdrop,
   };
 });
 

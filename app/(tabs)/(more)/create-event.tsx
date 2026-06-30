@@ -22,6 +22,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
@@ -32,6 +33,7 @@ import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 /**
  * Validate URL format using URL constructor.
@@ -121,6 +123,7 @@ export default function CreateEventModal() {
     userOrganizations,
     loading: userOrgsLoading,
   } = useUserOrganizations();
+  const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const isPresented = router.canGoBack();
   const params = useLocalSearchParams<{ templateId?: string; source?: string }>();
@@ -420,6 +423,7 @@ export default function CreateEventModal() {
   }, []);
 
   const submit = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     const trimmedForm = {
       ...form,
       title: form.title.trim(),
@@ -540,6 +544,7 @@ export default function CreateEventModal() {
   // rest is enforced at publish time. This is unrelated to the LOCAL form
   // autosave (clearEventDraft below only clears that local snapshot).
   const submitDraft = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     const trimmedForm = {
       ...form,
       title: form.title.trim(),

@@ -12,7 +12,10 @@ module.exports = {
   // setup. Omitting it made CI run without the axios fetch-adapter workaround
   // that local runs had — on jest-expo 56 that divergence breaks suites with
   // partial react-native mocks.
-  setupFiles: ['<rootDir>/jest.streams-fix.js'],
+  setupFiles: [
+    '<rootDir>/jest.streams-fix.js',
+    './node_modules/react-native-gesture-handler/jestSetup.js',
+  ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 
   testMatch: [

@@ -95,8 +95,12 @@ describe('Routes', () => {
       expect(Routes.DRAFT_EVENTS).toBe('/draft-events');
     });
 
-    it('should have 21 static route definitions', () => {
-      expect(Object.keys(Routes)).toHaveLength(21);
+    it('should define HOME_AREA as /home-area', () => {
+      expect(Routes.HOME_AREA).toBe('/home-area');
+    });
+
+    it('should have 22 static route definitions', () => {
+      expect(Object.keys(Routes)).toHaveLength(22);
     });
 
     it('should have all route values starting with /', () => {

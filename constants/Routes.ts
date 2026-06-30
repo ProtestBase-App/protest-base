@@ -17,6 +17,7 @@ export const Routes = {
   DELETE_ACCOUNT: '/delete-account',
   TERMS_AND_CONDITIONS: '/terms-and-conditions',
   PRIVACY_CENTER: '/privacy-center',
+  HOME_AREA: '/home-area',
   BECOME_ORGANIZER: '/become-organizer',
 
   CREATE_EVENT: '/create-event',

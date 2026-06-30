@@ -4,6 +4,7 @@ import { formatEventForList, FormattedEventListItem } from '@/utils/eventFormatt
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { isNetworkError } from '@/utils/networkError';
 import { logger } from '@/utils/logger';
+import { t } from '@/utils/i18n';
 
 export interface ExploreFilters {
   /** Date filter preset: 'today', 'tomorrow', 'thisWeek', 'thisWeekend' or null for all dates */
@@ -23,6 +24,9 @@ interface UseExplorePaginationOptions {
   pageSize?: number;
   /** Server-side filter options */
   filters: ExploreFilters;
+  /** When true, all network fetches short-circuit so loaded pages stay put
+   * instead of being wiped by a doomed request. */
+  isOffline?: boolean;
 }
 
 interface UseExplorePaginationReturn {
@@ -49,8 +53,13 @@ interface UseExplorePaginationReturn {
 export function useExplorePagination({
   pageSize = 20,
   filters,
+  isOffline = false,
 }: UseExplorePaginationOptions): UseExplorePaginationReturn {
   const { userLanguage } = useGlobalContext();
+
+  // Read inside callbacks without re-creating them on every connectivity flip.
+  const isOfflineRef = useRef(isOffline);
+  isOfflineRef.current = isOffline;
 
   const [events, setEvents] = useState<FormattedEventListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -113,6 +122,17 @@ export function useExplorePagination({
   // the stale in-flight response.
   const fetchEvents = useCallback(
     async (isRefresh: boolean = false) => {
+      // Offline: don't fire a doomed request. Surface the offline message and
+      // keep whatever pages are already loaded. Clear the loading flags so the
+      // screen leaves its splash and renders the (possibly empty) list/error.
+      if (isOfflineRef.current) {
+        setError(t('connectivity.cannotRefreshOffline'));
+        setLoading(false);
+        setRefreshing(false);
+        loadingRef.current = false;
+        return;
+      }
+
       const currentRequestId = ++requestIdRef.current;
 
       try {
@@ -162,6 +182,7 @@ export function useExplorePagination({
   // pagination calls; safe here because loadMore doesn't need to supersede
   // previous requests like fetchEvents does.
   const loadMoreEvents = useCallback(async () => {
+    if (isOfflineRef.current) return;
     if (loadingRef.current || !hasMore) return;
 
     const currentRequestId = requestIdRef.current;
@@ -217,6 +238,7 @@ export function useExplorePagination({
   }, [fetchEvents]);
 
   const handleEndReached = useCallback(() => {
+    if (isOfflineRef.current) return;
     if (!loadingMore && hasMore && !loading) {
       loadMoreEvents();
     }

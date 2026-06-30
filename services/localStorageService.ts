@@ -300,3 +300,40 @@ export const hasEventDraft = async (): Promise<boolean> => {
     return false;
   }
 };
+
+// Home area (anonymous "near me" preference, kept in AsyncStorage)
+//
+// A single administrative-hierarchy token (e.g. 'm:be:7500') chosen manually by
+// the user. Non-sensitive (a public admin token, not a coordinate) and
+// deliberately NOT cleared on logout — it's a device preference, see
+// STORAGE_KEYS.HOME_AREA.
+
+const HOME_AREA_KEY = STORAGE_KEYS.HOME_AREA;
+
+/** Persist the chosen home-area token. */
+export const setHomeArea = async (token: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(HOME_AREA_KEY, token);
+  } catch (error: any) {
+    logger.error('Failed to save home area', { errorMessage: error.message });
+  }
+};
+
+/** Read the stored home-area token; null when unset or on error. */
+export const getHomeArea = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(HOME_AREA_KEY);
+  } catch (error: any) {
+    logger.error('Failed to get home area', { errorMessage: error.message });
+    return null;
+  }
+};
+
+/** Remove the stored home-area token. */
+export const clearHomeArea = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(HOME_AREA_KEY);
+  } catch (error: any) {
+    logger.error('Failed to clear home area', { errorMessage: error.message });
+  }
+};

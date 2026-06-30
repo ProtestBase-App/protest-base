@@ -22,7 +22,9 @@ describe('FiltersSheetShell', () => {
     jest.clearAllMocks();
   });
 
-  it('renders nothing when not visible', () => {
+  it('does not present the sheet body while visible is false', () => {
+    // BottomSheetModal is imperative: with visible=false the shell never calls
+    // present(), so nothing mounts.
     const { queryByText } = renderWithProviders(
       <FiltersSheetShell {...defaultProps} visible={false}>
         <Text>Sheet body</Text>
@@ -33,7 +35,22 @@ describe('FiltersSheetShell', () => {
     expect(queryByText('Sheet body')).toBeNull();
   });
 
-  it('renders the title and children when visible', () => {
+  it('does not fire onClose on first mount when never presented', () => {
+    // The presentedRef guard means dismiss() is only called if present() was
+    // called first. Mounting with visible=false must not trigger dismiss() →
+    // onDismiss → onClose, even though the effect runs on mount.
+    const onClose = jest.fn();
+    const { queryByText } = renderWithProviders(
+      <FiltersSheetShell visible={false} onClose={onClose} title="Sheet Title">
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(queryByText('Sheet body')).toBeNull();
+  });
+
+  it('presents the title and children when visible is true', () => {
     const { getByText } = renderWithProviders(
       <FiltersSheetShell {...defaultProps}>
         <Text>Sheet body</Text>
@@ -42,6 +59,30 @@ describe('FiltersSheetShell', () => {
 
     expect(getByText('Sheet Title')).toBeTruthy();
     expect(getByText('Sheet body')).toBeTruthy();
+  });
+
+  it('dismisses the sheet and funnels onClose when visible flips to false', () => {
+    // Flipping visible→false drives dismiss(); the sheet hides and the dismissal
+    // funnels back through onDismiss → onClose — the same path swipe-down /
+    // backdrop-tap / hardware-back take at runtime. The shell never calls
+    // onClose itself on hide, so this proves the onDismiss wiring.
+    const onClose = jest.fn();
+    const { getByText, queryByText, rerender } = renderWithProviders(
+      <FiltersSheetShell {...defaultProps} onClose={onClose}>
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    expect(getByText('Sheet Title')).toBeTruthy();
+
+    rerender(
+      <FiltersSheetShell {...defaultProps} visible={false} onClose={onClose}>
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    expect(queryByText('Sheet Title')).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('calls onClose when the close button is pressed', () => {

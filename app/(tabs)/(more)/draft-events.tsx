@@ -16,6 +16,7 @@ import { Spacing, Typography } from '@/constants/DesignTokens';
 import { DynamicRoutes, Routes } from '@/constants/Routes';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { usePaginatedEvents } from '@/hooks/usePaginatedEvents';
 import {
@@ -33,6 +34,7 @@ import {
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { getThemeColors } from '@/utils/themeColors';
 
 export default function DraftEventsScreen() {
@@ -44,6 +46,7 @@ export default function DraftEventsScreen() {
     refreshUserEventCounts,
   } = useGlobalContext();
   const { userOrganizations } = useUserOrganizations();
+  const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
@@ -154,6 +157,7 @@ export default function DraftEventsScreen() {
 
   const handlePublish = useCallback(
     async (event: Event) => {
+      if (!assertOnlineOrAlert(isOffline)) return;
       if (mutationBusyRef.current) return;
 
       // Belt and braces: the pill is only enabled when ready, but the readiness
@@ -195,11 +199,12 @@ export default function DraftEventsScreen() {
         setBusyId(null);
       }
     },
-    [refreshCountsAndCache, refreshAll]
+    [refreshCountsAndCache, refreshAll, isOffline]
   );
 
   const handleDelete = useCallback(
     (event: Event) => {
+      if (!assertOnlineOrAlert(isOffline)) return;
       if (mutationBusyRef.current || confirmOpenRef.current) return;
       confirmOpenRef.current = true;
       Alert.alert(
@@ -244,7 +249,7 @@ export default function DraftEventsScreen() {
         }
       );
     },
-    [refreshCountsAndCache, refreshAll]
+    [refreshCountsAndCache, refreshAll, isOffline]
   );
 
   const renderItem = useCallback(

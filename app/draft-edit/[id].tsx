@@ -26,6 +26,7 @@ import {
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
@@ -35,6 +36,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 // Matches common URL patterns, with or without protocol/www.
 const URL_REGEX =
@@ -44,6 +46,7 @@ export default function DraftEdit() {
   const { user, isLogged, userLanguage, refetchEvents, refreshUserEventCounts } =
     useGlobalContext();
   const { userOrganizations } = useUserOrganizations();
+  const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { id } = useLocalSearchParams();
@@ -172,6 +175,7 @@ export default function DraftEdit() {
   };
 
   const handleSave = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     if (!validateLight()) return;
     setActionBusy(true);
     try {
@@ -186,6 +190,7 @@ export default function DraftEdit() {
   };
 
   const handlePublish = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     if (!validateLight()) return;
 
     // Client-side readiness — reports every problem at once and blocks the
@@ -243,6 +248,7 @@ export default function DraftEdit() {
   };
 
   const handleDelete = () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     Alert.alert(t('drafts.deleteConfirmTitle'), t('drafts.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {

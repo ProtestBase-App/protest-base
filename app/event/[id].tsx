@@ -30,15 +30,18 @@ import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { useLikedEvents } from '@/context/LikedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 import { logger } from '@/utils/logger';
 
 export default function EventDetails() {
   const { user, isLogged, userLanguage, refetchEvents, upsertEventInCache } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { saveEvent, unsaveEvent, isSaved } = useSavedEvents();
   const { likeEvent, unlikeEvent, isLiked } = useLikedEvents();
   const { loading: postalCodesLoading, getSubMunicipalityName } = usePostalCodes();
@@ -199,6 +202,7 @@ export default function EventDetails() {
   };
 
   const handleConfirmCancel = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     try {
       setIsCancelling(true);
       const result = await cancelEvent(eventId);

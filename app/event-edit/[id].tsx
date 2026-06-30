@@ -20,6 +20,7 @@ import { Event } from '@/types/event.types';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
@@ -28,6 +29,7 @@ import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
+import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 // Matches common URL patterns, with or without protocol/www.
 const URL_REGEX =
@@ -37,6 +39,7 @@ export default function EditEvent() {
   const { user, isLogged, userLanguage, eventsCache, refetchEvents, refreshUserEventCounts } =
     useGlobalContext();
   const { userOrganizations } = useUserOrganizations();
+  const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { id, isCreated } = useLocalSearchParams();
@@ -159,6 +162,7 @@ export default function EditEvent() {
   };
 
   const submit = async () => {
+    if (!assertOnlineOrAlert(isOffline)) return;
     const newEmptyFields = {
       title: form.title === '',
       start_time: form.start_time === '',

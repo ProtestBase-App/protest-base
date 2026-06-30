@@ -82,6 +82,10 @@ export interface MapQuickChipsRowProps {
   /** Selected backend category values (shared with the filter sheet). */
   selectedCategories: string[];
   onToggleCategory: (value: string) => void;
+  /** Show the "Near me" sort toggle (only when a home area is set). */
+  showNearMe?: boolean;
+  nearMeActive?: boolean;
+  onToggleNearMe?: () => void;
 }
 
 export function MapQuickChipsRow({
@@ -89,6 +93,9 @@ export function MapQuickChipsRow({
   onTimeFilterChange,
   selectedCategories,
   onToggleCategory,
+  showNearMe = false,
+  nearMeActive = false,
+  onToggleNearMe,
 }: MapQuickChipsRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -100,6 +107,19 @@ export function MapQuickChipsRow({
       contentContainerStyle={styles.row}
       style={styles.scroll}
     >
+      {showNearMe && onToggleNearMe && (
+        <>
+          <OverlayChip
+            label={t('maps.nearMe')}
+            active={nearMeActive}
+            onPress={onToggleNearMe}
+            themeColors={themeColors}
+            activeTextColor={themeColors.mapAccentSoftText}
+          />
+          <View style={[styles.divider, { backgroundColor: themeColors.mapOverlayBorder }]} />
+        </>
+      )}
+
       {TIME_OPTIONS.map((option) => (
         <OverlayChip
           key={option.value}

@@ -404,6 +404,34 @@ describe('Delete Account Screen', () => {
     });
   });
 
+  describe('Offline guard', () => {
+    it('blocks deletion and alerts when offline (mutation never fires)', async () => {
+      const mockUser = createMockUser({ email: 'test@example.com' });
+      const { getByText, getByPlaceholderText } = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: mockUser },
+          connectivityContext: { isOffline: true },
+        },
+      });
+
+      const emailInput = getByPlaceholderText('account.email');
+      fireEvent.changeText(emailInput, 'test@example.com');
+      const passwordInput = getByPlaceholderText('auth.password');
+      fireEvent.changeText(passwordInput, 'mypassword123');
+
+      const confirmButton = getByText('account.confirmButton');
+      fireEvent.press(confirmButton);
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'common.error',
+          'connectivity.actionUnavailableOffline'
+        );
+      });
+      expect(deleteAccount).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Navigation', () => {
     it('navigates back when close button is pressed', () => {
       const mockUser = createMockUser();

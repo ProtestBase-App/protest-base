@@ -22,6 +22,7 @@ jest.mock('@/services/event.service', () => ({
 }));
 
 import React from 'react';
+import { Alert, RefreshControl } from 'react-native';
 import { renderWithProviders, createMockEvent, fireEvent, act } from '@/test-utils/render';
 import HomeTab from '@/app/(tabs)/home';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
@@ -334,6 +335,31 @@ describe('Home Screen (calendar tab)', () => {
       });
 
       expect(unsaveEvent).toHaveBeenCalledWith('event-today');
+    });
+  });
+
+  describe('Offline pull-to-refresh', () => {
+    it('does not refetch and shows the offline notice when offline', async () => {
+      const refetchEvents = jest.fn().mockResolvedValue(undefined);
+
+      const { UNSAFE_getByType } = renderWithProviders(<HomeTab />, {
+        providerOverrides: {
+          globalContext: { refetchEvents },
+          connectivityContext: { isOffline: true },
+        },
+      });
+
+      const refreshControl = UNSAFE_getByType(RefreshControl);
+      await act(async () => {
+        refreshControl.props.onRefresh();
+      });
+
+      expect(refetchEvents).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'common.error',
+        'connectivity.cannotRefreshOffline',
+        expect.any(Array)
+      );
     });
   });
 });

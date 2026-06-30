@@ -732,4 +732,56 @@ describe('useExplorePagination', () => {
       expect(result.current.events).toHaveLength(2);
     });
   });
+
+  describe('offline behavior (isOffline)', () => {
+    it('does not call getEventsBackend on mount when offline, and sets an error', async () => {
+      const { result } = renderHook(() =>
+        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline: true })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(result.current.error).toBeTruthy();
+      expect(result.current.events).toEqual([]);
+    });
+
+    it('handleEndReached does not fetch when offline', async () => {
+      const { result } = renderHook(() =>
+        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline: true })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => {
+        result.current.handleEndReached();
+      });
+
+      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+    });
+
+    it('keeps already-loaded events when going offline and refreshing', async () => {
+      mockGetEventsBackend.mockResolvedValue(makeApiResponse(3, 3));
+
+      let isOffline = false;
+      const { result, rerender } = renderHook(() =>
+        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.events).toHaveLength(3);
+
+      // Connectivity drops; a pull-to-refresh must not wipe the loaded pages.
+      isOffline = true;
+      rerender({});
+      const callCountBefore = mockGetEventsBackend.mock.calls.length;
+
+      await act(async () => {
+        result.current.handleRefresh();
+      });
+
+      expect(mockGetEventsBackend).toHaveBeenCalledTimes(callCountBefore);
+      expect(result.current.events).toHaveLength(3);
+    });
+  });
 });

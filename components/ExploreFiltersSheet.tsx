@@ -236,6 +236,7 @@ export function ExploreFiltersSheet({
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.location')} />
         <SheetSearchMultiSelect
+          inBottomSheet
           options={locationOptions}
           selected={draft.locations}
           onChange={(next) => setDraft((prev) => ({ ...prev, locations: next }))}
@@ -250,6 +251,7 @@ export function ExploreFiltersSheet({
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.organization')} />
         <SheetSearchMultiSelect
+          inBottomSheet
           options={organizationOptions}
           selected={draft.organizations}
           onChange={(next) => setDraft((prev) => ({ ...prev, organizations: next }))}

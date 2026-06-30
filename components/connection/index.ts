@@ -6,3 +6,4 @@
 
 export { ConnectionErrorScreen } from './ConnectionErrorScreen';
 export { ConnectionGate } from './ConnectionGate';
+export { OfflineBanner } from './OfflineBanner';

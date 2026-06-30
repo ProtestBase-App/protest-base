@@ -1,6 +1,9 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFiles: ['<rootDir>/jest.streams-fix.js'],
+  setupFiles: [
+    '<rootDir>/jest.streams-fix.js',
+    './node_modules/react-native-gesture-handler/jestSetup.js',
+  ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: [
     // Utility tests (pure logic, no mocks)

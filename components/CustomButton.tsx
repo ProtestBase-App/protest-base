@@ -22,10 +22,14 @@ export default function CustomButton({
   containerStyles,
   textStyles,
   isLoading,
+  disabled = false,
   testID,
 }: CustomButtonProps) {
   const colorScheme = useColorScheme();
   const backgroundColor = colorScheme === 'dark' ? '#F0405B' : '#FF4662';
+
+  // A loading button is also non-interactive; both states dim it.
+  const isDimmed = isLoading || disabled;
 
   return (
     <>
@@ -37,13 +41,13 @@ export default function CustomButton({
           styles.touchableOpacity,
           { backgroundColor },
           containerStyles,
-          isLoading && styles.opacity50,
+          isDimmed && styles.opacity50,
         ]}
-        disabled={isLoading}
+        disabled={isDimmed}
       >
         <ThemedText
           type="defaultSemiBold"
-          style={[styles.text, textStyles, isLoading && styles.opacity50]}
+          style={[styles.text, textStyles, isDimmed && styles.opacity50]}
         >
           {title}
         </ThemedText>

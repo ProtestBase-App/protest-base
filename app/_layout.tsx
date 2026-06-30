@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { logger } from '@/utils/logger';
 import GlobalProvider, { useGlobalContext } from '@/context/GlobalProvider';
@@ -12,6 +13,7 @@ import { SavedEventsProvider } from '@/context/SavedEventsProvider';
 import { LikedEventsProvider } from '@/context/LikedEventsProvider';
 import { FollowedOrgsProvider } from '@/context/FollowedOrgsProvider';
 import { PostalCodeProvider } from '@/context/PostalCodeProvider';
+import { HomeAreaProvider } from '@/context/HomeAreaProvider';
 import { PastEventsProvider } from '@/context/PastEventsProvider';
 import { TemplatesProvider } from '@/context/TemplatesProvider';
 import { OrganizationsProvider } from '@/context/OrganizationsProvider';
@@ -21,8 +23,10 @@ import { VersionCheckProvider } from '@/context/VersionCheckProvider';
 import { VersionGate } from '@/components/version';
 import { IntegrityProvider } from '@/context/IntegrityProvider';
 import { IntegrityGate } from '@/components/integrity';
-import { ConnectionGate } from '@/components/connection';
+import { ConnectionGate, OfflineBanner } from '@/components/connection';
+import { ConnectivityProvider } from '@/context/ConnectivityProvider';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
+import { PrivacyScreenGuard } from '@/components/PrivacyScreenGuard';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
 import { Platform, StyleSheet } from 'react-native';
@@ -82,50 +86,62 @@ export default function RootLayout() {
     // drafts list's swipe-to-delete); renders as a plain View otherwise.
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaProvider>
-        {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
-        {/* This ensures version check happens BEFORE authentication */}
-        <VersionCheckProvider>
-          <VersionGate>
-            {/* IntegrityGate runs after the version check (which uses /app/config */}
-            {/* on the bootstrap path) but before GlobalProvider so the install token */}
-            {/* exists for every authenticated request. */}
-            <IntegrityProvider>
-              <IntegrityGate>
-                <GlobalProvider>
-                  <ConnectionGate>
-                    <UserOrganizationsProvider>
-                      <SavedEventsProvider>
-                        <LikedEventsProvider>
-                          <FollowedOrgsProvider>
-                            <PastEventsProvider>
-                              <TemplatesProvider>
-                                <OrganizationsProvider>
-                                  <PostalCodeProvider>
-                                    <ThemeProvider
-                                      value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-                                    >
-                                      <ExploreTabProvider>
-                                        <NotificationsBootstrap />
-                                        <RootNavigator />
-                                        <StatusBar
-                                          style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                        />
-                                      </ExploreTabProvider>
-                                    </ThemeProvider>
-                                  </PostalCodeProvider>
-                                </OrganizationsProvider>
-                              </TemplatesProvider>
-                            </PastEventsProvider>
-                          </FollowedOrgsProvider>
-                        </LikedEventsProvider>
-                      </SavedEventsProvider>
-                    </UserOrganizationsProvider>
-                  </ConnectionGate>
-                </GlobalProvider>
-              </IntegrityGate>
-            </IntegrityProvider>
-          </VersionGate>
-        </VersionCheckProvider>
+        {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
+            pure UI context, so it wraps the data providers harmlessly. */}
+        <BottomSheetModalProvider>
+          {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
+          {/* This ensures version check happens BEFORE authentication */}
+          <VersionCheckProvider>
+            <VersionGate>
+              {/* IntegrityGate runs after the version check (which uses /app/config */}
+              {/* on the bootstrap path) but before GlobalProvider so the install token */}
+              {/* exists for every authenticated request. */}
+              <IntegrityProvider>
+                <IntegrityGate>
+                  <GlobalProvider>
+                    <ConnectionGate>
+                      <ConnectivityProvider>
+                        <UserOrganizationsProvider>
+                          <SavedEventsProvider>
+                            <LikedEventsProvider>
+                              <FollowedOrgsProvider>
+                                <PastEventsProvider>
+                                  <TemplatesProvider>
+                                    <OrganizationsProvider>
+                                      <PostalCodeProvider>
+                                        <HomeAreaProvider>
+                                          <ThemeProvider
+                                            value={
+                                              colorScheme === 'dark' ? DarkTheme : DefaultTheme
+                                            }
+                                          >
+                                            <ExploreTabProvider>
+                                              <NotificationsBootstrap />
+                                              <PrivacyScreenGuard />
+                                              <RootNavigator />
+                                              <OfflineBanner />
+                                              <StatusBar
+                                                style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                              />
+                                            </ExploreTabProvider>
+                                          </ThemeProvider>
+                                        </HomeAreaProvider>
+                                      </PostalCodeProvider>
+                                    </OrganizationsProvider>
+                                  </TemplatesProvider>
+                                </PastEventsProvider>
+                              </FollowedOrgsProvider>
+                            </LikedEventsProvider>
+                          </SavedEventsProvider>
+                        </UserOrganizationsProvider>
+                      </ConnectivityProvider>
+                    </ConnectionGate>
+                  </GlobalProvider>
+                </IntegrityGate>
+              </IntegrityProvider>
+            </VersionGate>
+          </VersionCheckProvider>
+        </BottomSheetModalProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useExploreTabContext } from '@/context/ExploreTabProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useHomeArea } from '@/context/HomeAreaProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useOrganizations } from '@/context/OrganizationsProvider';
@@ -15,6 +17,7 @@ import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { FilterChip } from '@/components/ui/FilterChip';
 import SearchInput from '@/components/SearchInput';
 import ExploreEventCard from '@/components/ExploreEventCard';
 import { ExploreFiltersSheet } from '@/components/ExploreFiltersSheet';
@@ -22,7 +25,7 @@ import { ExploreActiveFilterChips } from '@/components/ExploreActiveFilterChips'
 import EmptyEventMyEvents from '@/components/EmptyEventMyEvents';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
-import { Typography } from '@/constants/DesignTokens';
+import { Spacing, Typography } from '@/constants/DesignTokens';
 import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { shareEventWithAlert } from '@/utils/shareHelpers';
 import { Event, getEventByIdBackend } from '@/services/event.service';
@@ -42,14 +45,17 @@ function LoadingFooter() {
 export default function ExploreTab() {
   const logo = useLogoScheme();
   const { userLanguage, eventsCache } = useGlobalContext();
+  const { isOffline } = useConnectivity();
   const { saveEvent, unsaveEvent, isSaved, savedEventIds } = useSavedEvents();
   const {
     getSubMunicipalityName,
     loading: postalCodesLoading,
     expandLocationTokens,
     resolveLocationLabel,
+    isLocationSelectionTooBroad,
   } = usePostalCodes();
   const { dropdownItems: organizationItems } = useOrganizations();
+  const { homeAreaToken } = useHomeArea();
   const {
     searchQuery,
     setSearchQuery,
@@ -96,6 +102,7 @@ export default function ExploreTab() {
     handleEndReached,
   } = useExplorePagination({
     pageSize: 20,
+    isOffline,
     filters: {
       dateFilter: appliedFilters.dateFilter,
       postalCodes: expandedPostalCodes,
@@ -190,6 +197,21 @@ export default function ExploreTab() {
     },
     [setAppliedFilters, setShouldScrollToTop]
   );
+
+  // "My area" quick-scope: append the home token to the existing location
+  // filter (reusing the server-side postcode expansion). Once applied it shows
+  // as a normal removable location chip, so no separate clear is needed.
+  const showMyAreaChip = !!homeAreaToken && !appliedFilters.locations.includes(homeAreaToken);
+
+  const applyMyArea = useCallback(() => {
+    if (!homeAreaToken) return;
+    const next = [...appliedFilters.locations, homeAreaToken];
+    if (isLocationSelectionTooBroad(next)) {
+      Alert.alert(t('common.error'), t('filters.selectionTooBroad'));
+      return;
+    }
+    mutateAppliedFilters((prev) => ({ ...prev, locations: [...prev.locations, homeAreaToken] }));
+  }, [homeAreaToken, appliedFilters.locations, isLocationSelectionTooBroad, mutateAppliedFilters]);
 
   const removeCategoryFilter = useCallback(
     () => mutateAppliedFilters((prev) => ({ ...prev, category: null })),
@@ -349,6 +371,18 @@ export default function ExploreTab() {
           </TouchableOpacity>
         </ThemedView>
 
+        {showMyAreaChip && (
+          <ThemedView style={styles.myAreaRow}>
+            <FilterChip
+              small
+              label={t('homeArea.scopeChip')}
+              accessibilityLabel={t('homeArea.scopeChip')}
+              onPress={applyMyArea}
+              leading={<IconSymbol name="mappin.and.ellipse" size={11} color={themeColors.tint} />}
+            />
+          </ThemedView>
+        )}
+
         <ExploreActiveFilterChips
           filters={appliedFilters}
           resolveLocationLabel={resolveLocationLabel}
@@ -466,6 +500,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#FFFFFF',
     lineHeight: 14,
+  },
+  myAreaRow: {
+    flexDirection: 'row',
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   calendarContainer: {
     marginHorizontal: 8,
