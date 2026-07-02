@@ -139,10 +139,6 @@ export default (): ExpoConfig => {
       // development / preview / production environments — EAS does not read
       // .env.local. The value must equal the backend API_KEY (not WEBSITE_API_KEY).
       apiKey: process.env.EXPO_PUBLIC_API_KEY,
-      // Store-screenshot escape hatch: ships a production build with
-      // screen-capture protection OFF. Pass as an EAS env var (EAS ignores
-      // .env.local); never enable for a store release.
-      allowScreenshots: process.env.EXPO_PUBLIC_ALLOW_SCREENSHOTS === 'true',
     },
     plugins: [
       'expo-router',
