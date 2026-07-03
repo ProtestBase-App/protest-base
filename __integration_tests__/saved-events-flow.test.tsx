@@ -66,6 +66,13 @@ jest.mock('@/services/api', () => ({
   setTokenExpirationCallback: jest.fn(),
 }));
 
+// Keep GlobalProvider's snapshot persistence inert so fire-and-forget writes
+// can't leak state between tests via the shared stateful AsyncStorage mock.
+jest.mock('@/services/eventsCacheStorage', () => ({
+  loadPersistedEvents: jest.fn(() => Promise.resolve(null)),
+  persistEvents: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('@/services/engagement.service', () => ({
   saveEventOnServer: jest.fn(() => Promise.resolve(1)),
   unsaveEventOnServer: jest.fn(() => Promise.resolve(0)),

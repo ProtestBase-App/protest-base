@@ -40,7 +40,8 @@ import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { logger } from '@/utils/logger';
 
 export default function EventDetails() {
-  const { user, isLogged, userLanguage, refetchEvents, upsertEventInCache } = useGlobalContext();
+  const { user, isLogged, userLanguage, refetchEvents, upsertEventInCache, removeEventFromCache } =
+    useGlobalContext();
   const { isOffline } = useConnectivity();
   const { saveEvent, unsaveEvent, isSaved } = useSavedEvents();
   const { likeEvent, unlikeEvent, isLiked } = useLikedEvents();
@@ -120,6 +121,10 @@ export default function EventDetails() {
         // must surface as a connectivity problem instead.
         if (err instanceof EventNotFoundError) {
           setError(t('events.detailNotFound'));
+          // Confirmed deleted on the backend — evict any cached copy (e.g. a
+          // disk-hydrated snapshot entry) so it stops appearing on the
+          // calendar/map lists.
+          removeEventFromCache(eventId);
         } else if (err instanceof EventNetworkError) {
           setError(t('events.detailNetworkError'));
         } else {

@@ -58,6 +58,13 @@ jest.mock('@/services/event.service', () => ({
   fetchEventCounts: (...args: any[]) => mockFetchEventCounts(...args),
 }));
 
+const mockLoadPersistedEvents = jest.fn();
+const mockPersistEvents = jest.fn();
+jest.mock('@/services/eventsCacheStorage', () => ({
+  loadPersistedEvents: (...args: any[]) => mockLoadPersistedEvents(...args),
+  persistEvents: (...args: any[]) => mockPersistEvents(...args),
+}));
+
 const mockSetTokenExpirationCallback = jest.fn();
 jest.mock('@/services/api', () => ({
   __esModule: true,
@@ -119,6 +126,8 @@ describe('GlobalProvider', () => {
     (AsyncStorage.removeItem as jest.Mock).mockResolvedValue(undefined);
     mockGetEventsBackend.mockResolvedValue({ events: [], total: 0, limit: 100, offset: 0 });
     mockFetchEventCounts.mockResolvedValue({ upcoming: 0, past: 0 });
+    mockLoadPersistedEvents.mockResolvedValue(null);
+    mockPersistEvents.mockResolvedValue(undefined);
     // Restore getLocales default after clearAllMocks resets it
     const { getLocales } = require('expo-localization');
     (getLocales as jest.Mock).mockReturnValue([{ languageCode: 'en' }]);
@@ -531,6 +540,169 @@ describe('GlobalProvider', () => {
       expect(result.current.eventsCache['event-1']).toBeDefined();
       expect(result.current.eventsCache['event-2']).toBeDefined();
       expect(result.current.eventsLoading).toBe(false);
+    });
+  });
+
+  describe('events cache: single-page fetch (#2) + stale-while-revalidate (#3)', () => {
+    it('fetches the whole browse window in one request at the max limit', async () => {
+      renderHook(() => useGlobalContext(), { wrapper });
+
+      await flushPromises();
+      await flushPromises();
+
+      expect(mockGetEventsBackend).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 500, offset: 0, includeEnded: true }),
+        // Large single-response fetch gets a longer budget than the 10s default.
+        expect.objectContaining({ timeout: expect.any(Number) })
+      );
+      // Single page — the old up-to-5-call waterfall is gone.
+      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves out-of-window upserted events across a wholesale refetch', async () => {
+      const freshEvent = {
+        $id: 'fresh',
+        id: 'fresh',
+        title: 'Fresh',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockGetEventsBackend.mockResolvedValue({
+        events: [freshEvent],
+        total: 1,
+        limit: 500,
+        offset: 0,
+      });
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      await flushPromises();
+
+      // A deep-linked past event (older than the 20-day lookback) warmed into
+      // the cache by the detail screen.
+      const oldEvent = {
+        $id: 'old-deep-link',
+        id: 'old-deep-link',
+        title: 'Old',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() - 30 * 86400000).toISOString(),
+      };
+      act(() => {
+        result.current.upsertEventInCache(oldEvent as any);
+      });
+
+      await act(async () => {
+        await result.current.refetchEvents();
+      });
+
+      // The wholesale replace keeps the entry the fetch window cannot see...
+      expect(result.current.eventsCache['old-deep-link']).toBeDefined();
+      expect(result.current.eventsCache['fresh']).toBeDefined();
+    });
+
+    it('re-persists the snapshot when a screen upserts after a fresh fetch', async () => {
+      const event = {
+        $id: 'e1',
+        id: 'e1',
+        title: 'E',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockGetEventsBackend.mockResolvedValue({ events: [event], total: 1, limit: 500, offset: 0 });
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      await flushPromises();
+      mockPersistEvents.mockClear();
+
+      const created = {
+        $id: 'created-now',
+        id: 'created-now',
+        title: 'Created',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 2 * 86400000).toISOString(),
+      };
+      act(() => {
+        result.current.upsertEventInCache(created as any);
+      });
+      await flushPromises();
+
+      expect(mockPersistEvents).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ $id: 'created-now' })])
+      );
+    });
+
+    it('hydrates eventsCache from the persisted snapshot before the network fetch resolves', async () => {
+      const persisted = {
+        $id: 'p1',
+        id: 'p1',
+        title: 'Persisted',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockLoadPersistedEvents.mockResolvedValue([persisted]);
+
+      let resolveFetch: (value: any) => void = () => {};
+      mockGetEventsBackend.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          })
+      );
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+
+      await flushPromises();
+
+      // Painted from persistence while the network fetch is still pending.
+      expect(result.current.eventsCache['p1']).toBeDefined();
+
+      const fresh = {
+        $id: 'fresh',
+        id: 'fresh',
+        title: 'Fresh',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 172800000).toISOString(),
+      };
+      await act(async () => {
+        resolveFetch({ events: [fresh], total: 1, limit: 500, offset: 0 });
+      });
+
+      // Fresh fetch replaces the persisted snapshot wholesale.
+      expect(result.current.eventsCache['fresh']).toBeDefined();
+      expect(result.current.eventsCache['p1']).toBeUndefined();
+    });
+
+    it('persists events after a successful initial fetch', async () => {
+      const event = {
+        $id: 'e1',
+        id: 'e1',
+        title: 'E',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockGetEventsBackend.mockResolvedValue({ events: [event], total: 1, limit: 500, offset: 0 });
+
+      renderHook(() => useGlobalContext(), { wrapper });
+
+      await flushPromises();
+      await flushPromises();
+
+      expect(mockPersistEvents).toHaveBeenCalledWith([event]);
     });
   });
 

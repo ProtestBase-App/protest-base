@@ -36,6 +36,10 @@ export const STORAGE_KEYS = {
   TEMPLATES_CACHE: 'templatesCache',
   TEMPLATES_CACHE_TIMESTAMP: 'templatesCacheTimestamp',
   USER_EVENT_COUNTS: 'userEventCounts',
+  // Public events snapshot for stale-while-revalidate cold-start paint. Like
+  // HOME_AREA below, it holds only public data (explore/maps/calendar work
+  // logged-out), so it is deliberately NOT in USER_DATA_KEYS and survives logout.
+  EVENTS_CACHE: 'eventsCache',
   API_PREFIX: 'apiPrefix',
   HOME_VIEW_PREFERENCE: 'homeViewPreference',
   NOTIFICATION_PERMISSION_REQUESTED: 'notificationPermissionRequested',

@@ -256,6 +256,30 @@ describe('event.service', () => {
 
       await expect(getEventsBackend()).rejects.toThrow('Network Error');
     });
+
+    it('forwards a per-request timeout override to axios', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0, limit: 500, offset: 0 } },
+      });
+
+      await getEventsBackend({ limit: 500 }, { timeout: 30000 });
+
+      expect(mockApi.get).toHaveBeenCalledWith('/events', {
+        params: expect.objectContaining({ limit: 500 }),
+        timeout: 30000,
+      });
+    });
+
+    it('rethrows axios network errors unwrapped so isNetworkError() keeps working', async () => {
+      // Shape axios.isAxiosError recognizes — a timeout abort.
+      const axiosTimeout = Object.assign(new Error('timeout of 30000ms exceeded'), {
+        isAxiosError: true,
+        code: 'ECONNABORTED',
+      });
+      mockApi.get.mockRejectedValueOnce(axiosTimeout);
+
+      await expect(getEventsBackend()).rejects.toBe(axiosTimeout);
+    });
   });
 
   // ============================================================

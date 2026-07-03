@@ -14,7 +14,7 @@ import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { logger } from '@/utils/logger';
 
 export default function Index() {
-  const { loading, eventsLoading } = useGlobalContext();
+  const { loading } = useGlobalContext();
   const { loading: savedEventsLoading } = useSavedEvents();
   const { loading: postalCodesLoading } = usePostalCodes();
   const notificationHandledRef = useRef(false);
@@ -64,11 +64,15 @@ export default function Index() {
       router.replace(Routes.EXPLORE);
     };
 
-    const allDataLoaded = !loading && !eventsLoading && !savedEventsLoading && !postalCodesLoading;
+    // The events cache is intentionally NOT gated here: the landing tab
+    // (Explore) fetches its own list, and Home/Maps self-guard against an empty
+    // cache with their own splash. Waiting on eventsLoading would block
+    // time-to-interactive on a cache the landing screen never reads.
+    const allDataLoaded = !loading && !savedEventsLoading && !postalCodesLoading;
     if (allDataLoaded) {
       redirect();
     }
-  }, [loading, eventsLoading, savedEventsLoading, postalCodesLoading]);
+  }, [loading, savedEventsLoading, postalCodesLoading]);
 
   return (
     <ThemedView style={styles.splashContainer}>

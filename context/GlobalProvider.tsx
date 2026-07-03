@@ -5,12 +5,14 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react';
 import { getLocales } from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUser, getCurrentUserSessions } from '@/services/auth.service';
 import { getEventsBackend, fetchEventCounts, EventCounts } from '@/services/event.service';
+import { loadPersistedEvents, persistEvents } from '@/services/eventsCacheStorage';
 import * as SecureStore from 'expo-secure-store';
 import { setTokenExpirationCallback } from '@/services/api';
 import { Alert } from 'react-native';
@@ -24,47 +26,99 @@ import { t } from '@/utils/i18n';
 import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
 import { clearAllUserData } from '@/services/localStorageService';
-
-// Safety ceiling for the paginated cache fill (pages × EVENTS_DEFAULT events).
-const MAX_EVENT_PAGES = 5;
+import { parseAsUTC } from '@/utils/eventFormatters';
 
 /**
- * Fetch the full browse window (lookback + all upcoming events), paging until
- * the server's `total` is exhausted or the safety ceiling is hit. The calendar
- * tab browses ALL events from this cache, so a single page (100 events) is not
- * enough once the backend holds more.
+ * Timeout for the one-shot cache fetch: it downloads up to EVENTS_MAX events in
+ * a single response, so it needs a bigger budget than the axios instance's 10s
+ * default, which is sized for small paginated requests.
  */
-async function fetchAllCacheableEvents(): Promise<Event[]> {
+const CACHE_FETCH_TIMEOUT_MS = 30000;
+
+/** Where the current eventsCache contents came from — see cacheSourceRef. */
+type EventsCacheSource = 'empty' | 'hydrated' | 'fresh';
+
+/** Key an events array by $id for O(1) cache lookups. */
+function toEventsMap(events: Event[]): Record<string, Event> {
+  const map: Record<string, Event> = {};
+  events.forEach((event) => {
+    map[event.$id] = event;
+  });
+  return map;
+}
+
+interface CacheableEventsFetch {
+  events: Event[];
+  /** ISO start of the fetched window — entries older than this are outside it. */
+  lookbackDate: string;
+  /** True when the backend reported more events than the ceiling returned. */
+  truncated: boolean;
+}
+
+/**
+ * Fetch the full browse window (lookback + all upcoming events) in a single
+ * request. The calendar and maps tabs browse ALL events from this cache, so we
+ * pull up to the backend's documented ceiling (API_LIMITS.EVENTS_MAX) in one
+ * round-trip instead of walking pages — one request keeps cold-start latency and
+ * the per-request integrity/attestation overhead to a single hit.
+ */
+async function fetchAllCacheableEvents(): Promise<CacheableEventsFetch> {
   // Look back to include events that started recently but may still be ongoing.
   // This ensures multi-day events and events without end_time are included.
   const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
 
-  const events: Event[] = [];
-  let total = Number.POSITIVE_INFINITY;
-
-  for (let page = 0; page < MAX_EVENT_PAGES && events.length < total; page++) {
-    // includeEnded: true so the cache can serve saved events whose end_time is
-    // in the past but still within the saved-event retention window (kept by
-    // SavedEventsProvider).
-    const result = await getEventsBackend({
+  // includeEnded: true so the cache can serve saved events whose end_time is in
+  // the past but still within the saved-event retention window (kept by
+  // SavedEventsProvider).
+  const result = await getEventsBackend(
+    {
       startDate: lookbackDate,
-      limit: API_LIMITS.EVENTS_DEFAULT,
-      offset: events.length,
+      limit: API_LIMITS.EVENTS_MAX,
+      offset: 0,
       includeEnded: true,
+    },
+    { timeout: CACHE_FETCH_TIMEOUT_MS }
+  );
+
+  const truncated = result.total > result.events.length;
+  if (truncated) {
+    logger.warn('[GlobalProvider] Events cache truncated at fetch ceiling', {
+      fetched: result.events.length,
+      total: result.total,
     });
-    events.push(...result.events);
-    total = result.total;
-    if (result.events.length === 0) break;
   }
 
-  if (events.length < total) {
-    logger.warn('[GlobalProvider] Events cache truncated at page ceiling', {
-      fetched: events.length,
-      total,
-    });
-  }
+  return { events: result.events, lookbackDate, truncated };
+}
 
-  return events;
+/**
+ * Wholesale-apply a fresh fetch while preserving screen-upserted entries the
+ * fetch window cannot see: events older than the lookback (deep links to past
+ * events) and — when the fetch hit its ceiling — events starting beyond the last
+ * fetched one. Entries inside the window are replaced authoritatively, so
+ * backend-deleted events still drop out.
+ */
+function applyFreshEvents(
+  prev: Record<string, Event>,
+  fetched: Event[],
+  lookbackDate: string,
+  truncated: boolean
+): Record<string, Event> {
+  const next = toEventsMap(fetched);
+  const lookbackMs = parseAsUTC(lookbackDate).getTime();
+  const horizonMs =
+    truncated && fetched.length > 0
+      ? Math.max(...fetched.map((event) => parseAsUTC(event.start_time).getTime()))
+      : Number.POSITIVE_INFINITY;
+
+  for (const [id, event] of Object.entries(prev)) {
+    if (id in next) continue;
+    const startMs = parseAsUTC(event.start_time).getTime();
+    if (startMs < lookbackMs || startMs > horizonMs) {
+      next[id] = event;
+    }
+  }
+  return next;
 }
 
 export interface GlobalContextValue {
@@ -125,6 +179,12 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
 
   const [eventsCache, setEventsCache] = useState<Record<string, Event>>({});
   const [eventsLoading, setEventsLoading] = useState<boolean>(false);
+
+  // Provenance of the current eventsCache contents. Hydrated-from-disk data must
+  // never be re-persisted (restamping would reset the snapshot's age and let
+  // stale data outlive the hydration window) and must never overwrite data from
+  // a fresh fetch (retryConnection re-entry).
+  const cacheSourceRef = useRef<EventsCacheSource>('empty');
 
   // null means counts have never been loaded (show splash for logged-in users)
   const [userEventCounts, setUserEventCounts] = useState<EventCounts | null>(null);
@@ -242,14 +302,32 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      const events = await fetchAllCacheableEvents();
+      // Start the network fetch first and hydrate from disk while it's in
+      // flight — the two are independent, so serializing them would delay the
+      // fresh data by the disk read. The no-op catch stops a pre-await
+      // rejection from surfacing as unhandled; the await below still throws
+      // into this try/catch.
+      const fetchPromise = fetchAllCacheableEvents();
+      fetchPromise.catch(() => {});
 
-      const eventsMap: Record<string, Event> = {};
-      events.forEach((event) => {
-        eventsMap[event.$id] = event;
-      });
+      // Stale-while-revalidate: paint the persisted snapshot instantly, merged
+      // UNDER anything screens already upserted (those entries are fresher).
+      // The Home/Maps tabs stop showing their splash as soon as the cache is
+      // non-empty, so a cold start renders cached events without a network
+      // wait. Skipped once a fresh fetch has landed this session
+      // (retryConnection re-entry) so stale entries can't resurface.
+      const persisted = cacheSourceRef.current !== 'fresh' ? await loadPersistedEvents() : null;
+      // Re-check after the await — a concurrent invocation (retryConnection)
+      // may have landed a fresh fetch while the disk read was in flight.
+      if (persisted && cacheSourceRef.current !== 'fresh') {
+        cacheSourceRef.current = 'hydrated';
+        setEventsCache((prev) => ({ ...toEventsMap(persisted), ...prev }));
+      }
 
-      setEventsCache(eventsMap);
+      const { events, lookbackDate, truncated } = await fetchPromise;
+
+      cacheSourceRef.current = 'fresh';
+      setEventsCache((prev) => applyFreshEvents(prev, events, lookbackDate, truncated));
       logger.info('[GlobalProvider] Events cache initialized', { count: events.length });
     } catch (error) {
       logger.error('Failed to fetch events cache:', { error });
@@ -318,18 +396,25 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      const events = await fetchAllCacheableEvents();
+      const { events, lookbackDate, truncated } = await fetchAllCacheableEvents();
 
-      const eventsMap: Record<string, Event> = {};
-      events.forEach((event) => {
-        eventsMap[event.$id] = event;
-      });
-
-      setEventsCache(eventsMap);
+      cacheSourceRef.current = 'fresh';
+      setEventsCache((prev) => applyFreshEvents(prev, events, lookbackDate, truncated));
     } finally {
       setEventsLoading(false);
     }
   }, []);
+
+  // Mirror every fresh-data cache change (bulk fetches, screen upserts/removes)
+  // into the cold-start snapshot, so events created or hydrated mid-session
+  // survive a restart. Hydrated-only states are deliberately not re-persisted —
+  // see cacheSourceRef. An empty cache never clobbers an existing snapshot.
+  useEffect(() => {
+    if (cacheSourceRef.current !== 'fresh') return;
+    const events = Object.values(eventsCache);
+    if (events.length === 0) return;
+    void persistEvents(events);
+  }, [eventsCache]);
 
   const contextValue = useMemo(
     () => ({
