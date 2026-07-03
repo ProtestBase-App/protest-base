@@ -1,10 +1,17 @@
+import { HOME_AREA_CENTROIDS } from '@/constants/HomeAreaCentroids';
+import { POSTAL_CODES_EN } from '@/constants/PostalCodes_BE_EN';
 import { createMockEvent } from '@/test-utils/render';
-import type { LocationFilterOption } from '@/utils/locationFilterOptions';
+import {
+  buildLocationFilterOptions,
+  expandLocationTokens,
+  type LocationFilterOption,
+} from '@/utils/locationFilterOptions';
 import {
   buildHomeAreaMatch,
   deriveHomeAreaCenter,
   HomeAreaMatch,
   rankEventByHomeArea,
+  resolveHomeAreaCenter,
   sortEventsByHomeArea,
 } from '../homeArea';
 
@@ -65,10 +72,14 @@ describe('buildHomeAreaMatch', () => {
   it('resolves a municipality token to graduated muni/province/region sets', () => {
     const match = buildHomeAreaMatch('m:be:7500', OPTIONS, mockExpand)!;
     expect(match.country).toBe('belgium');
+    expect(match.token).toBe('m:be:7500');
     expect([...match.municipalityCodes].sort()).toEqual(['7500', '7501', '7502']);
     expect(match.provinceCodes.has('7000')).toBe(true);
     expect(match.provinceCodes.has('5000')).toBe(false);
     expect(match.regionCodes.has('5000')).toBe(true);
+    // Resolved parent tokens drive the centroid fallback chain.
+    expect(match.provinceToken).toBe('p:be:hainaut');
+    expect(match.regionToken).toBe('r:be:wallonia');
   });
 
   it('resolves a province token: empty municipality set, province = home, region resolved', () => {
@@ -76,6 +87,8 @@ describe('buildHomeAreaMatch', () => {
     expect(match.municipalityCodes.size).toBe(0);
     expect(match.provinceCodes.has('7000')).toBe(true);
     expect(match.regionCodes.has('5000')).toBe(true);
+    expect(match.provinceToken).toBe('p:be:hainaut');
+    expect(match.regionToken).toBe('r:be:wallonia');
   });
 
   it('resolves a region token: only the region set is populated', () => {
@@ -83,6 +96,8 @@ describe('buildHomeAreaMatch', () => {
     expect(match.municipalityCodes.size).toBe(0);
     expect(match.provinceCodes.size).toBe(0);
     expect(match.regionCodes.has('5000')).toBe(true);
+    expect(match.provinceToken).toBeNull();
+    expect(match.regionToken).toBe('r:be:wallonia');
   });
 
   it('leaves the region set empty for an NL province (NL has no region tier)', () => {
@@ -90,6 +105,145 @@ describe('buildHomeAreaMatch', () => {
     expect(match.country).toBe('netherlands');
     expect(match.provinceCodes.has('7510')).toBe(true);
     expect(match.regionCodes.size).toBe(0);
+    expect(match.provinceToken).toBe('p:nl:overijssel');
+    expect(match.regionToken).toBeNull();
+  });
+});
+
+// ============================================================================
+// resolveHomeAreaCenter — static per-area centering (the home-area map fix)
+// ============================================================================
+
+describe('resolveHomeAreaCenter', () => {
+  /** Build a bare match; resolveHomeAreaCenter only reads the three token fields. */
+  function match(
+    token: string,
+    provinceToken: string | null,
+    regionToken: string | null
+  ): HomeAreaMatch {
+    return {
+      token,
+      country: 'belgium',
+      municipalityCodes: new Set(),
+      provinceCodes: new Set(),
+      regionCodes: new Set(),
+      provinceToken,
+      regionToken,
+    };
+  }
+
+  it('centers a listed municipality on its own coordinate (Tournai)', () => {
+    const center = resolveHomeAreaCenter(match('m:be:7500', 'p:be:hainaut', 'r:be:wallonia'));
+    expect(center).toEqual([3.3891, 50.6071]);
+  });
+
+  it('regression: Antwerp centers on Antwerp, not the Flanders protest cluster', () => {
+    // The old event-mean recenter dropped Antwerp onto the Ghent area (~lng 3.7)
+    // because Antwerp had no nearby protests. It must now land on Antwerp.
+    const center = resolveHomeAreaCenter(match('m:be:2000', 'p:be:antwerp', 'r:be:flanders'))!;
+    expect(center[0]).toBeGreaterThan(4.2); // clearly east of Ghent (~3.72)
+    expect(center[1]).toBeGreaterThan(51.1); // Antwerp ~51.22
+  });
+
+  it('falls back to the province center for an unlisted municipality', () => {
+    // A village not in the curated table still centers inside its province.
+    const center = resolveHomeAreaCenter(match('m:be:6044', 'p:be:hainaut', 'r:be:wallonia'));
+    expect(center).toEqual([3.9557, 50.4542]); // Mons (Hainaut capital)
+  });
+
+  it('falls back to the region center when neither muni nor province is listed', () => {
+    const center = resolveHomeAreaCenter(match('m:be:6044', null, 'r:be:wallonia'));
+    expect(center).toEqual([4.85, 50.3]);
+  });
+
+  it('returns null when no tier is in the centroid table', () => {
+    expect(resolveHomeAreaCenter(match('9999', null, null))).toBeNull();
+  });
+});
+
+// ============================================================================
+// Integration: real bundled dataset → real hierarchy options → centering.
+//
+// Guards against token drift: the curated centroid table keys must match the
+// tokens the live builder actually emits (municipality min-code tokens, and the
+// province/region tokens resolved by postcode-containment).
+// ============================================================================
+
+describe('home-area centering — real BE dataset integration', () => {
+  const { options, tokenToCodes } = buildLocationFilterOptions({
+    // Cast mirrors the provider, which holds the rows as `any[]`.
+    belgiumRows: POSTAL_CODES_EN as unknown as Record<string, unknown>[],
+    lang: 'en',
+  });
+  const expand = (values: string[]) => expandLocationTokens(values, tokenToCodes);
+
+  it('resolves the Antwerp municipality to its real parent tokens', () => {
+    const match = buildHomeAreaMatch('m:be:2000', options, expand)!;
+    expect(match.provinceToken).toBe('p:be:antwerp');
+    expect(match.regionToken).toBe('r:be:flanders');
+  });
+
+  it('regression: picking Antwerp centers on Antwerp, not the Ghent cluster', () => {
+    const center = resolveHomeAreaCenter(buildHomeAreaMatch('m:be:2000', options, expand)!)!;
+    expect(center[0]).toBeGreaterThan(4.2); // east of Ghent (~3.72)
+    expect(center[1]).toBeGreaterThan(51.1); // Antwerp ~51.22
+  });
+
+  it('centers an unlisted Antwerp-province village on the province capital', () => {
+    // Mortsel (m:be:2640) is a real Antwerp-province municipality not in the
+    // curated table — it must fall back to the Antwerp province center.
+    const match = buildHomeAreaMatch('m:be:2640', options, expand)!;
+    expect(match.token).toBe('m:be:2640');
+    expect(resolveHomeAreaCenter(match)).toEqual([4.4025, 51.2194]); // Antwerp (province capital)
+  });
+});
+
+// ============================================================================
+// HOME_AREA_CENTROIDS coordinate sanity — every value is hand-entered, so guard
+// against the silent failure mode: a transposed [lat, lng] or wrong-country
+// pair recreates the exact "wrong city" bug for a different area.
+// ============================================================================
+
+describe('HOME_AREA_CENTROIDS coordinate integrity', () => {
+  it('places every centroid inside the BE/NL bounding box (catches lat/lng swaps)', () => {
+    // Belgium + Netherlands span roughly lng 2.5–7.3, lat 49.4–53.7. A swapped
+    // pair puts a ~51 latitude into the longitude slot → out of range. Collect
+    // offenders so a failure names the token.
+    const outOfBounds = Object.entries(HOME_AREA_CENTROIDS).filter(
+      ([, [lng, lat]]) => lng < 2.5 || lng > 7.3 || lat < 49.4 || lat > 53.7
+    );
+    expect(outOfBounds).toEqual([]);
+  });
+
+  it('keeps each province center equal to its capital municipality (invariant lock)', () => {
+    // Province centers are defined as the province capital's coordinate — assert
+    // it stays byte-identical so an edit to one without the other is caught.
+    const PROVINCE_CAPITAL: Record<string, string> = {
+      'p:be:antwerp': 'm:be:2000', // Antwerp
+      'p:be:east-flanders': 'm:be:9000', // Ghent
+      'p:be:flemish-brabant': 'm:be:3000', // Leuven
+      'p:be:hainaut': 'm:be:7000', // Mons
+      'p:be:liege': 'm:be:4000', // Liège
+      'p:be:limburg': 'm:be:3500', // Hasselt
+      'p:be:namur': 'm:be:5000', // Namur
+      'p:be:walloon-brabant': 'm:be:1300', // Wavre
+      'p:be:west-flanders': 'm:be:8000', // Bruges
+      'p:nl:zuid-holland': 'm:nl:2292', // The Hague
+      'p:nl:noord-holland': 'm:nl:2011', // Haarlem
+      'p:nl:noord-brabant': 'm:nl:5211', // 's-Hertogenbosch
+      'p:nl:gelderland': 'm:nl:6811', // Arnhem
+      'p:nl:utrecht': 'm:nl:3451', // Utrecht
+      'p:nl:overijssel': 'm:nl:8011', // Zwolle
+      'p:nl:limburg': 'm:nl:6211', // Maastricht
+      'p:nl:groningen': 'm:nl:9479', // Groningen
+      'p:nl:fryslan': 'm:nl:8832', // Leeuwarden
+      'p:nl:drenthe': 'm:nl:9401', // Assen
+      'p:nl:flevoland': 'm:nl:1336', // Lelystad
+      'p:nl:zeeland': 'm:nl:4331', // Middelburg
+    };
+    for (const [prov, muni] of Object.entries(PROVINCE_CAPITAL)) {
+      expect(HOME_AREA_CENTROIDS[prov]).toEqual(HOME_AREA_CENTROIDS[muni]);
+    }
   });
 });
 

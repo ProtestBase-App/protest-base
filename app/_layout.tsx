@@ -26,7 +26,6 @@ import { IntegrityGate } from '@/components/integrity';
 import { ConnectionGate, OfflineBanner } from '@/components/connection';
 import { ConnectivityProvider } from '@/context/ConnectivityProvider';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
-import { PrivacyScreenGuard } from '@/components/PrivacyScreenGuard';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
 import { Platform, StyleSheet } from 'react-native';
@@ -117,7 +116,6 @@ export default function RootLayout() {
                                           >
                                             <ExploreTabProvider>
                                               <NotificationsBootstrap />
-                                              <PrivacyScreenGuard />
                                               <RootNavigator />
                                               <OfflineBanner />
                                               <StatusBar

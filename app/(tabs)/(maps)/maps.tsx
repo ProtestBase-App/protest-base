@@ -28,6 +28,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColors';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { eventCategories } from '@/constants/EventCategories';
+import { homeAreaZoomForToken } from '@/constants/HomeAreaCentroids';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useHomeArea } from '@/context/HomeAreaProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
@@ -35,7 +36,11 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
 import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { parseAsUTC } from '@/utils/eventFormatters';
-import { deriveHomeAreaCenter, sortEventsByHomeArea } from '@/utils/homeArea';
+import {
+  deriveHomeAreaCenter,
+  resolveHomeAreaCenter,
+  sortEventsByHomeArea,
+} from '@/utils/homeArea';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import {
@@ -264,9 +269,15 @@ export default function MapsScreen() {
     // that one fly. Later token-change recenters have no competing auto-fly.
     if (isInitialRecenter) homeOwnsInitialCameraRef.current = true;
 
+    // Center on the picked area itself (curated centroid), tier-zoomed to frame
+    // it. Fall back to the in-area event mean, then Brussels, only for tokens the
+    // centroid table doesn't cover (e.g. a legacy raw postal code).
     const center =
-      deriveHomeAreaCenter(geocodedEventsRef.current, homeAreaMatch) ?? BRUSSELS_CENTER;
-    cameraRef.current?.flyTo({ center, zoom: DEFAULT_ZOOM, duration: 700 });
+      resolveHomeAreaCenter(homeAreaMatch) ??
+      deriveHomeAreaCenter(geocodedEventsRef.current, homeAreaMatch) ??
+      BRUSSELS_CENTER;
+    const zoom = homeAreaZoomForToken(homeAreaToken) ?? DEFAULT_ZOOM;
+    cameraRef.current?.flyTo({ center, zoom, duration: 700 });
   }, [isFocused, mapReady, isInitialEventsLoad, homeAreaLoading, homeAreaToken, homeAreaMatch]);
 
   // Selection drives the camera and the carousel position (two-way sync).

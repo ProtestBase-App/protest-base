@@ -220,6 +220,44 @@ describe('Explore Screen', () => {
       expect(getByText('Test Event')).toBeTruthy();
     });
 
+    it('renders the event list on first load without waiting for image prefetch', () => {
+      // A real image URL would have triggered the old ExpoImage.prefetch splash
+      // gate; the list must now paint immediately and let images fill in.
+      (useExplorePagination as jest.Mock).mockReturnValue({
+        events: [
+          {
+            $id: 'event-img',
+            title: 'Image Event',
+            description: '',
+            image: 'https://example.com/pic.jpg',
+            city: 'Brussels',
+            country: 'belgium',
+            startDateFull: new Date().toISOString(),
+            endDateFull: null,
+            categories: ['climate'],
+            organizer_name: 'Org',
+            organization_id: 'org-1',
+            co_organizers: [],
+            postal_code: 1000,
+            view_count: 0,
+            help_needed: false,
+          },
+        ],
+        loading: false,
+        refreshing: false,
+        loadingMore: false,
+        hasMore: false,
+        handleRefresh: jest.fn(),
+        handleEndReached: jest.fn(),
+      });
+
+      const { getByText, UNSAFE_queryByType } = renderWithProviders(<ExploreTab />);
+
+      expect(getByText('Image Event')).toBeTruthy();
+      // No splash / footer loader is shown for a fully-loaded list.
+      expect(UNSAFE_queryByType(BrandLoader)).toBeNull();
+    });
+
     it('shows empty state when no events are available', () => {
       (useExplorePagination as jest.Mock).mockReturnValue({
         events: [],

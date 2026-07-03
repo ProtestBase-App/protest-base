@@ -71,8 +71,15 @@ export interface EventFilterParams {
  *   category: 'Protest',
  *   search: 'climate'
  * });
+ *
+ * @param options.timeout - Per-request timeout override in ms. The global events
+ *   cache uses this for its single large (up to EVENTS_MAX) fetch, which needs a
+ *   bigger budget than the axios instance default sized for small pages.
  */
-export async function getEventsBackend(filters: EventFilterParams = {}): Promise<{
+export async function getEventsBackend(
+  filters: EventFilterParams = {},
+  options?: { timeout?: number }
+): Promise<{
   events: Event[];
   total: number;
   limit: number;
@@ -157,7 +164,10 @@ export async function getEventsBackend(filters: EventFilterParams = {}): Promise
         offset: number;
         filters_applied?: Record<string, unknown>;
       };
-    }>('/events', { params });
+    }>('/events', {
+      params,
+      ...(options?.timeout !== undefined ? { timeout: options.timeout } : {}),
+    });
 
     if (!response.data.success) {
       throw new Error('Failed to fetch events');
@@ -165,6 +175,13 @@ export async function getEventsBackend(filters: EventFilterParams = {}): Promise
 
     return response.data.data;
   } catch (error: any) {
+    // Network-level failures (timeout, DNS, offline) are rethrown untouched so
+    // callers' isNetworkError() checks keep working — wrapping into a plain
+    // Error would hide the axios error code they rely on. The message callers
+    // display is the same either way.
+    if (isNetworkError(error)) {
+      throw error;
+    }
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch events');
   }
 }

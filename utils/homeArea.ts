@@ -17,6 +17,7 @@
  * Pure module — no React, no i18n (mirrors `utils/locationFilterOptions.ts`).
  */
 
+import { HOME_AREA_CENTROIDS } from '@/constants/HomeAreaCentroids';
 import { Event } from '@/types/event.types';
 import { parseAsUTC } from '@/utils/eventFormatters';
 import { hasMapCoordinates } from '@/utils/mapTabUtils';
@@ -29,6 +30,8 @@ const TOKEN_COUNTRY: Record<string, string> = {
 };
 
 export interface HomeAreaMatch {
+  /** The original home-area token this match was built from (for centroid lookup). */
+  token: string;
   /**
    * Backend country value the home token belongs to ('belgium' | 'netherlands'),
    * or null for a raw/unknown token. Gates event matching against the BE/NL
@@ -41,25 +44,30 @@ export interface HomeAreaMatch {
   provinceCodes: Set<string>;
   /** Postcodes in the home region (empty for NL, which has no region tier). */
   regionCodes: Set<string>;
+  /** Resolved province token (e.g. 'p:be:antwerp'); null when unresolved/NL-raw. */
+  provinceToken: string | null;
+  /** Resolved region token (e.g. 'r:be:flanders'); null for NL and raw tokens. */
+  regionToken: string | null;
 }
 
 type ExpandTokens = (values: string[]) => { codes: string[]; truncated: boolean };
 
 /**
  * Find the option at `tierPrefix` (e.g. 'p:be:') whose member postcodes include
- * `code`. Since municipality ⊂ province ⊂ region, the containing option is
- * unique. Bounded cost (~10 provinces / ~3 regions), run once per home change.
+ * `code`, returning both its token and its expanded code set. Since municipality
+ * ⊂ province ⊂ region, the containing option is unique. Bounded cost (~10
+ * provinces / ~3 regions), run once per home change.
  */
 function findContainingTier(
   options: LocationFilterOption[],
   tierPrefix: string,
   code: string,
   expandTokens: ExpandTokens
-): Set<string> | null {
+): { token: string; codes: Set<string> } | null {
   for (const option of options) {
     if (!option.value.startsWith(tierPrefix)) continue;
     const codes = expandTokens([option.value]).codes;
-    if (codes.includes(code)) return new Set(codes);
+    if (codes.includes(code)) return { token: option.value, codes: new Set(codes) };
   }
   return null;
 }
@@ -90,11 +98,15 @@ export function buildHomeAreaMatch(
   let municipalityCodes = new Set<string>();
   let provinceCodes = new Set<string>();
   let regionCodes = new Set<string>();
+  let provinceToken: string | null = null;
+  let regionToken: string | null = null;
 
   if (tierPrefix === 'p') {
     provinceCodes = homeCodes;
+    provinceToken = token;
   } else if (tierPrefix === 'r') {
     regionCodes = homeCodes;
+    regionToken = token;
   } else {
     // Municipality token, or a raw postal code treated as the finest tier.
     municipalityCodes = homeCodes;
@@ -104,14 +116,28 @@ export function buildHomeAreaMatch(
   if (country && (tierPrefix === 'm' || tierPrefix === 'p' || tierPrefix === '')) {
     const rep = homeCodes.values().next().value as string;
     if (tierPrefix !== 'p') {
-      provinceCodes =
-        findContainingTier(options, `p:${countrySegment}:`, rep, expandTokens) ?? provinceCodes;
+      const province = findContainingTier(options, `p:${countrySegment}:`, rep, expandTokens);
+      if (province) {
+        provinceCodes = province.codes;
+        provinceToken = province.token;
+      }
     }
-    regionCodes =
-      findContainingTier(options, `r:${countrySegment}:`, rep, expandTokens) ?? regionCodes;
+    const region = findContainingTier(options, `r:${countrySegment}:`, rep, expandTokens);
+    if (region) {
+      regionCodes = region.codes;
+      regionToken = region.token;
+    }
   }
 
-  return { country, municipalityCodes, provinceCodes, regionCodes };
+  return {
+    token,
+    country,
+    municipalityCodes,
+    provinceCodes,
+    regionCodes,
+    provinceToken,
+    regionToken,
+  };
 }
 
 /**
@@ -182,12 +208,31 @@ function meanCenter(
 }
 
 /**
+ * Static map-recenter point for the home area: the curated geographic center of
+ * the picked area, tightest tier first (municipality → province → region), or
+ * null when none of the three tiers is in the centroid table (e.g. a raw postal
+ * code). This is preferred over {@link deriveHomeAreaCenter} because it centers
+ * on *the area itself* rather than on where protests happen to be — so picking a
+ * city with no nearby protests still recenters on that city, not on the
+ * region-wide protest cluster.
+ */
+export function resolveHomeAreaCenter(match: HomeAreaMatch): [number, number] | null {
+  for (const tokenAtTier of [match.token, match.provinceToken, match.regionToken]) {
+    if (!tokenAtTier) continue;
+    const center = HOME_AREA_CENTROIDS[tokenAtTier];
+    if (center) return center;
+  }
+  return null;
+}
+
+/**
  * Map-recenter point: the arithmetic mean of geocoded events in the home area,
  * tightest tier first (municipality → province → region), or null when no
  * in-area event has coordinates (caller falls back to a static center).
  *
  * Centers on "where protests in your area are", not the geographic centroid —
- * an MVP limitation (a sparse province with one event centers on that event).
+ * kept as a fallback behind {@link resolveHomeAreaCenter} for tokens the curated
+ * centroid table doesn't cover.
  */
 export function deriveHomeAreaCenter(
   events: Event[],

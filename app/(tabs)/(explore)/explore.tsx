@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { StyleSheet, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useExploreTabContext } from '@/context/ExploreTabProvider';
@@ -111,39 +110,6 @@ export default function ExploreTab() {
       search: searchQuery,
     },
   });
-
-  // First-start splash: hold the loader until the initial fetch completes AND
-  // the first batch of event images is prefetched. Only runs once per app session.
-  const [firstLoadImagesReady, setFirstLoadImagesReady] = useState(false);
-  const firstLoadPrefetchStartedRef = useRef(false);
-
-  useEffect(() => {
-    if (firstLoadPrefetchStartedRef.current) return;
-    if (loading || postalCodesLoading) return;
-    firstLoadPrefetchStartedRef.current = true;
-
-    const urls = displayedEvents
-      .slice(0, 20)
-      .map((e) => e.image)
-      .filter((u): u is string => typeof u === 'string' && u.length > 0);
-
-    if (urls.length === 0) {
-      setFirstLoadImagesReady(true);
-      return;
-    }
-
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      setFirstLoadImagesReady(true);
-    };
-
-    ExpoImage.prefetch(urls).finally(finish);
-    // Safety: never hold the splash longer than 5s even if prefetch hangs.
-    const timeoutId = setTimeout(finish, 5000);
-    return () => clearTimeout(timeoutId);
-  }, [loading, postalCodesLoading, displayedEvents]);
 
   // Refs for stable callbacks — updated during render so FlatList items read latest values.
   const eventsCacheRef = useRef(eventsCache);
@@ -318,7 +284,7 @@ export default function ExploreTab() {
     return item.$id || `${index}-${item.start_time}`;
   }, []);
 
-  if (loading || postalCodesLoading || !firstLoadImagesReady) {
+  if (loading || postalCodesLoading) {
     return (
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />

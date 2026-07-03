@@ -53,6 +53,14 @@ jest.mock('@/services/event.service', () => ({
   fetchEventCounts: jest.fn(() => Promise.resolve({ upcoming: 0, past: 0 })),
 }));
 
+// Persistence is exercised by eventsCacheStorage.test.ts + the GlobalProvider
+// unit test. Stub it here so these cache-flow assertions stay deterministic and
+// no fire-and-forget snapshot leaks between tests via the shared AsyncStorage mock.
+jest.mock('@/services/eventsCacheStorage', () => ({
+  loadPersistedEvents: jest.fn(() => Promise.resolve(null)),
+  persistEvents: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('@/services/api', () => ({
   __esModule: true,
   default: {},

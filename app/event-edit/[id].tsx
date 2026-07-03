@@ -16,7 +16,6 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { getEventByIdBackend, updateEvent } from '@/services/event.service';
-import { Event } from '@/types/event.types';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
@@ -36,7 +35,7 @@ const URL_REGEX =
   /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/;
 
 export default function EditEvent() {
-  const { user, isLogged, userLanguage, eventsCache, refetchEvents, refreshUserEventCounts } =
+  const { user, isLogged, userLanguage, refetchEvents, refreshUserEventCounts } =
     useGlobalContext();
   const { userOrganizations } = useUserOrganizations();
   const { isOffline } = useConnectivity();
@@ -89,16 +88,15 @@ export default function EditEvent() {
       try {
         setLoading(true);
 
-        const cachedEvent = eventsCache[eventId] as Event | undefined;
-
-        if (cachedEvent) {
-          const formatted = formatEventForDisplay(cachedEvent, userLanguage);
-          setEventDetail([formatted]);
-        } else {
-          const fetchedEvent = await getEventByIdBackend(eventId);
-          const formatted = formatEventForDisplay(fetchedEvent, userLanguage);
-          setEventDetail([formatted]);
-        }
+        // Always fetch fresh — never seed from eventsCache. The form populates
+        // every field from this object and writes them all back on submit, so a
+        // stale cached copy (long session, or disk-hydrated snapshot) would
+        // silently revert changes made from another device. Skipping the cache
+        // also keeps the open form stable while background refreshes replace
+        // eventsCache wholesale.
+        const fetchedEvent = await getEventByIdBackend(eventId);
+        const formatted = formatEventForDisplay(fetchedEvent, userLanguage);
+        setEventDetail([formatted]);
       } catch (error) {
         logger.warn('Failed to load event for editing', {
           eventId,
@@ -113,7 +111,7 @@ export default function EditEvent() {
     if (eventId) {
       loadEvent();
     }
-  }, [eventId, eventsCache, userLanguage]);
+  }, [eventId, userLanguage]);
 
   // Populate form once event data is available.
   useEffect(() => {

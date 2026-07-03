@@ -128,6 +128,35 @@ describe('EditEvent', () => {
       await findByText('eventEdit.title');
     });
 
+    it('always fetches fresh and ignores a stale cached copy of the event', async () => {
+      // A stale (e.g. disk-hydrated) cache entry must never seed the edit form:
+      // submitting would write its outdated untouched fields back to the server.
+      const staleEvent = { ...mockEvent, title: 'Stale Cached Title' };
+
+      const { findByDisplayValue, queryByDisplayValue } = renderWithProviders(<EditEvent />, {
+        providerOverrides: {
+          globalContext: {
+            user: mockUser,
+            isLogged: true,
+            loading: false,
+            userLanguage: 'en',
+            eventsCache: {
+              'event-1': staleEvent,
+            },
+            refetchEvents: jest.fn(),
+            refreshUserEventCounts: jest.fn(),
+          },
+          organizationsContext: {
+            dropdownItems: [],
+          },
+        },
+      });
+
+      expect(getEventByIdBackend).toHaveBeenCalledWith('event-1');
+      await findByDisplayValue(mockEvent.title);
+      expect(queryByDisplayValue('Stale Cached Title')).toBeNull();
+    });
+
     it('should redirect to more tab when not logged in', () => {
       const { getByText } = renderWithProviders(<EditEvent />, {
         providerOverrides: {
@@ -197,12 +226,14 @@ describe('EditEvent', () => {
   });
 
   describe('Pre-fill Form Data', () => {
-    it('should pre-fill form with cached event data', async () => {
+    it('should pre-fill form with the freshly loaded event data', async () => {
       const eventWithCategories = {
         ...mockEvent,
         categories: ['protest', 'climate'],
         co_organizers: ['org-a', 'org-b'],
       };
+      // The edit screen always loads fresh from the backend (never the cache).
+      getEventByIdBackend.mockResolvedValue(eventWithCategories);
 
       const { findByDisplayValue } = renderWithProviders(<EditEvent />, {
         providerOverrides: {
@@ -211,9 +242,7 @@ describe('EditEvent', () => {
             isLogged: true,
             loading: false,
             userLanguage: 'en',
-            eventsCache: {
-              'event-1': eventWithCategories,
-            },
+            eventsCache: {},
             refetchEvents: jest.fn(),
             refreshUserEventCounts: jest.fn(),
           },
@@ -237,6 +266,7 @@ describe('EditEvent', () => {
         ...mockEvent,
         co_organizers: ['org-a', 'org-b'],
       };
+      getEventByIdBackend.mockResolvedValue(eventWithCoOrgs);
 
       const { findByText } = renderWithProviders(<EditEvent />, {
         providerOverrides: {
@@ -245,9 +275,7 @@ describe('EditEvent', () => {
             isLogged: true,
             loading: false,
             userLanguage: 'en',
-            eventsCache: {
-              'event-1': eventWithCoOrgs,
-            },
+            eventsCache: {},
             refetchEvents: jest.fn(),
             refreshUserEventCounts: jest.fn(),
           },
