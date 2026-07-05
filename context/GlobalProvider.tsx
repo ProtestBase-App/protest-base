@@ -194,22 +194,43 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   const localeCode = getLocales()[0]?.languageCode;
   const userLanguage = localeCode && supportedLanguages.includes(localeCode) ? localeCode : 'en';
 
+  /** Sign out in memory only — no storage is touched. */
+  const resetAuthMemoryState = useCallback((): void => {
+    setIsLogged(false);
+    setUser(null);
+    setUserEventCounts(null);
+  }, []);
+
+  /**
+   * Sign out WITHOUT wiping device-local user data. For launches where no
+   * authenticated session ever existed — guests, the overwhelming majority of
+   * users — saved/liked/followed lists and their scheduled reminders must
+   * survive. Only the auth token keys are removed (hygiene for a half-written
+   * login). Real invalidation (logout, account deletion, expired/replaced
+   * session) goes through clearAuthState instead.
+   */
+  const resetAuthState = useCallback(async (): Promise<void> => {
+    try {
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
+      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
+    } catch (error) {
+      logger.error('Failed to clear auth tokens from storage:', { error });
+    }
+    resetAuthMemoryState();
+  }, [resetAuthMemoryState]);
+
   const clearAuthState = useCallback(async (): Promise<void> => {
     // Wipe storage BEFORE flipping auth state so consumers reacting to
     // isLogged (e.g. SavedEventsProvider's logout reload) observe the
     // post-wipe contents, never the pre-logout data.
     try {
       await clearAllUserData();
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
     } catch (error) {
       logger.error('Failed to clear user data from storage:', { error });
     }
-    setIsLogged(false);
-    setUser(null);
-    setUserEventCounts(null);
-  }, []);
+    await resetAuthState();
+  }, [resetAuthState]);
 
   const refreshUserEventCounts = useCallback(async (organizationIds?: string[]): Promise<void> => {
     // If no organizations, set counts to zero (not null) to exit loading state
@@ -238,15 +259,20 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   const validateUserSession = useCallback(async (): Promise<void> => {
     logger.debug('[GlobalProvider] Validating user session...');
     try {
+      // No token / no session id = the user was never authenticated this
+      // install (guest) or a login write was interrupted. NEVER clearAuthState
+      // here: it would wipe the guest's saved/liked/followed lists and cancel
+      // their scheduled reminders on every launch.
       const accessToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
       if (!accessToken) {
-        await clearAuthState();
+        logger.debug('[GlobalProvider] No access token — guest session');
+        await resetAuthState();
         return;
       }
 
       const storedSessionId = await SecureStore.getItemAsync(SECURE_STORE_KEYS.SESSION_ID);
       if (!storedSessionId) {
-        await clearAuthState();
+        await resetAuthState();
         return;
       }
 
@@ -290,12 +316,16 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
       if (isNetworkError(error)) {
         setConnectionError(true);
       } else {
-        await clearAuthState();
+        // Unexpected failure (e.g. backend 5xx): possibly transient, so keep
+        // local data AND the stored tokens — the next launch revalidates. A
+        // genuinely dead session is invalidated by the 401→refresh-failure
+        // callback instead, with a user-visible alert.
+        resetAuthMemoryState();
       }
     } finally {
       setLoading(false);
     }
-  }, [clearAuthState]);
+  }, [clearAuthState, resetAuthState, resetAuthMemoryState]);
 
   // Extracted as useCallback so retryConnection can re-invoke it
   const fetchInitialEvents = useCallback(async (): Promise<void> => {

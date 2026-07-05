@@ -11,6 +11,7 @@
  * - refetchEvents error re-throw
  * - Token expiration alert callback
  * - clearAuthState storage error path
+ * - Guest launch preserves device-local user data (no wipe)
  * - useGlobalContext hook guard
  */
 import React from 'react';
@@ -460,6 +461,70 @@ describe('GlobalProvider', () => {
 
       expect(result.current.isLogged).toBe(false);
       expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('guest launch (no access token) preserves device-local data', () => {
+    const savedList = JSON.stringify([{ id: 'saved-1', endsAt: Date.now() + 86400000 }]);
+
+    it('does not wipe user data when launching without any auth keys', async () => {
+      mockSecureStore['securelist.savedEventIds'] = savedList;
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      expect(result.current.isLogged).toBe(false);
+      expect(result.current.loading).toBe(false);
+      // Saved events survive the launch and no bulk user-data wipe ran.
+      expect(mockSecureStore['securelist.savedEventIds']).toBe(savedList);
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+      expect(mockGetCurrentUser).not.toHaveBeenCalled();
+    });
+
+    it('removes orphaned auth keys but keeps user data when only the access token is missing', async () => {
+      // Half-written login: refresh token + session id without an access token.
+      mockSecureStore['refresh_token'] = 'orphan-refresh';
+      mockSecureStore['session_id'] = 'orphan-session';
+      mockSecureStore['securelist.savedEventIds'] = savedList;
+
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      expect(mockSecureStore['refresh_token']).toBeUndefined();
+      expect(mockSecureStore['session_id']).toBeUndefined();
+      expect(mockSecureStore['securelist.savedEventIds']).toBe(savedList);
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+    });
+
+    it('keeps user data when access_token exists but session_id is missing', async () => {
+      mockSecureStore['access_token'] = 'valid-token';
+      mockSecureStore['securelist.savedEventIds'] = savedList;
+
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      // The orphan token is removed, the user's lists are not.
+      expect(mockSecureStore['access_token']).toBeUndefined();
+      expect(mockSecureStore['securelist.savedEventIds']).toBe(savedList);
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+    });
+
+    it('preserves data and stored session on unexpected (non-network) validation errors', async () => {
+      mockSecureStore['access_token'] = 'valid-token';
+      mockSecureStore['session_id'] = 'session-1';
+      mockSecureStore['securelist.savedEventIds'] = savedList;
+      mockGetCurrentUser.mockRejectedValue(new Error('Internal server error'));
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      expect(result.current.isLogged).toBe(false);
+      expect(result.current.loading).toBe(false);
+      // Tokens survive so the next launch can revalidate; nothing was wiped.
+      expect(mockSecureStore['access_token']).toBe('valid-token');
+      expect(mockSecureStore['session_id']).toBe('session-1');
+      expect(mockSecureStore['securelist.savedEventIds']).toBe(savedList);
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
     });
   });
 
