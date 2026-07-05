@@ -799,6 +799,32 @@ describe('services/api.ts', () => {
         originalError,
       });
     });
+
+    it('preserves the ACCOUNT_LOCKED code instead of collapsing it to RATE_LIMIT_EXCEEDED', async () => {
+      const error = {
+        config: { method: 'post', url: '/auth/login', headers: {} },
+        response: { status: 429, data: { code: 'ACCOUNT_LOCKED', error: 'Account locked' } },
+        message: 'Too Many Requests',
+      };
+
+      await expect(getStore().responseRejected(error)).rejects.toMatchObject({
+        code: 'ACCOUNT_LOCKED',
+        isRateLimited: true,
+      });
+    });
+
+    it('handles ACCOUNT_LOCKED even when the backend ships it as 403', async () => {
+      const error = {
+        config: { method: 'post', url: '/auth/login', headers: {} },
+        response: { status: 403, data: { code: 'ACCOUNT_LOCKED', error: 'Account locked' } },
+        message: 'Forbidden',
+      };
+
+      await expect(getStore().responseRejected(error)).rejects.toMatchObject({
+        code: 'ACCOUNT_LOCKED',
+        isRateLimited: true,
+      });
+    });
   });
 
   // ============================================================

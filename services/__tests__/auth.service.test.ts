@@ -182,6 +182,31 @@ describe('auth.service', () => {
 
       await expect(login('user@example.com', 'password123')).rejects.toThrow('Login failed');
     });
+
+    // Regression: the response interceptor rejects with a RateLimitError that
+    // carries `code`/`isRateLimited` but has NO `.response`. login() must forward
+    // it intact so the UI can show the rate-limit / lockout message. Before the
+    // guarded re-throw, login() collapsed it into a bare Error('Login failed'),
+    // silently discarding the signal.
+    it('re-throws a rate-limit error from the interceptor without collapsing it', async () => {
+      const rateLimitError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'RATE_LIMIT_EXCEEDED', isRateLimited: true }
+      );
+      mockApi.post.mockRejectedValueOnce(rateLimitError);
+
+      await expect(login('user@example.com', 'password123')).rejects.toBe(rateLimitError);
+    });
+
+    it('re-throws an account-locked error from the interceptor without collapsing it', async () => {
+      const lockedError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'ACCOUNT_LOCKED', isRateLimited: true }
+      );
+      mockApi.post.mockRejectedValueOnce(lockedError);
+
+      await expect(login('user@example.com', 'password123')).rejects.toBe(lockedError);
+    });
   });
 
   // ============================================================
@@ -401,6 +426,28 @@ describe('auth.service', () => {
         'Failed to send password reset email'
       );
     });
+
+    // Same swallow bug as login(): the interceptor's RateLimitError has no
+    // `.response`, so it must be forwarded intact rather than collapsed.
+    it('re-throws a rate-limit error from the interceptor without collapsing it', async () => {
+      const rateLimitError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'RATE_LIMIT_EXCEEDED', isRateLimited: true }
+      );
+      mockApi.post.mockRejectedValueOnce(rateLimitError);
+
+      await expect(forgotPassword('user@example.com')).rejects.toBe(rateLimitError);
+    });
+
+    it('re-throws an account-locked error from the interceptor without collapsing it', async () => {
+      const lockedError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'ACCOUNT_LOCKED', isRateLimited: true }
+      );
+      mockApi.post.mockRejectedValueOnce(lockedError);
+
+      await expect(forgotPassword('user@example.com')).rejects.toBe(lockedError);
+    });
   });
 
   // ============================================================
@@ -442,6 +489,32 @@ describe('auth.service', () => {
       mockApi.delete.mockRejectedValueOnce({});
 
       await expect(deleteAccount('password123')).rejects.toThrow('Failed to delete account');
+    });
+
+    // The response interceptor rewrites rate-limit / lockout responses globally
+    // (any endpoint, incl. DELETE /auth/account) into an Error with code/isRateLimited
+    // but no `.response`. deleteAccount() must forward it intact so the delete-account
+    // screen's rate-limit branch (deleteAccountMessage) is reachable.
+    it('re-throws a rate-limit error from the interceptor without collapsing it', async () => {
+      const rateLimitError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'RATE_LIMIT_EXCEEDED', isRateLimited: true }
+      );
+      mockApi.delete.mockRejectedValueOnce(rateLimitError);
+
+      await expect(deleteAccount('password123')).rejects.toBe(rateLimitError);
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+
+    it('re-throws an account-locked error from the interceptor without collapsing it', async () => {
+      const lockedError = Object.assign(
+        new Error('Too many requests. Please wait a moment and try again.'),
+        { code: 'ACCOUNT_LOCKED', isRateLimited: true }
+      );
+      mockApi.delete.mockRejectedValueOnce(lockedError);
+
+      await expect(deleteAccount('password123')).rejects.toBe(lockedError);
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
   });
 });

@@ -284,6 +284,8 @@ const fr: LocaleData = {
     firstTimeSentTo: 'Nous avons envoyé un lien de configuration à :',
     firstTimeNextSteps:
       'Ouvrez le lien pour créer votre mot de passe sur notre site web. Une fois terminé, revenez ici et connectez-vous.',
+    troubleSigningInTitle: 'Un problème pour vous connecter ?',
+    troubleSigningInBody: 'Réinitialisez votre mot de passe pour vous reconnecter.',
     migrationBannerTitle: 'Réinitialisation du mot de passe requise',
     migrationBannerMessage:
       'Nous avons récemment migré nos systèmes pour améliorer la sécurité. Votre ancien mot de passe ne fonctionnera plus.',

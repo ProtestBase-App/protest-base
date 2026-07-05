@@ -46,6 +46,17 @@ export const login = async (email: string, password: string): Promise<User> => {
 
     return responseData.user;
   } catch (error: any) {
+    // The response interceptor rejects rate-limit / lockout errors as a plain
+    // Error carrying `code`/`isRateLimited` but no `.response`. Forward those
+    // intact so the sign-in screen can show the correct message; the generic
+    // extraction below would otherwise collapse them into 'Login failed'.
+    if (
+      error?.isRateLimited ||
+      error?.code === 'RATE_LIMIT_EXCEEDED' ||
+      error?.code === 'ACCOUNT_LOCKED'
+    ) {
+      throw error;
+    }
     const apiError = error.response?.data as ApiError;
     throw new Error(apiError?.error || 'Login failed');
   }
@@ -123,6 +134,14 @@ export const forgotPassword = async (
     }>('/auth/forgot-password', { email });
     return response.data;
   } catch (error: any) {
+    // Forward interceptor-shaped rate-limit / lockout errors intact (see login()).
+    if (
+      error?.isRateLimited ||
+      error?.code === 'RATE_LIMIT_EXCEEDED' ||
+      error?.code === 'ACCOUNT_LOCKED'
+    ) {
+      throw error;
+    }
     const apiError = error.response?.data as ApiError;
     throw new Error(apiError?.error || 'Failed to send password reset email');
   }
@@ -136,6 +155,16 @@ export const deleteAccount = async (password: string): Promise<void> => {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
     await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
   } catch (error: any) {
+    // Forward interceptor-shaped rate-limit / lockout errors intact (see login()).
+    // The interceptor rewrites these globally with no `.response`, so without this
+    // guard the delete-account screen's dedicated rate-limit message is unreachable.
+    if (
+      error?.isRateLimited ||
+      error?.code === 'RATE_LIMIT_EXCEEDED' ||
+      error?.code === 'ACCOUNT_LOCKED'
+    ) {
+      throw error;
+    }
     const apiError = error.response?.data as ApiError;
     if (apiError?.code === 'INVALID_CREDENTIALS') {
       throw new Error('INVALID_CREDENTIALS');

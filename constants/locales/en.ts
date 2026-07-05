@@ -279,6 +279,8 @@ const en: LocaleData = {
     firstTimeSentTo: 'We sent a password setup link to:',
     firstTimeNextSteps:
       'Open the link to create your password on our website. Once done, come back here and sign in.',
+    troubleSigningInTitle: 'Trouble signing in?',
+    troubleSigningInBody: 'Reset your password to get back in.',
     migrationBannerTitle: 'Password Reset Required',
     migrationBannerMessage:
       'We recently migrated our systems to improve security. Your previous password will no longer work.',

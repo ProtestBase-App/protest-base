@@ -298,6 +298,8 @@ const nl = {
     firstTimeSentTo: 'We hebben een koppeling om je wachtwoord in te stellen gestuurd naar:',
     firstTimeNextSteps:
       'Open de koppeling om je wachtwoord aan te maken op onze website. Kom daarna hier terug en meld je aan.',
+    troubleSigningInTitle: 'Problemen met inloggen?',
+    troubleSigningInBody: 'Herstel je wachtwoord om weer in te loggen.',
     migrationBannerTitle: 'Wachtwoord opnieuw instellen vereist',
     migrationBannerMessage:
       'We hebben onlangs onze systemen gemigreerd om de beveiliging te verbeteren. Je vorige wachtwoord werkt niet meer.',

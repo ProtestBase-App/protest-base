@@ -249,6 +249,73 @@ describe('SignIn Screen', () => {
         );
       });
     });
+
+    it('shows the dedicated account-locked message when the account is locked', async () => {
+      const lockedError = new Error('Account locked');
+      (lockedError as any).code = 'ACCOUNT_LOCKED';
+      (lockedError as any).isRateLimited = true;
+      (login as jest.Mock).mockRejectedValue(lockedError);
+
+      const { getByText, getByPlaceholderText } = renderWithProviders(<SignIn />);
+
+      const emailInput = getByPlaceholderText('auth.emailPlaceholder');
+      const passwordInput = getByPlaceholderText('auth.passwordPlaceholder');
+
+      fireEvent.changeText(emailInput, 'test@example.com');
+      fireEvent.changeText(passwordInput, 'password123');
+
+      await waitForDebounce();
+
+      const signInButton = getByText('auth.signInButton');
+      fireEvent.press(signInButton);
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'errors.rateLimit.title',
+          'errors.rateLimit.accountLockedMessage'
+        );
+      });
+    });
+  });
+
+  describe('Reset-password nudge', () => {
+    it('stays hidden until 2 failed attempts, then appears and opens the reset modal', async () => {
+      (login as jest.Mock).mockRejectedValue(new Error('Invalid credentials'));
+
+      const { getByText, queryByText, getByPlaceholderText } = renderWithProviders(<SignIn />);
+
+      // Hidden before any failed attempt.
+      expect(queryByText('auth.troubleSigningInBody')).toBeNull();
+
+      const emailInput = getByPlaceholderText('auth.emailPlaceholder');
+      const passwordInput = getByPlaceholderText('auth.passwordPlaceholder');
+      fireEvent.changeText(emailInput, 'test@example.com');
+      fireEvent.changeText(passwordInput, 'wrongpassword');
+      await waitForDebounce();
+
+      // 1st failed attempt — nudge still hidden.
+      fireEvent.press(getByText('auth.signInButton'));
+      await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
+      expect(queryByText('auth.troubleSigningInBody')).toBeNull();
+
+      // The button enters a short cooldown (text flips to tryAgainIn); wait until
+      // it re-enables before the second press.
+      await waitFor(() => expect(getByText('auth.signInButton')).toBeTruthy(), {
+        timeout: 5000,
+        interval: 200,
+      });
+
+      // 2nd failed attempt.
+      fireEvent.press(getByText('auth.signInButton'));
+      await waitFor(() => expect(login).toHaveBeenCalledTimes(2));
+
+      // Nudge now visible.
+      const nudge = await waitFor(() => getByText('auth.troubleSigningInBody'));
+
+      // Tapping the nudge opens the forgot-password modal.
+      fireEvent.press(nudge);
+      expect(getByText('auth.resetPasswordTitle')).toBeTruthy();
+    }, 15000);
   });
 
   describe('Forgot Password Modal', () => {
@@ -369,6 +436,31 @@ describe('SignIn Screen', () => {
 
       await waitFor(() => {
         expect(getByText('common.error')).toBeTruthy();
+      });
+    });
+
+    it('shows the rate-limit message when the password reset is rate limited', async () => {
+      // Mock the exact shape the interceptor now produces (code + isRateLimited,
+      // no `.response`) that forgotPassword() forwards intact — this proves the
+      // previously-dead forgotPasswordMessage branch is now reachable.
+      const rateLimitError = Object.assign(new Error('Too many requests'), {
+        code: 'RATE_LIMIT_EXCEEDED',
+        isRateLimited: true,
+      });
+      (forgotPassword as jest.Mock).mockRejectedValue(rateLimitError);
+
+      const { getByText, getByPlaceholderText } = renderWithProviders(<SignIn />);
+
+      fireEvent.press(getByText('auth.forgotPassword'));
+
+      const emailInput = getByPlaceholderText('auth.resetPasswordPlaceholder');
+      fireEvent.changeText(emailInput, 'test@example.com');
+      await waitForDebounce();
+
+      fireEvent.press(getByText('auth.resetPasswordSend'));
+
+      await waitFor(() => {
+        expect(getByText('errors.rateLimit.forgotPasswordMessage')).toBeTruthy();
       });
     });
   });
