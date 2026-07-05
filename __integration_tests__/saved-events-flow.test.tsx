@@ -182,6 +182,39 @@ describe('Saved Events Flow Integration', () => {
     expect(result.current.saved.savedEventIds).toContain('saved-2');
   });
 
+  it('keeps guest saved events across an app restart (no launch wipe)', async () => {
+    mockGetEventsBackend.mockResolvedValue({ events: [], total: 0, limit: 100, offset: 0 });
+
+    // A guest (no access token in SecureStore) saved two events in a previous
+    // session.
+    secureStoreMem.set(
+      SECURE_LIST_KEYS.SAVED_EVENT_IDS,
+      JSON.stringify([
+        { id: 'saved-1', endsAt: Date.now() + DAY_MS },
+        { id: 'saved-2', endsAt: Date.now() + DAY_MS },
+      ])
+    );
+
+    // Launch 1.
+    const first = renderHook(() => useTestHook(), { wrapper });
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(first.result.current.saved.savedEventIds).toEqual(['saved-1', 'saved-2']);
+    // The backing storage survives the launch (regression: validateUserSession
+    // used to clearAllUserData for guests, silently wiping this key while the
+    // in-memory list still looked intact for the rest of the session).
+    expect(secureStoreMem.has(SECURE_LIST_KEYS.SAVED_EVENT_IDS)).toBe(true);
+    first.unmount();
+
+    // Launch 2 (app restart): the saved events are still there.
+    const second = renderHook(() => useTestHook(), { wrapper });
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(second.result.current.saved.savedEventIds).toEqual(['saved-1', 'saved-2']);
+  });
+
   it('migrates legacy AsyncStorage savedEventIds on first read', async () => {
     mockGetEventsBackend.mockResolvedValue({ events: [], total: 0, limit: 100, offset: 0 });
 
