@@ -221,6 +221,10 @@ const en: LocaleData = {
     mandatoryFieldsError: 'Please fill in all mandatory fields.',
     invalidTimeRangeError: 'End time cannot be before the Start time',
     closeAccessibilityLabel: 'Close edit event screen',
+    discardTitle: 'Discard changes?',
+    discardMessage: 'You have unsaved changes. If you leave now, they will be lost.',
+    keepEditing: 'Keep editing',
+    discardConfirm: 'Discard',
   },
 
   // ============================================
@@ -577,6 +581,8 @@ const en: LocaleData = {
     selectCountry: 'Select country',
     postalCodePlaceholder: 'Postal code',
     searchPostalCode: 'Search by postal code or municipality...',
+    searchNoResults: 'No matches found',
+    searchMinLength: 'Type at least {{count}} characters',
     streetAddressPlaceholder: 'Street name and number',
     // Address autocomplete
     addressSearchPlaceholder: 'Search for an address…',

@@ -239,6 +239,10 @@ const nl = {
     mandatoryFieldsError: 'Vul alle verplichte velden in.',
     invalidTimeRangeError: 'Eindtijd kan niet vóór de starttijd liggen',
     closeAccessibilityLabel: 'Sluit evenement bewerken scherm',
+    discardTitle: 'Wijzigingen negeren?',
+    discardMessage: 'Je hebt niet-opgeslagen wijzigingen. Als je nu weggaat, gaan ze verloren.',
+    keepEditing: 'Verder bewerken',
+    discardConfirm: 'Negeren',
   },
 
   // ============================================
@@ -620,6 +624,8 @@ const nl = {
     selectCountry: 'Selecteer een land',
     postalCodePlaceholder: 'Postcode',
     searchPostalCode: 'Zoek op postcode of gemeente...',
+    searchNoResults: 'Geen resultaten',
+    searchMinLength: 'Typ minstens {{count}} tekens',
     streetAddressPlaceholder: 'Straat en huisnummer',
     // Address autocomplete
     addressSearchPlaceholder: 'Zoek een adres…',

@@ -736,6 +736,8 @@ const EventForm: React.FC<EventFormProps> = ({
               resolveSelectedLabel={resolvePostalLabel}
               leadingIconName="mappin.and.ellipse"
               minSearchLength={2}
+              minLengthHintText={t('createEvent.searchMinLength', { count: 2 })}
+              noResultsText={t('createEvent.searchNoResults')}
               singleSelect
             />
           </ThemedView>
@@ -799,6 +801,7 @@ const EventForm: React.FC<EventFormProps> = ({
           resolveSelectedLabel={resolveOrganizationLabel}
           leadingIconName="person"
           minSearchLength={0}
+          noResultsText={t('createEvent.searchNoResults')}
           maxSelected={MAX_CO_ORGANIZERS}
           maxSelectedHint={t('createEvent.maxCoOrganizers', { max: MAX_CO_ORGANIZERS })}
         />

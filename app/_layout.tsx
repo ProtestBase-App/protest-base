@@ -161,9 +161,14 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      {/* Edit screens: only accessible when logged in */}
+      {/* Edit screens: only accessible when logged in. gestureEnabled is off so
+          the iOS swipe-back can't bypass the unsaved-changes guard (which only
+          intercepts the buttons and the Android back). */}
       <Stack.Protected guard={isLogged}>
-        <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="event-edit/[id]"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
         <Stack.Screen name="draft-edit/[id]" options={{ headerShown: false }} />
       </Stack.Protected>
 

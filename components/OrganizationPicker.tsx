@@ -81,6 +81,7 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
         resolveSelectedLabel={resolveLabel}
         leadingIconName="person"
         minSearchLength={0}
+        noResultsText={t('createEvent.searchNoResults')}
         singleSelect
       />
       {error && errorMessage ? (

@@ -226,6 +226,11 @@ const fr: LocaleData = {
     mandatoryFieldsError: 'Veuillez remplir tous les champs obligatoires.',
     invalidTimeRangeError: "L'heure de fin ne peut pas être antérieure à l'heure de début",
     closeAccessibilityLabel: "Fermer l'écran de modification d'événement",
+    discardTitle: 'Abandonner les modifications ?',
+    discardMessage:
+      'Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.',
+    keepEditing: 'Continuer les modifications',
+    discardConfirm: 'Abandonner',
   },
 
   // ============================================
@@ -579,6 +584,8 @@ const fr: LocaleData = {
     selectCountry: 'Sélectionnez un pays',
     postalCodePlaceholder: 'Code postal',
     searchPostalCode: 'Rechercher par code postal ou commune...',
+    searchNoResults: 'Aucun résultat',
+    searchMinLength: 'Saisissez au moins {{count}} caractères',
     streetAddressPlaceholder: 'Nom et numéro de rue',
     // Address autocomplete
     addressSearchPlaceholder: 'Rechercher une adresse…',

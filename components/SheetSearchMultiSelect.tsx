@@ -28,6 +28,18 @@ export interface SheetSearchMultiSelectProps {
   minSearchLength?: number;
   maxVisibleOptions?: number;
   /**
+   * Message shown inside the open panel when a query at/above minSearchLength
+   * matches nothing. Opt-in: when omitted the panel simply closes on no match
+   * (legacy behaviour), so existing callers are unaffected.
+   */
+  noResultsText?: string;
+  /**
+   * Hint shown inside the open panel while the query is below minSearchLength
+   * (including an empty query on focus). Gives fields with minSearchLength > 0 a
+   * visible "keep typing" affordance instead of looking dead when tapped. Opt-in.
+   */
+  minLengthHintText?: string;
+  /**
    * Restrict the selection to a single value: picking an option replaces the
    * current selection and collapses the dropdown. The selected value still
    * renders as one removable chip above the input. Defaults to multi-select.
@@ -76,6 +88,8 @@ export function SheetSearchMultiSelect({
   leadingIconName,
   minSearchLength = 0,
   maxVisibleOptions = 5,
+  noResultsText,
+  minLengthHintText,
   singleSelect = false,
   maxSelected,
   maxSelectedHint,
@@ -143,7 +157,20 @@ export function SheetSearchMultiSelect({
     maxVisibleOptions,
   ]);
 
-  const dropdownOpen = visibleOptions.length > 0;
+  // Panel visibility: matched options, a "keep typing" hint (query below the
+  // min length), or a "no matches" message (query at/above the min but empty
+  // result). The message rows only appear when the host supplies their copy, so
+  // callers that don't opt in keep the legacy close-on-no-match behaviour.
+  const panelActive = focused && !disabled && !atMax;
+  const belowMinLength = normalizedQuery.length < minSearchLength;
+  const showMinLengthHint = panelActive && belowMinLength && !!minLengthHintText;
+  const showNoResults =
+    panelActive &&
+    !belowMinLength &&
+    normalizedQuery.length > 0 &&
+    visibleOptions.length === 0 &&
+    !!noResultsText;
+  const dropdownOpen = visibleOptions.length > 0 || showMinLengthHint || showNoResults;
 
   const handleRemove = (value: string) => {
     onChange(selected.filter((v) => v !== value));
@@ -217,16 +244,20 @@ export function SheetSearchMultiSelect({
           accessibilityLabel={placeholder}
           accessibilityState={{ disabled }}
         />
-        {!disabled && query.length > 0 && (
-          <Pressable
-            onPress={handleClearQuery}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            hitSlop={8}
-          >
-            <IconSymbol name="xmark" size={12} color={themeColors.placeholder} />
-          </Pressable>
-        )}
+        {!disabled &&
+          (query.length > 0 ? (
+            <Pressable
+              onPress={handleClearQuery}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              hitSlop={8}
+            >
+              <IconSymbol name="xmark" size={12} color={themeColors.placeholder} />
+            </Pressable>
+          ) : (
+            // Caret signals this is a tap-to-open list, not a plain text box.
+            <IconSymbol name="chevron.down" size={16} color={themeColors.placeholder} />
+          ))}
       </View>
 
       {dropdownOpen && (
@@ -239,33 +270,43 @@ export function SheetSearchMultiSelect({
             },
           ]}
         >
-          {visibleOptions.map((option, index) => (
-            <Pressable
-              key={option.value}
-              style={[
-                styles.optionRow,
-                index > 0 && { borderTopWidth: 0.5, borderTopColor: themeColors.separator },
-              ]}
-              onPress={() => handleSelect(option.value)}
-              accessibilityRole="button"
-              accessibilityLabel={option.label}
-            >
-              <IconSymbol name={leadingIconName} size={12} color={themeColors.secondaryText} />
-              <View style={styles.optionText}>
-                <ThemedText style={styles.optionLabel} numberOfLines={1}>
-                  {option.label}
-                </ThemedText>
-                {option.sublabel ? (
-                  <ThemedText style={[styles.optionSublabel, { color: themeColors.secondaryText }]}>
-                    {option.sublabel}
+          {visibleOptions.length > 0 ? (
+            visibleOptions.map((option, index) => (
+              <Pressable
+                key={option.value}
+                style={[
+                  styles.optionRow,
+                  index > 0 && { borderTopWidth: 0.5, borderTopColor: themeColors.separator },
+                ]}
+                onPress={() => handleSelect(option.value)}
+                accessibilityRole="button"
+                accessibilityLabel={option.label}
+              >
+                <IconSymbol name={leadingIconName} size={12} color={themeColors.secondaryText} />
+                <View style={styles.optionText}>
+                  <ThemedText style={styles.optionLabel} numberOfLines={1}>
+                    {option.label}
                   </ThemedText>
-                ) : null}
-              </View>
-              <ThemedText style={[styles.optionAdd, { color: themeColors.placeholder }]}>
-                +
+                  {option.sublabel ? (
+                    <ThemedText
+                      style={[styles.optionSublabel, { color: themeColors.secondaryText }]}
+                    >
+                      {option.sublabel}
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <ThemedText style={[styles.optionAdd, { color: themeColors.placeholder }]}>
+                  +
+                </ThemedText>
+              </Pressable>
+            ))
+          ) : (
+            <View style={styles.messageRow}>
+              <ThemedText style={[styles.messageText, { color: themeColors.secondaryText }]}>
+                {showMinLengthHint ? minLengthHintText : noResultsText}
               </ThemedText>
-            </Pressable>
-          ))}
+            </View>
+          )}
         </View>
       )}
 
@@ -335,6 +376,14 @@ const styles = StyleSheet.create({
   },
   optionAdd: {
     fontSize: Typography.sizes.base,
+  },
+  messageRow: {
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+  },
+  messageText: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.families.regular,
   },
   maxHint: {
     fontSize: Typography.sizes.xs,

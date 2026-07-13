@@ -383,6 +383,67 @@ describe('SheetSearchMultiSelect', () => {
     });
   });
 
+  describe('Hint & empty-state panel', () => {
+    it('shows the min-length hint on focus when the query is below minSearchLength', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          minLengthHintText="Type at least 2 characters"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      // Empty query on focus is below the min length → the hint stands in for
+      // the empty option list so the field doesn't look dead.
+      expect(screen.getByText('Type at least 2 characters')).toBeTruthy();
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+
+    it('shows the no-results message when a query matches nothing', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          noResultsText="No matches found"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'zzz');
+
+      expect(screen.getByText('No matches found')).toBeTruthy();
+    });
+
+    it('does not show the no-results message while matches exist', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          noResultsText="No matches found"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'bru');
+
+      expect(screen.queryByText('No matches found')).toBeNull();
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+    });
+
+    it('renders no panel text when the hint/no-results copy is not provided (legacy)', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} minSearchLength={2} />);
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'zzz');
+
+      // Opt-in: without the copy props the panel stays closed on no match.
+      expect(screen.queryByText('No matches found')).toBeNull();
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+  });
+
   describe('Disabled (locked) state', () => {
     it('renders the selected value but makes the input non-editable', () => {
       render(<SheetSearchMultiSelect {...defaultProps} disabled selected={['opt-brussels']} />);
