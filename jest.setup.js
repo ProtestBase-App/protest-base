@@ -278,6 +278,14 @@ jest.mock('react-native-reanimated', () => {
 });
 
 // ============================================================================
+// react-native-keyboard-controller mock
+// ============================================================================
+// The shipped mock is an exported object, not self-registering, so wire it up here.
+jest.mock('react-native-keyboard-controller', () =>
+  require('react-native-keyboard-controller/jest')
+);
+
+// ============================================================================
 // @gorhom/bottom-sheet mock
 // ============================================================================
 // BottomSheetModal is imperative (no `visible` prop), so the mock tracks its

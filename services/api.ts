@@ -433,15 +433,29 @@ api.interceptors.response.use(
       return api(originalRequest);
     }
 
-    if (error.response?.status === 429 || error.response?.data?.code === 'RATE_LIMIT_EXCEEDED') {
+    // ACCOUNT_LOCKED is the account-lockout signal (backend ships it as 429, but
+    // it is registered as 403 — so key on the code, not only the status, to stay
+    // robust to either). Preserve the backend code so the sign-in screen can show
+    // the dedicated lockout message instead of the generic rate-limit copy.
+    const backendCode = error.response?.data?.code;
+    if (
+      error.response?.status === 429 ||
+      backendCode === 'RATE_LIMIT_EXCEEDED' ||
+      backendCode === 'ACCOUNT_LOCKED'
+    ) {
       const rateLimitError: RateLimitError = Object.assign(
         new Error('Too many requests. Please wait a moment and try again.'),
-        { code: 'RATE_LIMIT_EXCEEDED', isRateLimited: true, originalError: error }
+        {
+          code: backendCode === 'ACCOUNT_LOCKED' ? 'ACCOUNT_LOCKED' : 'RATE_LIMIT_EXCEEDED',
+          isRateLimited: true,
+          originalError: error,
+        }
       );
 
       logger.warn('[API] Rate limit exceeded', {
         url: error.config?.url,
         status: error.response?.status,
+        code: rateLimitError.code,
       });
 
       return Promise.reject(rateLimitError);

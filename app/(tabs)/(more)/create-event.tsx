@@ -1,16 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  BackHandler,
-} from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { router, Link, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 
 import { createEventBackend, createDraftEvent } from '@/services/event.service';
 import { getTemplate } from '@/services/template.service';
@@ -24,6 +18,7 @@ import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { getThemeColors } from '@/utils/themeColors';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
@@ -125,6 +120,7 @@ export default function CreateEventModal() {
   } = useUserOrganizations();
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
   const isPresented = router.canGoBack();
   const params = useLocalSearchParams<{ templateId?: string; source?: string }>();
 
@@ -206,7 +202,7 @@ export default function CreateEventModal() {
   const draftCheckedRef = useRef(false);
   const saveFailureCountRef = useRef(0);
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
 
   const handleCloseAttempt = useCallback(() => {
     if (!formHasChanges) {
@@ -662,87 +658,72 @@ export default function CreateEventModal() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={true}
-          automaticallyAdjustKeyboardInsets={false}
-          scrollEventThrottle={16}
-        >
-          <ThemedView style={styles.container}>
-            <ThemedView style={styles.headerRow}>
-              <ThemedText type="title" style={styles.titleText}>
-                {t('more.createEvent')}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={handleBackPress}
-                style={styles.closeButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={t('createEvent.closeAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={24} color="#687076" />
-              </TouchableOpacity>
-            </ThemedView>
-
-            <OrganizationPicker
-              value={form.organization_id || selectedOrganizationId || undefined}
-              onValueChange={(id) => setForm({ ...form, organization_id: id })}
-              error={emptyFields.organization_id}
-              errorMessage={t('createEvent.organizationRequired')}
-            />
-
-            <EventForm
-              form={form}
-              setForm={setForm}
-              emptyFields={emptyFields}
-              userLanguage={userLanguage}
-              scrollViewRef={scrollViewRef}
-            />
-
-            <CustomButton
-              testID="btn-create-event-submit"
-              title={t('more.createEvent')}
-              handlePress={submit}
-              containerStyles={styles.button}
-              isLoading={isSubmitting}
-            />
-
-            <CustomButton
-              testID="btn-create-event-draft"
-              title={t('drafts.saveAsDraft')}
-              handlePress={submitDraft}
-              containerStyles={styles.buttonDraft}
-              isLoading={isSavingDraft}
-            />
-
-            {!isPresented && <Link href="../">{t('common.dismiss')}</Link>}
+    <>
+      {/* No footer: create-event keeps its submit/draft buttons inline. */}
+      <FormScreenScaffold scrollViewRef={scrollViewRef}>
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.headerRow}>
+            <ThemedText type="title" style={styles.titleText}>
+              {t('more.createEvent')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={handleBackPress}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={t('createEvent.closeAccessibilityLabel')}
+              accessibilityRole="button"
+            >
+              <IconSymbol name="xmark" size={24} color={themeColors.icon} />
+            </TouchableOpacity>
           </ThemedView>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+          <OrganizationPicker
+            value={form.organization_id || selectedOrganizationId || undefined}
+            onValueChange={(id) => setForm({ ...form, organization_id: id })}
+            error={emptyFields.organization_id}
+            errorMessage={t('createEvent.organizationRequired')}
+          />
+
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            scrollViewRef={scrollViewRef}
+          />
+
+          <CustomButton
+            testID="btn-create-event-submit"
+            title={t('more.createEvent')}
+            handlePress={submit}
+            containerStyles={styles.button}
+            isLoading={isSubmitting}
+          />
+
+          <CustomButton
+            testID="btn-create-event-draft"
+            title={t('drafts.saveAsDraft')}
+            handlePress={submitDraft}
+            containerStyles={[
+              styles.buttonDraft,
+              {
+                backgroundColor: themeColors.buttonSecondaryBackground,
+                borderColor: themeColors.buttonSecondaryBorder,
+              },
+            ]}
+            textStyles={{ color: themeColors.text }}
+            isLoading={isSavingDraft}
+          />
+
+          {!isPresented && <Link href="../">{t('common.dismiss')}</Link>}
+        </ThemedView>
+      </FormScreenScaffold>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
   container: {
     width: '100%',
     justifyContent: 'flex-start',
@@ -765,13 +746,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Slimmer than CustomButton's tall default (containerStyles win over the
+  // base minHeight), matching the edit screens' 48px action buttons.
   button: {
     marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 12,
+    minHeight: 48,
   },
   buttonDraft: {
     marginBottom: 20,
-    backgroundColor: '#687076',
+    minHeight: 48,
+    borderWidth: 1,
   },
   splashContainer: {
     flex: 1,

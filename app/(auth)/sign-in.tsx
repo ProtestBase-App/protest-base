@@ -28,15 +28,20 @@ import { ExternalLinks } from '@/constants/ExternalLinks';
 import { isValidEmail, getEmailValidationError } from '@/utils/validation';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
-import { Typography, Spacing, BorderRadius } from '@/constants/DesignTokens';
+import { Typography, Spacing, BorderRadius, IconSizes } from '@/constants/DesignTokens';
 
 const MODAL_FADE_ANIMATION_DURATION = 300; // ms — must match the modal's fade animation
 const INPUT_FOCUS_DELAY = 100; // ms
 
-const COOLDOWN_PER_ATTEMPT_MS = 2_000;
-const LOCKOUT_AFTER_FAILURES = 3;
-const LOCKOUT_DURATION_MS = 30_000;
+// Escalating cooldown between failed attempts, indexed by attempt count. This is
+// client-side only: it smooths repeat-tapping from the app itself and does not
+// (and cannot) stop direct-API abuse, which is enforced server-side.
+const COOLDOWN_SCHEDULE_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 const COOLDOWN_TICK_INTERVAL_MS = 1_000;
+// After this many failed sign-ins, surface a "reset your password?" nudge so a
+// confused legitimate user is routed to recovery instead of retrying a forgotten
+// password.
+const NUDGE_AFTER_FAILURES = 2;
 
 export default function SignIn() {
   const { setUser, setIsLogged } = useGlobalContext();
@@ -126,10 +131,8 @@ export default function SignIn() {
   }, [resetCooldownEndTime]);
 
   const applyCooldown = useCallback((attempts: number): number => {
-    if (attempts >= LOCKOUT_AFTER_FAILURES) {
-      return Date.now() + LOCKOUT_DURATION_MS;
-    }
-    return Date.now() + COOLDOWN_PER_ATTEMPT_MS;
+    const index = Math.min(Math.max(attempts - 1, 0), COOLDOWN_SCHEDULE_MS.length - 1);
+    return Date.now() + COOLDOWN_SCHEDULE_MS[index];
   }, []);
 
   const submit = async () => {
@@ -169,11 +172,16 @@ export default function SignIn() {
       setFailedAttempts(newAttempts);
       setCooldownEndTime(applyCooldown(newAttempts));
 
+      const errorCode = (error as { code?: string })?.code;
       const isRateLimitError =
-        (error as { code?: string })?.code === 'RATE_LIMIT_EXCEEDED' ||
+        errorCode === 'RATE_LIMIT_EXCEEDED' ||
         (error as { isRateLimited?: boolean })?.isRateLimited;
 
-      if (isRateLimitError) {
+      // Account lockout carries its own message. It also sets isRateLimited, so
+      // it must be handled before the generic rate-limit branch.
+      if (errorCode === 'ACCOUNT_LOCKED') {
+        Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.accountLockedMessage'));
+      } else if (isRateLimitError) {
         Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.loginMessage'));
       } else {
         Alert.alert(t('common.error'), (error as Error).message || t('errors.unknownError'));
@@ -336,6 +344,49 @@ export default function SignIn() {
                 isLoading={!canSubmit || isSubmitting || cooldownRemaining > 0}
                 testID="btn-sign-in-submit"
               />
+
+              {failedAttempts >= NUDGE_AFTER_FAILURES && (
+                <TouchableOpacity
+                  style={[
+                    styles.nudgeBanner,
+                    {
+                      backgroundColor: themeColors.highlightBackground,
+                      borderColor: themeColors.highlightBorder,
+                    },
+                  ]}
+                  onPress={() => handleOpenModal('forgot')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
+                  testID="nudge-reset-password"
+                >
+                  <ThemedView
+                    style={[
+                      styles.nudgeIconWrap,
+                      { backgroundColor: themeColors.highlightIconBackground },
+                    ]}
+                  >
+                    <IconSymbol
+                      name="questionmark.circle"
+                      size={IconSizes.md}
+                      color={themeColors.tint}
+                    />
+                  </ThemedView>
+                  <ThemedView style={styles.nudgeTextWrap}>
+                    <ThemedText style={styles.nudgeTitle}>
+                      {t('auth.troubleSigningInTitle')}
+                    </ThemedText>
+                    <ThemedText style={[styles.nudgeBody, { color: themeColors.secondaryText }]}>
+                      {t('auth.troubleSigningInBody')}
+                    </ThemedText>
+                  </ThemedView>
+                  <IconSymbol
+                    name="chevron.right"
+                    size={IconSizes.sm}
+                    color={themeColors.chevron}
+                  />
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.forgetPasswordButton}
@@ -605,6 +656,36 @@ const styles = StyleSheet.create({
   text2: {
     fontSize: Typography.sizes.base,
     fontFamily: Typography.families.regular,
+  },
+  nudgeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  nudgeIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nudgeTextWrap: {
+    flex: 1,
+    gap: 2,
+    backgroundColor: 'transparent',
+  },
+  nudgeTitle: {
+    fontFamily: Typography.families.semiBold,
+    fontSize: Typography.sizes.sm,
+  },
+  nudgeBody: {
+    fontFamily: Typography.families.regular,
+    fontSize: Typography.sizes.xs,
+    lineHeight: 16,
   },
   forgetPasswordButton: {
     alignContent: 'center',

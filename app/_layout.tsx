@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { logger } from '@/utils/logger';
 import GlobalProvider, { useGlobalContext } from '@/context/GlobalProvider';
@@ -85,61 +86,65 @@ export default function RootLayout() {
     // drafts list's swipe-to-delete); renders as a plain View otherwise.
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaProvider>
-        {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
+        {/* Wraps BottomSheetModalProvider so the sheets and forms share one
+            keyboard source of truth. */}
+        <KeyboardProvider>
+          {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
             pure UI context, so it wraps the data providers harmlessly. */}
-        <BottomSheetModalProvider>
-          {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
-          {/* This ensures version check happens BEFORE authentication */}
-          <VersionCheckProvider>
-            <VersionGate>
-              {/* IntegrityGate runs after the version check (which uses /app/config */}
-              {/* on the bootstrap path) but before GlobalProvider so the install token */}
-              {/* exists for every authenticated request. */}
-              <IntegrityProvider>
-                <IntegrityGate>
-                  <GlobalProvider>
-                    <ConnectionGate>
-                      <ConnectivityProvider>
-                        <UserOrganizationsProvider>
-                          <SavedEventsProvider>
-                            <LikedEventsProvider>
-                              <FollowedOrgsProvider>
-                                <PastEventsProvider>
-                                  <TemplatesProvider>
-                                    <OrganizationsProvider>
-                                      <PostalCodeProvider>
-                                        <HomeAreaProvider>
-                                          <ThemeProvider
-                                            value={
-                                              colorScheme === 'dark' ? DarkTheme : DefaultTheme
-                                            }
-                                          >
-                                            <ExploreTabProvider>
-                                              <NotificationsBootstrap />
-                                              <RootNavigator />
-                                              <OfflineBanner />
-                                              <StatusBar
-                                                style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                              />
-                                            </ExploreTabProvider>
-                                          </ThemeProvider>
-                                        </HomeAreaProvider>
-                                      </PostalCodeProvider>
-                                    </OrganizationsProvider>
-                                  </TemplatesProvider>
-                                </PastEventsProvider>
-                              </FollowedOrgsProvider>
-                            </LikedEventsProvider>
-                          </SavedEventsProvider>
-                        </UserOrganizationsProvider>
-                      </ConnectivityProvider>
-                    </ConnectionGate>
-                  </GlobalProvider>
-                </IntegrityGate>
-              </IntegrityProvider>
-            </VersionGate>
-          </VersionCheckProvider>
-        </BottomSheetModalProvider>
+          <BottomSheetModalProvider>
+            {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
+            {/* This ensures version check happens BEFORE authentication */}
+            <VersionCheckProvider>
+              <VersionGate>
+                {/* IntegrityGate runs after the version check (which uses /app/config */}
+                {/* on the bootstrap path) but before GlobalProvider so the install token */}
+                {/* exists for every authenticated request. */}
+                <IntegrityProvider>
+                  <IntegrityGate>
+                    <GlobalProvider>
+                      <ConnectionGate>
+                        <ConnectivityProvider>
+                          <UserOrganizationsProvider>
+                            <SavedEventsProvider>
+                              <LikedEventsProvider>
+                                <FollowedOrgsProvider>
+                                  <PastEventsProvider>
+                                    <TemplatesProvider>
+                                      <OrganizationsProvider>
+                                        <PostalCodeProvider>
+                                          <HomeAreaProvider>
+                                            <ThemeProvider
+                                              value={
+                                                colorScheme === 'dark' ? DarkTheme : DefaultTheme
+                                              }
+                                            >
+                                              <ExploreTabProvider>
+                                                <NotificationsBootstrap />
+                                                <RootNavigator />
+                                                <OfflineBanner />
+                                                <StatusBar
+                                                  style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                                />
+                                              </ExploreTabProvider>
+                                            </ThemeProvider>
+                                          </HomeAreaProvider>
+                                        </PostalCodeProvider>
+                                      </OrganizationsProvider>
+                                    </TemplatesProvider>
+                                  </PastEventsProvider>
+                                </FollowedOrgsProvider>
+                              </LikedEventsProvider>
+                            </SavedEventsProvider>
+                          </UserOrganizationsProvider>
+                        </ConnectivityProvider>
+                      </ConnectionGate>
+                    </GlobalProvider>
+                  </IntegrityGate>
+                </IntegrityProvider>
+              </VersionGate>
+            </VersionCheckProvider>
+          </BottomSheetModalProvider>
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -161,9 +166,14 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
-      {/* Edit screens: only accessible when logged in */}
+      {/* Edit screens: only accessible when logged in. gestureEnabled is off so
+          the iOS swipe-back can't bypass the unsaved-changes guard (which only
+          intercepts the buttons and the Android back). */}
       <Stack.Protected guard={isLogged}>
-        <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="event-edit/[id]"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
         <Stack.Screen name="draft-edit/[id]" options={{ headerShown: false }} />
       </Stack.Protected>
 

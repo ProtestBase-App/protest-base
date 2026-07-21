@@ -383,6 +383,67 @@ describe('SheetSearchMultiSelect', () => {
     });
   });
 
+  describe('Hint & empty-state panel', () => {
+    it('shows the min-length hint on focus when the query is below minSearchLength', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          minLengthHintText="Type at least 2 characters"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      // Empty query on focus is below the min length → the hint stands in for
+      // the empty option list so the field doesn't look dead.
+      expect(screen.getByText('Type at least 2 characters')).toBeTruthy();
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+
+    it('shows the no-results message when a query matches nothing', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          noResultsText="No matches found"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'zzz');
+
+      expect(screen.getByText('No matches found')).toBeTruthy();
+    });
+
+    it('does not show the no-results message while matches exist', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          minSearchLength={2}
+          noResultsText="No matches found"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'bru');
+
+      expect(screen.queryByText('No matches found')).toBeNull();
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+    });
+
+    it('renders no panel text when the hint/no-results copy is not provided (legacy)', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} minSearchLength={2} />);
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'zzz');
+
+      // Opt-in: without the copy props the panel stays closed on no match.
+      expect(screen.queryByText('No matches found')).toBeNull();
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+  });
+
   describe('Disabled (locked) state', () => {
     it('renders the selected value but makes the input non-editable', () => {
       render(<SheetSearchMultiSelect {...defaultProps} disabled selected={['opt-brussels']} />);
@@ -417,6 +478,54 @@ describe('SheetSearchMultiSelect', () => {
 
       const chip = screen.getByLabelText('Remove Brussels');
       expect(chip.props.accessibilityState.disabled).toBe(true);
+    });
+  });
+
+  // Blur timing matters: the host re-scrolls off these callbacks, so a blur
+  // reported before the panel tears down would pull the tapped row away.
+  describe('onFocusChange', () => {
+    it('reports focus immediately', () => {
+      const onFocusChange = jest.fn();
+      render(<SheetSearchMultiSelect {...defaultProps} onFocusChange={onFocusChange} />);
+
+      fireEvent(getInput(), 'focus');
+
+      expect(onFocusChange).toHaveBeenCalledWith(true);
+    });
+
+    it('defers the blur report until the panel tears down (120ms)', () => {
+      const onFocusChange = jest.fn();
+      render(<SheetSearchMultiSelect {...defaultProps} onFocusChange={onFocusChange} />);
+
+      fireEvent(getInput(), 'focus');
+      onFocusChange.mockClear();
+      fireEvent(getInput(), 'blur');
+
+      // Still focused as far as the host knows — the row-tap window is open.
+      expect(onFocusChange).not.toHaveBeenCalled();
+
+      act(() => {
+        jest.advanceTimersByTime(120);
+      });
+
+      expect(onFocusChange).toHaveBeenCalledWith(false);
+    });
+
+    it('does not report blur when focus returns within the row-tap window', () => {
+      const onFocusChange = jest.fn();
+      render(<SheetSearchMultiSelect {...defaultProps} onFocusChange={onFocusChange} />);
+
+      fireEvent(getInput(), 'focus');
+      fireEvent(getInput(), 'blur');
+      onFocusChange.mockClear();
+      // Selecting a row refocuses the input, which cancels the pending blur.
+      fireEvent(getInput(), 'focus');
+
+      act(() => {
+        jest.advanceTimersByTime(120);
+      });
+
+      expect(onFocusChange).not.toHaveBeenCalledWith(false);
     });
   });
 });

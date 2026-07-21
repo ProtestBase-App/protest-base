@@ -14,6 +14,7 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
+  'chevron.down': 'keyboard-arrow-down',
   'heart.fill': 'favorite',
   heart: 'favorite-border',
   'list.bullet': 'list',

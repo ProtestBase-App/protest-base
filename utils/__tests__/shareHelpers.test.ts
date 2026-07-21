@@ -101,15 +101,15 @@ describe('shareHelpers', () => {
         expect(shareCall.message).toContain('🔗');
       });
 
-      it('should NOT include URL in message on iOS', async () => {
+      it('should include URL in message on iOS (Signal and Telegram drop the url property)', async () => {
         (Share.share as jest.Mock).mockResolvedValue({});
         (Platform as any).OS = 'ios';
 
         await shareEvent({ event: mockEvent, userLanguage: 'en' });
 
         const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
-        expect(shareCall.message).not.toContain('🔗 https://');
-        // URL should still be in the url property
+        expect(shareCall.message).toContain('🔗 https://protestbase.be/event/event123');
+        // URL should also be in the url property (share sheet preview, Copy, AirDrop)
         expect(shareCall.url).toBe('https://protestbase.be/event/event123');
       });
 
@@ -210,6 +210,46 @@ describe('shareHelpers', () => {
         (Share.share as jest.Mock).mockResolvedValue({});
 
         await shareEvent({ event: mockEvent, userLanguage: 'es' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('Join this event on ProtestBase!');
+      });
+    });
+
+    describe('Status-aware CTA', () => {
+      it('should swap the join CTA for a cancelled note on cancelled events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'cancelled' }, userLanguage: 'en' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('❌ This event has been cancelled.');
+        expect(shareCall.message).not.toContain('Join this event on ProtestBase!');
+      });
+
+      it('should swap the join CTA for a past note on past events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'past' }, userLanguage: 'en' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('🕒 This event has already taken place.');
+        expect(shareCall.message).not.toContain('Join this event on ProtestBase!');
+      });
+
+      it('should localize the cancelled note', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'cancelled' }, userLanguage: 'fr' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('❌ Cet événement a été annulé.');
+      });
+
+      it('should keep the join CTA for active events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'active' }, userLanguage: 'en' });
 
         const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
         expect(shareCall.message).toContain('Join this event on ProtestBase!');

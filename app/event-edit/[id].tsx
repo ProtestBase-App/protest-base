@@ -1,16 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -25,6 +19,7 @@ import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
+import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -77,7 +72,10 @@ export default function EditEvent() {
     help_description: false,
   });
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
+  // Baseline snapshot of the freshly loaded form; drives the unsaved-changes
+  // guard so leaving without saving prompts only when something actually changed.
+  const initialFormRef = useRef<FormState | null>(null);
 
   const scrollToTop = useCallback(() => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
@@ -126,38 +124,75 @@ export default function EditEvent() {
         if (isNaN(postalCode)) postalCode = null;
       }
 
-      setForm((prevForm) => ({
-        ...prevForm,
-        title: eventDetail[0].title || '',
-        description: eventDetail[0].description || '',
-        images: eventDetail[0].images || [],
-        street_address: eventDetail[0].street_address || '',
-        city: eventDetail[0].city || '',
-        region: eventDetail[0].region || '',
-        country: eventDetail[0].country || '',
-        start_time: eventDetail[0].startDateFull || '',
-        end_time: eventDetail[0].endDateFull || '',
-        postal_code: postalCode,
-        co_organizers: eventDetail[0].co_organizers || [],
-        categories:
-          eventDetail[0].categories && eventDetail[0].categories.length > 0
-            ? eventDetail[0].categories[0]
-            : '',
-        website_url: eventDetail[0].website_url || '',
-        disclaimer: eventDetail[0].disclaimer || '',
-        help_needed: eventDetail[0].help_needed || false,
-        help_description: eventDetail[0].help_description || '',
-      }));
+      setForm((prevForm) => {
+        const next: FormState = {
+          ...prevForm,
+          title: eventDetail[0].title || '',
+          description: eventDetail[0].description || '',
+          images: eventDetail[0].images || [],
+          street_address: eventDetail[0].street_address || '',
+          city: eventDetail[0].city || '',
+          region: eventDetail[0].region || '',
+          country: eventDetail[0].country || '',
+          start_time: eventDetail[0].startDateFull || '',
+          end_time: eventDetail[0].endDateFull || '',
+          postal_code: postalCode,
+          co_organizers: eventDetail[0].co_organizers || [],
+          categories:
+            eventDetail[0].categories && eventDetail[0].categories.length > 0
+              ? eventDetail[0].categories[0]
+              : '',
+          website_url: eventDetail[0].website_url || '',
+          disclaimer: eventDetail[0].disclaimer || '',
+          help_needed: eventDetail[0].help_needed || false,
+          help_description: eventDetail[0].help_description || '',
+        };
+        // Snapshot the loaded state as the dirty-check baseline.
+        initialFormRef.current = next;
+        return next;
+      });
     }
   }, [eventDetail]);
 
-  const handleBackPress = () => {
+  const isDirty = useCallback(
+    () =>
+      initialFormRef.current !== null &&
+      JSON.stringify(form) !== JSON.stringify(initialFormRef.current),
+    [form]
+  );
+
+  const performExit = useCallback(() => {
     if (isCreated) {
       router.push(Routes.MY_EVENTS);
     } else {
       router.back();
     }
-  };
+  }, [isCreated]);
+
+  const handleBackPress = useCallback(() => {
+    if (isDirty()) {
+      Alert.alert(t('eventEdit.discardTitle'), t('eventEdit.discardMessage'), [
+        { text: t('eventEdit.keepEditing'), style: 'cancel' },
+        { text: t('eventEdit.discardConfirm'), style: 'destructive', onPress: performExit },
+      ]);
+      return;
+    }
+    performExit();
+  }, [isDirty, performExit]);
+
+  // Intercept the Android hardware back so it honours the unsaved-changes guard
+  // instead of silently discarding edits.
+  useEffect(() => {
+    const onHardwareBack = () => {
+      if (isDirty()) {
+        handleBackPress();
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+    return () => sub?.remove?.();
+  }, [isDirty, handleBackPress]);
 
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
@@ -254,7 +289,10 @@ export default function EditEvent() {
     return <Redirect href="/(tabs)/(more)/more" />;
   }
 
-  if (loading || isSubmitting) {
+  // Only the initial fetch takes over the screen. During save the form stays
+  // mounted and the Save button shows its own spinner, so the page doesn't blink
+  // out from under the user.
+  if (loading) {
     return (
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />
@@ -263,80 +301,71 @@ export default function EditEvent() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollViewContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets={false}
-        >
-          <ThemedView style={styles.container}>
-            <ThemedView style={styles.headerRow}>
-              <ThemedText type="title" style={styles.titleText}>
-                {t('eventEdit.title')}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={() => handleBackPress()}
-                style={styles.closeButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={t('eventEdit.closeAccessibilityLabel')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={24} color={themeColors.icon} />
-              </TouchableOpacity>
-            </ThemedView>
+    <>
+      <FormScreenScaffold
+        scrollViewRef={scrollViewRef}
+        footer={
+          <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
+            <CustomButton
+              testID="button-cancel"
+              title={t('common.cancel')}
+              handlePress={() => handleBackPress()}
+              containerStyles={[
+                styles.buttonCancel,
+                {
+                  backgroundColor: themeColors.buttonSecondaryBackground,
+                  borderColor: themeColors.buttonSecondaryBorder,
+                },
+              ]}
+              textStyles={{ color: themeColors.text }}
+              isLoading={false}
+              disabled={isSubmitting}
+            />
 
-            <EventForm
-              form={form}
-              setForm={setForm}
-              emptyFields={emptyFields}
-              userLanguage={userLanguage}
-              scrollViewRef={scrollViewRef}
+            <CustomButton
+              testID="button-save"
+              title={t('common.save')}
+              handlePress={submit}
+              containerStyles={styles.buttonSave}
+              isLoading={isSubmitting}
             />
           </ThemedView>
-        </ScrollView>
+        }
+      >
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.headerRow}>
+            <ThemedText type="title" style={styles.titleText}>
+              {t('eventEdit.title')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => handleBackPress()}
+              disabled={isSubmitting}
+              style={[styles.closeButton, isSubmitting && styles.closeButtonDisabled]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={t('eventEdit.closeAccessibilityLabel')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting }}
+            >
+              <IconSymbol name="xmark" size={24} color={themeColors.icon} />
+            </TouchableOpacity>
+          </ThemedView>
 
-        <ThemedView style={styles.footerWrapper}>
-          <SafeAreaView style={styles.footerSafeArea} edges={['bottom']}>
-            <ThemedView style={styles.footer}>
-              <CustomButton
-                title={t('common.cancel')}
-                handlePress={() => handleBackPress()}
-                containerStyles={styles.buttonCancel}
-                isLoading={false}
-              />
-
-              <CustomButton
-                title={t('common.save')}
-                handlePress={submit}
-                containerStyles={styles.buttonSave}
-                isLoading={isSubmitting}
-              />
-            </ThemedView>
-          </SafeAreaView>
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            mode="edit-event"
+            scrollViewRef={scrollViewRef}
+          />
         </ThemedView>
-      </KeyboardAvoidingView>
+      </FormScreenScaffold>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 120,
-  },
   container: {
     width: '100%',
     justifyContent: 'flex-start',
@@ -359,42 +388,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  closeButtonDisabled: {
+    opacity: 0.4,
+  },
+  // Slim action bar: equal-width buttons override CustomButton's tall default
+  // (containerStyles win over the base minHeight).
   buttonCancel: {
-    marginVertical: 16,
-    width: '45%',
-    minHeight: 10,
-    height: '80%',
-    marginLeft: 4,
-    backgroundColor: '#687076',
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
   },
   buttonSave: {
-    marginVertical: 16,
-    width: '45%',
-    minHeight: 10,
-    height: '80%',
-    marginRight: 4,
+    flex: 1,
+    minHeight: 48,
   },
   splashContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  footerSafeArea: {
-    width: '100%',
-  },
   footer: {
     flexDirection: 'row',
-    padding: 4,
-    borderTopWidth: 1,
-    // Not themeColors.border — that would require dynamic styles.
-    borderTopColor: '#ccc',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
   },
 });

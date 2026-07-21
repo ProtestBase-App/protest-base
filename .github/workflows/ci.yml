@@ -35,7 +35,7 @@ jobs:
         run: npm run lint
 
       - name: Check accessibility (a11y)
-        run: npx eslint --plugin react-native-a11y "app/**/*.{ts,tsx}" "components/**/*.{ts,tsx}" --no-eslintrc --parser @typescript-eslint/parser --parser-options=ecmaVersion:2020
+        run: npx eslint "app/**/*.{ts,tsx}" "components/**/*.{ts,tsx}" --config eslint.a11y.config.js
         continue-on-error: true
 
       - name: Run Critical Tests

@@ -226,6 +226,11 @@ const fr: LocaleData = {
     mandatoryFieldsError: 'Veuillez remplir tous les champs obligatoires.',
     invalidTimeRangeError: "L'heure de fin ne peut pas être antérieure à l'heure de début",
     closeAccessibilityLabel: "Fermer l'écran de modification d'événement",
+    discardTitle: 'Abandonner les modifications ?',
+    discardMessage:
+      'Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.',
+    keepEditing: 'Continuer les modifications',
+    discardConfirm: 'Abandonner',
   },
 
   // ============================================
@@ -284,6 +289,8 @@ const fr: LocaleData = {
     firstTimeSentTo: 'Nous avons envoyé un lien de configuration à :',
     firstTimeNextSteps:
       'Ouvrez le lien pour créer votre mot de passe sur notre site web. Une fois terminé, revenez ici et connectez-vous.',
+    troubleSigningInTitle: 'Un problème pour vous connecter ?',
+    troubleSigningInBody: 'Réinitialisez votre mot de passe pour vous reconnecter.',
     migrationBannerTitle: 'Réinitialisation du mot de passe requise',
     migrationBannerMessage:
       'Nous avons récemment migré nos systèmes pour améliorer la sécurité. Votre ancien mot de passe ne fonctionnera plus.',
@@ -577,6 +584,8 @@ const fr: LocaleData = {
     selectCountry: 'Sélectionnez un pays',
     postalCodePlaceholder: 'Code postal',
     searchPostalCode: 'Rechercher par code postal ou commune...',
+    searchNoResults: 'Aucun résultat',
+    searchMinLength: 'Saisissez au moins {{count}} caractères',
     streetAddressPlaceholder: 'Nom et numéro de rue',
     // Address autocomplete
     addressSearchPlaceholder: 'Rechercher une adresse…',
@@ -586,6 +595,10 @@ const fr: LocaleData = {
     addressUnavailable:
       'La recherche d’adresses est indisponible pour le moment. Vous pouvez quand même enregistrer.',
     clearStreetAddressAccessibilityLabel: 'Effacer l’adresse',
+    // Postal confirmation card (filled state)
+    postalFilledFromAddress: 'Rempli automatiquement à partir de l’adresse',
+    postalChange: 'Modifier',
+    changePostalAccessibilityLabel: 'Modifier le code postal',
     organizerNamePlaceholder: 'Nom de votre organisation',
     contactEmailPlaceholder: 'contact@exemple.com',
     helpDescriptionPlaceholder: "Décrivez les bénévoles ou l'aide dont vous avez besoin...",

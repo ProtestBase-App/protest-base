@@ -1,17 +1,9 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  BackHandler,
-} from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -362,121 +354,95 @@ export default function EditTemplateScreen() {
 
   return (
     <ThemedView style={styles.wrapper}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollViewContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            <ThemedView style={styles.container}>
-              <TouchableOpacity
-                onPress={handleBackPress}
-                style={styles.closeButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel="Close edit template screen"
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={24} color="#687076" />
-              </TouchableOpacity>
-
-              <ThemedText type="title" style={styles.titleSpacing}>
-                {t('template.editTitle')}
-              </ThemedText>
-
-              <ThemedView style={styles.templateMetaSection}>
-                <FormField
-                  title={t('template.nameLabel')}
-                  value={templateName}
-                  placeholder={t('template.namePlaceholder')}
-                  handleChangeText={(value) => {
-                    setTemplateName(value);
-                    if (value.trim()) setTemplateNameError(false);
-                  }}
-                  otherStyles={styles.fieldSpacing}
-                  maxLength={100}
-                  hasError={templateNameError}
-                />
-
-                <FormField
-                  title={t('template.descriptionLabel')}
-                  value={templateDescription}
-                  placeholder={t('template.descriptionPlaceholder')}
-                  handleChangeText={setTemplateDescription}
-                  otherStyles={styles.fieldSpacing}
-                  maxLength={8000}
-                />
-              </ThemedView>
-
-              <ThemedView
-                style={[styles.divider, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}
-              />
-
-              <ThemedText style={styles.sectionTitle}>
-                {t('template.eventDetailsSection')}
-              </ThemedText>
-
-              <EventForm
-                form={form}
-                setForm={setForm}
-                emptyFields={emptyFields}
-                userLanguage={userLanguage}
-                mode="edit-template"
-              />
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDelete}
-                activeOpacity={0.7}
-              >
-                <IconSymbol name="trash" size={18} color="#EF4444" />
-                <ThemedText style={styles.deleteButtonText}>
-                  {t('template.deleteButton')}
-                </ThemedText>
-              </TouchableOpacity>
-            </ThemedView>
-          </ScrollView>
-
+      <FormScreenScaffold
+        contentContainerStyle={styles.scrollViewContent}
+        footer={
           <ThemedView
             style={[styles.footerWrapper, { borderTopColor: isDark ? '#374151' : '#E5E7EB' }]}
           >
-            <SafeAreaView
-              style={styles.footerSafeArea}
-              edges={Platform.OS === 'ios' ? ['bottom'] : []}
-            >
-              <ThemedView style={styles.footer}>
-                <CustomButton
-                  title={t('common.cancel')}
-                  handlePress={handleBackPress}
-                  containerStyles={styles.buttonCancel}
-                  isLoading={false}
-                />
-                <CustomButton
-                  title={t('common.save')}
-                  handlePress={handleSave}
-                  containerStyles={styles.buttonSave}
-                  isLoading={isSubmitting}
-                />
-              </ThemedView>
-            </SafeAreaView>
+            <ThemedView style={styles.footer}>
+              <CustomButton
+                title={t('common.cancel')}
+                handlePress={handleBackPress}
+                containerStyles={styles.buttonCancel}
+                isLoading={false}
+              />
+              <CustomButton
+                title={t('common.save')}
+                handlePress={handleSave}
+                containerStyles={styles.buttonSave}
+                isLoading={isSubmitting}
+              />
+            </ThemedView>
           </ThemedView>
-        </KeyboardAvoidingView>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      </SafeAreaView>
+        }
+      >
+        <ThemedView style={styles.container}>
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Close edit template screen"
+            accessibilityRole="button"
+          >
+            <IconSymbol name="xmark" size={24} color="#687076" />
+          </TouchableOpacity>
+
+          <ThemedText type="title" style={styles.titleSpacing}>
+            {t('template.editTitle')}
+          </ThemedText>
+
+          <ThemedView style={styles.templateMetaSection}>
+            <FormField
+              title={t('template.nameLabel')}
+              value={templateName}
+              placeholder={t('template.namePlaceholder')}
+              handleChangeText={(value) => {
+                setTemplateName(value);
+                if (value.trim()) setTemplateNameError(false);
+              }}
+              otherStyles={styles.fieldSpacing}
+              maxLength={100}
+              hasError={templateNameError}
+            />
+
+            <FormField
+              title={t('template.descriptionLabel')}
+              value={templateDescription}
+              placeholder={t('template.descriptionPlaceholder')}
+              handleChangeText={setTemplateDescription}
+              otherStyles={styles.fieldSpacing}
+              maxLength={8000}
+            />
+          </ThemedView>
+
+          <ThemedView
+            style={[styles.divider, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}
+          />
+
+          <ThemedText style={styles.sectionTitle}>{t('template.eventDetailsSection')}</ThemedText>
+
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            mode="edit-template"
+          />
+
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} activeOpacity={0.7}>
+            <IconSymbol name="trash" size={18} color="#EF4444" />
+            <ThemedText style={styles.deleteButtonText}>{t('template.deleteButton')}</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      </FormScreenScaffold>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollViewContent: {
@@ -543,14 +509,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  footerSafeArea: {
-    width: '100%',
-  },
   footer: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.md : Spacing.md,
+    paddingBottom: Spacing.md,
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.md,

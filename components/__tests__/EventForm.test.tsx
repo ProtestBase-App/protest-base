@@ -113,6 +113,12 @@ jest.mock('@/constants/PostalCodes_BE_EN', () => ({
       sub_municipality_name_french: 'Bruxelles',
       post_code: 1000,
     },
+    {
+      sub_municipality_name_english: 'Antwerp',
+      sub_municipality_name_dutch: 'Antwerpen',
+      sub_municipality_name_french: 'Anvers',
+      post_code: 2000,
+    },
   ],
 }));
 
@@ -833,7 +839,7 @@ describe('EventForm — street address autocomplete', () => {
   });
 });
 
-describe('EventForm — postal-code lock & suggestion coordinates', () => {
+describe('EventForm — postal confirmation card & suggestion coordinates', () => {
   afterEach(() => jest.clearAllMocks());
 
   const SUGGESTION = {
@@ -865,10 +871,7 @@ describe('EventForm — postal-code lock & suggestion coordinates', () => {
     street_address: '',
   };
 
-  // The single TextInput inside the postal picker; its `editable` prop reflects
-  // the lock (false when locked to an accepted suggestion's postcode).
-  const postalInput = () =>
-    within(screen.getByTestId('dropdown-event-postal-code')).getByDisplayValue('');
+  const FROM_ADDRESS_CAPTION = 'Set automatically from the address';
 
   // Apply the latest functional setForm updater to read the resulting state.
   const latestNext = (setForm: jest.Mock, base: FormState) => {
@@ -890,15 +893,11 @@ describe('EventForm — postal-code lock & suggestion coordinates', () => {
     });
   }
 
-  it('locks the postal picker once a suggestion carrying a postcode is accepted', async () => {
-    const setForm = jest.fn();
-    mockSearchAddress.mockResolvedValue([SUGGESTION]);
-
-    // Before any pick the postal picker is interactive.
+  it('shows the filled value as a confirmation card (no search input) instead of the picker', async () => {
     render(
       <EventForm
         form={baseForm}
-        setForm={setForm}
+        setForm={jest.fn()}
         emptyFields={mockEmptyFields}
         userLanguage="en"
       />
@@ -906,12 +905,44 @@ describe('EventForm — postal-code lock & suggestion coordinates', () => {
     await act(async () => {
       await flushPromises();
     });
-    expect(postalInput().props.editable).toBe(true);
-    screen.unmount();
+    // A filled postal renders as the read-only card — the search picker (the
+    // confusing leftover input) is gone entirely.
+    expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('postal-code-filled')).getByText('Brussels (1000)')
+    ).toBeTruthy();
+    expect(screen.queryByTestId('dropdown-event-postal-code')).toBeNull();
+    // Loaded/manual value: not address-derived, so no "from the address" caption.
+    expect(screen.queryByText(FROM_ADDRESS_CAPTION)).toBeNull();
+  });
+
+  it('shows the manual picker when no postal code is set', async () => {
+    render(
+      <EventForm
+        form={{ ...mockForm, country: 'belgium', postal_code: null }}
+        setForm={jest.fn()}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(screen.getByTestId('dropdown-event-postal-code')).toBeTruthy();
+    expect(screen.queryByTestId('postal-code-filled')).toBeNull();
+  });
+
+  it('captions the confirmation as address-derived once a suggestion carrying a postcode is accepted', async () => {
+    const setForm = jest.fn();
+    mockSearchAddress.mockResolvedValue([SUGGESTION]);
 
     await pickFirstSuggestion(setForm, baseForm);
-    // The accepted suggestion's postcode is authoritative → picker locks.
-    expect(postalInput().props.editable).toBe(false);
+
+    // The accepted suggestion's postcode is authoritative → confirmation card
+    // with the "set from the address" caption, still no picker.
+    expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
+    expect(screen.getByText(FROM_ADDRESS_CAPTION)).toBeTruthy();
+    expect(screen.queryByTestId('dropdown-event-postal-code')).toBeNull();
   });
 
   it('forwards the accepted suggestion coordinates to form state', async () => {
@@ -930,46 +961,82 @@ describe('EventForm — postal-code lock & suggestion coordinates', () => {
     );
   });
 
-  it('keeps the postal picker editable for a postal-less POI but still stores its pin', async () => {
+  it('keeps the prior postal confirmed without the caption for a postal-less POI, and stores its pin', async () => {
     const setForm = jest.fn();
     mockSearchAddress.mockResolvedValue([POI]);
 
     await pickFirstSuggestion(setForm, baseForm);
 
-    // A POI carries no postcode, so nothing trustworthy to lock to.
-    expect(postalInput().props.editable).toBe(true);
+    // A POI carries no postcode: the prior value stays confirmed, but it is not
+    // claimed to derive from the picked street.
+    expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
+    expect(screen.queryByText(FROM_ADDRESS_CAPTION)).toBeNull();
     const next = latestNext(setForm, baseForm);
     expect(next).toEqual(expect.objectContaining({ geocod_lat: 50.85, geocod_lng: 4.35 }));
   });
 
-  it('unlocks the postal picker when the street text is edited away from the suggestion', async () => {
+  it('drops the address-derived caption when the street text is edited away from the suggestion', async () => {
     const setForm = jest.fn();
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
 
     await pickFirstSuggestion(setForm, baseForm);
-    expect(postalInput().props.editable).toBe(false);
+    expect(screen.getByText(FROM_ADDRESS_CAPTION)).toBeTruthy();
 
-    // Editing the street diverges from the accepted suggestion → re-enable picking.
+    // Editing the street diverges from the accepted suggestion → the postcode
+    // is no longer authoritative; the value stays but sheds the caption.
     await act(async () => {
       fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'rue de la loi 1');
     });
-    expect(postalInput().props.editable).toBe(true);
+    expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
+    expect(screen.queryByText(FROM_ADDRESS_CAPTION)).toBeNull();
   });
 
-  it('clears the pin and unlocks the picker when the street is cleared', async () => {
+  it('clears the pin and drops the caption when the street is cleared', async () => {
     const setForm = jest.fn();
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
 
     await pickFirstSuggestion(setForm, baseForm);
-    expect(postalInput().props.editable).toBe(false);
+    expect(screen.getByText(FROM_ADDRESS_CAPTION)).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Clear street address'));
-    expect(postalInput().props.editable).toBe(true);
+    expect(screen.queryByText(FROM_ADDRESS_CAPTION)).toBeNull();
 
     const next = latestNext(setForm, baseForm);
     expect(next).toEqual(
       expect.objectContaining({ street_address: '', geocod_lat: null, geocod_lng: null })
     );
+  });
+
+  it('reveals the manual picker via "Change" and returns to the confirmation after a manual pick', async () => {
+    const setForm = jest.fn();
+    render(
+      <EventForm
+        form={baseForm}
+        setForm={setForm}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+      />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+
+    // "Change" swaps the card for the editable picker (with the value as a chip).
+    fireEvent.press(screen.getByTestId('button-change-postal-code'));
+    const picker = screen.getByTestId('dropdown-event-postal-code');
+    expect(screen.queryByTestId('postal-code-filled')).toBeNull();
+
+    // Search and pick a different code — commits it and ends the override.
+    const input = within(picker).getByDisplayValue('');
+    fireEvent(input, 'focus');
+    fireEvent.changeText(input, 'antwerp');
+    fireEvent.press(within(picker).getByLabelText('Antwerp (2000)'));
+
+    const next = latestNext(setForm, baseForm);
+    expect(next).toEqual(expect.objectContaining({ postal_code: 2000 }));
+    // The (controlled) value is still present → the confirmation card returns.
+    expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
+    expect(screen.queryByTestId('dropdown-event-postal-code')).toBeNull();
   });
 });
 
@@ -1774,7 +1841,7 @@ describe('EventForm — category chip toggle', () => {
 describe('EventForm — postal code clearing', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears only the postal code when its chip is removed, leaving the address intact', async () => {
+  it('clears only the postal code when its chip is removed behind "Change", leaving the address intact', async () => {
     const setForm = jest.fn();
     // Address-first: the street is no longer gated behind the postal, so clearing
     // the (manual fallback) postal must not touch the street/city/region.
@@ -1786,7 +1853,7 @@ describe('EventForm — postal code clearing', () => {
       city: 'Brussels',
       region: 'Brussels-Capital',
     };
-    render(
+    const { rerender } = render(
       <EventForm
         form={formWithPostalCode}
         setForm={setForm}
@@ -1797,9 +1864,17 @@ describe('EventForm — postal code clearing', () => {
     await act(async () => {
       await flushPromises();
     });
-    // The selected postal code renders as a removable chip ("Remove Brussels (1000)").
+    // The filled value shows as the confirmation card; "Change" reveals the
+    // picker with the value as a removable chip ("Remove Brussels (1000)").
+    fireEvent.press(screen.getByTestId('button-change-postal-code'));
     fireEvent.press(screen.getByLabelText(/remove brussels/i));
-    expect(setForm).toHaveBeenCalledWith(
+    const updater = setForm.mock.calls
+      .map((c) => c[0])
+      .reverse()
+      .find((arg) => typeof arg === 'function');
+    expect(updater).toBeDefined();
+    const next = updater(formWithPostalCode);
+    expect(next).toEqual(
       expect.objectContaining({
         postal_code: null,
         street_address: 'Rue de la Loi 16',
@@ -1807,6 +1882,12 @@ describe('EventForm — postal code clearing', () => {
         region: 'Brussels-Capital',
       })
     );
+    // Once the parent commits the removal, the picker shows for a fresh search.
+    rerender(
+      <EventForm form={next} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
+    );
+    expect(screen.getByTestId('dropdown-event-postal-code')).toBeTruthy();
+    expect(screen.queryByTestId('postal-code-filled')).toBeNull();
   });
 });
 

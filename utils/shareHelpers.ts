@@ -17,6 +17,8 @@ interface ShareResult {
 
 interface ShareStrings {
   cta: string;
+  ctaCancelled: string;
+  ctaPast: string;
   errorTitle: string;
   eventNotFound: string;
   shareFailed: string;
@@ -26,18 +28,24 @@ function getShareStrings(language: string): ShareStrings {
   const strings: Record<string, ShareStrings> = {
     en: {
       cta: 'Join this event on ProtestBase!',
+      ctaCancelled: '❌ This event has been cancelled.',
+      ctaPast: '🕒 This event has already taken place.',
       errorTitle: 'Error',
       eventNotFound: 'Event not found or incomplete data.',
       shareFailed: 'Failed to share event. Please try again.',
     },
     fr: {
       cta: 'Rejoignez cet événement sur ProtestBase !',
+      ctaCancelled: '❌ Cet événement a été annulé.',
+      ctaPast: '🕒 Cet événement a déjà eu lieu.',
       errorTitle: 'Erreur',
       eventNotFound: 'Événement introuvable ou données incomplètes.',
       shareFailed: "Échec du partage de l'événement. Veuillez réessayer.",
     },
     nl: {
       cta: 'Doe mee aan dit evenement op ProtestBase!',
+      ctaCancelled: '❌ Dit evenement is geannuleerd.',
+      ctaPast: '🕒 Dit evenement heeft al plaatsgevonden.',
       errorTitle: 'Fout',
       eventNotFound: 'Evenement niet gevonden of onvolledige gegevens.',
       shareFailed: 'Delen van evenement mislukt. Probeer het opnieuw.',
@@ -47,11 +55,13 @@ function getShareStrings(language: string): ShareStrings {
 }
 
 /**
- * Generate a platform-optimized share message for an event
+ * Generate a share message for an event
  *
- * Platform differences:
- * - iOS: URL is handled separately via the `url` property, so message excludes it
- * - Android: URL property is ignored, so URL is included in the message
+ * The URL is always included in the message text: on iOS, share targets like
+ * Signal and Telegram only consume the text activity item and drop the
+ * separate `url` property, so the link must travel in the text itself.
+ * Merge-style targets (iMessage, Mail) may show the URL twice — accepted
+ * tradeoff for the link never being lost.
  */
 function createShareMessage(
   event: Event,
@@ -73,9 +83,16 @@ function createShareMessage(
     locationLine ? `\n${locationLine}` : ''
   }`;
 
-  return Platform.OS === 'ios'
-    ? `${eventDetails}\n\n${shareStrings.cta}`
-    : `${eventDetails}\n\n${shareStrings.cta}\n\n🔗 ${universalLink}`;
+  // Cancelled/past events stay shareable (the link spreads the word), but the
+  // "join" CTA would be misleading — swap it for a status note.
+  const cta =
+    event.status === 'cancelled'
+      ? shareStrings.ctaCancelled
+      : event.status === 'past'
+        ? shareStrings.ctaPast
+        : shareStrings.cta;
+
+  return `${eventDetails}\n\n${cta}\n\n🔗 ${universalLink}`;
 }
 
 interface ShareContent {
@@ -88,9 +105,10 @@ interface ShareContent {
 /**
  * Share an event using the native share sheet
  *
- * Handles platform-specific behavior:
- * - iOS: Uses separate message, url, and title properties for rich link previews
- * - Android: Includes URL in message since url property is ignored
+ * The URL is always in the message text (see createShareMessage). On iOS the
+ * separate `url` and `title` properties are also set: `url` powers the share
+ * sheet header preview and system actions (Copy, AirDrop, Reading List);
+ * Android ignores both.
  *
  * Enhanced for optimal sharing experience on:
  * - WhatsApp: Rich preview with OG tags from website

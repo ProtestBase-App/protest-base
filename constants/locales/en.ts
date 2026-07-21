@@ -221,6 +221,10 @@ const en: LocaleData = {
     mandatoryFieldsError: 'Please fill in all mandatory fields.',
     invalidTimeRangeError: 'End time cannot be before the Start time',
     closeAccessibilityLabel: 'Close edit event screen',
+    discardTitle: 'Discard changes?',
+    discardMessage: 'You have unsaved changes. If you leave now, they will be lost.',
+    keepEditing: 'Keep editing',
+    discardConfirm: 'Discard',
   },
 
   // ============================================
@@ -279,6 +283,8 @@ const en: LocaleData = {
     firstTimeSentTo: 'We sent a password setup link to:',
     firstTimeNextSteps:
       'Open the link to create your password on our website. Once done, come back here and sign in.',
+    troubleSigningInTitle: 'Trouble signing in?',
+    troubleSigningInBody: 'Reset your password to get back in.',
     migrationBannerTitle: 'Password Reset Required',
     migrationBannerMessage:
       'We recently migrated our systems to improve security. Your previous password will no longer work.',
@@ -575,6 +581,8 @@ const en: LocaleData = {
     selectCountry: 'Select country',
     postalCodePlaceholder: 'Postal code',
     searchPostalCode: 'Search by postal code or municipality...',
+    searchNoResults: 'No matches found',
+    searchMinLength: 'Type at least {{count}} characters',
     streetAddressPlaceholder: 'Street name and number',
     // Address autocomplete
     addressSearchPlaceholder: 'Search for an address…',
@@ -583,6 +591,10 @@ const en: LocaleData = {
     addressError: 'Could not search addresses. Please try again.',
     addressUnavailable: 'Address search is unavailable right now. You can still save.',
     clearStreetAddressAccessibilityLabel: 'Clear street address',
+    // Postal confirmation card (filled state)
+    postalFilledFromAddress: 'Set automatically from the address',
+    postalChange: 'Change',
+    changePostalAccessibilityLabel: 'Change postal code',
     organizerNamePlaceholder: 'Your organization name',
     contactEmailPlaceholder: 'contact@example.com',
     helpDescriptionPlaceholder: 'Describe what volunteers or help you need...',

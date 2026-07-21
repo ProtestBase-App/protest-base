@@ -260,3 +260,69 @@ describe('AddressAutocompleteField', () => {
     expect(onEdit).not.toHaveBeenCalled();
   });
 });
+
+describe('AddressAutocompleteField — keyboard-host focus signal', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('signals focus immediately and blur only after the tap-grace delay', () => {
+    jest.useFakeTimers();
+    const onFocusChange = jest.fn();
+    renderField({ onFocusChange });
+    const input = screen.getByTestId('street-input');
+
+    fireEvent(input, 'focus');
+    expect(onFocusChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent(input, 'blur');
+    // Not yet — a suggestion tap must land before the reserved band collapses.
+    expect(onFocusChange).toHaveBeenLastCalledWith(true);
+
+    act(() => {
+      jest.advanceTimersByTime(120);
+    });
+    expect(onFocusChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('cancels the pending blur signal when the input is refocused within the grace window', () => {
+    jest.useFakeTimers();
+    const onFocusChange = jest.fn();
+    renderField({ onFocusChange });
+    const input = screen.getByTestId('street-input');
+
+    fireEvent(input, 'focus');
+    fireEvent(input, 'blur');
+    act(() => {
+      jest.advanceTimersByTime(50);
+    });
+    fireEvent(input, 'focus');
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    // The stale blur never fires: the host keeps the headroom reserved.
+    expect(onFocusChange.mock.calls.map((c) => c[0])).toEqual([true, true]);
+  });
+
+  it('releases the signal when unmounted while focused (e.g. country deselected)', () => {
+    const onFocusChange = jest.fn();
+    const { unmount } = renderField({ onFocusChange });
+
+    fireEvent(screen.getByTestId('street-input'), 'focus');
+    expect(onFocusChange).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    expect(onFocusChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not signal on mount when never focused', () => {
+    const onFocusChange = jest.fn();
+    const { unmount } = renderField({ onFocusChange });
+    expect(onFocusChange).not.toHaveBeenCalled();
+    // Unmount without focus stays silent too — nothing was reserved.
+    unmount();
+    expect(onFocusChange).not.toHaveBeenCalled();
+  });
+});

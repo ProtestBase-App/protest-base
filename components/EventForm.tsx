@@ -24,6 +24,7 @@ import {
   SheetSearchMultiSelectOption,
 } from '@/components/SheetSearchMultiSelect';
 import AddressAutocompleteField from '@/components/AddressAutocompleteField';
+import { useFormKeyboard } from '@/components/FormScreenScaffold';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { FilterChip } from '@/components/ui/FilterChip';
 import { eventCategories } from '@/constants/EventCategories';
@@ -68,6 +69,7 @@ const EventForm: React.FC<EventFormProps> = ({
   const themeColors = getThemeColors(colorScheme);
   const iconColor = isDark ? 'white' : 'black';
   const userLang = userLanguage;
+  const { setDropdownFocused } = useFormKeyboard();
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
@@ -76,11 +78,17 @@ const EventForm: React.FC<EventFormProps> = ({
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
   const [isPickingImage, setIsPickingImage] = React.useState(false);
   // True once a street suggestion *carrying a postcode* is accepted this session:
-  // the postal picker locks to that suggestion's code. Cleared when the user
-  // edits/clears the street, picks a postal-less POI, or changes country — i.e.
-  // exactly when there is no longer a trusted postcode to lock to. Never seeded
-  // from a loaded event/draft, so an edit screen opens with the picker enabled.
+  // the postal confirmation card then captions the value as derived from the
+  // address. Cleared when the user edits/clears the street, picks a postal-less
+  // POI, changes country, or taps "Change" — i.e. exactly when there is no
+  // longer a trusted postcode tied to the street. Never seeded from a loaded
+  // event/draft, so an edit screen opens without the caption.
   const [postalLocked, setPostalLocked] = React.useState(false);
+  // True while the user is re-picking a filled postal code ("Change" on the
+  // confirmation card): the manual picker shows instead of the card. Reset on
+  // any committed change (manual pick/removal, accepted street suggestion,
+  // country switch) so the confirmation returns.
+  const [postalManualOverride, setPostalManualOverride] = React.useState(false);
   const previousCountry = React.useRef<string | null>(null);
   const isInitialMount = React.useRef(true);
 
@@ -112,8 +120,10 @@ const EventForm: React.FC<EventFormProps> = ({
           geocod_lat: null,
           geocod_lng: null,
         }));
-        // The locked suggestion belonged to the previous country — release it.
+        // The locked suggestion belonged to the previous country — release it
+        // (and any in-progress manual re-pick with it).
         setPostalLocked(false);
+        setPostalManualOverride(false);
       }
       previousCountry.current = form.country;
       isInitialMount.current = false;
@@ -268,9 +278,13 @@ const EventForm: React.FC<EventFormProps> = ({
     (s: AddressSuggestion) => {
       // A live pick carries the pin the user confirmed — store it so the parent
       // forwards geocod_lat/lng and the backend adopts it instead of re-geocoding.
-      // Lock the postal picker only to a suggestion that carries a postcode; a
-      // postal-less POI keeps manual picking enabled (and the prior postal set).
-      setPostalLocked(s.postal_code != null);
+      // Lock only to a suggestion whose postcode parses; a postal-less POI keeps
+      // manual picking available (and the prior postal set). A trusted postcode
+      // also ends any in-progress manual re-pick — the confirmation card returns.
+      const parsed = s.postal_code != null ? parseInt(s.postal_code, 10) : NaN;
+      const hasTrustedPostal = !Number.isNaN(parsed);
+      setPostalLocked(hasTrustedPostal);
+      if (hasTrustedPostal) setPostalManualOverride(false);
       setForm((f) => {
         if (!s.postal_code) {
           return {
@@ -280,13 +294,12 @@ const EventForm: React.FC<EventFormProps> = ({
             geocod_lng: s.lng,
           };
         }
-        const parsed = parseInt(s.postal_code, 10);
         return {
           ...f,
           street_address: s.street_address,
           city: s.city ?? '',
           region: s.region ?? '',
-          postal_code: Number.isNaN(parsed) ? f.postal_code : parsed,
+          postal_code: hasTrustedPostal ? parsed : f.postal_code,
           geocod_lat: s.lat,
           geocod_lng: s.lng,
         };
@@ -302,11 +315,37 @@ const EventForm: React.FC<EventFormProps> = ({
   }, [setForm]);
 
   // The user is editing the street text away from the accepted suggestion — the
-  // postcode is no longer authoritative, so re-enable manual picking. The still-
-  // committed street_address (and its coordinates) stay until a new pick/clear.
+  // postcode is no longer authoritative, so drop its "from the address" caption.
+  // The still-committed street_address (and its coordinates) stay until a new
+  // pick/clear.
   const handleAddressEdit = useCallback(() => {
     setPostalLocked(false);
   }, []);
+
+  // "Change" on the confirmation card: release the address-derived lock and
+  // reveal the manual picker until a new value (or removal) is committed.
+  const handlePostalChangePress = useCallback(() => {
+    setPostalLocked(false);
+    setPostalManualOverride(true);
+  }, []);
+
+  // Manual fallback path (empty postal, or re-picking via "Change"). The street
+  // is not gated behind the postal, so picking/clearing here never touches the
+  // address or its pin. Committing (or removing) a value ends the override so a
+  // present value renders as the confirmation card again.
+  const handlePostalManualChange = useCallback(
+    (next: string[]) => {
+      const code = next[0];
+      setForm((f) => ({ ...f, postal_code: code ? Number(code) : null }));
+      setPostalManualOverride(false);
+    },
+    [setForm]
+  );
+
+  // Filled → render the read-only confirmation card instead of the search
+  // picker (whether the value came from the address or a manual pick), unless
+  // the user is mid-"Change".
+  const postalConfirmed = form.postal_code != null && !postalManualOverride;
 
   // Scroll to end when the disclaimer focuses; delay lets the keyboard appear first.
   const handleDisclaimerFocus = useCallback(() => {
@@ -692,6 +731,7 @@ const EventForm: React.FC<EventFormProps> = ({
             onSelect={handleAddressSelect}
             onClear={handleAddressClear}
             onEdit={handleAddressEdit}
+            onFocusChange={setDropdownFocused}
             placeholder={t('createEvent.addressSearchPlaceholder')}
             searchingText={t('createEvent.addressSearching')}
             noResultsText={t('createEvent.addressNoResults')}
@@ -701,9 +741,10 @@ const EventForm: React.FC<EventFormProps> = ({
             otherStyles={styles.fieldSpacingNested}
           />
 
-          {/* Postal code: auto-filled and locked from the accepted address; the
-              manual picker stays usable as a fallback (no suggestion picked, or
-              the address service is unavailable). One postal per event. */}
+          {/* Postal code: a filled value (auto-filled from the accepted address
+              or picked manually) renders as a read-only confirmation card with a
+              "Change" escape hatch — no leftover-looking search input. Empty (or
+              mid-"Change") shows the manual picker. One postal per event. */}
           <ThemedView style={[styles.labelWithLoadingWrapper, styles.fieldSpacingNested]}>
             <ThemedText style={styles.fieldLabel}>
               {t('createEvent.postalCode')} ({t('common.optional')})
@@ -718,29 +759,67 @@ const EventForm: React.FC<EventFormProps> = ({
           </ThemedView>
 
           <ThemedView style={styles.controlSpacing}>
-            <SheetSearchMultiSelect
-              testID="dropdown-event-postal-code"
-              options={postalCodeOptions}
-              selected={form.postal_code ? [String(form.postal_code)] : []}
-              disabled={postalLocked}
-              onChange={(next) => {
-                // Manual fallback path (only reachable while unlocked). The street
-                // is no longer gated behind the postal, so picking/clearing the
-                // postal here never touches the address or its pin.
-                const code = next[0];
-                setForm({ ...form, postal_code: code ? Number(code) : null });
-              }}
-              placeholder={
-                postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
-              }
-              resolveSelectedLabel={resolvePostalLabel}
-              leadingIconName="mappin.and.ellipse"
-              minSearchLength={2}
-              singleSelect
-            />
+            {postalConfirmed ? (
+              <View
+                testID="postal-code-filled"
+                style={[
+                  styles.postalFilledRow,
+                  {
+                    backgroundColor: themeColors.surfaceAltBackground,
+                    borderColor: themeColors.cardBorder,
+                  },
+                ]}
+              >
+                <IconSymbol name="checkmark.circle.fill" size={18} color={themeColors.success} />
+                <View style={styles.postalFilledTextGroup}>
+                  <ThemedText style={styles.postalFilledValue} numberOfLines={1}>
+                    {resolvePostalLabel(String(form.postal_code))}
+                  </ThemedText>
+                  {postalLocked && (
+                    <ThemedText
+                      style={[styles.postalFilledCaption, { color: themeColors.secondaryText }]}
+                    >
+                      {t('createEvent.postalFilledFromAddress')}
+                    </ThemedText>
+                  )}
+                </View>
+                <TouchableOpacity
+                  testID="button-change-postal-code"
+                  onPress={handlePostalChangePress}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('createEvent.changePostalAccessibilityLabel')}
+                >
+                  <ThemedText style={[styles.postalChangeText, { color: themeColors.tint }]}>
+                    {t('createEvent.postalChange')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <SheetSearchMultiSelect
+                testID="dropdown-event-postal-code"
+                options={postalCodeOptions}
+                selected={form.postal_code ? [String(form.postal_code)] : []}
+                onChange={handlePostalManualChange}
+                placeholder={
+                  postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
+                }
+                resolveSelectedLabel={resolvePostalLabel}
+                leadingIconName="mappin.and.ellipse"
+                minSearchLength={2}
+                minLengthHintText={t('createEvent.searchMinLength', { count: 2 })}
+                noResultsText={t('createEvent.searchNoResults')}
+                singleSelect
+                onFocusChange={setDropdownFocused}
+              />
+            )}
           </ThemedView>
 
-          <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
+          {/* The search/auto-fill explainer only makes sense while the picker
+              shows — the confirmation card speaks for itself. */}
+          {!postalConfirmed && (
+            <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
+          )}
         </ThemedView>
       )}
 
@@ -799,8 +878,10 @@ const EventForm: React.FC<EventFormProps> = ({
           resolveSelectedLabel={resolveOrganizationLabel}
           leadingIconName="person"
           minSearchLength={0}
+          noResultsText={t('createEvent.searchNoResults')}
           maxSelected={MAX_CO_ORGANIZERS}
           maxSelectedHint={t('createEvent.maxCoOrganizers', { max: MAX_CO_ORGANIZERS })}
+          onFocusChange={setDropdownFocused}
         />
       </ThemedView>
 
@@ -1030,6 +1111,34 @@ const styles = StyleSheet.create({
   },
   fieldLoadingIndicator: {
     marginLeft: 8,
+  },
+  // Matches SheetSearchMultiSelect's input-row geometry so the confirmation
+  // card reads as the same control, just settled.
+  postalFilledRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderWidth: 1,
+    borderRadius: 13,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+  },
+  postalFilledTextGroup: {
+    flex: 1,
+  },
+  postalFilledValue: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.families.semiBold,
+    lineHeight: 20,
+  },
+  postalFilledCaption: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    lineHeight: 16,
+  },
+  postalChangeText: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.families.semiBold,
   },
 });
 

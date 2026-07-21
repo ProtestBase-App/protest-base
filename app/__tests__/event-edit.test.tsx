@@ -40,6 +40,8 @@ jest.mock('@/utils/logger', () => ({
 }));
 
 import React from 'react';
+import { Alert } from 'react-native';
+import { fireEvent } from '@testing-library/react-native';
 import { renderWithProviders, createMockEvent, createMockUser } from '@/test-utils/render';
 import EditEvent from '../event-edit/[id]';
 
@@ -321,6 +323,58 @@ describe('EditEvent', () => {
       // Wait for form to load - cancel button should work
       await findByText('common.cancel');
       expect(router.back).toBeDefined();
+    });
+  });
+
+  describe('Unsaved changes guard', () => {
+    const providerOverrides = {
+      globalContext: {
+        user: mockUser,
+        isLogged: true,
+        loading: false,
+        userLanguage: 'en',
+        eventsCache: {},
+        refetchEvents: jest.fn(),
+        refreshUserEventCounts: jest.fn(),
+      },
+      organizationsContext: { dropdownItems: [] },
+    };
+
+    it('prompts before leaving when the form has unsaved edits', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+
+      const titleInput = await findByDisplayValue(mockEvent.title);
+      fireEvent.changeText(titleInput, 'A different title');
+      fireEvent.press(getByTestId('button-cancel'));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        'eventEdit.discardTitle',
+        'eventEdit.discardMessage',
+        expect.any(Array)
+      );
+
+      alertSpy.mockRestore();
+    });
+
+    it('leaves immediately without a prompt when nothing was edited', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { router } = require('expo-router');
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+
+      await findByDisplayValue(mockEvent.title);
+      fireEvent.press(getByTestId('button-cancel'));
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(router.back).toHaveBeenCalled();
+
+      alertSpy.mockRestore();
     });
   });
 });

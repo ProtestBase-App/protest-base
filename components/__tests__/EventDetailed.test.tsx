@@ -60,10 +60,6 @@ jest.mock('@/utils/eventFormatters', () => ({
   parseAsUTC: jest.fn((dateStr: string) => new Date(dateStr)),
 }));
 
-jest.mock('@/hooks/useLogoScheme', () => ({
-  useLogoScheme: jest.fn(() => ({ uri: 'logo' })),
-}));
-
 import React from 'react';
 import { Linking, Alert } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
@@ -125,6 +121,7 @@ const defaultProps = {
   viewCount: 0,
   onBack: jest.fn(),
   onSave: jest.fn(),
+  onShare: jest.fn(),
   onOrganizerPress: jest.fn(),
   onOpenCreatorMenu: jest.fn(),
   userLanguage: 'en' as const,
@@ -243,6 +240,19 @@ describe('EventDetailed', () => {
     expect(screen.queryByText('YOUR EVENT')).toBeNull();
   });
 
+  it('renders a badge per event category', () => {
+    const categorizedEvent = { ...mockEvent, categories: ['Protest', 'Learn'] };
+    render(<EventDetailed {...defaultProps} event={categorizedEvent} />);
+    expect(screen.getByText('Protest')).toBeTruthy();
+    expect(screen.getByText('Learn')).toBeTruthy();
+  });
+
+  it('does not render the category row when the event has no categories', () => {
+    const uncategorizedEvent = { ...mockEvent, categories: [] };
+    render(<EventDetailed {...defaultProps} event={uncategorizedEvent} />);
+    expect(screen.queryByLabelText(/^Category:/)).toBeNull();
+  });
+
   it('calls onBack when back button is pressed', () => {
     const onBack = jest.fn();
     render(<EventDetailed {...defaultProps} onBack={onBack} />);
@@ -257,6 +267,22 @@ describe('EventDetailed', () => {
     const saveButton = screen.getByLabelText('Save');
     fireEvent.press(saveButton);
     expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onShare when share button is pressed', () => {
+    const onShare = jest.fn();
+    render(<EventDetailed {...defaultProps} onShare={onShare} />);
+    const shareButton = screen.getByLabelText('Share');
+    fireEvent.press(shareButton);
+    expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the share button available in creator mode', () => {
+    const onShare = jest.fn();
+    render(<EventDetailed {...defaultProps} isCreator={true} onShare={onShare} />);
+    const shareButton = screen.getByLabelText('Share');
+    fireEvent.press(shareButton);
+    expect(onShare).toHaveBeenCalledTimes(1);
   });
 
   it('calls onOpenCreatorMenu when edit pill is pressed (creator mode)', () => {
