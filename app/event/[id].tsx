@@ -19,6 +19,7 @@ import { canUserEditEvent } from '@/utils/eventPermissions';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import { openMap } from '@/utils/mapHelpers';
+import { shareEventWithAlert } from '@/utils/shareHelpers';
 import EventDetailed from '@/components/EventDetailed';
 import CreatorActionSheet from '@/components/CreatorActionSheet';
 import CancelEventModal from '@/components/CancelEventModal';
@@ -268,6 +269,27 @@ export default function EventDetails() {
     openMap(event.geocod_lat, event.geocod_lng, address);
   };
 
+  // Ref (not state): a double-tap lands before any re-render, so only a
+  // synchronous flag reliably prevents a second native share sheet.
+  const isSharingRef = useRef(false);
+
+  const handleShare = async () => {
+    if (!rawEvent || isSharingRef.current) return;
+    isSharingRef.current = true;
+    try {
+      // shareEventWithAlert re-formats the event itself, so it needs the raw
+      // Event (not the FormattedEvent). cityLabel is resolved the same way as
+      // directions/sharing elsewhere so the shared message stays consistent.
+      const cityLabel =
+        rawEvent.postal_code && rawEvent.country
+          ? getSubMunicipalityName(String(rawEvent.postal_code), rawEvent.country, rawEvent.city)
+          : undefined;
+      await shareEventWithAlert(rawEvent, userLanguage, cityLabel);
+    } finally {
+      isSharingRef.current = false;
+    }
+  };
+
   if (loading || postalCodesLoading) {
     return (
       <ThemedView style={styles.splashContainer}>
@@ -314,6 +336,7 @@ export default function EventDetails() {
             onBack={handleBackPress}
             onSave={handleSave}
             onLike={handleLike}
+            onShare={handleShare}
             onOrganizerPress={handleOrganizerPress}
             onOpenCreatorMenu={() => setMenuOpen(true)}
             refreshing={refreshing}

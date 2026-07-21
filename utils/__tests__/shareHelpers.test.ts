@@ -216,6 +216,46 @@ describe('shareHelpers', () => {
       });
     });
 
+    describe('Status-aware CTA', () => {
+      it('should swap the join CTA for a cancelled note on cancelled events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'cancelled' }, userLanguage: 'en' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('❌ This event has been cancelled.');
+        expect(shareCall.message).not.toContain('Join this event on ProtestBase!');
+      });
+
+      it('should swap the join CTA for a past note on past events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'past' }, userLanguage: 'en' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('🕒 This event has already taken place.');
+        expect(shareCall.message).not.toContain('Join this event on ProtestBase!');
+      });
+
+      it('should localize the cancelled note', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'cancelled' }, userLanguage: 'fr' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('❌ Cet événement a été annulé.');
+      });
+
+      it('should keep the join CTA for active events', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+
+        await shareEvent({ event: { ...mockEvent, status: 'active' }, userLanguage: 'en' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('Join this event on ProtestBase!');
+      });
+    });
+
     describe('Error handling', () => {
       it('should return error when event is missing', async () => {
         const result = await shareEvent({ event: null as any, userLanguage: 'en' });

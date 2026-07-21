@@ -17,6 +17,8 @@ interface ShareResult {
 
 interface ShareStrings {
   cta: string;
+  ctaCancelled: string;
+  ctaPast: string;
   errorTitle: string;
   eventNotFound: string;
   shareFailed: string;
@@ -26,18 +28,24 @@ function getShareStrings(language: string): ShareStrings {
   const strings: Record<string, ShareStrings> = {
     en: {
       cta: 'Join this event on ProtestBase!',
+      ctaCancelled: '❌ This event has been cancelled.',
+      ctaPast: '🕒 This event has already taken place.',
       errorTitle: 'Error',
       eventNotFound: 'Event not found or incomplete data.',
       shareFailed: 'Failed to share event. Please try again.',
     },
     fr: {
       cta: 'Rejoignez cet événement sur ProtestBase !',
+      ctaCancelled: '❌ Cet événement a été annulé.',
+      ctaPast: '🕒 Cet événement a déjà eu lieu.',
       errorTitle: 'Erreur',
       eventNotFound: 'Événement introuvable ou données incomplètes.',
       shareFailed: "Échec du partage de l'événement. Veuillez réessayer.",
     },
     nl: {
       cta: 'Doe mee aan dit evenement op ProtestBase!',
+      ctaCancelled: '❌ Dit evenement is geannuleerd.',
+      ctaPast: '🕒 Dit evenement heeft al plaatsgevonden.',
       errorTitle: 'Fout',
       eventNotFound: 'Evenement niet gevonden of onvolledige gegevens.',
       shareFailed: 'Delen van evenement mislukt. Probeer het opnieuw.',
@@ -73,9 +81,18 @@ function createShareMessage(
     locationLine ? `\n${locationLine}` : ''
   }`;
 
+  // Cancelled/past events stay shareable (the link spreads the word), but the
+  // "join" CTA would be misleading — swap it for a status note.
+  const cta =
+    event.status === 'cancelled'
+      ? shareStrings.ctaCancelled
+      : event.status === 'past'
+        ? shareStrings.ctaPast
+        : shareStrings.cta;
+
   return Platform.OS === 'ios'
-    ? `${eventDetails}\n\n${shareStrings.cta}`
-    : `${eventDetails}\n\n${shareStrings.cta}\n\n🔗 ${universalLink}`;
+    ? `${eventDetails}\n\n${cta}`
+    : `${eventDetails}\n\n${cta}\n\n🔗 ${universalLink}`;
 }
 
 interface ShareContent {

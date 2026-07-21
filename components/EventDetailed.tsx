@@ -10,7 +10,6 @@ import {
   FlatList,
   TurboModuleRegistry,
   ActivityIndicator,
-  Image as RNImage,
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -23,6 +22,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
+import { getCategoryColors } from '@/constants/CategoryColors';
 import { countries } from '@/constants/Countries';
 import { CoOrganizerAvatar } from '@/types/event.types';
 import { FormattedEvent, parseAsUTC } from '@/utils/eventFormatters';
@@ -33,7 +33,6 @@ import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
-import { useLogoScheme } from '@/hooks/useLogoScheme';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 
 // Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
@@ -97,6 +96,7 @@ export interface EventDetailedProps {
   viewCount: number;
   onBack: () => void;
   onSave: () => void;
+  onShare: () => void;
   onOrganizerPress: (orgId: string) => void;
   onOpenCreatorMenu: () => void;
   refreshing?: boolean;
@@ -114,6 +114,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   viewCount,
   onBack,
   onSave,
+  onShare,
   onOrganizerPress,
   onOpenCreatorMenu,
   refreshing,
@@ -125,7 +126,6 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const logo = useLogoScheme();
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
@@ -390,26 +390,60 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               </BlurView>
             </TouchableOpacity>
 
-            <RNImage source={logo} style={styles.navLogo} resizeMode="contain" />
-
-            {isCreator ? (
+            <View style={styles.heroNavRightGroup}>
+              {/* Share is offered to every viewer, creator or not, so it stays
+                  outside the creator/visitor branch below. */}
               <TouchableOpacity
-                style={[styles.creatorPill, { backgroundColor: themeColors.tint }]}
-                onPress={onOpenCreatorMenu}
+                onPress={onShare}
                 accessibilityRole="button"
-                accessibilityLabel={t('events.modifyPill')}
+                accessibilityLabel={t('events.share')}
               >
-                <IconSymbol name="pencil" size={14} color="white" />
-                <ThemedText style={styles.creatorPillText}>{t('events.modifyPill')}</ThemedText>
+                <BlurView intensity={20} tint="dark" style={styles.navPill}>
+                  <IconSymbol name="square.and.arrow.up" size={IconSizes.md} color="white" />
+                </BlurView>
               </TouchableOpacity>
-            ) : (
-              <View style={styles.heroNavRightGroup}>
-                {onLike && (
+
+              {isCreator ? (
+                <TouchableOpacity
+                  style={[styles.creatorPill, { backgroundColor: themeColors.tint }]}
+                  onPress={onOpenCreatorMenu}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('events.modifyPill')}
+                >
+                  <IconSymbol name="pencil" size={14} color="white" />
+                  <ThemedText style={styles.creatorPillText}>{t('events.modifyPill')}</ThemedText>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  {onLike && (
+                    <TouchableOpacity
+                      onPress={onLike}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        isEventLiked ? t('events.likedEvent') : t('events.likeEvent')
+                      }
+                    >
+                      <BlurView
+                        intensity={20}
+                        tint="dark"
+                        style={[
+                          styles.navPill,
+                          isEventLiked && { backgroundColor: themeColors.tint },
+                        ]}
+                      >
+                        <IconSymbol
+                          name={isEventLiked ? 'heart.fill' : 'heart'}
+                          size={IconSizes.md}
+                          color="white"
+                        />
+                      </BlurView>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    onPress={onLike}
+                    onPress={onSave}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      isEventLiked ? t('events.likedEvent') : t('events.likeEvent')
+                      isEventSaved ? t('events.savedEvent') : t('events.saveEvent')
                     }
                   >
                     <BlurView
@@ -417,36 +451,19 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       tint="dark"
                       style={[
                         styles.navPill,
-                        isEventLiked && { backgroundColor: themeColors.tint },
+                        isEventSaved && { backgroundColor: themeColors.tint },
                       ]}
                     >
                       <IconSymbol
-                        name={isEventLiked ? 'heart.fill' : 'heart'}
+                        name={isEventSaved ? 'bookmark.fill' : 'bookmark'}
                         size={IconSizes.md}
                         color="white"
                       />
                     </BlurView>
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={onSave}
-                  accessibilityRole="button"
-                  accessibilityLabel={isEventSaved ? t('events.savedEvent') : t('events.saveEvent')}
-                >
-                  <BlurView
-                    intensity={20}
-                    tint="dark"
-                    style={[styles.navPill, isEventSaved && { backgroundColor: themeColors.tint }]}
-                  >
-                    <IconSymbol
-                      name={isEventSaved ? 'bookmark.fill' : 'bookmark'}
-                      size={IconSizes.md}
-                      color="white"
-                    />
-                  </BlurView>
-                </TouchableOpacity>
-              </View>
-            )}
+                </>
+              )}
+            </View>
           </View>
 
           <ThemedText
@@ -580,6 +597,29 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
                 <CreatorStat label={t('events.savesCount')} value={String(event.save_count ?? 0)} />
               </View>
+            </View>
+          )}
+
+          {event.categories && event.categories.length > 0 && (
+            <View style={styles.categoryRow}>
+              {event.categories.map((category) => {
+                const categoryColors = getCategoryColors(category);
+                return (
+                  <View
+                    key={category}
+                    style={[styles.categoryBadge, { backgroundColor: categoryColors.badgeBg }]}
+                  >
+                    <ThemedText
+                      type="categoryBadge"
+                      style={{ color: categoryColors.color }}
+                      accessibilityRole="text"
+                      accessibilityLabel={`Category: ${t(`categories.${category.toLowerCase()}`)}`}
+                    >
+                      {t(`categories.${category.toLowerCase()}`)}
+                    </ThemedText>
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -1014,10 +1054,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  navLogo: {
-    width: 40,
-    height: 40,
-  },
   heroNavRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1175,6 +1211,17 @@ const styles = StyleSheet.create({
     height: 24,
   },
 
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  categoryBadge: {
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: 10,
+  },
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
