@@ -101,15 +101,15 @@ describe('shareHelpers', () => {
         expect(shareCall.message).toContain('🔗');
       });
 
-      it('should NOT include URL in message on iOS', async () => {
+      it('should include URL in message on iOS (Signal and Telegram drop the url property)', async () => {
         (Share.share as jest.Mock).mockResolvedValue({});
         (Platform as any).OS = 'ios';
 
         await shareEvent({ event: mockEvent, userLanguage: 'en' });
 
         const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
-        expect(shareCall.message).not.toContain('🔗 https://');
-        // URL should still be in the url property
+        expect(shareCall.message).toContain('🔗 https://protestbase.be/event/event123');
+        // URL should also be in the url property (share sheet preview, Copy, AirDrop)
         expect(shareCall.url).toBe('https://protestbase.be/event/event123');
       });
 

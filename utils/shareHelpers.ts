@@ -55,11 +55,13 @@ function getShareStrings(language: string): ShareStrings {
 }
 
 /**
- * Generate a platform-optimized share message for an event
+ * Generate a share message for an event
  *
- * Platform differences:
- * - iOS: URL is handled separately via the `url` property, so message excludes it
- * - Android: URL property is ignored, so URL is included in the message
+ * The URL is always included in the message text: on iOS, share targets like
+ * Signal and Telegram only consume the text activity item and drop the
+ * separate `url` property, so the link must travel in the text itself.
+ * Merge-style targets (iMessage, Mail) may show the URL twice — accepted
+ * tradeoff for the link never being lost.
  */
 function createShareMessage(
   event: Event,
@@ -90,9 +92,7 @@ function createShareMessage(
         ? shareStrings.ctaPast
         : shareStrings.cta;
 
-  return Platform.OS === 'ios'
-    ? `${eventDetails}\n\n${cta}`
-    : `${eventDetails}\n\n${cta}\n\n🔗 ${universalLink}`;
+  return `${eventDetails}\n\n${cta}\n\n🔗 ${universalLink}`;
 }
 
 interface ShareContent {
@@ -105,9 +105,10 @@ interface ShareContent {
 /**
  * Share an event using the native share sheet
  *
- * Handles platform-specific behavior:
- * - iOS: Uses separate message, url, and title properties for rich link previews
- * - Android: Includes URL in message since url property is ignored
+ * The URL is always in the message text (see createShareMessage). On iOS the
+ * separate `url` and `title` properties are also set: `url` powers the share
+ * sheet header preview and system actions (Copy, AirDrop, Reading List);
+ * Android ignores both.
  *
  * Enhanced for optimal sharing experience on:
  * - WhatsApp: Rich preview with OG tags from website
