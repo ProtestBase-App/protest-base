@@ -1,17 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  View,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, Alert, View, TouchableOpacity } from 'react-native';
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -84,7 +78,7 @@ export default function DraftEdit() {
     help_description: false,
   });
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
 
   // Load the draft via the preview endpoint (the public GET 404s on drafts) and
   // map the raw Event directly into form state. We deliberately avoid
@@ -290,94 +284,72 @@ export default function DraftEdit() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollViewContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets={false}
-        >
-          <ThemedView style={styles.container}>
-            <ThemedView style={styles.headerRow}>
-              <ThemedText type="title" style={styles.titleText}>
-                {t('drafts.editTitle')}
-              </ThemedText>
-              <View style={styles.headerActions}>
-                <TouchableOpacity
-                  onPress={handleDelete}
-                  style={styles.headerButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel={t('drafts.delete')}
-                  accessibilityRole="button"
-                  testID="btn-draft-delete"
-                >
-                  <IconSymbol name="trash" size={24} color={themeColors.destructive} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => router.back()}
-                  style={styles.headerButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel={t('common.close')}
-                  accessibilityRole="button"
-                >
-                  <IconSymbol name="xmark" size={24} color={themeColors.icon} />
-                </TouchableOpacity>
-              </View>
-            </ThemedView>
+    <>
+      <FormScreenScaffold
+        scrollViewRef={scrollViewRef}
+        footer={
+          <ThemedView style={styles.footer}>
+            <CustomButton
+              testID="btn-draft-save"
+              title={t('drafts.save')}
+              handlePress={handleSave}
+              containerStyles={styles.buttonSecondary}
+              isLoading={actionBusy}
+            />
 
-            <EventForm
-              form={form}
-              setForm={setForm}
-              emptyFields={emptyFields}
-              userLanguage={userLanguage}
-              scrollViewRef={scrollViewRef}
+            <CustomButton
+              testID="btn-draft-publish"
+              title={t('drafts.publish')}
+              handlePress={handlePublish}
+              containerStyles={styles.buttonPrimary}
+              isLoading={actionBusy}
             />
           </ThemedView>
-        </ScrollView>
+        }
+      >
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.headerRow}>
+            <ThemedText type="title" style={styles.titleText}>
+              {t('drafts.editTitle')}
+            </ThemedText>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                onPress={handleDelete}
+                style={styles.headerButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel={t('drafts.delete')}
+                accessibilityRole="button"
+                testID="btn-draft-delete"
+              >
+                <IconSymbol name="trash" size={24} color={themeColors.destructive} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.headerButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel={t('common.close')}
+                accessibilityRole="button"
+              >
+                <IconSymbol name="xmark" size={24} color={themeColors.icon} />
+              </TouchableOpacity>
+            </View>
+          </ThemedView>
 
-        <ThemedView style={styles.footerWrapper}>
-          <SafeAreaView style={styles.footerSafeArea} edges={['bottom']}>
-            <ThemedView style={styles.footer}>
-              <CustomButton
-                testID="btn-draft-save"
-                title={t('drafts.save')}
-                handlePress={handleSave}
-                containerStyles={styles.buttonSecondary}
-                isLoading={actionBusy}
-              />
-
-              <CustomButton
-                testID="btn-draft-publish"
-                title={t('drafts.publish')}
-                handlePress={handlePublish}
-                containerStyles={styles.buttonPrimary}
-                isLoading={actionBusy}
-              />
-            </ThemedView>
-          </SafeAreaView>
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            scrollViewRef={scrollViewRef}
+          />
         </ThemedView>
-      </KeyboardAvoidingView>
+      </FormScreenScaffold>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 120,
-  },
   container: {
     width: '100%',
     justifyContent: 'flex-start',
@@ -424,15 +396,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  footerWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  footerSafeArea: {
-    width: '100%',
   },
   footer: {
     flexDirection: 'row',

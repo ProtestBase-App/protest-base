@@ -1,17 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  BackHandler,
-} from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import CustomButton from '@/components/CustomButton';
 import FormField from '@/components/FormField';
 import { ThemedText } from '@/components/ThemedText';
@@ -407,129 +399,110 @@ export default function CreateTemplateScreen() {
 
   return (
     <ThemedView style={styles.wrapper}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardView}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+      {/* No footer: buttons stay inline at the end of the form. */}
+      <FormScreenScaffold contentContainerStyle={styles.scrollContent}>
+        <ThemedView style={styles.container}>
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Close create template screen"
+            accessibilityRole="button"
           >
-            <ThemedView style={styles.container}>
-              <TouchableOpacity
-                onPress={handleBackPress}
-                style={styles.closeButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel="Close create template screen"
-                accessibilityRole="button"
-              >
-                <IconSymbol name="xmark" size={24} color="#687076" />
-              </TouchableOpacity>
+            <IconSymbol name="xmark" size={24} color="#687076" />
+          </TouchableOpacity>
 
-              <ThemedText type="title" style={styles.titleSpacing}>
-                {isFromPastEvent ? t('template.createFromEventTitle') : t('template.createTitle')}
-              </ThemedText>
+          <ThemedText type="title" style={styles.titleSpacing}>
+            {isFromPastEvent ? t('template.createFromEventTitle') : t('template.createTitle')}
+          </ThemedText>
 
-              <ThemedText style={[styles.subtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
-                {t('template.createSubtitle')}
-              </ThemedText>
+          <ThemedText style={[styles.subtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+            {t('template.createSubtitle')}
+          </ThemedText>
 
-              <OrganizationPicker
-                value={selectedOrgId || selectedOrganizationId || undefined}
-                onValueChange={(id) => {
-                  setSelectedOrgId(id);
-                  setOrgError(false);
-                }}
-                error={orgError}
-                errorMessage={t('createEvent.organizationRequired')}
-              />
+          <OrganizationPicker
+            value={selectedOrgId || selectedOrganizationId || undefined}
+            onValueChange={(id) => {
+              setSelectedOrgId(id);
+              setOrgError(false);
+            }}
+            error={orgError}
+            errorMessage={t('createEvent.organizationRequired')}
+          />
 
-              <ThemedView style={styles.templateMetaSection}>
-                <FormField
-                  testID="input-template-name"
-                  title={t('template.nameLabel')}
-                  value={templateName}
-                  placeholder={t('template.namePlaceholder')}
-                  handleChangeText={(value) => {
-                    setTemplateName(value);
-                    if (value.trim()) setTemplateNameError(false);
-                  }}
-                  otherStyles={styles.fieldSpacing}
-                  maxLength={100}
-                  hasError={templateNameError}
-                />
+          <ThemedView style={styles.templateMetaSection}>
+            <FormField
+              testID="input-template-name"
+              title={t('template.nameLabel')}
+              value={templateName}
+              placeholder={t('template.namePlaceholder')}
+              handleChangeText={(value) => {
+                setTemplateName(value);
+                if (value.trim()) setTemplateNameError(false);
+              }}
+              otherStyles={styles.fieldSpacing}
+              maxLength={100}
+              hasError={templateNameError}
+            />
 
-                <FormField
-                  testID="input-template-description"
-                  title={t('template.descriptionLabel')}
-                  value={templateDescription}
-                  placeholder={t('template.descriptionPlaceholder')}
-                  handleChangeText={setTemplateDescription}
-                  otherStyles={styles.fieldSpacing}
-                  maxLength={8000}
-                />
-              </ThemedView>
+            <FormField
+              testID="input-template-description"
+              title={t('template.descriptionLabel')}
+              value={templateDescription}
+              placeholder={t('template.descriptionPlaceholder')}
+              handleChangeText={setTemplateDescription}
+              otherStyles={styles.fieldSpacing}
+              maxLength={8000}
+            />
+          </ThemedView>
 
-              <ThemedView
-                style={[styles.divider, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}
-              />
+          <ThemedView
+            style={[styles.divider, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}
+          />
 
-              <ThemedText style={styles.sectionTitle}>
-                {t('template.eventDetailsSection')}
-              </ThemedText>
+          <ThemedText style={styles.sectionTitle}>{t('template.eventDetailsSection')}</ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+            {t('template.eventDetailsHelper')}
+          </ThemedText>
+
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            mode="create-template"
+          />
+
+          <ThemedView style={styles.buttonContainer}>
+            <CustomButton
+              testID="btn-template-submit"
+              title={t('template.saveButton')}
+              handlePress={submit}
+              containerStyles={styles.saveButton}
+              isLoading={isSubmitting}
+            />
+
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
+              onPress={handleBackPress}
+              activeOpacity={0.7}
+            >
               <ThemedText
-                style={[styles.sectionSubtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}
+                style={[styles.cancelButtonText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}
               >
-                {t('template.eventDetailsHelper')}
+                {t('common.cancel')}
               </ThemedText>
-
-              <EventForm
-                form={form}
-                setForm={setForm}
-                emptyFields={emptyFields}
-                userLanguage={userLanguage}
-                mode="create-template"
-              />
-
-              <ThemedView style={styles.buttonContainer}>
-                <CustomButton
-                  testID="btn-template-submit"
-                  title={t('template.saveButton')}
-                  handlePress={submit}
-                  containerStyles={styles.saveButton}
-                  isLoading={isSubmitting}
-                />
-
-                <TouchableOpacity
-                  style={[styles.cancelButton, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
-                  onPress={handleBackPress}
-                  activeOpacity={0.7}
-                >
-                  <ThemedText
-                    style={[styles.cancelButtonText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}
-                  >
-                    {t('common.cancel')}
-                  </ThemedText>
-                </TouchableOpacity>
-              </ThemedView>
-            </ThemedView>
-          </ScrollView>
-        </KeyboardAvoidingView>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      </SafeAreaView>
+            </TouchableOpacity>
+          </ThemedView>
+        </ThemedView>
+      </FormScreenScaffold>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   scrollContent: {

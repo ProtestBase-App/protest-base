@@ -67,6 +67,12 @@ export interface SheetSearchMultiSelectProps {
    * event form, the organization picker) must keep the default plain TextInput.
    */
   inBottomSheet?: boolean;
+  /**
+   * Focus/blur signal for a keyboard-aware host to reserve room for the dropdown.
+   * Blur fires on the same delay as the panel teardown, so the host never
+   * re-scrolls out from under a row the user is mid-tap on.
+   */
+  onFocusChange?: (focused: boolean) => void;
   testID?: string;
 }
 
@@ -95,6 +101,7 @@ export function SheetSearchMultiSelect({
   maxSelectedHint,
   disabled = false,
   inBottomSheet = false,
+  onFocusChange,
   testID,
 }: SheetSearchMultiSelectProps) {
   const colorScheme = useColorScheme();
@@ -123,10 +130,14 @@ export function SheetSearchMultiSelect({
       blurTimeoutRef.current = null;
     }
     setFocused(true);
+    onFocusChange?.(true);
   };
 
   const handleBlur = () => {
-    blurTimeoutRef.current = setTimeout(() => setFocused(false), 120);
+    blurTimeoutRef.current = setTimeout(() => {
+      setFocused(false);
+      onFocusChange?.(false);
+    }, 120);
   };
 
   const normalizedQuery = query.trim().toLowerCase();

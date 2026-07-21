@@ -24,6 +24,7 @@ import {
   SheetSearchMultiSelectOption,
 } from '@/components/SheetSearchMultiSelect';
 import AddressAutocompleteField from '@/components/AddressAutocompleteField';
+import { useFormKeyboard } from '@/components/FormScreenScaffold';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { FilterChip } from '@/components/ui/FilterChip';
 import { eventCategories } from '@/constants/EventCategories';
@@ -68,6 +69,7 @@ const EventForm: React.FC<EventFormProps> = ({
   const themeColors = getThemeColors(colorScheme);
   const iconColor = isDark ? 'white' : 'black';
   const userLang = userLanguage;
+  const { setDropdownFocused } = useFormKeyboard();
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
@@ -739,6 +741,7 @@ const EventForm: React.FC<EventFormProps> = ({
               minLengthHintText={t('createEvent.searchMinLength', { count: 2 })}
               noResultsText={t('createEvent.searchNoResults')}
               singleSelect
+              onFocusChange={setDropdownFocused}
             />
           </ThemedView>
 
@@ -804,6 +807,7 @@ const EventForm: React.FC<EventFormProps> = ({
           noResultsText={t('createEvent.searchNoResults')}
           maxSelected={MAX_CO_ORGANIZERS}
           maxSelectedHint={t('createEvent.maxCoOrganizers', { max: MAX_CO_ORGANIZERS })}
+          onFocusChange={setDropdownFocused}
         />
       </ThemedView>
 

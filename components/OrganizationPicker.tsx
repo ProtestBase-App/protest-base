@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import { useFormKeyboard } from '@/components/FormScreenScaffold';
 import {
   SheetSearchMultiSelect,
   SheetSearchMultiSelectOption,
@@ -48,6 +49,7 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
   const { dropdownItems, hasSingleOrganization, hasMultipleOrganizations } = useUserOrganizations();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
+  const { setDropdownFocused } = useFormKeyboard();
 
   const options = useMemo<SheetSearchMultiSelectOption[]>(
     () => dropdownItems.map((item) => ({ value: item.value, label: item.label })),
@@ -83,6 +85,7 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
         minSearchLength={0}
         noResultsText={t('createEvent.searchNoResults')}
         singleSelect
+        onFocusChange={setDropdownFocused}
       />
       {error && errorMessage ? (
         <ThemedText style={[styles.errorText, { color: themeColors.error }]}>

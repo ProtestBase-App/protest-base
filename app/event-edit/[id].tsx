@@ -1,17 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  StyleSheet,
-  Platform,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  BackHandler,
-} from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -78,7 +71,7 @@ export default function EditEvent() {
     help_description: false,
   });
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   // Baseline snapshot of the freshly loaded form; drives the unsaved-changes
   // guard so leaving without saving prompts only when something actually changed.
   const initialFormRef = useRef<FormState | null>(null);
@@ -307,89 +300,67 @@ export default function EditEvent() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollViewContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets={false}
-        >
-          <ThemedView style={styles.container}>
-            <ThemedView style={styles.headerRow}>
-              <ThemedText type="title" style={styles.titleText}>
-                {t('eventEdit.title')}
-              </ThemedText>
-              <TouchableOpacity
-                onPress={() => handleBackPress()}
-                disabled={isSubmitting}
-                style={[styles.closeButton, isSubmitting && styles.closeButtonDisabled]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={t('eventEdit.closeAccessibilityLabel')}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: isSubmitting }}
-              >
-                <IconSymbol name="xmark" size={24} color={themeColors.icon} />
-              </TouchableOpacity>
-            </ThemedView>
+    <>
+      <FormScreenScaffold
+        scrollViewRef={scrollViewRef}
+        footer={
+          <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
+            <CustomButton
+              testID="button-cancel"
+              title={t('common.cancel')}
+              handlePress={() => handleBackPress()}
+              containerStyles={[
+                styles.buttonCancel,
+                { backgroundColor: themeColors.buttonSecondaryBackground },
+              ]}
+              isLoading={false}
+              disabled={isSubmitting}
+            />
 
-            <EventForm
-              form={form}
-              setForm={setForm}
-              emptyFields={emptyFields}
-              userLanguage={userLanguage}
-              mode="edit-event"
-              scrollViewRef={scrollViewRef}
+            <CustomButton
+              testID="button-save"
+              title={t('common.save')}
+              handlePress={submit}
+              containerStyles={styles.buttonSave}
+              isLoading={isSubmitting}
             />
           </ThemedView>
-        </ScrollView>
+        }
+      >
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.headerRow}>
+            <ThemedText type="title" style={styles.titleText}>
+              {t('eventEdit.title')}
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => handleBackPress()}
+              disabled={isSubmitting}
+              style={[styles.closeButton, isSubmitting && styles.closeButtonDisabled]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={t('eventEdit.closeAccessibilityLabel')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting }}
+            >
+              <IconSymbol name="xmark" size={24} color={themeColors.icon} />
+            </TouchableOpacity>
+          </ThemedView>
 
-        <ThemedView style={styles.footerWrapper}>
-          <SafeAreaView style={styles.footerSafeArea} edges={['bottom']}>
-            <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
-              <CustomButton
-                testID="button-cancel"
-                title={t('common.cancel')}
-                handlePress={() => handleBackPress()}
-                containerStyles={[
-                  styles.buttonCancel,
-                  { backgroundColor: themeColors.buttonSecondaryBackground },
-                ]}
-                isLoading={false}
-                disabled={isSubmitting}
-              />
-
-              <CustomButton
-                testID="button-save"
-                title={t('common.save')}
-                handlePress={submit}
-                containerStyles={styles.buttonSave}
-                isLoading={isSubmitting}
-              />
-            </ThemedView>
-          </SafeAreaView>
+          <EventForm
+            form={form}
+            setForm={setForm}
+            emptyFields={emptyFields}
+            userLanguage={userLanguage}
+            mode="edit-event"
+            scrollViewRef={scrollViewRef}
+          />
         </ThemedView>
-      </KeyboardAvoidingView>
+      </FormScreenScaffold>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 160,
-  },
   container: {
     width: '100%',
     justifyContent: 'flex-start',
@@ -429,15 +400,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  footerWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  footerSafeArea: {
-    width: '100%',
   },
   footer: {
     flexDirection: 'row',
