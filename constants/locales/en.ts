@@ -591,6 +591,10 @@ const en: LocaleData = {
     addressError: 'Could not search addresses. Please try again.',
     addressUnavailable: 'Address search is unavailable right now. You can still save.',
     clearStreetAddressAccessibilityLabel: 'Clear street address',
+    // Postal confirmation card (filled state)
+    postalFilledFromAddress: 'Set automatically from the address',
+    postalChange: 'Change',
+    changePostalAccessibilityLabel: 'Change postal code',
     organizerNamePlaceholder: 'Your organization name',
     contactEmailPlaceholder: 'contact@example.com',
     helpDescriptionPlaceholder: 'Describe what volunteers or help you need...',

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -11,6 +12,7 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { DROPDOWN_HEADROOM } from '@/components/FormScreenScaffold';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography, Spacing, BorderRadius } from '@/constants/DesignTokens';
@@ -27,6 +29,11 @@ import {
 const MIN_QUERY_LENGTH = 3;
 /** Max suggestions the backend returns; we render them as plain rows (no virtualization). */
 const MAX_VISIBLE_RESULTS = 8;
+/**
+ * Blur is reported to the keyboard host on this delay so a tap on a suggestion
+ * row lands before the reserved band collapses (mirrors SheetSearchMultiSelect).
+ */
+const BLUR_SIGNAL_DELAY_MS = 120;
 
 type SearchStatus = 'idle' | 'searching' | 'no_results' | 'error' | 'unavailable';
 
@@ -53,6 +60,14 @@ export interface AddressAutocompleteFieldProps {
    * upstream re-sync (loads/country changes) or by selecting a suggestion.
    */
   onEdit?: () => void;
+  /**
+   * Focus/blur signal for a keyboard-aware host (FormScreenScaffold's
+   * setDropdownFocused) to reserve room below the input so the suggestion list
+   * renders above the keyboard. Blur fires on a short delay — and on unmount
+   * while focused — so the reserved band is always released, never collapsed
+   * out from under a row the user is mid-tap on.
+   */
+  onFocusChange?: (focused: boolean) => void;
   title: string;
   placeholder: string;
   /** Localized copy for the transient states. */
@@ -86,6 +101,7 @@ export default function AddressAutocompleteField({
   onSelect,
   onClear,
   onEdit,
+  onFocusChange,
   title,
   placeholder,
   searchingText,
@@ -107,6 +123,39 @@ export default function AddressAutocompleteField({
 
   // Monotonic request id — only the latest in-flight search may write state.
   const seqRef = useRef(0);
+  // Pending delayed-blur signal to the keyboard host.
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest-refs so the unmount cleanup releases the host's reserved headroom
+  // (e.g. country deselected while typing) without re-running on prop churn.
+  const onFocusChangeRef = useRef(onFocusChange);
+  const isFocusedRef = useRef(false);
+  useEffect(() => {
+    onFocusChangeRef.current = onFocusChange;
+  });
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+      if (isFocusedRef.current) onFocusChangeRef.current?.(false);
+    };
+  }, []);
+
+  const handleFocus = () => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setIsFocused(true);
+    isFocusedRef.current = true;
+    onFocusChange?.(true);
+  };
+
+  const handleBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setIsFocused(false);
+      isFocusedRef.current = false;
+      onFocusChange?.(false);
+    }, BLUR_SIGNAL_DELAY_MS);
+  };
 
   const debouncedQuery = useDebouncedValue(query, 300);
 
@@ -215,8 +264,8 @@ export default function AddressAutocompleteField({
           placeholder={placeholder}
           placeholderTextColor={themeColors.placeholder}
           onChangeText={handleChangeText}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           editable={!!countryCode}
           autoCapitalize="words"
           autoCorrect={false}
@@ -247,27 +296,37 @@ export default function AddressAutocompleteField({
             { backgroundColor: themeColors.cardBackground, borderColor: themeColors.inputBorder },
           ]}
         >
-          {visibleResults.map((suggestion, index) => (
-            <TouchableOpacity
-              key={`${suggestion.label}-${index}`}
-              testID={`address-suggestion-${index}`}
-              style={[
-                styles.resultRow,
-                index < visibleResults.length - 1 && {
-                  borderBottomColor: themeColors.separator,
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                },
-              ]}
-              onPress={() => handleSelect(suggestion)}
-              accessibilityRole="button"
-              accessibilityLabel={suggestion.label}
-            >
-              <IconSymbol name="location.fill" size={16} color={themeColors.tint} />
-              <ThemedText style={styles.resultText} numberOfLines={2}>
-                {suggestion.label}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
+          {/* Capped to the host's reserved keyboard headroom and internally
+              scrollable so every row stays reachable above the keyboard.
+              Nested scroll views don't inherit the parent's tap handling, and
+              Android needs nestedScrollEnabled to scroll inside the form. */}
+          <ScrollView
+            style={styles.resultsScroll}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {visibleResults.map((suggestion, index) => (
+              <TouchableOpacity
+                key={`${suggestion.label}-${index}`}
+                testID={`address-suggestion-${index}`}
+                style={[
+                  styles.resultRow,
+                  index < visibleResults.length - 1 && {
+                    borderBottomColor: themeColors.separator,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                  },
+                ]}
+                onPress={() => handleSelect(suggestion)}
+                accessibilityRole="button"
+                accessibilityLabel={suggestion.label}
+              >
+                <IconSymbol name="location.fill" size={16} color={themeColors.tint} />
+                <ThemedText style={styles.resultText} numberOfLines={2}>
+                  {suggestion.label}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </ThemedView>
       )}
 
@@ -327,6 +386,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  resultsScroll: {
+    // The list must fit inside the band the scaffold clears above the keyboard.
+    maxHeight: DROPDOWN_HEADROOM,
   },
   resultRow: {
     flexDirection: 'row',

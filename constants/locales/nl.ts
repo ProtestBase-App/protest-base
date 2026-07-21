@@ -634,6 +634,10 @@ const nl = {
     addressError: 'Adressen zoeken mislukt. Probeer opnieuw.',
     addressUnavailable: 'Adres zoeken is momenteel niet beschikbaar. Je kunt nog steeds opslaan.',
     clearStreetAddressAccessibilityLabel: 'Adres wissen',
+    // Postal confirmation card (filled state)
+    postalFilledFromAddress: 'Automatisch ingevuld op basis van het adres',
+    postalChange: 'Wijzigen',
+    changePostalAccessibilityLabel: 'Postcode wijzigen',
     cityPlaceholder: 'Stad',
     eventLinkPlaceholder: 'https://www.voorbeeld.com',
     selectCoOrganizers: 'Selecteer mede-organiserende groepen',

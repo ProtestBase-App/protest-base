@@ -595,6 +595,10 @@ const fr: LocaleData = {
     addressUnavailable:
       'La recherche d’adresses est indisponible pour le moment. Vous pouvez quand même enregistrer.',
     clearStreetAddressAccessibilityLabel: 'Effacer l’adresse',
+    // Postal confirmation card (filled state)
+    postalFilledFromAddress: 'Rempli automatiquement à partir de l’adresse',
+    postalChange: 'Modifier',
+    changePostalAccessibilityLabel: 'Modifier le code postal',
     organizerNamePlaceholder: 'Nom de votre organisation',
     contactEmailPlaceholder: 'contact@exemple.com',
     helpDescriptionPlaceholder: "Décrivez les bénévoles ou l'aide dont vous avez besoin...",

@@ -18,6 +18,7 @@ import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { getThemeColors } from '@/utils/themeColors';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
@@ -119,6 +120,7 @@ export default function CreateEventModal() {
   } = useUserOrganizations();
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
   const isPresented = router.canGoBack();
   const params = useLocalSearchParams<{ templateId?: string; source?: string }>();
 
@@ -671,7 +673,7 @@ export default function CreateEventModal() {
               accessibilityLabel={t('createEvent.closeAccessibilityLabel')}
               accessibilityRole="button"
             >
-              <IconSymbol name="xmark" size={24} color="#687076" />
+              <IconSymbol name="xmark" size={24} color={themeColors.icon} />
             </TouchableOpacity>
           </ThemedView>
 
@@ -702,7 +704,14 @@ export default function CreateEventModal() {
             testID="btn-create-event-draft"
             title={t('drafts.saveAsDraft')}
             handlePress={submitDraft}
-            containerStyles={styles.buttonDraft}
+            containerStyles={[
+              styles.buttonDraft,
+              {
+                backgroundColor: themeColors.buttonSecondaryBackground,
+                borderColor: themeColors.buttonSecondaryBorder,
+              },
+            ]}
+            textStyles={{ color: themeColors.text }}
             isLoading={isSavingDraft}
           />
 
@@ -737,13 +746,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Slimmer than CustomButton's tall default (containerStyles win over the
+  // base minHeight), matching the edit screens' 48px action buttons.
   button: {
     marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 12,
+    minHeight: 48,
   },
   buttonDraft: {
     marginBottom: 20,
-    backgroundColor: '#687076',
+    minHeight: 48,
+    borderWidth: 1,
   },
   splashContainer: {
     flex: 1,

@@ -19,6 +19,7 @@ import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
+import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -311,8 +312,12 @@ export default function EditEvent() {
               handlePress={() => handleBackPress()}
               containerStyles={[
                 styles.buttonCancel,
-                { backgroundColor: themeColors.buttonSecondaryBackground },
+                {
+                  backgroundColor: themeColors.buttonSecondaryBackground,
+                  borderColor: themeColors.buttonSecondaryBorder,
+                },
               ]}
+              textStyles={{ color: themeColors.text }}
               isLoading={false}
               disabled={isSubmitting}
             />
@@ -386,15 +391,16 @@ const styles = StyleSheet.create({
   closeButtonDisabled: {
     opacity: 0.4,
   },
+  // Slim action bar: equal-width buttons override CustomButton's tall default
+  // (containerStyles win over the base minHeight).
   buttonCancel: {
-    marginVertical: 16,
-    width: '45%',
-    marginLeft: 4,
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
   },
   buttonSave: {
-    marginVertical: 16,
-    width: '45%',
-    marginRight: 4,
+    flex: 1,
+    minHeight: 48,
   },
   splashContainer: {
     flex: 1,
@@ -403,9 +409,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 4,
-    borderTopWidth: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
   },
 });

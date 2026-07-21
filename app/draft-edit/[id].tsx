@@ -26,6 +26,7 @@ import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import type { UpdateEventRequest } from '@/types/event.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
+import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { logger } from '@/utils/logger';
@@ -288,12 +289,19 @@ export default function DraftEdit() {
       <FormScreenScaffold
         scrollViewRef={scrollViewRef}
         footer={
-          <ThemedView style={styles.footer}>
+          <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
             <CustomButton
               testID="btn-draft-save"
               title={t('drafts.save')}
               handlePress={handleSave}
-              containerStyles={styles.buttonSecondary}
+              containerStyles={[
+                styles.buttonSecondary,
+                {
+                  backgroundColor: themeColors.buttonSecondaryBackground,
+                  borderColor: themeColors.buttonSecondaryBorder,
+                },
+              ]}
+              textStyles={{ color: themeColors.text }}
               isLoading={actionBusy}
             />
 
@@ -377,20 +385,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Slim action bar: equal-width buttons override CustomButton's tall default
+  // (containerStyles win over the base minHeight).
   buttonSecondary: {
-    marginVertical: 16,
-    width: '45%',
-    minHeight: 10,
-    height: '80%',
-    marginLeft: 4,
-    backgroundColor: '#687076',
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
   },
   buttonPrimary: {
-    marginVertical: 16,
-    width: '45%',
-    minHeight: 10,
-    height: '80%',
-    marginRight: 4,
+    flex: 1,
+    minHeight: 48,
   },
   splashContainer: {
     flex: 1,
@@ -399,10 +403,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
   },
 });
