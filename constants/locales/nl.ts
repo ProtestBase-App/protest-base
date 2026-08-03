@@ -566,6 +566,8 @@ const nl = {
     location: 'Locatie',
     members: 'Leden',
     loadError: 'Kon de organisatorgegevens niet laden',
+    notFoundTitle: 'Deze organisatie bestaat niet meer',
+    notFoundBody: 'Ze is verwijderd, dus haar profiel is niet langer beschikbaar.',
   },
 
   // ============================================

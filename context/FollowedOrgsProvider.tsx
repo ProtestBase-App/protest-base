@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from 'react';
@@ -18,12 +19,15 @@ import {
 import { logger } from '@/utils/logger';
 
 /**
- * Tracks which organizations the user follows. Device-local; encrypted at rest
- * via expo-secure-store. The server has no per-user "am I following" flag,
- * only the aggregate follower_count.
+ * Device-local organization state: which orgs the user follows, and which the
+ * backend has confirmed no longer exist. Encrypted at rest via
+ * expo-secure-store. The server has no per-user "am I following" flag, only the
+ * aggregate follower_count.
  *
  * Unlike saved/liked events, follows do not have a retention window — orgs
- * don't expire.
+ * don't expire. They can, however, be hard-deleted server-side (an owner
+ * deleting their account takes the org with it), which is what
+ * `markOrganizationDeleted` cleans up after.
  */
 interface FollowedOrgsContextType {
   followedOrgIds: string[];
@@ -31,6 +35,15 @@ interface FollowedOrgsContextType {
   followOrganization: (organizationId: string) => Promise<number | null>;
   unfollowOrganization: (organizationId: string) => Promise<number | null>;
   isFollowing: (organizationId: string) => boolean;
+  /**
+   * Record that the backend confirmed this org is gone (404
+   * ORGANIZATION_NOT_FOUND): drop any follow for it and remember the ID so
+   * callers can skip re-fetching it. No server call — the org no longer exists,
+   * so its follower_count is moot.
+   */
+  markOrganizationDeleted: (organizationId: string) => void;
+  /** Whether this org 404'd earlier in the current app run. */
+  isKnownDeletedOrg: (organizationId: string) => boolean;
   loading: boolean;
 }
 
@@ -39,6 +52,12 @@ const FollowedOrgsContext = createContext<FollowedOrgsContextType | undefined>(u
 export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
   const [followedOrgIds, setFollowedOrgIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Orgs the backend has confirmed are deleted. Session-scoped on purpose: the
+  // follow entry itself is pruned from storage below, so this only has to stop
+  // repeat fetches driven by references we don't own — an organizer link on a
+  // cached event outlives the org it points at.
+  const knownDeletedOrgIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -119,9 +138,42 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
     [followedOrgIds]
   );
 
+  const markOrganizationDeleted = useCallback(
+    (organizationId: string): void => {
+      knownDeletedOrgIdsRef.current.add(organizationId);
+      if (!followedOrgIds.includes(organizationId)) return;
+      const next = followedOrgIds.filter((id) => id !== organizationId);
+      setFollowedOrgIds(next);
+      persist(next);
+      logger.info('[FollowedOrgs] dropped follow for deleted organization', { organizationId });
+    },
+    [followedOrgIds, persist]
+  );
+
+  const isKnownDeletedOrg = useCallback(
+    (organizationId: string): boolean => knownDeletedOrgIdsRef.current.has(organizationId),
+    []
+  );
+
   const value = useMemo<FollowedOrgsContextType>(
-    () => ({ followedOrgIds, followOrganization, unfollowOrganization, isFollowing, loading }),
-    [followedOrgIds, followOrganization, unfollowOrganization, isFollowing, loading]
+    () => ({
+      followedOrgIds,
+      followOrganization,
+      unfollowOrganization,
+      isFollowing,
+      markOrganizationDeleted,
+      isKnownDeletedOrg,
+      loading,
+    }),
+    [
+      followedOrgIds,
+      followOrganization,
+      unfollowOrganization,
+      isFollowing,
+      markOrganizationDeleted,
+      isKnownDeletedOrg,
+      loading,
+    ]
   );
 
   return <FollowedOrgsContext.Provider value={value}>{children}</FollowedOrgsContext.Provider>;

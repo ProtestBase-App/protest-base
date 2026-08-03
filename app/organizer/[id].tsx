@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
   StyleSheet,
@@ -21,7 +21,7 @@ import { useFollowedOrgs } from '@/context/FollowedOrgsProvider';
 import { DEFAULT_EXPLORE_FILTERS, useExploreTabContext } from '@/context/ExploreTabProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { getEventsBackend } from '@/services/event.service';
-import { getOrganizationById } from '@/services/organizer.service';
+import { getOrganizationById, OrganizationNotFoundError } from '@/services/organizer.service';
 import { OrganizationDetail } from '@/types/organization.types';
 import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
@@ -33,6 +33,22 @@ import { logger } from '@/utils/logger';
 import { useLogoScheme } from '@/hooks/useLogoScheme';
 
 const UPCOMING_PREVIEW_COUNT = 3;
+
+/**
+ * Tolerant 404 detection, mirroring SavedEventsProvider's: duck-types the error
+ * code so it still matches when a test mock substitutes a stand-in class that
+ * isn't reference-equal to the real `OrganizationNotFoundError`.
+ */
+function isOrganizationNotFoundError(err: unknown): boolean {
+  if (typeof OrganizationNotFoundError === 'function' && err instanceof OrganizationNotFoundError) {
+    return true;
+  }
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: unknown }).code === 'ORGANIZATION_NOT_FOUND'
+  );
+}
 
 // Rotating palette for the event card icon — cycled by index so consecutive
 // events look distinct. Values are intentionally bright enough to read on dark
@@ -59,6 +75,8 @@ export default function OrganizerProfile() {
     followOrganization,
     unfollowOrganization,
     isFollowing: isFollowingOrg,
+    markOrganizationDeleted,
+    isKnownDeletedOrg,
   } = useFollowedOrgs();
   const { getSubMunicipalityName } = usePostalCodes();
   const { setAppliedFilters, setSearchQuery, setShouldScrollToTop } = useExploreTabContext();
@@ -68,6 +86,9 @@ export default function OrganizerProfile() {
 
   const [detail, setDetail] = useState<OrganizationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
+  // Seeded from the dead-org set: a revisit paints the gone state on the first
+  // frame instead of flashing the profile skeleton until the effect runs.
+  const [notFound, setNotFound] = useState(() => (orgId ? isKnownDeletedOrg(orgId) : false));
   const [followerCount, setFollowerCount] = useState<number>(0);
 
   const [upcomingEvents, setUpcomingEvents] = useState<FormattedEvent[]>([]);
@@ -77,10 +98,28 @@ export default function OrganizerProfile() {
 
   const isFollowing = orgId ? isFollowingOrg(orgId) : false;
 
+  // Latest-ref: markOrganizationDeleted's identity changes whenever the follow
+  // list does, and neither belongs in the fetch effects' deps — a change there
+  // would refire the very request this is meant to stop.
+  const orgStateRef = useRef({ markOrganizationDeleted, isKnownDeletedOrg });
+  useEffect(() => {
+    orgStateRef.current = { markOrganizationDeleted, isKnownDeletedOrg };
+  }, [markOrganizationDeleted, isKnownDeletedOrg]);
+
   // Load rich organization detail. Silently falls back to the cached listing
   // entry if the detail endpoint fails (keeps Name rendering even without bio).
   useEffect(() => {
     if (!orgId) return;
+    // Keep this per-id: if the screen instance is ever reused for a different
+    // org, a previous 404 must not label the new one as deleted.
+    setNotFound(false);
+    // Confirmed gone earlier this run — don't ask the backend again.
+    if (orgStateRef.current.isKnownDeletedOrg(orgId)) {
+      setNotFound(true);
+      setDetailLoading(false);
+      setEventsLoading(false);
+      return;
+    }
     setDetailLoading(true);
     getOrganizationById(orgId)
       .then((data) => {
@@ -89,6 +128,14 @@ export default function OrganizerProfile() {
         if (data.avatar) setOrganizerAvatar(data.avatar);
       })
       .catch((err) => {
+        // Only a 404 carrying ORGANIZATION_NOT_FOUND proves the org is gone.
+        // Anything else (offline, 5xx) keeps the cached-listing fallback so a
+        // transient failure can't present a live org as deleted.
+        if (isOrganizationNotFoundError(err)) {
+          setNotFound(true);
+          orgStateRef.current.markOrganizationDeleted(orgId);
+          return;
+        }
         logger.warn('[OrganizerProfile] Failed to load detail', { error: err });
       })
       .finally(() => setDetailLoading(false));
@@ -96,6 +143,10 @@ export default function OrganizerProfile() {
 
   useEffect(() => {
     if (!orgId) return;
+    if (orgStateRef.current.isKnownDeletedOrg(orgId)) {
+      setEventsLoading(false);
+      return;
+    }
     setEventsLoading(true);
     getEventsBackend({
       organizationId: orgId,
@@ -206,286 +257,321 @@ export default function OrganizerProfile() {
             </TouchableOpacity>
             <RNImage source={logo} style={styles.navLogo} resizeMode="contain" />
             <View style={styles.navRight}>
-              <TouchableOpacity
-                onPress={handleShare}
-                style={styles.navIconButton}
-                accessibilityRole="button"
-              >
-                <IconSymbol
-                  name="square.and.arrow.up"
-                  size={IconSizes.lg}
-                  color={themeColors.text}
-                />
-              </TouchableOpacity>
+              {!notFound && (
+                <TouchableOpacity
+                  onPress={handleShare}
+                  style={styles.navIconButton}
+                  accessibilityRole="button"
+                >
+                  <IconSymbol
+                    name="square.and.arrow.up"
+                    size={IconSizes.lg}
+                    color={themeColors.text}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            <View style={styles.identity}>
-              <OrganizerAvatar avatarUrl={organizerAvatar} name={name} size={88} />
-              <View style={styles.orgNameRow}>
-                <ThemedText style={styles.orgName}>{name}</ThemedText>
-                {isVerified && (
-                  <IconSymbol
-                    name="checkmark.shield"
-                    size={IconSizes.md}
-                    color={themeColors.tint}
-                    style={styles.verifiedIcon}
-                  />
-                )}
-              </View>
-              <ThemedText style={[styles.memberSinceText, { color: themeColors.subtleText }]}>
-                {t('organizer.memberSince')} {memberSince}
-              </ThemedText>
-            </View>
-
-            <View
-              style={[
-                styles.statsRow,
-                {
-                  backgroundColor: themeColors.cardBackground,
-                  borderColor: themeColors.cardBorder,
-                },
-              ]}
+          {notFound ? (
+            // The whole body is withheld, not just the About card: the Follow
+            // button and "See all events" would otherwise keep firing requests
+            // for an ID the backend has already told us is gone.
+            <ThemedView
+              style={styles.notFoundContainer}
+              // `accessible` is what makes the combined label below the single
+              // announcement; without it the label is ignored and the icon,
+              // title and body are read as three separate elements.
+              accessible
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={`${t('organizer.notFoundTitle')}. ${t('organizer.notFoundBody')}`}
             >
-              <StatItem
-                label={t('organizer.events')}
-                value={
-                  totalEventCount === null || totalEventCount === undefined
-                    ? '…'
-                    : String(totalEventCount)
-                }
+              <IconSymbol
+                name="exclamationmark.triangle"
+                size={44}
+                color={themeColors.subtleText}
               />
-              <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
-              <StatItem label={t('organizer.followers')} value={String(followerCount)} />
-              {typeof detail?.member_count === 'number' && (
-                <>
-                  <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
-                  <StatItem label={t('organizer.members')} value={String(detail.member_count)} />
-                </>
-              )}
-            </View>
-
-            {/* Follow button. Backend handles auth-gated behaviour (guest: direct
-                ±1; signed-in: 24h dedup per user). */}
-            <TouchableOpacity
-              style={[
-                styles.followButton,
-                {
-                  backgroundColor: isFollowing
-                    ? themeColors.buttonSecondaryBackground
-                    : themeColors.tint,
-                  borderColor: isFollowing ? themeColors.cardBorder : 'transparent',
-                  borderWidth: isFollowing ? 1 : 0,
-                },
-              ]}
-              onPress={handleFollow}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-            >
-              <ThemedText
-                style={[
-                  styles.followButtonText,
-                  { color: isFollowing ? themeColors.text : 'white' },
-                ]}
-              >
-                {isFollowing ? t('organizer.following') : t('organizer.follow')}
+              <ThemedText style={styles.notFoundTitle}>{t('organizer.notFoundTitle')}</ThemedText>
+              <ThemedText style={[styles.notFoundBody, { color: themeColors.subtleText }]}>
+                {t('organizer.notFoundBody')}
               </ThemedText>
-            </TouchableOpacity>
-
-            <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <ThemedText style={styles.sectionTitle}>{t('organizer.upcomingEvents')}</ThemedText>
-                {!eventsLoading && eventCount !== null && eventCount > 0 && (
-                  <TouchableOpacity
-                    onPress={handleSeeAllEvents}
-                    accessibilityRole="button"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <ThemedText style={[styles.seeAllText, { color: themeColors.tint }]}>
-                      {t('organizer.seeAll')}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
+            </ThemedView>
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              <View style={styles.identity}>
+                <OrganizerAvatar avatarUrl={organizerAvatar} name={name} size={88} />
+                <View style={styles.orgNameRow}>
+                  <ThemedText style={styles.orgName}>{name}</ThemedText>
+                  {isVerified && (
+                    <IconSymbol
+                      name="checkmark.shield"
+                      size={IconSizes.md}
+                      color={themeColors.tint}
+                      style={styles.verifiedIcon}
+                    />
+                  )}
+                </View>
+                <ThemedText style={[styles.memberSinceText, { color: themeColors.subtleText }]}>
+                  {t('organizer.memberSince')} {memberSince}
+                </ThemedText>
               </View>
 
-              {eventsLoading ? (
-                <ActivityIndicator
-                  size="small"
-                  color={themeColors.tint}
-                  style={styles.eventsLoader}
-                />
-              ) : upcomingEvents.length === 0 ? (
-                <ThemedText style={[styles.emptyText, { color: themeColors.subtleText }]}>
-                  {t('organizer.noUpcomingEvents')}
-                </ThemedText>
-              ) : (
-                upcomingEvents.slice(0, UPCOMING_PREVIEW_COUNT).map((ev, index) => {
-                  const palette = EVENT_CARD_PALETTE[index % EVENT_CARD_PALETTE.length];
-                  const location = formatEventLocation(ev);
-                  return (
-                    <TouchableOpacity
-                      key={ev.$id}
-                      style={[
-                        styles.eventCard,
-                        {
-                          backgroundColor: themeColors.cardBackground,
-                          borderColor: themeColors.cardBorder,
-                        },
-                      ]}
-                      onPress={() => router.push(DynamicRoutes.event(ev.$id))}
-                      activeOpacity={0.75}
-                    >
-                      <View
-                        style={[
-                          styles.eventIconBox,
-                          { backgroundColor: palette.bg, borderColor: palette.border },
-                        ]}
-                      >
-                        <View style={[styles.eventIconDot, { backgroundColor: palette.dot }]} />
-                      </View>
-                      <View style={styles.eventCardText}>
-                        <ThemedText style={styles.eventCardTitle} numberOfLines={2}>
-                          {ev.title}
-                        </ThemedText>
-                        <ThemedText
-                          style={[styles.eventCardMeta, { color: themeColors.subtleText }]}
-                          numberOfLines={1}
-                        >
-                          {ev.start_date}
-                          {ev.start_time ? ` · ${ev.start_time}` : ''}
-                        </ThemedText>
-                        {location ? (
-                          <ThemedText
-                            style={[styles.eventCardMeta, { color: themeColors.subtleText }]}
-                            numberOfLines={1}
-                          >
-                            {location}
-                          </ThemedText>
-                        ) : null}
-                      </View>
-                      <IconSymbol
-                        name="chevron.right"
-                        size={IconSizes.md}
-                        color={themeColors.chevron}
-                      />
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <ThemedText style={[styles.sectionTitle, styles.aboutTitle]}>
-                {t('organizer.about')}
-              </ThemedText>
               <View
                 style={[
-                  styles.aboutCard,
+                  styles.statsRow,
                   {
                     backgroundColor: themeColors.cardBackground,
                     borderColor: themeColors.cardBorder,
                   },
                 ]}
               >
-                {detailLoading && !detail ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={themeColors.tint}
-                    style={styles.aboutLoader}
-                  />
-                ) : (
+                <StatItem
+                  label={t('organizer.events')}
+                  value={
+                    totalEventCount === null || totalEventCount === undefined
+                      ? '…'
+                      : String(totalEventCount)
+                  }
+                />
+                <View style={[styles.statDivider, { backgroundColor: themeColors.separator }]} />
+                <StatItem label={t('organizer.followers')} value={String(followerCount)} />
+                {typeof detail?.member_count === 'number' && (
                   <>
-                    <ThemedText style={[styles.bioText, { color: themeColors.text }]}>
-                      {bio?.trim() ? bio : t('organizer.noBio')}
-                    </ThemedText>
-
-                    {(location || websiteUrl || isVerified || memberSinceSource) && (
-                      <View
-                        style={[styles.aboutSeparator, { backgroundColor: themeColors.separator }]}
-                      />
-                    )}
-
-                    {location ? (
-                      <View style={styles.aboutRow}>
-                        <IconSymbol
-                          name="location.fill"
-                          size={IconSizes.md}
-                          color={themeColors.subtleText}
-                        />
-                        <ThemedText
-                          style={[styles.aboutText, { color: themeColors.secondaryText }]}
-                        >
-                          {location}
-                        </ThemedText>
-                      </View>
-                    ) : null}
-
-                    {websiteUrl ? (
-                      <TouchableOpacity
-                        style={styles.aboutRow}
-                        onPress={() => {
-                          if (!websiteUrl) return;
-                          // website_url is organizer-supplied (untrusted); only
-                          // open plain http(s) links so a crafted value cannot
-                          // trigger arbitrary scheme handling on the device.
-                          void openExternalUrlSafely(websiteUrl, 'organizer-website');
-                        }}
-                        accessibilityRole="link"
-                      >
-                        <IconSymbol
-                          name="globe.europe.africa"
-                          size={IconSizes.md}
-                          color={themeColors.tint}
-                        />
-                        <ThemedText
-                          style={[styles.aboutText, { color: themeColors.tint }]}
-                          numberOfLines={1}
-                        >
-                          {websiteUrl}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    ) : null}
-
-                    {isVerified ? (
-                      <View style={styles.aboutRow}>
-                        <IconSymbol
-                          name="checkmark.shield"
-                          size={IconSizes.md}
-                          color={themeColors.tint}
-                        />
-                        <ThemedText
-                          style={[styles.aboutText, { color: themeColors.secondaryText }]}
-                        >
-                          {t('organizer.verifiedOrganizer')}
-                        </ThemedText>
-                      </View>
-                    ) : null}
-
-                    {memberSinceSource ? (
-                      <View style={styles.aboutRow}>
-                        <IconSymbol
-                          name="calendar"
-                          size={IconSizes.md}
-                          color={themeColors.subtleText}
-                        />
-                        <ThemedText
-                          style={[styles.aboutText, { color: themeColors.secondaryText }]}
-                        >
-                          {t('organizer.memberSince')} {memberSince}
-                        </ThemedText>
-                      </View>
-                    ) : null}
+                    <View
+                      style={[styles.statDivider, { backgroundColor: themeColors.separator }]}
+                    />
+                    <StatItem label={t('organizer.members')} value={String(detail.member_count)} />
                   </>
                 )}
               </View>
-            </View>
 
-            <View style={styles.bottomPadding} />
-          </ScrollView>
+              {/* Follow button. Backend handles auth-gated behaviour (guest: direct
+                ±1; signed-in: 24h dedup per user). */}
+              <TouchableOpacity
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: isFollowing
+                      ? themeColors.buttonSecondaryBackground
+                      : themeColors.tint,
+                    borderColor: isFollowing ? themeColors.cardBorder : 'transparent',
+                    borderWidth: isFollowing ? 1 : 0,
+                  },
+                ]}
+                onPress={handleFollow}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+              >
+                <ThemedText
+                  style={[
+                    styles.followButtonText,
+                    { color: isFollowing ? themeColors.text : 'white' },
+                  ]}
+                >
+                  {isFollowing ? t('organizer.following') : t('organizer.follow')}
+                </ThemedText>
+              </TouchableOpacity>
+
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <ThemedText style={styles.sectionTitle}>
+                    {t('organizer.upcomingEvents')}
+                  </ThemedText>
+                  {!eventsLoading && eventCount !== null && eventCount > 0 && (
+                    <TouchableOpacity
+                      onPress={handleSeeAllEvents}
+                      accessibilityRole="button"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <ThemedText style={[styles.seeAllText, { color: themeColors.tint }]}>
+                        {t('organizer.seeAll')}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {eventsLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={themeColors.tint}
+                    style={styles.eventsLoader}
+                  />
+                ) : upcomingEvents.length === 0 ? (
+                  <ThemedText style={[styles.emptyText, { color: themeColors.subtleText }]}>
+                    {t('organizer.noUpcomingEvents')}
+                  </ThemedText>
+                ) : (
+                  upcomingEvents.slice(0, UPCOMING_PREVIEW_COUNT).map((ev, index) => {
+                    const palette = EVENT_CARD_PALETTE[index % EVENT_CARD_PALETTE.length];
+                    const location = formatEventLocation(ev);
+                    return (
+                      <TouchableOpacity
+                        key={ev.$id}
+                        style={[
+                          styles.eventCard,
+                          {
+                            backgroundColor: themeColors.cardBackground,
+                            borderColor: themeColors.cardBorder,
+                          },
+                        ]}
+                        onPress={() => router.push(DynamicRoutes.event(ev.$id))}
+                        activeOpacity={0.75}
+                      >
+                        <View
+                          style={[
+                            styles.eventIconBox,
+                            { backgroundColor: palette.bg, borderColor: palette.border },
+                          ]}
+                        >
+                          <View style={[styles.eventIconDot, { backgroundColor: palette.dot }]} />
+                        </View>
+                        <View style={styles.eventCardText}>
+                          <ThemedText style={styles.eventCardTitle} numberOfLines={2}>
+                            {ev.title}
+                          </ThemedText>
+                          <ThemedText
+                            style={[styles.eventCardMeta, { color: themeColors.subtleText }]}
+                            numberOfLines={1}
+                          >
+                            {ev.start_date}
+                            {ev.start_time ? ` · ${ev.start_time}` : ''}
+                          </ThemedText>
+                          {location ? (
+                            <ThemedText
+                              style={[styles.eventCardMeta, { color: themeColors.subtleText }]}
+                              numberOfLines={1}
+                            >
+                              {location}
+                            </ThemedText>
+                          ) : null}
+                        </View>
+                        <IconSymbol
+                          name="chevron.right"
+                          size={IconSizes.md}
+                          color={themeColors.chevron}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+
+              <View style={styles.section}>
+                <ThemedText style={[styles.sectionTitle, styles.aboutTitle]}>
+                  {t('organizer.about')}
+                </ThemedText>
+                <View
+                  style={[
+                    styles.aboutCard,
+                    {
+                      backgroundColor: themeColors.cardBackground,
+                      borderColor: themeColors.cardBorder,
+                    },
+                  ]}
+                >
+                  {detailLoading && !detail ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={themeColors.tint}
+                      style={styles.aboutLoader}
+                    />
+                  ) : (
+                    <>
+                      <ThemedText style={[styles.bioText, { color: themeColors.text }]}>
+                        {bio?.trim() ? bio : t('organizer.noBio')}
+                      </ThemedText>
+
+                      {(location || websiteUrl || isVerified || memberSinceSource) && (
+                        <View
+                          style={[
+                            styles.aboutSeparator,
+                            { backgroundColor: themeColors.separator },
+                          ]}
+                        />
+                      )}
+
+                      {location ? (
+                        <View style={styles.aboutRow}>
+                          <IconSymbol
+                            name="location.fill"
+                            size={IconSizes.md}
+                            color={themeColors.subtleText}
+                          />
+                          <ThemedText
+                            style={[styles.aboutText, { color: themeColors.secondaryText }]}
+                          >
+                            {location}
+                          </ThemedText>
+                        </View>
+                      ) : null}
+
+                      {websiteUrl ? (
+                        <TouchableOpacity
+                          style={styles.aboutRow}
+                          onPress={() => {
+                            if (!websiteUrl) return;
+                            // website_url is organizer-supplied (untrusted); only
+                            // open plain http(s) links so a crafted value cannot
+                            // trigger arbitrary scheme handling on the device.
+                            void openExternalUrlSafely(websiteUrl, 'organizer-website');
+                          }}
+                          accessibilityRole="link"
+                        >
+                          <IconSymbol
+                            name="globe.europe.africa"
+                            size={IconSizes.md}
+                            color={themeColors.tint}
+                          />
+                          <ThemedText
+                            style={[styles.aboutText, { color: themeColors.tint }]}
+                            numberOfLines={1}
+                          >
+                            {websiteUrl}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      ) : null}
+
+                      {isVerified ? (
+                        <View style={styles.aboutRow}>
+                          <IconSymbol
+                            name="checkmark.shield"
+                            size={IconSizes.md}
+                            color={themeColors.tint}
+                          />
+                          <ThemedText
+                            style={[styles.aboutText, { color: themeColors.secondaryText }]}
+                          >
+                            {t('organizer.verifiedOrganizer')}
+                          </ThemedText>
+                        </View>
+                      ) : null}
+
+                      {memberSinceSource ? (
+                        <View style={styles.aboutRow}>
+                          <IconSymbol
+                            name="calendar"
+                            size={IconSizes.md}
+                            color={themeColors.subtleText}
+                          />
+                          <ThemedText
+                            style={[styles.aboutText, { color: themeColors.secondaryText }]}
+                          >
+                            {t('organizer.memberSince')} {memberSince}
+                          </ThemedText>
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.bottomPadding} />
+            </ScrollView>
+          )}
         </ThemedView>
       </SafeAreaView>
     </ThemedView>
@@ -705,5 +791,24 @@ const styles = StyleSheet.create({
 
   bottomPadding: {
     height: 32,
+  },
+
+  notFoundContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.md,
+  },
+  notFoundTitle: {
+    fontFamily: Typography.families.bold,
+    fontSize: Typography.sizes.lg,
+    textAlign: 'center',
+  },
+  notFoundBody: {
+    fontFamily: Typography.families.regular,
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

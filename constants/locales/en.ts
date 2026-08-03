@@ -530,6 +530,8 @@ const en: LocaleData = {
     location: 'Location',
     members: 'Members',
     loadError: 'Could not load organizer details',
+    notFoundTitle: 'This organization no longer exists',
+    notFoundBody: 'It has been removed, so its profile is no longer available.',
   },
 
   // ============================================

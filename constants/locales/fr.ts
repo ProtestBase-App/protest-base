@@ -533,6 +533,8 @@ const fr: LocaleData = {
     location: 'Lieu',
     members: 'Membres',
     loadError: "Impossible de charger les détails de l'organisateur",
+    notFoundTitle: "Cette organisation n'existe plus",
+    notFoundBody: "Elle a été supprimée, son profil n'est donc plus disponible.",
   },
 
   // ============================================
