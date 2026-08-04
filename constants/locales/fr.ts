@@ -80,6 +80,7 @@ const fr: LocaleData = {
     confirmFilters: 'Confirmer les filtres',
     searchPlaceholder: 'Tapez au moins 2 caractères pour rechercher...',
     searchOrganizations: 'Rechercher des organisations...',
+    loadingOrganizations: 'Chargement des organisations…',
     postalCodesCount: '{{count}} codes postaux',
     selectionTooBroad:
       'Sélection trop large — choisissez moins de zones ou des zones plus petites.',

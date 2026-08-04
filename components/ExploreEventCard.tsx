@@ -16,7 +16,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { getCategoryColors } from '@/constants/CategoryColors';
+import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, BorderRadius, Shadows } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { isEventInProgress } from '@/utils/calendarTabUtils';
@@ -127,9 +127,9 @@ function ExploreEventCard({
                       type="categoryBadge"
                       style={{ color: categoryColors.color }}
                       accessibilityRole="text"
-                      accessibilityLabel={`Category: ${t(`categories.${category.toLowerCase()}`)}`}
+                      accessibilityLabel={`Category: ${formatCategoryLabel(category)}`}
                     >
-                      {t(`categories.${category.toLowerCase()}`)}
+                      {formatCategoryLabel(category)}
                     </ThemedText>
                   </ThemedView>
                 );

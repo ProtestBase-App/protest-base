@@ -219,7 +219,10 @@ export default function OrganizerProfile() {
 
   // Prefer detail fields (richer); fall back to the cached listing entry when
   // detail hasn't loaded or 404'd. createdAt is the same on both by design.
-  const name = detail?.Name ?? cachedOrg?.Name ?? '—';
+  // The listing cache is now filled lazily, so on a first run it is usually
+  // empty here — render nothing rather than flashing a dash that the detail
+  // response replaces a moment later.
+  const name = detail?.Name ?? cachedOrg?.Name ?? (detailLoading ? '' : '—');
   const memberSinceSource = detail?.$createdAt ?? cachedOrg?.$createdAt;
   const memberSince = memberSinceSource
     ? new Date(memberSinceSource).toLocaleDateString(userLanguage, {

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { getCategoryColors } from '@/constants/CategoryColors';
+import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { Event } from '@/types/event.types';
 import { formatCompactCount } from '@/utils/calendarTabUtils';
@@ -53,9 +53,7 @@ function MapEventCard({
 
   const displayedCategory = displayCategory ?? event.categories?.[0];
   const categoryColors = getCategoryColors(displayedCategory);
-  const categoryLabel = displayedCategory
-    ? t('categories.' + displayedCategory.toLowerCase())
-    : null;
+  const categoryLabel = displayedCategory ? formatCategoryLabel(displayedCategory) : null;
 
   const dateLabel = formatMapCardDateLabel(event, userLanguage, todayKey, t('maps.today'));
   const timeLabel = formatEventTime(event.start_time, userLanguage);

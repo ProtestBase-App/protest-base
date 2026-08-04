@@ -73,7 +73,18 @@ const EventForm: React.FC<EventFormProps> = ({
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
-  const { dropdownItems: organizations, loading: organizationsLoading } = useOrganizations();
+  const {
+    dropdownItems: organizations,
+    loading: organizationsLoading,
+    ensureOrganizations,
+  } = useOrganizations();
+
+  // The listing is not fetched at app start; the co-organizer picker below is
+  // the form's reason to need it.
+  React.useEffect(() => {
+    ensureOrganizations();
+  }, [ensureOrganizations]);
+
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
   const [isPickingImage, setIsPickingImage] = React.useState(false);

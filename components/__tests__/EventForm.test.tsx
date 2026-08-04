@@ -76,6 +76,7 @@ jest.mock('@/context/OrganizationsProvider', () => ({
       { label: 'Org B', value: 'org-b' },
     ],
     loading: false,
+    ensureOrganizations: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -1658,6 +1659,7 @@ describe('EventForm — organizations loading state', () => {
     useOrganizations.mockReturnValue({
       dropdownItems: [],
       loading: true,
+      ensureOrganizations: jest.fn().mockResolvedValue(undefined),
     });
 
     render(
@@ -1902,6 +1904,7 @@ describe('EventForm — co-organizer search selection', () => {
         { label: 'Org B', value: 'org-b' },
       ],
       loading: false,
+      ensureOrganizations: jest.fn().mockResolvedValue(undefined),
     });
   });
   afterEach(() => jest.clearAllMocks());
@@ -1951,6 +1954,7 @@ describe('EventForm — co-organizer cap', () => {
         { label: 'Org B', value: 'org-b' },
       ],
       loading: false,
+      ensureOrganizations: jest.fn().mockResolvedValue(undefined),
     });
   });
   afterEach(() => jest.clearAllMocks());

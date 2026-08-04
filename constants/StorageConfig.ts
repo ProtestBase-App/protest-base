@@ -40,6 +40,12 @@ export const STORAGE_KEYS = {
   // HOME_AREA below, it holds only public data (explore/maps/calendar work
   // logged-out), so it is deliberately NOT in USER_DATA_KEYS and survives logout.
   EVENTS_CACHE: 'eventsCache',
+  // Public organization listing snapshot. Fetched lazily (first filter sheet or
+  // event form), then served from disk so later launches paint the dropdowns
+  // without a network walk. Public data like EVENTS_CACHE above, so deliberately
+  // NOT in USER_DATA_KEYS — it survives logout.
+  ORGANIZATIONS_CACHE: 'organizationsCache',
+  ORGANIZATIONS_CACHE_TIMESTAMP: 'organizationsCacheTimestamp',
   API_PREFIX: 'apiPrefix',
   HOME_VIEW_PREFERENCE: 'homeViewPreference',
   NOTIFICATION_PERMISSION_REQUESTED: 'notificationPermissionRequested',

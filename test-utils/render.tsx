@@ -127,6 +127,7 @@ export interface MockOrganizationsContext {
   dropdownItems?: any[];
   loading?: boolean;
   error?: string | null;
+  ensureOrganizations?: jest.Mock;
   refreshOrganizations?: jest.Mock;
 }
 
@@ -285,6 +286,7 @@ const defaultOrganizationsContext: Required<MockOrganizationsContext> = {
   dropdownItems: [],
   loading: false,
   error: null,
+  ensureOrganizations: jest.fn().mockResolvedValue(undefined),
   refreshOrganizations: jest.fn().mockResolvedValue(undefined),
 };
 

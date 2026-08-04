@@ -14,6 +14,9 @@ describe('mapHelpers.openMap', () => {
   let openURLSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    // openMap arms a real 3s cooldown timer; on real timers it outlives the run
+    // and Jest force-exits the worker.
+    jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     __resetMapCooldownForTests();
     openURLSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   });
@@ -45,7 +48,6 @@ describe('mapHelpers.openMap', () => {
   });
 
   it('resets cooldown after 3 seconds', () => {
-    jest.useFakeTimers();
     openMap(50.85, 4.35, 'A');
     expect(openURLSpy).toHaveBeenCalledTimes(1);
 

@@ -102,8 +102,15 @@ describe('UpcomingEventsList', () => {
   });
 
   it('renders category badge', () => {
+    render(
+      <UpcomingEventsList events={[makeEvent({ categories: ['Protest'] })]} userLanguage="en" />
+    );
+    expect(screen.getByText('Protest')).toBeTruthy();
+  });
+
+  it('renders a non-canonical category verbatim instead of the translation key', () => {
     render(<UpcomingEventsList events={[makeEvent()]} userLanguage="en" />);
-    expect(screen.getByText('categories.climate')).toBeTruthy();
+    expect(screen.getByText('Climate')).toBeTruthy();
   });
 
   it('renders view count', () => {
