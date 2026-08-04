@@ -72,13 +72,19 @@ export function ExploreFiltersSheet({
     isLocationSelectionTooBroad,
     loading,
   } = usePostalCodes();
-  const { dropdownItems } = useOrganizations();
+  const { dropdownItems, loading: organizationsLoading, ensureOrganizations } = useOrganizations();
 
   const [draft, setDraft] = useState<ExploreAppliedFilters>(initialFilters);
 
   useEffect(() => {
     if (visible) setDraft(initialFilters);
   }, [visible, initialFilters]);
+
+  // The listing is not fetched at app start — opening the sheet is what makes
+  // it needed.
+  useEffect(() => {
+    if (visible) ensureOrganizations();
+  }, [visible, ensureOrganizations]);
 
   const toggleCategory = useCallback((value: string) => {
     setDraft((prev) => ({ ...prev, category: prev.category === value ? null : value }));
@@ -259,6 +265,8 @@ export function ExploreFiltersSheet({
           resolveSelectedLabel={resolveOrganizationLabel}
           leadingIconName="person"
           minSearchLength={0}
+          loading={organizationsLoading}
+          loadingText={t('filters.loadingOrganizations')}
         />
       </View>
 

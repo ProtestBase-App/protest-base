@@ -22,7 +22,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
-import { getCategoryColors } from '@/constants/CategoryColors';
+import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { countries } from '@/constants/Countries';
 import { CoOrganizerAvatar } from '@/types/event.types';
 import { FormattedEvent, parseAsUTC } from '@/utils/eventFormatters';
@@ -613,9 +613,9 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       type="categoryBadge"
                       style={{ color: categoryColors.color }}
                       accessibilityRole="text"
-                      accessibilityLabel={`Category: ${t(`categories.${category.toLowerCase()}`)}`}
+                      accessibilityLabel={`Category: ${formatCategoryLabel(category)}`}
                     >
-                      {t(`categories.${category.toLowerCase()}`)}
+                      {formatCategoryLabel(category)}
                     </ThemedText>
                   </View>
                 );

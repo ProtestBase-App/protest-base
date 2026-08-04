@@ -77,6 +77,8 @@ export interface MockFollowedOrgsContext {
   followOrganization?: jest.Mock;
   unfollowOrganization?: jest.Mock;
   isFollowing?: jest.Mock;
+  markOrganizationDeleted?: jest.Mock;
+  isKnownDeletedOrg?: jest.Mock;
   loading?: boolean;
 }
 
@@ -125,6 +127,7 @@ export interface MockOrganizationsContext {
   dropdownItems?: any[];
   loading?: boolean;
   error?: string | null;
+  ensureOrganizations?: jest.Mock;
   refreshOrganizations?: jest.Mock;
 }
 
@@ -238,6 +241,8 @@ const defaultFollowedOrgsContext: Required<MockFollowedOrgsContext> = {
   followOrganization: jest.fn().mockResolvedValue(null),
   unfollowOrganization: jest.fn().mockResolvedValue(null),
   isFollowing: jest.fn().mockReturnValue(false),
+  markOrganizationDeleted: jest.fn(),
+  isKnownDeletedOrg: jest.fn().mockReturnValue(false),
   loading: false,
 };
 
@@ -281,6 +286,7 @@ const defaultOrganizationsContext: Required<MockOrganizationsContext> = {
   dropdownItems: [],
   loading: false,
   error: null,
+  ensureOrganizations: jest.fn().mockResolvedValue(undefined),
   refreshOrganizations: jest.fn().mockResolvedValue(undefined),
 };
 

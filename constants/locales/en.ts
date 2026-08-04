@@ -80,6 +80,7 @@ const en: LocaleData = {
     confirmFilters: 'Confirm Filters',
     searchPlaceholder: 'Type at least 2 characters to search...',
     searchOrganizations: 'Search organizations...',
+    loadingOrganizations: 'Loading organizations…',
     postalCodesCount: '{{count}} postal codes',
     selectionTooBroad: 'Selection too broad — pick fewer or smaller areas.',
   },
@@ -530,6 +531,8 @@ const en: LocaleData = {
     location: 'Location',
     members: 'Members',
     loadError: 'Could not load organizer details',
+    notFoundTitle: 'This organization no longer exists',
+    notFoundBody: 'It has been removed, so its profile is no longer available.',
   },
 
   // ============================================

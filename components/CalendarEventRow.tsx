@@ -13,7 +13,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { getCategoryColors } from '@/constants/CategoryColors';
+import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
@@ -167,7 +167,7 @@ function CalendarEventRow({
             {displayedCategory && (
               <View style={[styles.badge, { backgroundColor: categoryColors.badgeBg }]}>
                 <ThemedText style={[styles.badgeText, { color: categoryColors.color }]}>
-                  {t(`categories.${displayedCategory.toLowerCase()}`)}
+                  {formatCategoryLabel(displayedCategory)}
                 </ThemedText>
               </View>
             )}

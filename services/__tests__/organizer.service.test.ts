@@ -27,6 +27,8 @@ import {
   getOrganizersBackend,
   getAllOrganizers,
   getMyOrganizations,
+  getOrganizationById,
+  OrganizationNotFoundError,
 } from '@/services/organizer.service';
 import type { UserOrganization } from '@/types/organization.types';
 
@@ -384,6 +386,95 @@ describe('organizer.service', () => {
       mockApi.get.mockRejectedValueOnce({});
 
       await expect(getMyOrganizations()).rejects.toThrow('Failed to fetch user organizations');
+    });
+  });
+
+  describe('getOrganizationById', () => {
+    it('returns the detail payload on success', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'org-1', Name: 'Org org-1', follower_count: 3 } },
+      });
+
+      const result = await getOrganizationById('org-1');
+
+      expect(result.$id).toBe('org-1');
+      expect(mockApi.get).toHaveBeenCalledWith('/organizations/org-1');
+    });
+
+    it('throws OrganizationNotFoundError on a 404 carrying ORGANIZATION_NOT_FOUND', async () => {
+      mockApi.get.mockRejectedValueOnce({
+        response: {
+          status: 404,
+          data: { success: false, code: 'ORGANIZATION_NOT_FOUND', statusCode: 404 },
+        },
+      });
+
+      await expect(getOrganizationById('dead-org')).rejects.toBeInstanceOf(
+        OrganizationNotFoundError
+      );
+    });
+
+    it('exposes the ORGANIZATION_NOT_FOUND code so callers can duck-type it', async () => {
+      mockApi.get.mockRejectedValueOnce({
+        response: { status: 404, data: { code: 'ORGANIZATION_NOT_FOUND' } },
+      });
+
+      await expect(getOrganizationById('dead-org')).rejects.toMatchObject({
+        code: 'ORGANIZATION_NOT_FOUND',
+        name: 'OrganizationNotFoundError',
+      });
+    });
+
+    // Guards the destructive path: a bare 404 (bad route, proxy) must NOT be
+    // mistaken for a deleted org, because callers drop local follows on it.
+    it('does NOT throw OrganizationNotFoundError on a 404 without the code', async () => {
+      mockApi.get.mockRejectedValueOnce({
+        response: { status: 404, data: { error: 'Not Found', message: 'Route not found' } },
+      });
+
+      const error = await getOrganizationById('org-1').catch((e) => e);
+
+      expect(error).not.toBeInstanceOf(OrganizationNotFoundError);
+      expect(error.code).toBeUndefined();
+      expect(error.message).toBe('Not Found');
+    });
+
+    it('does NOT throw OrganizationNotFoundError on a 500', async () => {
+      mockApi.get.mockRejectedValueOnce({
+        response: { status: 500, data: { error: 'Internal server error' } },
+      });
+
+      const error = await getOrganizationById('org-1').catch((e) => e);
+
+      expect(error).not.toBeInstanceOf(OrganizationNotFoundError);
+      expect(error.message).toBe('Internal server error');
+    });
+
+    // The response interceptor rewrites these with no `.response` at all.
+    it('forwards rate-limit errors intact instead of collapsing them', async () => {
+      const rateLimited = Object.assign(new Error('Too many requests.'), {
+        code: 'RATE_LIMIT_EXCEEDED',
+        isRateLimited: true,
+      });
+      mockApi.get.mockRejectedValueOnce(rateLimited);
+
+      await expect(getOrganizationById('org-1')).rejects.toBe(rateLimited);
+    });
+
+    it('forwards ACCOUNT_LOCKED errors intact', async () => {
+      const locked = Object.assign(new Error('Account locked.'), { code: 'ACCOUNT_LOCKED' });
+      mockApi.get.mockRejectedValueOnce(locked);
+
+      await expect(getOrganizationById('org-1')).rejects.toBe(locked);
+    });
+
+    it('throws a network error message when there is no response', async () => {
+      mockApi.get.mockRejectedValueOnce({ message: 'Network Error' });
+
+      const error = await getOrganizationById('org-1').catch((e) => e);
+
+      expect(error).not.toBeInstanceOf(OrganizationNotFoundError);
+      expect(error.message).toBe('Network Error');
     });
   });
 });

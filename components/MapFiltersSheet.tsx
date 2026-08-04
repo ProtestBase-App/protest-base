@@ -75,13 +75,19 @@ export function MapFiltersSheet({
   const themeColors = getThemeColors(colorScheme);
 
   const { getSubMunicipalityName } = usePostalCodes();
-  const { dropdownItems } = useOrganizations();
+  const { dropdownItems, loading: organizationsLoading, ensureOrganizations } = useOrganizations();
 
   const [draft, setDraft] = useState<MapFilters>(initialFilters);
 
   useEffect(() => {
     if (visible) setDraft(initialFilters);
   }, [visible, initialFilters]);
+
+  // The listing is not fetched at app start — opening the sheet is what makes
+  // it needed.
+  useEffect(() => {
+    if (visible) ensureOrganizations();
+  }, [visible, ensureOrganizations]);
 
   const toggleCategory = useCallback((value: string) => {
     setDraft((prev) => ({
@@ -228,6 +234,8 @@ export function MapFiltersSheet({
           placeholder={t('filters.searchOrganizations')}
           resolveSelectedLabel={resolveOrganizationLabel}
           leadingIconName="person"
+          loading={organizationsLoading}
+          loadingText={t('filters.loadingOrganizations')}
         />
       </View>
 

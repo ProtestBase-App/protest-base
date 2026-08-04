@@ -110,12 +110,32 @@ export async function getAllOrganizers(): Promise<{
 }
 
 /**
+ * Thrown when the backend confirms an organization is gone — a 404 carrying the
+ * ORGANIZATION_NOT_FOUND code. Lets callers evict dangling references via an
+ * instanceof check rather than brittle message parsing.
+ *
+ * Deliberately stricter than `EventNotFoundError`, which keys on the status
+ * alone: a 404 here triggers destructive local cleanup (dropping a follow the
+ * user created), and a routing or proxy 404 carries no `code` at all — so
+ * matching on the status by itself would discard follows for organizations that
+ * still exist. Keep the code check.
+ */
+export class OrganizationNotFoundError extends Error {
+  code = 'ORGANIZATION_NOT_FOUND' as const;
+  constructor(organizationId: string) {
+    super(`Organization with ID ${organizationId} not found`);
+    this.name = 'OrganizationNotFoundError';
+  }
+}
+
+/**
  * Get a single organization by ID — returns the full detail payload including
  * bio, website_url, location, is_verified, follower_count, member_count,
  * and event_count (detail-only — not present on list endpoints).
  *
  * @param organizationId - The organization ID to fetch
  * @returns OrganizationDetail
+ * @throws OrganizationNotFoundError on a 404 carrying ORGANIZATION_NOT_FOUND
  */
 export async function getOrganizationById(organizationId: string): Promise<OrganizationDetail> {
   try {
@@ -131,8 +151,18 @@ export async function getOrganizationById(organizationId: string): Promise<Organ
     logger.debug('[organizer.service] getOrganizationById', { organizationId });
     return response.data.data;
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      throw new Error('Organization not found');
+    // The response interceptor rejects rate-limit / lockout errors as a plain
+    // Error carrying `code`/`isRateLimited` but no `.response`. Forward those
+    // intact — the generic extraction below would collapse them.
+    if (
+      error?.isRateLimited ||
+      error?.code === 'RATE_LIMIT_EXCEEDED' ||
+      error?.code === 'ACCOUNT_LOCKED'
+    ) {
+      throw error;
+    }
+    if (error.response?.status === 404 && error.response?.data?.code === 'ORGANIZATION_NOT_FOUND') {
+      throw new OrganizationNotFoundError(organizationId);
     }
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch organization');
   }

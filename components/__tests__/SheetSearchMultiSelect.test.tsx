@@ -444,6 +444,74 @@ describe('SheetSearchMultiSelect', () => {
     });
   });
 
+  describe('Loading state', () => {
+    it('opens the panel on a loading row while options are being fetched', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          options={[]}
+          loading
+          loadingText="Loading organizations…"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+
+      expect(screen.getByText('Loading organizations…')).toBeTruthy();
+    });
+
+    it('takes precedence over the no-results message', () => {
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          options={[]}
+          loading
+          loadingText="Loading organizations…"
+          noResultsText="No matches found"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), 'zzz');
+
+      expect(screen.getByText('Loading organizations…')).toBeTruthy();
+      expect(screen.queryByText('No matches found')).toBeNull();
+    });
+
+    it('hides the loading row once options arrive', () => {
+      const { rerender } = render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          options={[]}
+          loading
+          loadingText="Loading organizations…"
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      expect(screen.getByText('Loading organizations…')).toBeTruthy();
+
+      rerender(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          loading={false}
+          loadingText="Loading organizations…"
+        />
+      );
+
+      expect(screen.queryByText('Loading organizations…')).toBeNull();
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+    });
+
+    it('stays closed while loading when no copy is provided (opt-in)', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} options={[]} loading />);
+
+      fireEvent(getInput(), 'focus');
+
+      expect(screen.queryByText('Loading organizations…')).toBeNull();
+    });
+  });
+
   describe('Disabled (locked) state', () => {
     it('renders the selected value but makes the input non-editable', () => {
       render(<SheetSearchMultiSelect {...defaultProps} disabled selected={['opt-brussels']} />);

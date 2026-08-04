@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -39,6 +39,14 @@ export interface SheetSearchMultiSelectProps {
    * visible "keep typing" affordance instead of looking dead when tapped. Opt-in.
    */
   minLengthHintText?: string;
+  /**
+   * Options are still being fetched. Opens the panel on a spinner row so a field
+   * whose options arrive over the network doesn't look dead when tapped. Opt-in:
+   * omit it for fields whose options are available synchronously.
+   */
+  loading?: boolean;
+  /** Copy for the spinner row; required for `loading` to render anything. */
+  loadingText?: string;
   /**
    * Restrict the selection to a single value: picking an option replaces the
    * current selection and collapses the dropdown. The selected value still
@@ -96,6 +104,8 @@ export function SheetSearchMultiSelect({
   maxVisibleOptions = 5,
   noResultsText,
   minLengthHintText,
+  loading = false,
+  loadingText,
   singleSelect = false,
   maxSelected,
   maxSelectedHint,
@@ -174,14 +184,19 @@ export function SheetSearchMultiSelect({
   // callers that don't opt in keep the legacy close-on-no-match behaviour.
   const panelActive = focused && !disabled && !atMax;
   const belowMinLength = normalizedQuery.length < minSearchLength;
-  const showMinLengthHint = panelActive && belowMinLength && !!minLengthHintText;
+  // While the options are loading there is nothing to match against, so the
+  // spinner row takes precedence over the "no matches" message.
+  const showLoading = panelActive && loading && visibleOptions.length === 0 && !!loadingText;
+  const showMinLengthHint = panelActive && !showLoading && belowMinLength && !!minLengthHintText;
   const showNoResults =
     panelActive &&
+    !showLoading &&
     !belowMinLength &&
     normalizedQuery.length > 0 &&
     visibleOptions.length === 0 &&
     !!noResultsText;
-  const dropdownOpen = visibleOptions.length > 0 || showMinLengthHint || showNoResults;
+  const dropdownOpen =
+    visibleOptions.length > 0 || showLoading || showMinLengthHint || showNoResults;
 
   const handleRemove = (value: string) => {
     onChange(selected.filter((v) => v !== value));
@@ -313,8 +328,15 @@ export function SheetSearchMultiSelect({
             ))
           ) : (
             <View style={styles.messageRow}>
+              {showLoading && (
+                <ActivityIndicator
+                  size="small"
+                  color={themeColors.tint}
+                  style={styles.messageSpinner}
+                />
+              )}
               <ThemedText style={[styles.messageText, { color: themeColors.secondaryText }]}>
-                {showMinLengthHint ? minLengthHintText : noResultsText}
+                {showLoading ? loadingText : showMinLengthHint ? minLengthHintText : noResultsText}
               </ThemedText>
             </View>
           )}
@@ -389,8 +411,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
   },
   messageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 11,
     paddingHorizontal: 13,
+  },
+  messageSpinner: {
+    marginRight: Spacing.sm,
   },
   messageText: {
     fontSize: Typography.sizes.sm,

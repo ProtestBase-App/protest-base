@@ -10,7 +10,7 @@ import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { t } from '@/utils/i18n';
+import { formatCategoryLabel } from '@/constants/CategoryColors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
 
@@ -128,7 +128,7 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
                   style={[styles.categoryBadge, { backgroundColor: themeColors.categoryBadgeBg }]}
                 >
                   <ThemedText style={[styles.categoryBadgeText, { color: themeColors.tint }]}>
-                    {t(`categories.${item.categories[0].toLowerCase()}`)}
+                    {formatCategoryLabel(item.categories[0])}
                   </ThemedText>
                 </View>
               )}

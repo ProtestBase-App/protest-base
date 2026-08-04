@@ -78,6 +78,7 @@ const nl = {
     confirmFilters: 'Filters bevestigen',
     searchPlaceholder: 'Typ minstens 2 tekens om te zoeken...',
     searchOrganizations: 'Zoek organisaties...',
+    loadingOrganizations: 'Organisaties laden…',
     postalCodesCount: '{{count}} postcodes',
     selectionTooBroad: 'Selectie te breed — kies minder of kleinere gebieden.',
   },
@@ -566,6 +567,8 @@ const nl = {
     location: 'Locatie',
     members: 'Leden',
     loadError: 'Kon de organisatorgegevens niet laden',
+    notFoundTitle: 'Deze organisatie bestaat niet meer',
+    notFoundBody: 'Ze is verwijderd, dus haar profiel is niet langer beschikbaar.',
   },
 
   // ============================================

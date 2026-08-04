@@ -11,6 +11,10 @@
  * `constants/EventCategories.ts` and the explore screen filters.
  */
 
+import { eventCategories } from '@/constants/EventCategories';
+import { t } from '@/utils/i18n';
+import { logger } from '@/utils/logger';
+
 export interface CategoryColorSet {
   /** Solid dot / text color. */
   color: string;
@@ -71,6 +75,34 @@ const FALLBACK_CATEGORY_COLORS: CategoryColorSet = {
 export function getCategoryColors(category: string | undefined | null): CategoryColorSet {
   if (!category) return FALLBACK_CATEGORY_COLORS;
   return CATEGORY_COLORS[category] ?? FALLBACK_CATEGORY_COLORS;
+}
+
+const CANONICAL_CATEGORY_KEYS = new Set(eventCategories.map(({ value }) => value.toLowerCase()));
+
+/** Unknown values already logged, so list renders don't spam the same warning. */
+const loggedUnknownCategories = new Set<string>();
+
+/**
+ * Label to display for a category value coming from event data.
+ *
+ * Backend records can carry values outside the canonical list (imports or
+ * direct API writes — the app's forms only offer `eventCategories`). Those have
+ * no translation, so `t()` would surface the raw key in the UI (e.g.
+ * "categories.betoging"). Show the stored value instead, which is already
+ * human-readable. Only use this for event-provided values: filter chips iterate
+ * the canonical list, and there a missing translation is a real regression that
+ * should stay visible.
+ */
+export function formatCategoryLabel(category: string): string {
+  const key = category.toLowerCase();
+  if (CANONICAL_CATEGORY_KEYS.has(key)) {
+    return t(`categories.${key}`);
+  }
+  if (!loggedUnknownCategories.has(key)) {
+    loggedUnknownCategories.add(key);
+    logger.warn('[CategoryColors] Event has a category outside the canonical list', { category });
+  }
+  return category;
 }
 
 /**

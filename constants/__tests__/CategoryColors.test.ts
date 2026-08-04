@@ -5,7 +5,11 @@
  * display-category selection used by the map and calendar tabs.
  */
 
-import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColors';
+import {
+  formatCategoryLabel,
+  getCategoryColors,
+  getDisplayCategory,
+} from '@/constants/CategoryColors';
 import { eventCategories } from '@/constants/EventCategories';
 
 describe('CategoryColors', () => {
@@ -53,6 +57,27 @@ describe('CategoryColors', () => {
       expect(getDisplayCategory(undefined, ['Learn'])).toBeUndefined();
       expect(getDisplayCategory(null, [])).toBeUndefined();
       expect(getDisplayCategory([], ['Learn'])).toBeUndefined();
+    });
+  });
+
+  describe('formatCategoryLabel', () => {
+    it('translates every canonical category', () => {
+      for (const { value } of eventCategories) {
+        const label = formatCategoryLabel(value);
+        expect(label).not.toContain('categories.');
+        expect(label.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('matches canonical categories case-insensitively', () => {
+      expect(formatCategoryLabel('protest')).toBe(formatCategoryLabel('Protest'));
+    });
+
+    it('returns the raw value for categories outside the canonical list', () => {
+      // Backend data can carry imported values (e.g. 'Betoging') that have no
+      // translation — the badge must not render "categories.betoging".
+      expect(formatCategoryLabel('Betoging')).toBe('Betoging');
+      expect(formatCategoryLabel('Manifestation')).toBe('Manifestation');
     });
   });
 });
