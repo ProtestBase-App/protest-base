@@ -84,20 +84,43 @@ export async function setApiPrefix(prefix: string): Promise<void> {
   }
 }
 
+// Tracks whether a prefix from a previous launch was found in storage.
+let prefixHydratedFromStorage = false;
+
 // Best-effort warm-start hydration — loads persisted prefix before /app/config returns.
-// VersionGate blocks all other API traffic until /app/config completes, but hydrating early
-// is cheap insurance. The prefixExplicitlySet guard prevents an out-of-order resolution
-// from overwriting a value just set by a fast bootstrap response.
-(async () => {
+// VersionGate blocks most other API traffic until /app/config completes, but hydrating early
+// is what lets the cold-start events fetch run alongside the bootstrap. The prefixExplicitlySet
+// guard prevents an out-of-order resolution from overwriting a value just set by a fast
+// bootstrap response.
+export const apiPrefixReady: Promise<void> = (async () => {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEYS.API_PREFIX);
-    if (stored !== null && !prefixExplicitlySet) {
-      apiPrefix = normalizePrefix(stored);
+    if (stored !== null) {
+      prefixHydratedFromStorage = true;
+      if (!prefixExplicitlySet) {
+        apiPrefix = normalizePrefix(stored);
+      }
     }
   } catch {
     // best-effort; ignore
   }
 })();
+
+/**
+ * True once the prefix is known — hydrated from a previous launch, or set by
+ * /app/config this session. Callers that issue a request before the bootstrap
+ * completes use this to tell a warm start (safe: reuse last launch's prefix)
+ * from a first-ever launch (unknown path — wait for /app/config instead).
+ * Await `apiPrefixReady` first, or this reports false simply because the read
+ * hasn't finished.
+ *
+ * A stored empty string counts as known: only version.service writes this key,
+ * and only after /app/config answered, so '' means "this backend takes no
+ * prefix" — never an un-discovered placeholder.
+ */
+export function hasKnownApiPrefix(): boolean {
+  return prefixHydratedFromStorage || prefixExplicitlySet;
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,

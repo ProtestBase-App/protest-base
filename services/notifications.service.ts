@@ -499,9 +499,7 @@ export function handleNotificationResponse(
   mode: NotificationNavigationMode
 ): boolean {
   const data = response.notification.request.content.data as
-    | (Partial<SavedDayNotificationData> & Partial<Remind1hNotificationData>)
-    | null
-    | undefined;
+    (Partial<SavedDayNotificationData> & Partial<Remind1hNotificationData>) | null | undefined;
   if (
     !data ||
     (data.type !== NOTIFICATION_TYPES.SAVED_DAY && data.type !== NOTIFICATION_TYPES.REMIND_1H)

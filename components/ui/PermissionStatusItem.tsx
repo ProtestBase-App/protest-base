@@ -61,10 +61,7 @@ export function PermissionStatusItem({
   };
 
   const getStatusIcon = ():
-    | 'checkmark.circle.fill'
-    | 'xmark.circle.fill'
-    | 'questionmark.circle'
-    | 'minus.circle' => {
+    'checkmark.circle.fill' | 'xmark.circle.fill' | 'questionmark.circle' | 'minus.circle' => {
     switch (status) {
       case 'granted':
         return 'checkmark.circle.fill';

@@ -41,8 +41,15 @@ import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { logger } from '@/utils/logger';
 
 export default function EventDetails() {
-  const { user, isLogged, userLanguage, refetchEvents, upsertEventInCache, removeEventFromCache } =
-    useGlobalContext();
+  const {
+    user,
+    isLogged,
+    userLanguage,
+    eventsCache,
+    refetchEvents,
+    upsertEventInCache,
+    removeEventFromCache,
+  } = useGlobalContext();
   const { isOffline } = useConnectivity();
   const { saveEvent, unsaveEvent, isSaved } = useSavedEvents();
   const { likeEvent, unlikeEvent, isLiked } = useLikedEvents();
@@ -53,14 +60,22 @@ export default function EventDetails() {
 
   const eventId = Array.isArray(id) ? id[0] : id;
 
-  const [rawEvent, setRawEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Cache-first paint: the card the user tapped was rendered from this same
+  // cache, so the event is almost always already in memory as a complete Event.
+  // Seeding the initial state from it (rather than setting it in an effect)
+  // keeps the very first render free of the spinner frame. Only the avatars —
+  // fetch-only fields, optional everywhere they're rendered — and view_count
+  // are missing; the revalidation below fills them in.
+  const cachedEvent = eventId ? eventsCache[eventId] : undefined;
+
+  const [rawEvent, setRawEvent] = useState<Event | null>(() => cachedEvent ?? null);
+  const [loading, setLoading] = useState(() => !cachedEvent);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [viewCount, setViewCount] = useState(0);
+  const [viewCount, setViewCount] = useState(() => cachedEvent?.view_count ?? 0);
 
   const event = useMemo<FormattedEvent | null>(
     () => (rawEvent ? formatEventForDisplay(rawEvent, userLanguage) : null),
@@ -76,6 +91,13 @@ export default function EventDetails() {
 
   const trackedEventId = useRef<string | null>(null);
 
+  // Latest-ref so the load effect can read the cache when eventId changes
+  // without re-running every time a background refresh replaces the cache.
+  const eventsCacheRef = useRef(eventsCache);
+  useEffect(() => {
+    eventsCacheRef.current = eventsCache;
+  });
+
   useEffect(() => {
     if (!eventId) {
       setError(t('events.detailLoadError'));
@@ -85,9 +107,22 @@ export default function EventDetails() {
 
     let isMounted = true;
 
+    // Painted from cache (see cachedEvent above): render now, revalidate below.
+    // On a miss — deep link, or an event outside the bulk-fetch window — this
+    // stays on the original blocking path.
+    const cached = eventsCacheRef.current[eventId];
+    if (cached) {
+      setRawEvent(cached);
+      setViewCount(cached.view_count ?? 0);
+      setError(null);
+      setLoading(false);
+    }
+
     const loadEvent = async () => {
       try {
-        setLoading(true);
+        if (!cached) {
+          setLoading(true);
+        }
         setError(null);
 
         const fetched = await getEventByIdBackend(eventId, true);
@@ -102,6 +137,8 @@ export default function EventDetails() {
         // trackEventView fails silently.
         setViewCount(fetched.view_count ?? 0);
 
+        // View tracking deliberately stays on the revalidation path rather than
+        // the cache paint, so the displayed count always comes from the server.
         if (trackedEventId.current !== eventId) {
           trackedEventId.current = eventId;
           try {
@@ -115,6 +152,16 @@ export default function EventDetails() {
         }
       } catch (err) {
         if (!isMounted) return;
+        // A revalidation failure must never blank a screen the user is already
+        // reading. Only a confirmed 404 may — the event is genuinely gone, and
+        // the eviction below keeps it off the calendar/map too.
+        if (cached && !(err instanceof EventNotFoundError)) {
+          logger.warn('Event revalidation failed; keeping the cached copy', {
+            eventId,
+            error: err,
+          });
+          return;
+        }
         logger.error('Failed to load event:', { eventId, error: err });
         setRawEvent(null);
         // Only a confirmed backend 404 may claim the event doesn't exist —

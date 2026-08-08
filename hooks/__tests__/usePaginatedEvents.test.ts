@@ -72,13 +72,10 @@ interface FormattedEvent {
 
 function makeResponse(count: number, total: number, startId = 1) {
   return {
-    events: Array.from(
-      { length: count },
-      (_, i): RawEvent => ({
-        $id: String(startId + i),
-        title: `Event ${startId + i}`,
-      })
-    ),
+    events: Array.from({ length: count }, (_, i): RawEvent => ({
+      $id: String(startId + i),
+      title: `Event ${startId + i}`,
+    })),
     total,
     limit: count,
     offset: startId - 1,

@@ -71,6 +71,9 @@ jest.mock('@/services/api', () => ({
   __esModule: true,
   default: {},
   setTokenExpirationCallback: (...args: any[]) => mockSetTokenExpirationCallback(...args),
+  // Read by eventsBootstrap, which GlobalProvider claims its launch fetch from.
+  apiPrefixReady: Promise.resolve(),
+  hasKnownApiPrefix: () => true,
 }));
 
 // expo-router mock (needed for token expiration handler navigation)
@@ -701,7 +704,8 @@ describe('GlobalProvider', () => {
       await flushPromises();
 
       expect(mockPersistEvents).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ $id: 'created-now' })])
+        expect.arrayContaining([expect.objectContaining({ $id: 'created-now' })]),
+        { etag: undefined, coversWindow: true }
       );
     });
 
@@ -715,7 +719,7 @@ describe('GlobalProvider', () => {
         country: 'BE',
         start_time: new Date(Date.now() + 86400000).toISOString(),
       };
-      mockLoadPersistedEvents.mockResolvedValue([persisted]);
+      mockLoadPersistedEvents.mockResolvedValue({ events: [persisted] });
 
       let resolveFetch: (value: any) => void = () => {};
       mockGetEventsBackend.mockImplementation(
@@ -767,7 +771,118 @@ describe('GlobalProvider', () => {
       await flushPromises();
       await flushPromises();
 
-      expect(mockPersistEvents).toHaveBeenCalledWith([event]);
+      expect(mockPersistEvents).toHaveBeenCalledWith([event], {
+        etag: undefined,
+        coversWindow: true,
+      });
+    });
+
+    it('persists the ETag of the fetched window alongside the snapshot', async () => {
+      const event = {
+        $id: 'e1',
+        id: 'e1',
+        title: 'E',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockGetEventsBackend.mockResolvedValue({
+        events: [event],
+        total: 1,
+        limit: 500,
+        offset: 0,
+        etag: 'W/"fresh"',
+      });
+
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      await flushPromises();
+
+      expect(mockPersistEvents).toHaveBeenCalledWith([event], {
+        etag: 'W/"fresh"',
+        coversWindow: true,
+      });
+    });
+
+    it('tells the snapshot it does not cover the window when the fetch was truncated', async () => {
+      const event = {
+        $id: 'e1',
+        id: 'e1',
+        title: 'E',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      // total > returned: the backend has more than the ceiling gave us.
+      mockGetEventsBackend.mockResolvedValue({
+        events: [event],
+        total: 900,
+        limit: 500,
+        offset: 0,
+        etag: 'W/"partial"',
+      });
+
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      await flushPromises();
+
+      // eventsCacheStorage drops the ETag on this claim, so the next launch
+      // cannot 304 itself into a permanently truncated cache.
+      expect(mockPersistEvents).toHaveBeenCalledWith([event], {
+        etag: 'W/"partial"',
+        coversWindow: false,
+      });
+    });
+
+    it('revalidates with the snapshot ETag and keeps the hydrated cache on a 304', async () => {
+      const persisted = {
+        $id: 'p1',
+        id: 'p1',
+        title: 'Persisted',
+        description: '',
+        organizer_name: 'Org',
+        country: 'BE',
+        start_time: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockLoadPersistedEvents.mockResolvedValue({ events: [persisted], etag: 'W/"abc"' });
+      mockGetEventsBackend.mockResolvedValue({
+        events: [],
+        total: 0,
+        limit: 500,
+        offset: 0,
+        notModified: true,
+        etag: 'W/"abc"',
+      });
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      await flushPromises();
+
+      expect(mockGetEventsBackend).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ ifNoneMatch: 'W/"abc"' })
+      );
+      // A bodyless 304 must never be mistaken for an empty result set.
+      expect(result.current.eventsCache['p1']).toBeDefined();
+      // Nothing changed, so the stored snapshot is left exactly as it was —
+      // re-persisting would restamp its age and extend the hydration window.
+      expect(mockPersistEvents).not.toHaveBeenCalled();
+    });
+
+    it('does not revalidate on pull-to-refresh, so counters can update', async () => {
+      mockLoadPersistedEvents.mockResolvedValue({ events: [], etag: 'W/"abc"' });
+
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      mockGetEventsBackend.mockClear();
+
+      await act(async () => {
+        await result.current.refetchEvents();
+      });
+
+      expect(mockGetEventsBackend.mock.calls[0][1]).not.toHaveProperty('ifNoneMatch');
     });
   });
 

@@ -147,7 +147,7 @@ describe('event.service', () => {
 
       await getEventsBackend({ postalCodes: [] });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams).not.toHaveProperty('postalCodes');
     });
 
@@ -194,7 +194,7 @@ describe('event.service', () => {
 
       await getEventsBackend({ search: '   ' });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams).not.toHaveProperty('search');
     });
 
@@ -280,6 +280,124 @@ describe('event.service', () => {
 
       await expect(getEventsBackend()).rejects.toBe(axiosTimeout);
     });
+
+    describe('ETag revalidation', () => {
+      it('sends If-None-Match and accepts 304 as a non-error status', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: {},
+          data: { success: true, data: { events: [], total: 0, limit: 500, offset: 0 } },
+        });
+
+        await getEventsBackend({ limit: 500 }, { ifNoneMatch: 'W/"abc"' });
+
+        const config = mockApi.get.mock.calls[0][1];
+        expect(config?.headers).toEqual({ 'If-None-Match': 'W/"abc"' });
+        // Axios rejects non-2xx by default, which would turn a 304 into a throw.
+        expect(config?.validateStatus?.(304)).toBe(true);
+        expect(config?.validateStatus?.(200)).toBe(true);
+        expect(config?.validateStatus?.(404)).toBe(false);
+      });
+
+      it('opts out of the JWT when the caller asks for an anonymous fetch', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: {},
+          data: { success: true, data: { events: [], total: 0, limit: 500, offset: 0 } },
+        });
+
+        await getEventsBackend({ limit: 500 }, { skipAuth: true });
+
+        expect(mockApi.get.mock.calls[0][1]).toEqual(expect.objectContaining({ skipAuth: true }));
+      });
+
+      it('sends the JWT by default', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: {},
+          data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+        });
+
+        await getEventsBackend();
+
+        expect(mockApi.get.mock.calls[0][1]).not.toHaveProperty('skipAuth');
+      });
+
+      it('does not send If-None-Match or relax validateStatus by default', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: {},
+          data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+        });
+
+        await getEventsBackend();
+
+        const config = mockApi.get.mock.calls[0][1];
+        expect(config?.headers).toBeUndefined();
+        expect(config?.validateStatus).toBeUndefined();
+      });
+
+      it('reports notModified with no events when the backend answers 304', async () => {
+        // A 304 is bodyless — `data` must never be read on this path.
+        mockApi.get.mockResolvedValueOnce({ status: 304, headers: {}, data: '' });
+
+        const result = await getEventsBackend({ limit: 500 }, { ifNoneMatch: 'W/"abc"' });
+
+        expect(result.notModified).toBe(true);
+        expect(result.events).toEqual([]);
+        // Echoes the validator back so the caller can re-persist it unchanged.
+        expect(result.etag).toBe('W/"abc"');
+      });
+
+      it('prefers the ETag the 304 response carries over the one sent', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 304,
+          headers: { etag: 'W/"server"' },
+          data: '',
+        });
+
+        const result = await getEventsBackend({}, { ifNoneMatch: 'W/"client"' });
+
+        expect(result.etag).toBe('W/"server"');
+      });
+
+      it('returns the ETag of a 200 response', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: { etag: 'W/"fresh"' },
+          data: {
+            success: true,
+            data: { events: [makeEvent()], total: 1, limit: 500, offset: 0 },
+          },
+        });
+
+        const result = await getEventsBackend();
+
+        expect(result.etag).toBe('W/"fresh"');
+        expect(result.notModified).toBeUndefined();
+        expect(result.events).toHaveLength(1);
+      });
+
+      it('reads the ETag header regardless of casing', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: { ETag: 'W/"cased"' },
+          data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+        });
+
+        expect((await getEventsBackend()).etag).toBe('W/"cased"');
+      });
+
+      it('leaves the ETag undefined when the backend sends none', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          status: 200,
+          headers: {},
+          data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+        });
+
+        expect((await getEventsBackend()).etag).toBeUndefined();
+      });
+    });
   });
 
   // ============================================================
@@ -311,7 +429,7 @@ describe('event.service', () => {
 
       await getOrganizationUpcomingEvents('org-1', { startDate: '2025-01-01T00:00:00Z' });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams.startDate).toBe('2025-01-01T00:00:00Z');
     });
 
@@ -322,7 +440,7 @@ describe('event.service', () => {
 
       await getOrganizationUpcomingEvents('org-1', { limit: 10, offset: 5, includeAvatars: true });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams.limit).toBe(10);
       expect(callParams.offset).toBe(5);
       expect(callParams.includeAvatars).toBe(true);
@@ -376,7 +494,7 @@ describe('event.service', () => {
 
       await getOrganizationPastEvents('org-1', { endDate: '2025-01-01T00:00:00Z' });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams.endDate).toBe('2025-01-01T00:00:00Z');
     });
 
@@ -387,7 +505,7 @@ describe('event.service', () => {
 
       await getOrganizationPastEvents('org-1', { limit: 5, offset: 10, includeAvatars: true });
 
-      const callParams = mockApi.get.mock.calls[0][1]?.params;
+      const callParams = mockApi.get.mock.calls[0][1]?.params as Record<string, unknown>;
       expect(callParams.limit).toBe(5);
       expect(callParams.offset).toBe(10);
       expect(callParams.includeAvatars).toBe(true);
@@ -1266,7 +1384,7 @@ describe('event.service', () => {
       expect(mockApi.get.mock.calls[1][0]).toBe('/organizations/org-1/events');
       const draftCall = mockApi.get.mock.calls.find((call) => call[0] === '/events/drafts');
       expect(draftCall).toBeDefined();
-      expect(draftCall?.[1]?.params?.organization_id).toBe('org-1');
+      expect((draftCall?.[1]?.params as Record<string, unknown>)?.organization_id).toBe('org-1');
     });
 
     it('throws with error message on API failure', async () => {

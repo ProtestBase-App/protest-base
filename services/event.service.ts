@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import api from './api';
 import {
   Event,
@@ -51,6 +52,34 @@ export interface EventFilterParams {
   organizationId?: string;
 }
 
+/** A page of events, plus the cache metadata the cold-start fetch revalidates with. */
+export interface EventsPageResponse {
+  events: Event[];
+  total: number;
+  limit: number;
+  offset: number;
+  /** ETag of this response, when the backend sent one. */
+  etag?: string;
+  /**
+   * True when the backend answered 304 Not Modified — `events` is empty and the
+   * caller's existing copy is still current. Only ever set for requests made
+   * with `ifNoneMatch`.
+   */
+  notModified?: boolean;
+}
+
+/**
+ * Read the ETag off a response. Axios lowercases header names, but fall back to
+ * the canonical casings so a different adapter can't silently drop the header
+ * (which would just disable revalidation, invisibly).
+ */
+function readETag(headers: unknown): string | undefined {
+  if (!headers || typeof headers !== 'object') return undefined;
+  const bag = headers as Record<string, unknown>;
+  const value = bag.etag ?? bag.ETag ?? bag.Etag;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 /**
  * Get all events with optional filters
  *
@@ -75,16 +104,18 @@ export interface EventFilterParams {
  * @param options.timeout - Per-request timeout override in ms. The global events
  *   cache uses this for its single large (up to EVENTS_MAX) fetch, which needs a
  *   bigger budget than the axios instance default sized for small pages.
+ * @param options.ifNoneMatch - ETag of a previously fetched window. When the
+ *   backend answers 304 the result carries `notModified: true` and no events —
+ *   the caller keeps what it already has instead of re-downloading it.
+ * @param options.skipAuth - Send without the user's JWT. The listing is public,
+ *   so callers that run outside the authenticated app shell (the cold-start
+ *   window fetch, which starts before GlobalProvider mounts) use this to stay
+ *   clear of the 401/refresh machinery entirely.
  */
 export async function getEventsBackend(
   filters: EventFilterParams = {},
-  options?: { timeout?: number }
-): Promise<{
-  events: Event[];
-  total: number;
-  limit: number;
-  offset: number;
-}> {
+  options?: { timeout?: number; ifNoneMatch?: string; skipAuth?: boolean }
+): Promise<EventsPageResponse> {
   try {
     const {
       startDate,
@@ -155,6 +186,23 @@ export async function getEventsBackend(
       params.organization_id = organizationId;
     }
 
+    const config: AxiosRequestConfig = { params };
+
+    if (options?.timeout !== undefined) {
+      config.timeout = options.timeout;
+    }
+
+    if (options?.skipAuth) {
+      config.skipAuth = true;
+    }
+
+    if (options?.ifNoneMatch) {
+      config.headers = { 'If-None-Match': options.ifNoneMatch };
+      // Axios treats anything outside 2xx as an error, so without this a 304
+      // would arrive as a thrown exception instead of a response.
+      config.validateStatus = (status) => (status >= 200 && status < 300) || status === 304;
+    }
+
     const response = await api.get<{
       success: boolean;
       data: {
@@ -164,16 +212,26 @@ export async function getEventsBackend(
         offset: number;
         filters_applied?: Record<string, unknown>;
       };
-    }>('/events', {
-      params,
-      ...(options?.timeout !== undefined ? { timeout: options.timeout } : {}),
-    });
+    }>('/events', config);
+
+    // 304 is bodyless by definition, so this must precede any `data` access —
+    // the success check below would otherwise throw on an empty body.
+    if (response.status === 304) {
+      return {
+        events: [],
+        total: 0,
+        limit,
+        offset,
+        etag: readETag(response.headers) ?? options?.ifNoneMatch,
+        notModified: true,
+      };
+    }
 
     if (!response.data.success) {
       throw new Error('Failed to fetch events');
     }
 
-    return response.data.data;
+    return { ...response.data.data, etag: readETag(response.headers) };
   } catch (error: any) {
     // Network-level failures (timeout, DNS, offline) are rethrown untouched so
     // callers' isNetworkError() checks keep working — wrapping into a plain
