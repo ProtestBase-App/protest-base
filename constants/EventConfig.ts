@@ -25,3 +25,13 @@ export const MAX_EVENT_IMAGES = 5;
 
 /** Maximum number of co-organizers per event — mirrors the backend's MAX_CO_ORGANIZERS cap. */
 export const MAX_CO_ORGANIZERS = 10;
+
+/**
+ * Lower bounds for the source-match ("confidence") score bands on automation
+ * drafts: >= 80 high, >= 50 medium, below that low. Mirrors the website's bands.
+ *
+ * The score measures how much of a scraped draft the crawler could corroborate
+ * against its source page — it is not an accuracy or AI-confidence rating, and
+ * it never gates publishing.
+ */
+export const CONFIDENCE_BANDS = { high: 80, medium: 50 } as const;

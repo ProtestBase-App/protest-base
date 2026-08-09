@@ -232,6 +232,14 @@ jest.mock('react-native-reanimated', () => {
     }),
     useDerivedValue: jest.fn((fn) => createMockSharedValue(fn())),
     useAnimatedGestureHandler: jest.fn(() => ({})),
+    // Required by react-native-gesture-handler's GestureDetector: its
+    // reanimatedWrapper sniffs for `useSharedValue` and, finding it, takes the
+    // "Reanimated is installed" path — which then calls these. Without them any
+    // component rendering a GestureDetector throws.
+    useEvent: jest.fn(() => ({})),
+    useHandler: jest.fn(() => ({ context: {}, doDependenciesDiffer: false, useWeb: false })),
+    useComposedEventHandler: jest.fn(() => ({})),
+    setGestureState: jest.fn(),
     useAnimatedScrollHandler: jest.fn(() => ({})),
     withTiming: jest.fn((value) => value),
     withSpring: jest.fn((value) => value),
@@ -254,6 +262,8 @@ jest.mock('react-native-reanimated', () => {
     FadeOut: { duration: jest.fn().mockReturnThis(), delay: jest.fn().mockReturnThis() },
     FadeInDown: { duration: jest.fn().mockReturnThis() },
     FadeOutUp: { duration: jest.fn().mockReturnThis() },
+    // Paired with FadeInDown for bottom-anchored surfaces (Toast).
+    FadeOutDown: { duration: jest.fn().mockReturnThis() },
     SlideInRight: { duration: jest.fn().mockReturnThis() },
     SlideOutLeft: { duration: jest.fn().mockReturnThis() },
     SlideInDown: (() => {

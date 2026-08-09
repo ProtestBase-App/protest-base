@@ -99,8 +99,12 @@ describe('Routes', () => {
       expect(Routes.HOME_AREA).toBe('/home-area');
     });
 
-    it('should have 22 static route definitions', () => {
-      expect(Object.keys(Routes)).toHaveLength(22);
+    it('should define DRAFT_TRIAGE as /draft-triage', () => {
+      expect(Routes.DRAFT_TRIAGE).toBe('/draft-triage');
+    });
+
+    it('should have 23 static route definitions', () => {
+      expect(Object.keys(Routes)).toHaveLength(23);
     });
 
     it('should have all route values starting with /', () => {

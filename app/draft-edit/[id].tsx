@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { StyleSheet, Alert, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Alert, BackHandler, View, TouchableOpacity } from 'react-native';
 import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
@@ -16,6 +16,7 @@ import {
   publishDraft,
   deleteEvent,
   EventIncompleteError,
+  EventNotDraftError,
 } from '@/services/event.service';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
@@ -80,6 +81,9 @@ export default function DraftEdit() {
   });
 
   const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
+  // Baseline snapshot of the freshly loaded draft; drives the unsaved-changes
+  // guard so leaving prompts only when something actually changed.
+  const initialFormRef = useRef<FormState | null>(null);
 
   // Load the draft via the preview endpoint (the public GET 404s on drafts) and
   // map the raw Event directly into form state. We deliberately avoid
@@ -91,28 +95,33 @@ export default function DraftEdit() {
       try {
         setLoading(true);
         const event = await getDraftEventPreview(eventId);
-        setForm((prev) => ({
-          ...prev,
-          organization_id: event.organization_id || '',
-          title: event.title || '',
-          description: event.description || '',
-          // Raw Event (not formatEventForDisplay) — heal pre-multi-image
-          // responses by surfacing the legacy single image as slot 0.
-          images: event.images?.length ? event.images : event.image ? [event.image] : [],
-          street_address: event.street_address || '',
-          city: event.city || '',
-          region: event.region || '',
-          country: event.country || '',
-          start_time: event.start_time || '',
-          end_time: event.end_time || '',
-          website_url: event.website_url || '',
-          categories: event.categories?.[0] ?? '',
-          disclaimer: event.disclaimer || '',
-          postal_code: typeof event.postal_code === 'number' ? event.postal_code : null,
-          co_organizers: event.co_organizers || [],
-          help_needed: event.help_needed || false,
-          help_description: event.help_description || '',
-        }));
+        setForm((prev) => {
+          const next: FormState = {
+            ...prev,
+            organization_id: event.organization_id || '',
+            title: event.title || '',
+            description: event.description || '',
+            // Raw Event (not formatEventForDisplay) — heal pre-multi-image
+            // responses by surfacing the legacy single image as slot 0.
+            images: event.images?.length ? event.images : event.image ? [event.image] : [],
+            street_address: event.street_address || '',
+            city: event.city || '',
+            region: event.region || '',
+            country: event.country || '',
+            start_time: event.start_time || '',
+            end_time: event.end_time || '',
+            website_url: event.website_url || '',
+            categories: event.categories?.[0] ?? '',
+            disclaimer: event.disclaimer || '',
+            postal_code: typeof event.postal_code === 'number' ? event.postal_code : null,
+            co_organizers: event.co_organizers || [],
+            help_needed: event.help_needed || false,
+            help_description: event.help_description || '',
+          };
+          // Snapshot the loaded state as the dirty-check baseline.
+          initialFormRef.current = next;
+          return next;
+        });
       } catch (error) {
         logger.warn('Failed to load draft for editing', {
           eventId,
@@ -127,6 +136,44 @@ export default function DraftEdit() {
 
     loadDraft();
   }, [eventId]);
+
+  const isDirty = useCallback(
+    () =>
+      initialFormRef.current !== null &&
+      JSON.stringify(form) !== JSON.stringify(initialFormRef.current),
+    [form]
+  );
+
+  /** Close the editor, confirming first when there are unsaved edits. */
+  const handleClosePress = useCallback(() => {
+    if (isDirty()) {
+      Alert.alert(t('eventEdit.discardTitle'), t('eventEdit.discardMessage'), [
+        { text: t('eventEdit.keepEditing'), style: 'cancel' },
+        {
+          text: t('eventEdit.discardConfirm'),
+          style: 'destructive',
+          onPress: () => router.back(),
+        },
+      ]);
+      return;
+    }
+    router.back();
+  }, [isDirty]);
+
+  // Intercept the Android hardware back so it honours the unsaved-changes guard
+  // instead of silently discarding edits (the iOS swipe-back is disabled via
+  // gestureEnabled: false in app/_layout.tsx).
+  useEffect(() => {
+    const onHardwareBack = () => {
+      if (isDirty()) {
+        handleClosePress();
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+    return () => sub?.remove?.();
+  }, [isDirty, handleClosePress]);
 
   // Build the partial update payload from the current form (empty optionals omitted).
   const buildDraftPatch = useCallback((): UpdateEventRequest => {
@@ -203,22 +250,35 @@ export default function DraftEdit() {
     }
 
     setActionBusy(true);
+    // Set when publish reports the event was already published elsewhere; the
+    // success path below runs either way, only the confirmation copy differs.
+    let publishedElsewhere = false;
     try {
       // Persist the latest edits first so the server publishes what the user sees.
       await patchEvent(eventId, buildDraftPatch());
       await publishDraft(eventId);
     } catch (error) {
-      // patch or publish failed — the draft is NOT published; keep the editor.
-      if (error instanceof EventIncompleteError) {
-        const messages = error.fields.length
-          ? error.fields.map((field) => t(publishFieldToMessageKey(field)))
-          : [t('drafts.issueIncomplete')];
-        Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
+      // Already published elsewhere (commonly the web dashboard). The patch above
+      // succeeded, so the edits are saved and the event is public — fall through
+      // to the success path instead of stranding the user in a draft editor for
+      // an event that is no longer a draft.
+      if (error instanceof EventNotDraftError) {
+        publishedElsewhere = true;
       } else {
-        Alert.alert(t('common.error'), (error as Error).message);
+        // patch or publish failed — the draft is NOT published; keep the editor.
+        if (error instanceof EventIncompleteError) {
+          const messages = error.fields.length
+            ? error.fields.map((field) => t(publishFieldToMessageKey(field)))
+            : [t('drafts.issueIncomplete')];
+          Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
+        } else if ((error as { isRateLimited?: boolean }).isRateLimited) {
+          Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.message'));
+        } else {
+          Alert.alert(t('common.error'), (error as Error).message);
+        }
+        setActionBusy(false);
+        return;
       }
-      setActionBusy(false);
-      return;
     }
 
     // Published successfully. The cache/count refresh is best-effort — a failure
@@ -239,7 +299,10 @@ export default function DraftEdit() {
     // The event is now public — route to its detail page (works for both
     // 'active' and 'past' results).
     router.replace(DynamicRoutes.event(eventId, { isCreated: true }));
-    Alert.alert(t('common.success'), t('drafts.published'));
+    Alert.alert(
+      t('common.success'),
+      publishedElsewhere ? t('drafts.alreadyPublished') : t('drafts.published')
+    );
   };
 
   const handleDelete = () => {
@@ -332,11 +395,12 @@ export default function DraftEdit() {
                 <IconSymbol name="trash" size={24} color={themeColors.destructive} />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={handleClosePress}
                 style={styles.headerButton}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel={t('common.close')}
                 accessibilityRole="button"
+                testID="btn-draft-close"
               >
                 <IconSymbol name="xmark" size={24} color={themeColors.icon} />
               </TouchableOpacity>

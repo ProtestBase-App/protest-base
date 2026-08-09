@@ -99,6 +99,13 @@ const MAPPING = {
   'mappin.and.ellipse': 'place',
   person: 'person',
   minus: 'remove',
+  // Drafts redesign (Aug 2026): triage mode + list rows.
+  'calendar.badge.exclamationmark': 'event-busy',
+  'calendar.badge.checkmark': 'event-available',
+  'arrow.uturn.backward': 'undo',
+  'chevron.up': 'keyboard-arrow-up',
+  // Outline bolt for the Automation label — 'bolt.fill' reads as an alert.
+  bolt: 'bolt',
 } as Partial<
   Record<
     Extract<import('expo-symbols').SymbolViewProps['name'], string>,

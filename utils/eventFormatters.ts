@@ -24,15 +24,33 @@ export function parseAsUTC(isoString: string): Date {
 /**
  * Format a date in the Belgium timezone, regardless of the user's local timezone.
  */
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Cached `Intl.DateTimeFormat`. Construction resolves locale data and is orders of
+ * magnitude more expensive than formatting, while the instances themselves are
+ * stateless — and list screens build them per row per render, where that cost
+ * dominated the frame budget. Cache key is locale + options.
+ */
+export function getDateFormatter(
+  locale: string,
+  options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = formatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options);
+    formatterCache.set(key, formatter);
+  }
+  return formatter;
+}
+
 function formatInBelgiumTimezone(
   date: Date,
   locale: string,
   options: Intl.DateTimeFormatOptions
 ): string {
-  return new Intl.DateTimeFormat(locale, {
-    ...options,
-    timeZone: EVENT_TIMEZONE,
-  }).format(date);
+  return getDateFormatter(locale, { ...options, timeZone: EVENT_TIMEZONE }).format(date);
 }
 
 function getDatePartsInBelgium(date: Date): {
@@ -42,7 +60,7 @@ function getDatePartsInBelgium(date: Date): {
   hour: number;
   minute: number;
 } {
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  const formatter = getDateFormatter('en-US', {
     timeZone: EVENT_TIMEZONE,
     year: 'numeric',
     month: '2-digit',

@@ -181,7 +181,19 @@ function RootNavigator() {
           name="event-edit/[id]"
           options={{ headerShown: false, gestureEnabled: false }}
         />
-        <Stack.Screen name="draft-edit/[id]" options={{ headerShown: false }} />
+        {/* gestureEnabled: false so a swipe-back cannot bypass the
+            unsaved-changes guard (mirrors event-edit above). */}
+        <Stack.Screen
+          name="draft-edit/[id]"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        {/* Triage deck: presented modally and outside the tabs, so the tab bar
+            is hidden and the deck owns the whole screen. gestureEnabled: false
+            because a swipe-back would fight the card's own pan gesture. */}
+        <Stack.Screen
+          name="draft-triage"
+          options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
+        />
       </Stack.Protected>
 
       {/* Public routes: always accessible */}

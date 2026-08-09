@@ -54,6 +54,10 @@ export const STORAGE_KEYS = {
   // it's an anonymous device preference that should survive logout and stay
   // usable for logged-out browsers (explore/maps are public).
   HOME_AREA: 'homeArea',
+  // One-shot flag: the drafts list teaches its swipe actions by animating the
+  // first row open once per install (the rows have no visible buttons). An
+  // anonymous UI preference, so deliberately NOT in USER_DATA_KEYS.
+  DRAFT_SWIPE_HINT_SEEN: 'draftSwipeHintSeen',
 } as const;
 
 /**

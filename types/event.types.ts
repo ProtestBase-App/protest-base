@@ -58,6 +58,21 @@ export interface Event {
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
 
+  // Origin of the event: 'user' (app/website) or 'automation' (scraper pipeline).
+  // The backend defaults it to 'user' in every response; only drafts surface it
+  // in the UI, where an automation draft is labelled as such.
+  created_via?: EventCreatedVia;
+
+  // Automation drafts only. 0-100 corroboration score with its per-check
+  // breakdown. `null` means NEVER SCORED (human draft, or an uncrawlable
+  // source) and must render nothing — distinct from a scored 0, which means
+  // nothing could be corroborated and renders loudly. Always test with
+  // `hasConfidenceScore()`, never `!score`.
+  confidence_score?: number | null;
+  // Free-form by backend design: the checks live in the automation workflow and
+  // evolve without a backend deploy, so parse defensively.
+  confidence_details?: Record<string, unknown> | null;
+
   // Only populated when includeAvatars=true.
   organizer_avatar?: string | null;
   co_organizer_avatars?: CoOrganizerAvatar[];
@@ -74,6 +89,12 @@ export interface Event {
  *   `includeCancelled` query param (defaults to false client-side).
  */
 export type EventStatus = 'draft' | 'active' | 'cancelled' | 'past';
+
+/**
+ * How the event entered the system. Drafts ingested by the scraping pipeline are
+ * 'automation'; anything a human created in the app or on the website is 'user'.
+ */
+export type EventCreatedVia = 'user' | 'automation';
 
 /** Image object from expo-image-picker. */
 export interface PickedImage {

@@ -9,7 +9,8 @@ import { getThemeColors } from '@/utils/themeColors';
 
 // Text on the green publish pill — constant by design (dark text on the live
 // green regardless of theme, same exception class as white-on-tint).
-const PUBLISH_PILL_TEXT = '#0E1117';
+/** Near-black used for text/icons on a `live`-green fill (contrast). */
+export const PUBLISH_PILL_TEXT = '#0E1117';
 
 export type ActionPillVariant = 'primary' | 'ghost' | 'publish' | 'disabled';
 

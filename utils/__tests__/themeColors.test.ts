@@ -153,6 +153,14 @@ describe('getThemeColors', () => {
       expect(colors).toHaveProperty('icon');
       expect(colors).toHaveProperty('surfaceAltBackground');
       expect(colors).toHaveProperty('shareButtonBg');
+      expect(colors).toHaveProperty('liveText');
+      expect(colors).toHaveProperty('modalBackdrop');
+    });
+
+    // Green text on a light background needs a darker green than the fill color.
+    it('darkens the green used for text in light mode only', () => {
+      expect(getThemeColors('light').liveText).toBe('#2E9C63');
+      expect(getThemeColors('dark').liveText).toBe(getThemeColors('dark').live);
     });
 
     it('should return all color properties from getThemeColors', () => {
@@ -160,10 +168,12 @@ describe('getThemeColors', () => {
       const propertyCount = Object.keys(colors).length;
 
       // Dynamically validate against actual source — count should stay in sync
-      // 46 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
+      // 48 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
       //    + 8 map overlay tokens (maps tab) + live/liveBg ("En cours" badge)
       //    + liveBorder (upcoming timeline ongoing rows)
-      expect(propertyCount).toBe(46);
+      //    + liveText/modalBackdrop (drafts redesign: contrast-safe green text,
+      //      recessed triage backdrop)
+      expect(propertyCount).toBe(48);
     });
 
     it('should have all properties as strings', () => {

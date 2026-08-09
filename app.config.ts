@@ -89,6 +89,29 @@ export default (): ExpoConfig => {
       ...(appEnv === 'production' ? { associatedDomains: ['applinks:protestbase.be'] } : {}),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // Non-production builds talk to test backends over cleartext HTTP, which
+        // App Transport Security blocks by default. Expo's own default
+        // (NSAllowsLocalNetworking) only covers .local, link-local and the
+        // RFC1918 private ranges — so a LAN IP like 192.168.x works, but a
+        // Tailscale address does NOT: the tailnet uses 100.64.0.0/10 (RFC 6598
+        // shared space), which iOS does not treat as "local networking" and
+        // refuses with NSURLErrorDomain -1022.
+        //
+        // Production is deliberately excluded: it speaks HTTPS to
+        // api.protestbase.be and must keep ATS strict (App Review would also
+        // require a justification for arbitrary loads).
+        // NSAllowsLocalNetworking is deliberately NOT set alongside this: iOS 10+
+        // IGNORES NSAllowsArbitraryLoads whenever one of the newer granular keys
+        // (NSAllowsLocalNetworking, NSAllowsArbitraryLoadsInWebContent) is
+        // present, so setting both silently reinstates the block. Arbitrary loads
+        // already covers local addresses, so nothing is lost.
+        ...(appEnv === 'production'
+          ? {}
+          : {
+              NSAppTransportSecurity: {
+                NSAllowsArbitraryLoads: true,
+              },
+            }),
       },
       entitlements: {
         // App Attest environment. Production builds talk to Apple's production

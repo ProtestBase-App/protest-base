@@ -4,6 +4,7 @@ import {
   Event,
   CreateEventRequest,
   CreateDraftRequest,
+  EventCreatedVia,
   UpdateEventRequest,
   PublishDraftResponse,
   PickedImage,
@@ -769,7 +770,10 @@ export interface EventCounts {
 /**
  * Fetch event counts (upcoming/ongoing, past and draft) for the current user's
  * organizations. Upcoming uses a startDate filter then filters for ongoing; past
- * uses an endDate filter; draft uses the dedicated drafts endpoint's total.
+ * uses an endDate filter; draft sums the dedicated drafts endpoint's total over
+ * every organization.
+ *
+ * Note: upcoming and past still count the FIRST organization only.
  *
  * @param organizationIds - Array of organization IDs to fetch event counts for
  * @returns Object containing upcoming, past and draft event counts
@@ -783,13 +787,15 @@ export async function fetchEventCounts(organizationIds: string[]): Promise<Event
     // Look back to include ongoing events that started recently.
     const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
 
-    const [upcomingResponse, pastResponse, draftResponse] = await Promise.all([
+    const [upcomingResponse, pastResponse, draftTotal] = await Promise.all([
       getOrganizationUpcomingEvents(organizationIds[0], {
         startDate: lookbackDate,
         limit: API_LIMITS.EVENTS_DEFAULT,
       }),
       getOrganizationPastEvents(organizationIds[0], { limit: 1 }),
-      getDraftEvents(organizationIds[0], { limit: 1 }),
+      // Drafts count every org the user belongs to — the drafts list shows them
+      // all, so a first-org-only badge would under-report unpublished work.
+      getDraftsTotalForOrganizations(organizationIds),
     ]);
 
     const ongoingCount = upcomingResponse.events.filter((event) => isEventOngoing(event)).length;
@@ -797,11 +803,41 @@ export async function fetchEventCounts(organizationIds: string[]): Promise<Event
     return {
       upcoming: ongoingCount,
       past: pastResponse.total,
-      draft: draftResponse.total,
+      draft: draftTotal,
     };
   } catch (error: any) {
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch event counts');
   }
+}
+
+/**
+ * Summed draft total across organizations, for the badge counts only.
+ *
+ * Unlike `getDraftEventsForOrganizations` (which backs the drafts list and fails
+ * loud), a single org's failure here degrades to a lower count instead of
+ * rejecting: this call sits inside `fetchEventCounts`' Promise.all, so throwing
+ * would blank the whole organizer dashboard — including the upcoming and past
+ * counts, which have nothing to do with drafts. The list remains the
+ * authoritative surface and still errors loudly.
+ */
+async function getDraftsTotalForOrganizations(organizationIds: string[]): Promise<number> {
+  const results = await Promise.allSettled(
+    organizationIds.map((organizationId) => getDraftEvents(organizationId, { limit: 1 }))
+  );
+
+  let total = 0;
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      total += result.value.total;
+    } else {
+      logger.warn('[EventService] Draft count failed for one organization', {
+        organizationId: organizationIds[index],
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+    }
+  }
+
+  return total;
 }
 
 // ---------------------------------------------------------------------------
@@ -827,24 +863,52 @@ export async function createDraftEvent(eventData: CreateDraftRequest): Promise<E
 }
 
 /**
+ * Server-side filters supported by GET /events/drafts, alongside pagination.
+ * All optional; an absent filter means "no restriction".
+ *
+ * When any filter is set the backend scans the org's drafts, filters in memory
+ * and paginates the FILTERED set, so `total` stays the exact post-filter count —
+ * pagination therefore needs no special handling on the client.
+ */
+export interface DraftEventsQuery {
+  limit?: number;
+  offset?: number;
+  /** Organizer/co-organizer avatars. Off by default — the drafts UI shows none. */
+  includeAvatars?: boolean;
+  /** Substring match over title OR description OR any category (max 200 chars). */
+  search?: string;
+  /** Exact category membership. */
+  category?: string;
+  /** Event origin: 'user' (created in the app/website) or 'automation'. */
+  createdVia?: EventCreatedVia;
+}
+
+/**
  * List draft events for an organization. Auth + membership gated; the public
  * /events list never returns drafts.
  *
  * @param organizationId - The organization whose drafts to fetch
- * @param options - Optional pagination (limit, offset)
+ * @param options - Optional pagination and server-side filters
  * @returns Object containing the draft events array and total count
  */
 export async function getDraftEvents(
   organizationId: string,
-  options?: { limit?: number; offset?: number }
+  options?: DraftEventsQuery
 ): Promise<OrganizationEventsResponse> {
   try {
     const params: Record<string, string | number | boolean> = {
       organization_id: organizationId,
-      includeAvatars: true,
     };
+    // Opt-in only: no drafts surface renders an organizer avatar, and asking for
+    // them costs two extra backend queries plus a larger payload for the JS
+    // thread to parse — which is felt as jank on a 500-row page.
+    if (options?.includeAvatars) params.includeAvatars = true;
     if (options?.limit) params.limit = options.limit;
     if (options?.offset) params.offset = options.offset;
+    // Backend caps search at 200 chars and 400s a longer one.
+    if (options?.search?.trim()) params.search = options.search.trim().slice(0, 200);
+    if (options?.category) params.category = options.category;
+    if (options?.createdVia) params.created_via = options.createdVia;
 
     logger.debug('[EventService] getDraftEvents called', { organizationId, params });
 
@@ -864,6 +928,56 @@ export async function getDraftEvents(
   } catch (error: any) {
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch draft events');
   }
+}
+
+/**
+ * List draft events across several organizations (typically all of the user's
+ * own). `/events/drafts` takes a single organization_id, so each org is queried
+ * in parallel with the same limit/offset and the pages are merged: events
+ * concatenated (deduped by $id) and totals summed.
+ *
+ * Ordering is not meaningful across a merged page — the backend sorts each org's
+ * drafts by start_time and callers re-sort the accumulated list (see
+ * draft-events.tsx). Completeness is preserved: the union of the per-org pages
+ * covers every draft, at the cost of a possible empty tail request for orgs that
+ * ran out of rows earlier than others.
+ *
+ * A single org's failure rejects the whole call on purpose — a silently short
+ * list of unpublished work is worse than an error state.
+ *
+ * @param organizationIds - The organizations whose drafts to fetch
+ * @param options - Optional pagination and filters, applied per organization
+ * @returns Object containing the merged draft events array and summed total
+ */
+export async function getDraftEventsForOrganizations(
+  organizationIds: string[],
+  options?: DraftEventsQuery
+): Promise<OrganizationEventsResponse> {
+  if (organizationIds.length === 0) {
+    return { events: [], total: 0 };
+  }
+  if (organizationIds.length === 1) {
+    return getDraftEvents(organizationIds[0], options);
+  }
+
+  const responses = await Promise.all(
+    organizationIds.map((organizationId) => getDraftEvents(organizationId, options))
+  );
+
+  const seen = new Set<string>();
+  const events: Event[] = [];
+  let total = 0;
+
+  for (const response of responses) {
+    total += response.total;
+    for (const event of response.events) {
+      if (seen.has(event.$id)) continue;
+      seen.add(event.$id);
+      events.push(event);
+    }
+  }
+
+  return { events, total };
 }
 
 /**
@@ -965,6 +1079,20 @@ export class EventIncompleteError extends Error {
 }
 
 /**
+ * Thrown when POST /events/:id/publish returns 409 EVENT_NOT_DRAFT — the event
+ * is no longer a draft, i.e. it was already published (typically from the web
+ * dashboard, or a duplicate tap) while this client still listed it as one.
+ * Callers should treat it as success-in-effect: drop the row and refresh.
+ */
+export class EventNotDraftError extends Error {
+  code = 'EVENT_NOT_DRAFT' as const;
+  constructor() {
+    super('This event has already been published');
+    this.name = 'EventNotDraftError';
+  }
+}
+
+/**
  * Publish a draft event. The backend returns the resulting status: 'active' for
  * a future-dated event, 'past' for a past-dated one (the backend does NOT block
  * past-dated publishes — callers must run the client readiness check first).
@@ -972,6 +1100,7 @@ export class EventIncompleteError extends Error {
  * @param eventId - The ID of the draft to publish
  * @returns The resulting { $id, status }
  * @throws EventIncompleteError on 422 (missing required fields)
+ * @throws EventNotDraftError on 409 (already published)
  */
 export async function publishDraft(eventId: string): Promise<PublishDraftResponse> {
   try {
@@ -988,8 +1117,17 @@ export async function publishDraft(eventId: string): Promise<PublishDraftRespons
 
     return response.data.data;
   } catch (error: any) {
+    // The api.ts interceptor rewrites a 429 into a RateLimitError that carries NO
+    // `.response`, so this guard MUST come before any error.response reads or the
+    // message degrades to the generic fallback (see auth error-swallow contract).
+    if (error?.isRateLimited || error?.code === 'RATE_LIMIT_EXCEEDED') {
+      throw error;
+    }
     if (error.response?.status === 422 && error.response?.data?.code === 'EVENT_INCOMPLETE') {
       throw new EventIncompleteError(error.response.data.fields ?? []);
+    }
+    if (error.response?.status === 409) {
+      throw new EventNotDraftError();
     }
     if (error.response?.status === 401) {
       throw new Error('Please log in to publish this event');

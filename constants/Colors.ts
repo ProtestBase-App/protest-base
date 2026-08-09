@@ -35,6 +35,9 @@ export const Colors = {
     highlightIconBackground: '#E0F2F7',
     calendarAccent: tintColorLight,
     calendarDotDefault: tintColorLight,
+    // Recessed backdrop for full-screen modal decks (triage mode), so the card
+    // on top reads as elevated above it.
+    modalBackdrop: '#F1F1F4',
   },
   dark: {
     text: '#FFFFFF',
@@ -64,6 +67,7 @@ export const Colors = {
     highlightIconBackground: '#2A3F4A',
     calendarAccent: tintColorDark,
     calendarDotDefault: tintColorDark,
+    modalBackdrop: '#12121C',
   },
   semantic: {
     success: '#34C759',

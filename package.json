@@ -13,7 +13,8 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --config jest.ci.config.js --ci --maxWorkers=2",
     "test:integration": "jest --testPathPattern='__integration_tests__'",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "check:lockfile": "node scripts/check-lockfile-emnapi.js"
   },
   "dependencies": {
     "@expo/app-integrity": "^57.0.1",
@@ -68,6 +69,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@emnapi/core": "1.10.0",
+    "@emnapi/runtime": "1.10.0",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",

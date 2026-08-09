@@ -17,9 +17,20 @@ interface SearchInputProps {
   styleProps?: object;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
+  /** Placeholder override; defaults to the explore-tab wording. */
+  placeholder?: string;
+  /** Accessibility label for the text field (defaults to the placeholder). */
+  accessibilityLabel?: string;
 }
 
-const SearchInput = ({ initialQuery, onSearch, styleProps, testID }: SearchInputProps) => {
+const SearchInput = ({
+  initialQuery,
+  onSearch,
+  styleProps,
+  testID,
+  placeholder,
+  accessibilityLabel,
+}: SearchInputProps) => {
   const [query, setQuery] = useState(
     typeof initialQuery === 'string' ? initialQuery : initialQuery?.join(' ') || ''
   );
@@ -78,7 +89,8 @@ const SearchInput = ({ initialQuery, onSearch, styleProps, testID }: SearchInput
           colorScheme === 'dark' ? styles.textInputDark : styles.textInputLight,
         ]}
         value={query}
-        placeholder={t('explore.searchPlaceholder')}
+        placeholder={placeholder ?? t('explore.searchPlaceholder')}
+        accessibilityLabel={accessibilityLabel ?? placeholder ?? t('explore.searchPlaceholder')}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholderTextColor={themeColors.placeholder}

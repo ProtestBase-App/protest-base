@@ -154,7 +154,9 @@ describe('getDraftStatus', () => {
       expect(result.missingFieldKeys).toContain('drafts.fieldCategory');
     });
 
-    it('returns missing when both city and street_address are absent', () => {
+    // Location is not a publish-blocking rule (backend gates description +
+    // categories only), so a locationless draft is publishable.
+    it('returns ready when both city and street_address are absent', () => {
       const event = createMockEvent({
         description: 'Valid description',
         categories: ['Strike'],
@@ -165,11 +167,11 @@ describe('getDraftStatus', () => {
 
       const result = getDraftStatus(event, NOW);
 
-      expect(result.kind).toBe('missing');
-      expect(result.missingFieldKeys).toContain('drafts.fieldLocation');
+      expect(result.kind).toBe('ready');
+      expect(result.missingFieldKeys).toEqual([]);
     });
 
-    it('returns missing when city is an empty string and street_address is absent', () => {
+    it('returns ready when city is blank and street_address is absent', () => {
       const event = createMockEvent({
         description: 'Valid description',
         categories: ['Strike'],
@@ -180,8 +182,7 @@ describe('getDraftStatus', () => {
 
       const result = getDraftStatus(event, NOW);
 
-      expect(result.kind).toBe('missing');
-      expect(result.missingFieldKeys).toContain('drafts.fieldLocation');
+      expect(result.kind).toBe('ready');
     });
 
     it('returns missing with drafts.fieldDate when start_time is absent (undefined)', () => {
@@ -228,7 +229,7 @@ describe('getDraftStatus', () => {
       expect(result.missingFieldKeys).toContain('drafts.fieldDate');
     });
 
-    it('accumulates all four missing field keys when the draft is completely empty', () => {
+    it('accumulates every missing field key when the draft is completely empty', () => {
       const event = createMockEvent({
         description: '',
         categories: [],
@@ -240,10 +241,13 @@ describe('getDraftStatus', () => {
       const result = getDraftStatus(event, NOW);
 
       expect(result.kind).toBe('missing');
-      expect(result.missingFieldKeys).toContain('drafts.fieldDescription');
-      expect(result.missingFieldKeys).toContain('drafts.fieldCategory');
-      expect(result.missingFieldKeys).toContain('drafts.fieldLocation');
-      expect(result.missingFieldKeys).toContain('drafts.fieldDate');
+      expect(result.missingFieldKeys).toEqual([
+        'drafts.fieldDescription',
+        'drafts.fieldCategory',
+        'drafts.fieldDate',
+      ]);
+      // Location is not a publish rule, so it never appears in the line.
+      expect(result.missingFieldKeys).not.toContain('drafts.fieldLocation');
     });
   });
 

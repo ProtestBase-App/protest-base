@@ -40,6 +40,7 @@ import {
   fetchEventCounts,
   createDraftEvent,
   getDraftEvents,
+  getDraftEventsForOrganizations,
   getDraftEventPreview,
   patchEvent,
   publishDraft,
@@ -1365,26 +1366,60 @@ describe('event.service', () => {
       expect(result.draft).toBe(0);
     });
 
-    it('fetches drafts from the drafts endpoint scoped to the first organizationId', async () => {
+    it('sums the drafts total across every organization', async () => {
+      mockApi.get
+        // Upcoming + past (first organization only).
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        })
+        // One drafts request per organization.
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 2 } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 3 } },
+        })
+        .mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 4 } },
+        });
+
+      const result = await fetchEventCounts(['org-1', 'org-2', 'org-3']);
+
+      // Upcoming + past still hit the org events endpoint for the first org only.
+      expect(mockApi.get.mock.calls[0][0]).toBe('/organizations/org-1/events');
+      expect(mockApi.get.mock.calls[1][0]).toBe('/organizations/org-1/events');
+
+      const draftOrgIds = mockApi.get.mock.calls
+        .filter((call) => call[0] === '/events/drafts')
+        .map((call) => (call[1]?.params as Record<string, unknown>)?.organization_id);
+      expect(draftOrgIds).toEqual(['org-1', 'org-2', 'org-3']);
+      expect(result.draft).toBe(9);
+    });
+
+    // The drafts fan-out degrades instead of rejecting: it sits inside the same
+    // Promise.all as the upcoming/past counts, so throwing would blank the whole
+    // organizer dashboard over one org's transient failure.
+    it('keeps the other counts when one organization drafts request fails', async () => {
       mockApi.get
         .mockResolvedValueOnce({
           data: { success: true, data: { events: [], total: 0 } },
         })
         .mockResolvedValueOnce({
-          data: { success: true, data: { events: [], total: 0 } },
+          data: { success: true, data: { events: [], total: 7 } },
         })
         .mockResolvedValueOnce({
-          data: { success: true, data: { events: [], total: 0 } },
-        });
+          data: { success: true, data: { events: [], total: 2 } },
+        })
+        .mockRejectedValueOnce({ message: 'Network Error' });
 
-      await fetchEventCounts(['org-1', 'org-2', 'org-3']);
+      const result = await fetchEventCounts(['org-1', 'org-2']);
 
-      // Upcoming + past hit the org events endpoint; drafts hit /events/drafts.
-      expect(mockApi.get.mock.calls[0][0]).toBe('/organizations/org-1/events');
-      expect(mockApi.get.mock.calls[1][0]).toBe('/organizations/org-1/events');
-      const draftCall = mockApi.get.mock.calls.find((call) => call[0] === '/events/drafts');
-      expect(draftCall).toBeDefined();
-      expect((draftCall?.[1]?.params as Record<string, unknown>)?.organization_id).toBe('org-1');
+      expect(result.past).toBe(7);
+      // org-2's drafts are missing from the badge, but the dashboard still renders.
+      expect(result.draft).toBe(2);
     });
 
     it('throws with error message on API failure', async () => {
@@ -1435,7 +1470,7 @@ describe('event.service', () => {
     });
 
     describe('getDraftEvents', () => {
-      it('requests /events/drafts with organization_id, includeAvatars and pagination', async () => {
+      it('requests /events/drafts with organization_id and pagination', async () => {
         mockApi.get.mockResolvedValueOnce({
           data: { success: true, data: { events: [makeEvent()], total: 1 } },
         });
@@ -1446,7 +1481,6 @@ describe('event.service', () => {
         expect(url).toBe('/events/drafts');
         expect(config.params).toEqual({
           organization_id: 'org-1',
-          includeAvatars: true,
           limit: 10,
           offset: 20,
         });
@@ -1454,9 +1488,142 @@ describe('event.service', () => {
         expect(result.events).toHaveLength(1);
       });
 
+      // Avatars cost two extra backend queries and inflate a 500-row payload that
+      // the JS thread has to parse; no drafts surface renders one.
+      it('does not ask for avatars unless explicitly requested', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
+        await getDraftEvents('org-1');
+        expect(mockApi.get.mock.calls[0][1]?.params).not.toHaveProperty('includeAvatars');
+
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
+        await getDraftEvents('org-1', { includeAvatars: true });
+        const withAvatars = mockApi.get.mock.calls[1][1]?.params as Record<string, unknown>;
+        expect(withAvatars.includeAvatars).toBe(true);
+      });
+
       it('throws when success is false', async () => {
         mockApi.get.mockResolvedValueOnce({ data: { success: false } });
         await expect(getDraftEvents('org-1')).rejects.toThrow('Failed to fetch draft events');
+      });
+
+      it('forwards the server-side search, category and created_via filters', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
+
+        await getDraftEvents('org-1', {
+          search: '  climate  ',
+          category: 'Strike',
+          createdVia: 'automation',
+        });
+
+        const [, config]: any[] = mockApi.get.mock.calls[0];
+        // Trimmed, and mapped to the snake_case param the endpoint expects.
+        expect(config.params).toEqual({
+          organization_id: 'org-1',
+          search: 'climate',
+          category: 'Strike',
+          created_via: 'automation',
+        });
+      });
+
+      it('omits filter params that are absent or blank', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
+
+        await getDraftEvents('org-1', { search: '   ' });
+
+        const [, config]: any[] = mockApi.get.mock.calls[0];
+        expect(config.params).not.toHaveProperty('search');
+        expect(config.params).not.toHaveProperty('category');
+        expect(config.params).not.toHaveProperty('created_via');
+      });
+
+      // The backend rejects a search over 200 chars, which would turn a long
+      // paste into a 400 instead of a (useless but harmless) empty result.
+      it('truncates a search longer than the backend maximum', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [], total: 0 } },
+        });
+
+        await getDraftEvents('org-1', { search: 'x'.repeat(250) });
+
+        const [, config]: any[] = mockApi.get.mock.calls[0];
+        expect(config.params.search).toHaveLength(200);
+      });
+    });
+
+    describe('getDraftEventsForOrganizations', () => {
+      it('returns empty without a request when there are no organizations', async () => {
+        const result = await getDraftEventsForOrganizations([]);
+
+        expect(mockApi.get).not.toHaveBeenCalled();
+        expect(result).toEqual({ events: [], total: 0 });
+      });
+
+      it('queries a single organization directly', async () => {
+        mockApi.get.mockResolvedValueOnce({
+          data: { success: true, data: { events: [makeEvent({ $id: 'd1' })], total: 1 } },
+        });
+
+        const result = await getDraftEventsForOrganizations(['org-1'], { limit: 5, offset: 0 });
+
+        expect(mockApi.get).toHaveBeenCalledTimes(1);
+        const [, config]: any[] = mockApi.get.mock.calls[0];
+        expect(config.params.organization_id).toBe('org-1');
+        expect(result.total).toBe(1);
+      });
+
+      it('merges every organization page and sums the totals', async () => {
+        mockApi.get
+          .mockResolvedValueOnce({
+            data: { success: true, data: { events: [makeEvent({ $id: 'a1' })], total: 3 } },
+          })
+          .mockResolvedValueOnce({
+            data: {
+              success: true,
+              data: { events: [makeEvent({ $id: 'b1' }), makeEvent({ $id: 'b2' })], total: 2 },
+            },
+          });
+
+        const result = await getDraftEventsForOrganizations(['org-1', 'org-2'], { limit: 100 });
+
+        expect(mockApi.get).toHaveBeenCalledTimes(2);
+        const orgParams = mockApi.get.mock.calls.map(
+          ([, config]: any[]) => config.params.organization_id
+        );
+        expect(orgParams).toEqual(['org-1', 'org-2']);
+        expect(result.events.map((e) => e.$id)).toEqual(['a1', 'b1', 'b2']);
+        expect(result.total).toBe(5);
+      });
+
+      it('dedupes an event returned by more than one organization', async () => {
+        mockApi.get
+          .mockResolvedValueOnce({
+            data: { success: true, data: { events: [makeEvent({ $id: 'dup' })], total: 1 } },
+          })
+          .mockResolvedValueOnce({
+            data: { success: true, data: { events: [makeEvent({ $id: 'dup' })], total: 1 } },
+          });
+
+        const result = await getDraftEventsForOrganizations(['org-1', 'org-2']);
+
+        expect(result.events).toHaveLength(1);
+      });
+
+      it('rejects when one organization fails rather than returning a short list', async () => {
+        mockApi.get
+          .mockResolvedValueOnce({
+            data: { success: true, data: { events: [makeEvent({ $id: 'a1' })], total: 1 } },
+          })
+          .mockRejectedValueOnce({ response: { data: { error: 'Boom' } } });
+
+        await expect(getDraftEventsForOrganizations(['org-1', 'org-2'])).rejects.toThrow('Boom');
       });
     });
 
@@ -1532,6 +1699,33 @@ describe('event.service', () => {
         await expect(publishDraft('d1')).rejects.toMatchObject({
           name: 'EventIncompleteError',
           fields: ['description', 'categories'],
+        });
+      });
+
+      it('throws EventNotDraftError on 409 (already published elsewhere)', async () => {
+        mockApi.post.mockRejectedValueOnce({
+          response: { status: 409, data: { code: 'EVENT_NOT_DRAFT' } },
+        });
+
+        await expect(publishDraft('d1')).rejects.toMatchObject({
+          name: 'EventNotDraftError',
+          code: 'EVENT_NOT_DRAFT',
+        });
+      });
+
+      // The api.ts interceptor turns a 429 into a RateLimitError with NO
+      // `.response`, so reading error.response.status first would swallow the
+      // rate-limit signal into the generic fallback message.
+      it('re-throws the interceptor rate-limit error with its flags intact', async () => {
+        const rateLimited = Object.assign(new Error('Too many requests.'), {
+          code: 'RATE_LIMIT_EXCEEDED',
+          isRateLimited: true,
+        });
+        mockApi.post.mockRejectedValueOnce(rateLimited);
+
+        await expect(publishDraft('d1')).rejects.toMatchObject({
+          code: 'RATE_LIMIT_EXCEEDED',
+          isRateLimited: true,
         });
       });
     });

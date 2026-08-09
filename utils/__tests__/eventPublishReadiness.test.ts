@@ -38,17 +38,15 @@ describe('getPublishIssues', () => {
     expect(codes({ ...validInput, categories: ['Strike'] })).not.toContain('CATEGORY_REQUIRED');
   });
 
-  it('flags a missing location when both city and street_address are empty', () => {
-    expect(codes({ ...validInput, city: '', street_address: '' })).toContain('LOCATION_REQUIRED');
-  });
-
-  it('accepts a location given either city only or street_address only', () => {
-    expect(codes({ ...validInput, city: 'Ghent', street_address: '' })).not.toContain(
+  // The backend's collectPublishReadinessErrors gates description + categories
+  // only, and the website's equivalent util deliberately skips location too.
+  // Gating it here refused publishes the web performs — automation drafts
+  // routinely arrive with no city.
+  it('does NOT block publishing when both city and street_address are empty', () => {
+    expect(codes({ ...validInput, city: '', street_address: '' })).not.toContain(
       'LOCATION_REQUIRED'
     );
-    expect(codes({ ...validInput, city: '', street_address: 'Main St 1' })).not.toContain(
-      'LOCATION_REQUIRED'
-    );
+    expect(codes({ ...validInput, city: undefined, street_address: undefined })).toEqual([]);
   });
 
   it('flags a past start_time', () => {
@@ -72,11 +70,11 @@ describe('getPublishIssues', () => {
       expect.arrayContaining([
         'DESCRIPTION_REQUIRED',
         'CATEGORY_REQUIRED',
-        'LOCATION_REQUIRED',
         'START_TIME_FUTURE_REQUIRED',
       ])
     );
-    expect(result).toHaveLength(4);
+    // Three rules, not four — location is not one of them.
+    expect(result).toHaveLength(3);
   });
 
   it('attaches an i18n message key to every issue', () => {

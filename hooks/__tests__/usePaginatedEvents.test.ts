@@ -566,4 +566,88 @@ describe('usePaginatedEvents', () => {
       expect(fetchFn).not.toHaveBeenCalled();
     });
   });
+
+  describe('refetchKey (server-side filters)', () => {
+    it('fetches once on mount, not twice, when a refetchKey is supplied', async () => {
+      const fetchFn = jest.fn().mockResolvedValue(makeResponse(2, 2));
+
+      const { result } = renderHook(() =>
+        usePaginatedEvents({ fetchFn, formatFn, pageSize: 10, refetchKey: 'a' })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('refetches page 1 when the key changes', async () => {
+      const fetchFn = jest.fn().mockResolvedValue(makeResponse(2, 2));
+
+      const { result, rerender } = renderHook(
+        ({ key }: { key: string }) =>
+          usePaginatedEvents({ fetchFn, formatFn, pageSize: 10, refetchKey: key }),
+        { initialProps: { key: 'a' } }
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ key: 'b' });
+
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+      // Page 1, not a continuation of the previous filter's pagination.
+      expect(fetchFn.mock.calls[1][1]).toBe(0);
+    });
+
+    it('does not raise the initial-load flag on a filter change', async () => {
+      const fetchFn = jest.fn().mockResolvedValue(makeResponse(2, 2));
+
+      const { result, rerender } = renderHook(
+        ({ key }: { key: string }) =>
+          usePaginatedEvents({ fetchFn, formatFn, pageSize: 10, refetchKey: key }),
+        { initialProps: { key: 'a' } }
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Never resolves: the rows from the previous filter must stay on screen
+      // instead of the screen flashing its splash.
+      fetchFn.mockReturnValueOnce(new Promise(() => {}));
+      rerender({ key: 'b' });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.refreshing).toBe(false);
+      expect(result.current.events).toHaveLength(2);
+    });
+
+    it('discards a superseded in-flight response', async () => {
+      let resolveFirst: ((value: unknown) => void) | undefined;
+      const fetchFn = jest
+        .fn()
+        // Mount fetch, resolved so the hook reaches its loaded state.
+        .mockResolvedValueOnce(makeResponse(1, 1, 1))
+        // Filter A: held open, resolves LAST with stale rows.
+        .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+        // Filter B: resolves immediately and must win.
+        .mockResolvedValueOnce(makeResponse(1, 1, 99));
+
+      const { result, rerender } = renderHook(
+        ({ key }: { key: string }) =>
+          usePaginatedEvents({ fetchFn, formatFn, pageSize: 10, refetchKey: key }),
+        { initialProps: { key: 'mount' } }
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ key: 'a' });
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+      rerender({ key: 'b' });
+      await waitFor(() => expect(result.current.events[0].id).toBe('99'));
+
+      // The stale response lands after the winner — it must be dropped.
+      await act(async () => {
+        resolveFirst?.(makeResponse(1, 1, 1));
+      });
+
+      expect(result.current.events[0].id).toBe('99');
+    });
+  });
 });

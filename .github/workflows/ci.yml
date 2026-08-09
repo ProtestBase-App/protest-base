@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check lockfile @emnapi entries
+        run: npm run check:lockfile
+
       - name: Check formatting (Prettier)
         run: npx prettier --check "**/*.{ts,tsx,js,jsx,json}" --ignore-path .gitignore
 

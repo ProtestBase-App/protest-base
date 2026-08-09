@@ -43,6 +43,7 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
     cardBackground: c.cardBackground,
     surfaceBackground: c.surfaceBackground,
     surfaceAltBackground: c.surfaceAltBackground,
+    modalBackdrop: c.modalBackdrop,
     inputBackground: c.inputBackground,
     headerBackground: c.headerBackground,
 
@@ -63,6 +64,9 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
     // "En cours" (in-progress) badge — live green, identical in both themes.
     live: '#3DBE7B',
     liveBg: 'rgba(61, 190, 123, 0.14)',
+    // Green for TEXT and thin outlines: #3DBE7B fails contrast on light
+    // backgrounds, so light mode darkens it. Fills keep using `live`.
+    liveText: isDark ? '#3DBE7B' : '#2E9C63',
     // Card outline for ongoing rows on the upcoming timeline (~27% alpha,
     // matching the CategoryColors border convention).
     liveBorder: 'rgba(61, 190, 123, 0.27)',
