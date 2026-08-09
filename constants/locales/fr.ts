@@ -232,6 +232,9 @@ const fr: LocaleData = {
       'Vous avez des modifications non enregistrées. Si vous quittez maintenant, elles seront perdues.',
     keepEditing: 'Continuer les modifications',
     discardConfirm: 'Abandonner',
+    // Under the date field of a date-only event. Picking a clock time is what
+    // turns it into a normal timed event — there is no toggle.
+    allDayHint: 'Aucune heure de début. Choisissez-en une pour donner une heure à cet événement.',
   },
 
   // ============================================
@@ -419,6 +422,8 @@ const fr: LocaleData = {
     description: 'Description',
     date: 'Date',
     time: 'Heure',
+    // Shown instead of a clock time when the event is date-only (all_day).
+    allDay: 'Toute la journée',
     location: 'Lieu',
     organizer: 'Organisateur',
     organizedBy: 'Organisé par',

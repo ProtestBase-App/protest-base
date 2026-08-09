@@ -20,7 +20,7 @@ jest.mock('@/context/PostalCodeProvider', () => ({
 }));
 
 jest.mock('@/utils/eventFormatters', () => ({
-  formatEventDateTime: jest.fn(() => 'Mar 15, 2025 14:00'),
+  formatEventDateTimeLabel: jest.fn(() => 'Mar 15, 2025 14:00'),
   // Real implementations needed: getEffectiveEndTime() (called from onSave)
   // parses end_time via parseAsUTC, and isEventInProgress() resolves Belgium
   // day keys via EVENT_TIMEZONE.

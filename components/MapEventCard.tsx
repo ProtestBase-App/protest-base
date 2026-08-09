@@ -7,7 +7,7 @@ import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColo
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { Event } from '@/types/event.types';
 import { formatCompactCount } from '@/utils/calendarTabUtils';
-import { formatEventTime } from '@/utils/eventFormatters';
+import { formatEventStartLabel } from '@/utils/eventFormatters';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { t } from '@/utils/i18n';
 import { formatMapCardDateLabel } from '@/utils/mapTabUtils';
@@ -56,7 +56,7 @@ function MapEventCard({
   const categoryLabel = displayedCategory ? formatCategoryLabel(displayedCategory) : null;
 
   const dateLabel = formatMapCardDateLabel(event, userLanguage, todayKey, t('maps.today'));
-  const timeLabel = formatEventTime(event.start_time, userLanguage);
+  const timeLabel = formatEventStartLabel(event, userLanguage);
   const place = event.street_address || event.city || '';
   const secondary = [dateLabel, timeLabel, place].filter(Boolean).join(' · ');
 

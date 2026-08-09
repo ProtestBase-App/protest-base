@@ -249,6 +249,10 @@ export default function ExploreTab() {
         country: item.country || '',
         start_time: item.startDateFull,
         end_time: item.endDateFull || undefined,
+        // Must be carried: the card renders "All day" and the ongoing badge off
+        // this flag, and it is the only thing that says the times are a
+        // date-only storage convention rather than a real 00:00 → 23:59 range.
+        all_day: item.all_day,
         categories: item.categories,
         organizer_name: item.organizer_name || '',
         organization_id: item.organization_id,

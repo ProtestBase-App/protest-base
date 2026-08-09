@@ -30,6 +30,7 @@ import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
+import { allDaySubmitField } from '@/utils/eventFormatters';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -84,6 +85,10 @@ export default function DraftEdit() {
   // Baseline snapshot of the freshly loaded draft; drives the unsaved-changes
   // guard so leaving prompts only when something actually changed.
   const initialFormRef = useRef<FormState | null>(null);
+  // Whether the draft ARRIVED date-only — the scraper's date-only sources land
+  // here. A ref, not form state: it never changes after load, and the dirty
+  // check stringifies the whole form.
+  const wasAllDayRef = useRef(false);
 
   // Load the draft via the preview endpoint (the public GET 404s on drafts) and
   // map the raw Event directly into form state. We deliberately avoid
@@ -95,6 +100,7 @@ export default function DraftEdit() {
       try {
         setLoading(true);
         const event = await getDraftEventPreview(eventId);
+        wasAllDayRef.current = event.all_day === true;
         setForm((prev) => {
           const next: FormState = {
             ...prev,
@@ -201,6 +207,7 @@ export default function DraftEdit() {
       co_organizers: finalCoOrganizers,
       help_needed: form.help_needed,
       help_description: form.help_needed ? form.help_description || undefined : undefined,
+      ...allDaySubmitField(wasAllDayRef.current, form.start_time),
     };
   }, [form]);
 
@@ -413,6 +420,7 @@ export default function DraftEdit() {
             emptyFields={emptyFields}
             userLanguage={userLanguage}
             scrollViewRef={scrollViewRef}
+            isAllDay={wasAllDayRef.current}
           />
         </ThemedView>
       </FormScreenScaffold>

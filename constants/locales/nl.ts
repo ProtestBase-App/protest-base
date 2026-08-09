@@ -244,6 +244,9 @@ const nl = {
     discardMessage: 'Je hebt niet-opgeslagen wijzigingen. Als je nu weggaat, gaan ze verloren.',
     keepEditing: 'Verder bewerken',
     discardConfirm: 'Negeren',
+    // Under the date field of a date-only event. Picking a clock time is what
+    // turns it into a normal timed event — there is no toggle.
+    allDayHint: 'Geen starttijd ingesteld. Kies er een om dit evenement een tijd te geven.',
   },
 
   // ============================================
@@ -434,6 +437,8 @@ const nl = {
     description: 'Beschrijving',
     date: 'Datum',
     time: 'Tijd',
+    // Shown instead of a clock time when the event is date-only (all_day).
+    allDay: 'Hele dag',
     location: 'Locatie',
     organizer: 'Organisator',
     organizedBy: 'Georganiseerd door',

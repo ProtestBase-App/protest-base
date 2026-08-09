@@ -15,6 +15,7 @@ import { Event } from '@/types/event.types';
 import {
   EVENT_TIMEZONE,
   formatEventTime24h,
+  getAllDayLabel,
   getDateFormatter,
   parseAsUTC,
 } from '@/utils/eventFormatters';
@@ -115,8 +116,17 @@ const LOCALE_MAP: Record<string, string> = { en: 'en-GB', fr: 'fr-FR', nl: 'nl-N
 /**
  * "Sat 27 Jun · 13:00" date line for the draft card, in the Belgium event
  * timezone. Null when the draft has no (parseable) start time.
+ *
+ * `allDay` takes the flag rather than the whole event because triage passes a
+ * pending rescheduled date instead of the stored one. That reschedule steps
+ * whole weeks and keeps the clock time, so an all-day draft stays all-day
+ * through it and callers pass the event's flag either way.
  */
-export function formatDraftDateLine(startTime: string | undefined, locale: string): string | null {
+export function formatDraftDateLine(
+  startTime: string | undefined,
+  locale: string,
+  allDay?: boolean
+): string | null {
   const startMs = parseStartMs(startTime);
   if (!Number.isFinite(startMs)) return null;
 
@@ -128,7 +138,10 @@ export function formatDraftDateLine(startTime: string | undefined, locale: strin
     timeZone: EVENT_TIMEZONE,
   }).format(new Date(startMs));
 
-  return `${datePart} · ${formatEventTime24h(startTime as string)}`;
+  const timePart =
+    allDay === true ? getAllDayLabel(locale) : formatEventTime24h(startTime as string);
+
+  return `${datePart} · ${timePart}`;
 }
 
 /** Most recently edited first ($updatedAt, falling back to $createdAt). */

@@ -15,7 +15,7 @@ import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
+import { allDaySubmitField, formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
@@ -76,6 +76,9 @@ export default function EditEvent() {
   // Baseline snapshot of the freshly loaded form; drives the unsaved-changes
   // guard so leaving without saving prompts only when something actually changed.
   const initialFormRef = useRef<FormState | null>(null);
+  // Whether the event ARRIVED date-only. A ref rather than form state: it never
+  // changes after load, and the dirty check above stringifies the whole form.
+  const wasAllDayRef = useRef(false);
 
   const scrollToTop = useCallback(() => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
@@ -123,6 +126,8 @@ export default function EditEvent() {
 
         if (isNaN(postalCode)) postalCode = null;
       }
+
+      wasAllDayRef.current = eventDetail[0].all_day === true;
 
       setForm((prevForm) => {
         const next: FormState = {
@@ -268,6 +273,7 @@ export default function EditEvent() {
         co_organizers: finalCoOrganizers,
         help_needed: form.help_needed,
         help_description: form.help_needed ? form.help_description || undefined : undefined,
+        ...allDaySubmitField(wasAllDayRef.current, form.start_time),
       });
 
       await refetchEvents();
@@ -357,6 +363,7 @@ export default function EditEvent() {
             userLanguage={userLanguage}
             mode="edit-event"
             scrollViewRef={scrollViewRef}
+            isAllDay={wasAllDayRef.current}
           />
         </ThemedView>
       </FormScreenScaffold>

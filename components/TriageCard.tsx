@@ -106,7 +106,7 @@ export default function TriageCard({
   // A pending date turns the block green: the decision is made, the save isn't.
   const effectiveDate = pendingDate ?? event.start_time;
   const dateResolved = !!pendingDate || status.kind !== 'pastDate';
-  const dateLine = formatDraftDateLine(effectiveDate, userLanguage);
+  const dateLine = formatDraftDateLine(effectiveDate, userLanguage, event.all_day);
 
   const location = [event.street_address, event.city].filter(Boolean).join(', ');
 
@@ -206,7 +206,7 @@ export default function TriageCard({
             <IconSymbol name="exclamationmark.triangle" size={16} color={themeColors.warning} />
             <ThemedText style={[styles.dateHeaderText, { color: themeColors.warning }]}>
               {t('drafts.triageDatePassed', {
-                date: formatDraftDateLine(event.start_time, userLanguage) ?? '',
+                date: formatDraftDateLine(event.start_time, userLanguage, event.all_day) ?? '',
               })}
             </ThemedText>
           </View>

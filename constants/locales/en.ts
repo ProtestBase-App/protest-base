@@ -226,6 +226,9 @@ const en: LocaleData = {
     discardMessage: 'You have unsaved changes. If you leave now, they will be lost.',
     keepEditing: 'Keep editing',
     discardConfirm: 'Discard',
+    // Under the date field of a date-only event. Picking a clock time is what
+    // turns it into a normal timed event — there is no toggle.
+    allDayHint: 'No start time set. Pick one to give this event a time.',
   },
 
   // ============================================
@@ -410,6 +413,8 @@ const en: LocaleData = {
     description: 'Description',
     date: 'Date',
     time: 'Time',
+    // Shown instead of a clock time when the event is date-only (all_day).
+    allDay: 'All day',
     location: 'Location',
     organizer: 'Organizer',
     organizedBy: 'Organized by',

@@ -78,6 +78,8 @@ const mockEvent: FormattedEvent = {
   description: 'A march for the climate',
   start_time: '14:00',
   end_time: '16:00',
+  all_day: false,
+  isMultiDay: false,
   start_date: 'March 15, 2025',
   end_date: 'March 15, 2025',
   startDateNoFormat: '2025-03-15',
@@ -332,6 +334,74 @@ describe('EventDetailed — calendar integration', () => {
 
     expect(Calendar.requestCalendarPermissionsAsync).toHaveBeenCalled();
     expect(Calendar.createEventInCalendarAsync).toHaveBeenCalled();
+  });
+
+  describe('all-day events', () => {
+    // The formatter has already turned start_time into the label and blanked
+    // end_time by the time the card sees the event.
+    const allDayEvent = {
+      ...mockEvent,
+      start_time: 'All day',
+      end_time: '',
+      all_day: true,
+      isMultiDay: false,
+    };
+
+    it('renders the label with no dangling separator', () => {
+      render(<EventDetailed {...defaultProps} event={allDayEvent} />);
+
+      const line = screen.getByText(/All day/);
+      expect(line).toBeTruthy();
+      expect(screen.queryByText(/›/)).toBeNull();
+    });
+
+    it('keeps the end DATE for a multi-day all-day event, without a time', () => {
+      render(
+        <EventDetailed
+          {...defaultProps}
+          event={{ ...allDayEvent, isMultiDay: true, end_date: 'March 18, 2025' }}
+        />
+      );
+
+      expect(screen.getAllByText(/March 18/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/All day/).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('exports an all-day calendar entry rather than a 00:00-23:59 block', async () => {
+      (Calendar.getCalendarPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+      (Calendar.requestCalendarPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+      (Calendar.createEventInCalendarAsync as jest.Mock).mockResolvedValue({ action: 'saved' });
+
+      render(<EventDetailed {...defaultProps} event={allDayEvent} />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByText('March 15, 2025'));
+      });
+
+      expect(Calendar.createEventInCalendarAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ allDay: true })
+      );
+    });
+
+    it('exports a timed event with allDay false', async () => {
+      (Calendar.getCalendarPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+      (Calendar.requestCalendarPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+      (Calendar.createEventInCalendarAsync as jest.Mock).mockResolvedValue({ action: 'saved' });
+
+      render(<EventDetailed {...defaultProps} />);
+
+      await act(async () => {
+        fireEvent.press(screen.getByText('March 15, 2025'));
+      });
+
+      expect(Calendar.createEventInCalendarAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ allDay: false })
+      );
+    });
   });
 
   it('handles calendar permission denied', async () => {
@@ -689,6 +759,9 @@ describe('EventDetailed — end time display variations', () => {
       ...mockEvent,
       startDateNoFormat: '2025-03-15',
       endDateNoFormat: '2025-03-16',
+      // The rendered branch is driven by isMultiDay (compared in Brussels), not
+      // by the UTC *NoFormat pair, which straddles midnight.
+      isMultiDay: true,
       end_date: 'March 16, 2025',
       end_time: '10:00',
     };

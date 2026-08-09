@@ -1,8 +1,13 @@
 import {
+  allDaySubmitField,
   formatEventForDisplay,
   formatEventForList,
   formatEventDateTime,
+  formatEventDateTimeLabel,
+  formatEventStartLabel,
+  formatEventStartLabel24h,
   formatTodayDate,
+  isBelgiumMidnight,
   parseAsUTC,
   EVENT_TIMEZONE,
 } from '../eventFormatters';
@@ -1149,6 +1154,140 @@ describe('eventFormatters', () => {
       // Both should use en-US as fallback (since 'EN' !== 'en')
       expect(upperResult).toBeTruthy();
       expect(mixedResult).toBeTruthy();
+    });
+  });
+
+  describe('all-day events', () => {
+    // Brussels 00:00 on 22 July 2026 is CEST (UTC+2), i.e. 21 July 22:00 UTC.
+    // The offset is what makes the naive UTC date comparison wrong, so the
+    // summer case is the one worth pinning.
+    const SUMMER_DAY_START = '2026-07-21T22:00:00.000Z';
+    const SUMMER_DAY_END = '2026-07-22T21:59:59.999Z';
+
+    const allDayEvent: Event = {
+      $id: 'all-day',
+      id: 'all-day',
+      title: 'Date-only protest',
+      description: 'Scraped from a source that published no time',
+      start_time: SUMMER_DAY_START,
+      end_time: SUMMER_DAY_END,
+      all_day: true,
+      country: 'Belgium',
+      organizer_name: 'Test',
+    };
+
+    // Byte-identical to the above except for the flag: a real vigil that starts
+    // at midnight. This pair is the whole point of branching on `all_day`.
+    const midnightTimedEvent: Event = {
+      ...allDayEvent,
+      $id: 'midnight-vigil',
+      id: 'midnight-vigil',
+      title: 'Midnight vigil',
+      all_day: false,
+    };
+
+    it('renders an all-day event and a genuine midnight event differently', () => {
+      const allDay = formatEventForDisplay(allDayEvent, 'en');
+      const timed = formatEventForDisplay(midnightTimedEvent, 'en');
+
+      expect(allDay.start_time).toBe('All day');
+      expect(timed.start_time).toBe('12:00 AM');
+      expect(allDay.start_time).not.toBe(timed.start_time);
+    });
+
+    it('suppresses the end clock time only for the all-day one', () => {
+      expect(formatEventForDisplay(allDayEvent, 'en').end_time).toBe('');
+      expect(formatEventForDisplay(midnightTimedEvent, 'en').end_time).toBe('11:59 PM');
+    });
+
+    it('does NOT treat a single-day all-day event as multi-day', () => {
+      // Regression: startDateNoFormat/endDateNoFormat are UTC and read
+      // 2026-07-21 vs 2026-07-22 here, so comparing them would call every
+      // single-day all-day event multi-day.
+      const result = formatEventForDisplay(allDayEvent, 'en');
+
+      expect(result.startDateNoFormat).toBe('2026-07-21');
+      expect(result.endDateNoFormat).toBe('2026-07-22');
+      expect(result.isMultiDay).toBe(false);
+    });
+
+    it('keeps the date range of a multi-day all-day event', () => {
+      const multiDay = formatEventForDisplay(
+        { ...allDayEvent, end_time: '2026-07-24T21:59:59.999Z' },
+        'en'
+      );
+
+      expect(multiDay.isMultiDay).toBe(true);
+      expect(multiDay.start_time).toBe('All day');
+      expect(multiDay.end_date).toBe('July 24');
+    });
+
+    it('translates the label in all three locales', () => {
+      expect(formatEventForDisplay(allDayEvent, 'en').start_time).toBe('All day');
+      expect(formatEventForDisplay(allDayEvent, 'fr').start_time).toBe('Toute la journée');
+      expect(formatEventForDisplay(allDayEvent, 'nl').start_time).toBe('Hele dag');
+    });
+
+    it('replaces the clock time in the list string', () => {
+      expect(formatEventForList(allDayEvent, 'en').start_time).toContain('All day');
+      expect(formatEventForList(allDayEvent, 'en').start_time).not.toContain('00:00');
+      expect(formatEventForList(midnightTimedEvent, 'en').start_time).toContain('00:00');
+      expect(formatEventForList(allDayEvent, 'en').all_day).toBe(true);
+    });
+
+    describe('label wrappers', () => {
+      it('formatEventStartLabel branches on the flag', () => {
+        expect(formatEventStartLabel(allDayEvent, 'fr')).toBe('Toute la journée');
+        expect(formatEventStartLabel(midnightTimedEvent, 'fr')).toBe('00:00');
+      });
+
+      it('formatEventStartLabel24h branches on the flag', () => {
+        expect(formatEventStartLabel24h(allDayEvent, 'nl')).toBe('Hele dag');
+        expect(formatEventStartLabel24h(midnightTimedEvent, 'nl')).toBe('00:00');
+      });
+
+      it('formatEventDateTimeLabel keeps the date and drops the time', () => {
+        const label = formatEventDateTimeLabel(allDayEvent, 'en');
+
+        expect(label).toContain('July 22');
+        expect(label).toContain('All day');
+        expect(label).not.toContain('AM');
+        expect(formatEventDateTimeLabel(midnightTimedEvent, 'en')).toContain('12:00 AM');
+      });
+    });
+
+    describe('isBelgiumMidnight', () => {
+      it('is true for the all-day storage convention, in both DST halves', () => {
+        expect(isBelgiumMidnight(SUMMER_DAY_START)).toBe(true);
+        // January: CET (UTC+1), so Brussels midnight is 23:00 UTC the day before.
+        expect(isBelgiumMidnight('2026-01-14T23:00:00.000Z')).toBe(true);
+      });
+
+      it('is false for a real clock time, and for UTC midnight in summer', () => {
+        expect(isBelgiumMidnight('2026-07-22T12:00:00.000Z')).toBe(false);
+        // 00:00 UTC in July is 02:00 in Brussels — not midnight there.
+        expect(isBelgiumMidnight('2026-07-22T00:00:00.000Z')).toBe(false);
+      });
+    });
+
+    describe('allDaySubmitField', () => {
+      it('says nothing about an event that was never all-day', () => {
+        expect(allDaySubmitField(false, SUMMER_DAY_START)).toEqual({});
+      });
+
+      it('keeps the flag while the start is still Brussels midnight', () => {
+        expect(allDaySubmitField(true, SUMMER_DAY_START)).toEqual({ all_day: true });
+        // A different DAY, still midnight — a reschedule, not a time being set.
+        expect(allDaySubmitField(true, '2026-07-28T22:00:00.000Z')).toEqual({ all_day: true });
+      });
+
+      it('clears the flag once a real clock time is picked', () => {
+        expect(allDaySubmitField(true, '2026-07-22T12:00:00.000Z')).toEqual({ all_day: false });
+      });
+
+      it('clears the flag when the start is missing', () => {
+        expect(allDaySubmitField(true, undefined)).toEqual({ all_day: false });
+      });
     });
   });
 });

@@ -38,6 +38,7 @@ const mockEvent: FormattedEventListItem = {
   title: 'Education Rally',
   description: 'Rally for education',
   start_time: 'Mar 15, 14:00',
+  all_day: false,
   startDateNoFormat: '2025-03-15',
   startDateFull: '2025-03-15T14:00:00Z',
   endDateFull: '2025-03-15T16:00:00Z',

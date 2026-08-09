@@ -517,7 +517,10 @@ function buildEventFormData(
       // strings (the server coerces them back to numbers). The JSON path sends
       // them verbatim as numbers — it does not coerce.
       formData.append(key, String(value));
-    } else if (key === 'help_needed' || key === 'is_draft') {
+    } else if (key === 'help_needed' || key === 'is_draft' || key === 'all_day') {
+      // Booleans must be listed here explicitly: the string branch below would
+      // drop them silently, and `all_day: false` is precisely the value that
+      // converts a scraped date-only event into a timed one.
       formData.append(key, String(value));
     } else if (typeof value === 'string') {
       formData.append(key, value);

@@ -33,6 +33,7 @@ import { MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
 import type { EventFormProps } from '@/types/eventForm.types';
+import { isBelgiumMidnight } from '@/utils/eventFormatters';
 import type { PickedImage } from '@/types/event.types';
 import type { AddressSuggestion, AddressCountryCode, AddressLang } from '@/types/address.types';
 import { SectionHeader, HelperText } from '@/utils/formHelpers';
@@ -63,6 +64,7 @@ const EventForm: React.FC<EventFormProps> = ({
   userLanguage,
   mode = 'create-event',
   scrollViewRef,
+  isAllDay = false,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -73,6 +75,12 @@ const EventForm: React.FC<EventFormProps> = ({
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
+
+  // A loaded all-day event stops being one the moment the organizer moves the
+  // start off Brussels midnight — that is the only way to give a scraped
+  // date-only event a real time, since there is no toggle. The edit screens
+  // apply the same test when deciding what `all_day` to submit.
+  const stillAllDay = isAllDay && !!form.start_time && isBelgiumMidnight(form.start_time);
   const {
     dropdownItems: organizations,
     loading: organizationsLoading,
@@ -692,6 +700,8 @@ const EventForm: React.FC<EventFormProps> = ({
             otherStyles={styles.fieldSpacing}
             hasError={emptyFields.start_time}
             minDate={new Date()}
+            allDayLabel={stillAllDay ? t('events.allDay') : undefined}
+            allDayHint={stillAllDay ? t('eventEdit.allDayHint') : undefined}
           />
 
           <FormDateField
@@ -702,6 +712,9 @@ const EventForm: React.FC<EventFormProps> = ({
             handleChangeText={(isoString: string) => setForm({ ...form, end_time: isoString })}
             otherStyles={styles.fieldSpacing}
             minDate={safeParseDate(form.start_time)}
+            // No hint here: the end of an all-day event is a storage artifact
+            // (23:59:59.999), not something the organizer is asked to set.
+            allDayLabel={stillAllDay ? t('events.allDay') : undefined}
           />
           <HelperText text={t('createEvent.endTimeHelper')} isDark={isDark} />
         </>

@@ -914,6 +914,40 @@ describe('event.service', () => {
       );
     });
 
+    it('carries all_day: false through the multipart branch', async () => {
+      // Regression: buildEventFormData drops any value that is not a string and
+      // not explicitly listed, so a boolean `false` would vanish silently — and
+      // `all_day: false` is exactly what converts a scraped date-only event.
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', {
+        ...baseUpdates,
+        all_day: false,
+        image: { uri: 'file:///new-img.jpg', mimeType: 'image/jpeg', fileName: 'new-img.jpg' },
+      });
+
+      const [, payload] = mockApi.put.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+      expect((payload as FormData).getAll('all_day')).toEqual(['false']);
+    });
+
+    it('carries all_day: true through the multipart branch', async () => {
+      mockApi.put.mockResolvedValueOnce({
+        data: { success: true, data: { $id: 'evt-1' } },
+      });
+
+      await updateEvent('evt-1', {
+        ...baseUpdates,
+        all_day: true,
+        image: { uri: 'file:///new-img.jpg', mimeType: 'image/jpeg', fileName: 'new-img.jpg' },
+      });
+
+      const [, payload] = mockApi.put.mock.calls[0];
+      expect((payload as FormData).getAll('all_day')).toEqual(['true']);
+    });
+
     it('sends FormData when new image file provided', async () => {
       mockApi.put.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'evt-1' } },

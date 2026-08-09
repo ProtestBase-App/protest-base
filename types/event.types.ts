@@ -34,6 +34,14 @@ export interface Event {
   start_time: string;
   end_time?: string;
 
+  // Date-only event: a date with no clock time. The timestamps above are then a
+  // STORAGE CONVENTION (Brussels 00:00 → 23:59:59.999), not a claim about time.
+  // Always branch on this flag — never infer it from the time being midnight, or
+  // a genuine midnight-starting vigil renders as "All day". Optional here (not in
+  // the API contract, where it is always present) because the persisted events
+  // cache can rehydrate objects written before this field existed.
+  all_day?: boolean;
+
   organization_id?: string;
 
   // organizer_* fields are populated from the authenticated user who created the event.
@@ -111,6 +119,14 @@ export interface CreateEventRequest {
   start_time: string;
 
   end_time?: string;
+
+  // Date-only event. There is no authoring UI for this — the scraper sets it, and
+  // the app only ever sends it from the edit screens to PRESERVE or CLEAR the flag
+  // on an event that already has it (see the all-day handling in event-edit). The
+  // server ignores any clock time sent alongside `true` and re-pins to the Brussels
+  // day, so sending `false` is the only way to give a scraped event a real time.
+  all_day?: boolean;
+
   street_address?: string;
   city?: string;
   region?: string;

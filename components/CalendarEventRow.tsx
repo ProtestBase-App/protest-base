@@ -18,7 +18,7 @@ import { Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
 import { CalendarDayEntry, formatCompactCount, isEventInProgress } from '@/utils/calendarTabUtils';
-import { formatEventTime } from '@/utils/eventFormatters';
+import { formatEventStartLabel } from '@/utils/eventFormatters';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 
@@ -88,7 +88,7 @@ function CalendarEventRow({
 
   const primarySegment = isMultiDay
     ? t('home.dayProgress', { index: dayIndex, total: totalDays })
-    : formatEventTime(event.start_time, userLanguage);
+    : formatEventStartLabel(event, userLanguage);
 
   const hasBadges =
     inProgress || event.help_needed === true || Boolean(displayedCategory) || isMultiDay;

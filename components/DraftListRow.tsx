@@ -94,7 +94,7 @@ function DraftListRowComponent({
         ? themeColors.warning
         : themeColors.subtleText;
 
-  const dateLine = formatDraftDateLine(event.start_time, userLanguage);
+  const dateLine = formatDraftDateLine(event.start_time, userLanguage, event.all_day);
   const missingList = status.missingFieldKeys.map((key) => t(key)).join(', ');
 
   // Latest-ref for the completion callback so the teaching animation depends only
