@@ -42,6 +42,7 @@ const makeEvent = (overrides: Partial<FormattedEventListItem> = {}): FormattedEv
   startDateNoFormat: '2025-03-15',
   startDateFull: '2025-03-15T14:00:00Z',
   endDateFull: '2025-03-15T16:00:00Z',
+  all_day: false,
   city: 'Brussels',
   country: 'belgium',
   postal_code: 1000,

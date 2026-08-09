@@ -25,7 +25,7 @@ import {
 } from '@/types/notifications.types';
 import { getEventDateKeyInBelgium, getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { isValidEventId } from '@/utils/deepLinkValidation';
-import { formatEventTime24h, parseAsUTC } from '@/utils/eventFormatters';
+import { formatEventStartLabel24h, parseAsUTC } from '@/utils/eventFormatters';
 import { getCurrentLocale, t, tPlural } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
@@ -154,7 +154,7 @@ export function buildSavedDayContent(
 
   if (sorted.length === 1) {
     const event = sorted[0];
-    const time = formatEventTime24h(event.start_time);
+    const time = formatEventStartLabel24h(event, language);
     const place = buildPlaceLabel(event);
     title = t('notifications.dayOf.title', locale);
     body = place
@@ -166,7 +166,7 @@ export function buildSavedDayContent(
       t('notifications.dayOf.digestItem', {
         ...locale,
         name: event.title,
-        time: formatEventTime24h(event.start_time),
+        time: formatEventStartLabel24h(event, language),
       })
     );
     title = t('notifications.dayOf.digestTitle', { ...locale, count: sorted.length });
@@ -499,9 +499,7 @@ export function handleNotificationResponse(
   mode: NotificationNavigationMode
 ): boolean {
   const data = response.notification.request.content.data as
-    | (Partial<SavedDayNotificationData> & Partial<Remind1hNotificationData>)
-    | null
-    | undefined;
+    (Partial<SavedDayNotificationData> & Partial<Remind1hNotificationData>) | null | undefined;
   if (
     !data ||
     (data.type !== NOTIFICATION_TYPES.SAVED_DAY && data.type !== NOTIFICATION_TYPES.REMIND_1H)

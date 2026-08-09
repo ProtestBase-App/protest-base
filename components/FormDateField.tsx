@@ -22,9 +22,25 @@ interface FormDateFieldProps {
   otherStyles?: object;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
+  /**
+   * Localised "All day". When passed it replaces the clock time in the field —
+   * a date-only event has no time to show. The caller decides when that is
+   * true, because the answer depends on the START value (still at Brussels
+   * midnight?) while this field may be the end, which sits at 23:59:59.999.
+   */
+  allDayLabel?: string;
+  /** Localised explanation shown under the field while `allDayLabel` is active. */
+  allDayHint?: string;
   [key: string]: any;
 }
 
+/**
+ * Device-local, deliberately: the picker below this field produces and consumes
+ * device-local dates, so formatting only the display in Brussels would desync
+ * the digits from the wheel the user is turning. On a non-Belgian device the
+ * date shown can therefore be off by a day — pre-existing for timed events and
+ * unchanged here.
+ */
 function formatDateForDisplay(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -53,6 +69,8 @@ export default function FormDateField({
   minDate,
   otherStyles,
   testID,
+  allDayLabel,
+  allDayHint,
   ...props
 }: FormDateFieldProps) {
   const colorScheme = useColorScheme();
@@ -134,11 +152,15 @@ export default function FormDateField({
     setIsFocused(!isFocused);
   };
 
+  const showingAllDay = !!allDayLabel && !!value;
+
   let displayValue = '';
   if (value) {
     const parsed = new Date(value);
     if (!isNaN(parsed.getTime())) {
-      displayValue = formatDateForDisplay(parsed);
+      displayValue = showingAllDay
+        ? `${formatDateForDisplay(parsed).split(' - ')[0]} - ${allDayLabel}`
+        : formatDateForDisplay(parsed);
     }
   }
 
@@ -178,6 +200,12 @@ export default function FormDateField({
           <IconSymbol size={24} name="calendar" color={themeColors.text} />
         </ThemedView>
       </TouchableOpacity>
+
+      {showingAllDay && !!allDayHint && (
+        <ThemedText style={[styles.hint, { color: themeColors.subtleText }]}>
+          {allDayHint}
+        </ThemedText>
+      )}
 
       {Platform.OS === 'ios' && showDatePicker && (
         <DateTimePicker
@@ -226,5 +254,10 @@ const styles = StyleSheet.create({
   },
   textInputDark: {
     color: Colors.dark.text,
+  },
+  hint: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    marginTop: 6,
   },
 });

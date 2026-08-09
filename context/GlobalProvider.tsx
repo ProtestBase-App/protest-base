@@ -11,8 +11,13 @@ import React, {
 import { getLocales } from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUser, getCurrentUserSessions } from '@/services/auth.service';
-import { getEventsBackend, fetchEventCounts, EventCounts } from '@/services/event.service';
-import { loadPersistedEvents, persistEvents } from '@/services/eventsCacheStorage';
+import { fetchEventCounts, EventCounts } from '@/services/event.service';
+import { persistEvents } from '@/services/eventsCacheStorage';
+import {
+  claimEventsFetch,
+  fetchAllCacheableEvents,
+  CacheableEventsFetch,
+} from '@/services/eventsBootstrap';
 import * as SecureStore from 'expo-secure-store';
 import { setTokenExpirationCallback } from '@/services/api';
 import { Alert } from 'react-native';
@@ -20,20 +25,11 @@ import { router } from 'expo-router';
 import { logger } from '@/utils/logger';
 import { User } from '@/types/auth.types';
 import { Event } from '@/types/event.types';
-import { API_LIMITS } from '@/constants/ApiConfig';
-import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { t } from '@/utils/i18n';
 import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
 import { clearAllUserData } from '@/services/localStorageService';
 import { parseAsUTC } from '@/utils/eventFormatters';
-
-/**
- * Timeout for the one-shot cache fetch: it downloads up to EVENTS_MAX events in
- * a single response, so it needs a bigger budget than the axios instance's 10s
- * default, which is sized for small paginated requests.
- */
-const CACHE_FETCH_TIMEOUT_MS = 30000;
 
 /** Where the current eventsCache contents came from — see cacheSourceRef. */
 type EventsCacheSource = 'empty' | 'hydrated' | 'fresh';
@@ -45,50 +41,6 @@ function toEventsMap(events: Event[]): Record<string, Event> {
     map[event.$id] = event;
   });
   return map;
-}
-
-interface CacheableEventsFetch {
-  events: Event[];
-  /** ISO start of the fetched window — entries older than this are outside it. */
-  lookbackDate: string;
-  /** True when the backend reported more events than the ceiling returned. */
-  truncated: boolean;
-}
-
-/**
- * Fetch the full browse window (lookback + all upcoming events) in a single
- * request. The calendar and maps tabs browse ALL events from this cache, so we
- * pull up to the backend's documented ceiling (API_LIMITS.EVENTS_MAX) in one
- * round-trip instead of walking pages — one request keeps cold-start latency and
- * the per-request integrity/attestation overhead to a single hit.
- */
-async function fetchAllCacheableEvents(): Promise<CacheableEventsFetch> {
-  // Look back to include events that started recently but may still be ongoing.
-  // This ensures multi-day events and events without end_time are included.
-  const lookbackDate = new Date(Date.now() - MAX_EVENT_LOOKBACK_MS).toISOString();
-
-  // includeEnded: true so the cache can serve saved events whose end_time is in
-  // the past but still within the saved-event retention window (kept by
-  // SavedEventsProvider).
-  const result = await getEventsBackend(
-    {
-      startDate: lookbackDate,
-      limit: API_LIMITS.EVENTS_MAX,
-      offset: 0,
-      includeEnded: true,
-    },
-    { timeout: CACHE_FETCH_TIMEOUT_MS }
-  );
-
-  const truncated = result.total > result.events.length;
-  if (truncated) {
-    logger.warn('[GlobalProvider] Events cache truncated at fetch ceiling', {
-      fetched: result.events.length,
-      total: result.total,
-    });
-  }
-
-  return { events: result.events, lookbackDate, truncated };
 }
 
 /**
@@ -185,6 +137,24 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   // stale data outlive the hydration window) and must never overwrite data from
   // a fresh fetch (retryConnection re-entry).
   const cacheSourceRef = useRef<EventsCacheSource>('empty');
+
+  // True while eventsCache holds exactly what the stored snapshot holds — it was
+  // hydrated from disk and nothing fresher has landed on top. A 304 marks the
+  // cache authoritative without changing its contents, so without this the
+  // mirror effect below would write those same events back and restamp the
+  // snapshot, letting a disk copy outlive the hydration window that bounds it.
+  const cacheMirrorsSnapshotRef = useRef(false);
+
+  // Whether the fetch behind the current cache saw the entire server window, or
+  // stopped at the fetch ceiling. Gates whether the snapshot may carry an ETag:
+  // a 304 against a partial snapshot would pin the app to that subset.
+  const windowTruncatedRef = useRef(true);
+
+  // ETag of the window the current cache came from. Seeded from the snapshot at
+  // hydration (NOT only from a 304 response) so a later screen upsert re-persists
+  // the snapshot with its ETag intact — dropping it here would silently disable
+  // revalidation on the next launch.
+  const etagRef = useRef<string | undefined>(undefined);
 
   // null means counts have never been loaded (show splash for logged-in users)
   const [userEventCounts, setUserEventCounts] = useState<EventCounts | null>(null);
@@ -332,13 +302,11 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      // Start the network fetch first and hydrate from disk while it's in
-      // flight — the two are independent, so serializing them would delay the
-      // fresh data by the disk read. The no-op catch stops a pre-await
-      // rejection from surfacing as unhandled; the await below still throws
-      // into this try/catch.
-      const fetchPromise = fetchAllCacheableEvents();
-      fetchPromise.catch(() => {});
+      // Adopt the fetch started before the startup gates resolved, so the
+      // window is already in flight (or in hand) by the time we get here. Falls
+      // back to starting one when nothing was prefetched — first-ever launch,
+      // or a retryConnection re-entry.
+      const bootstrap = claimEventsFetch();
 
       // Stale-while-revalidate: paint the persisted snapshot instantly, merged
       // UNDER anything screens already upserted (those entries are fresher).
@@ -346,17 +314,63 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
       // non-empty, so a cold start renders cached events without a network
       // wait. Skipped once a fresh fetch has landed this session
       // (retryConnection re-entry) so stale entries can't resurface.
-      const persisted = cacheSourceRef.current !== 'fresh' ? await loadPersistedEvents() : null;
+      //
+      // The snapshot is read BEFORE the request goes out (see eventsBootstrap)
+      // because it carries the ETag we revalidate with: paying one disk read up
+      // front turns an unchanged window into a bodyless 304 instead of the full
+      // payload.
+      const persisted = cacheSourceRef.current !== 'fresh' ? await bootstrap.snapshot : null;
       // Re-check after the await — a concurrent invocation (retryConnection)
       // may have landed a fresh fetch while the disk read was in flight.
       if (persisted && cacheSourceRef.current !== 'fresh') {
         cacheSourceRef.current = 'hydrated';
-        setEventsCache((prev) => ({ ...toEventsMap(persisted), ...prev }));
+        etagRef.current = persisted.etag;
+        setEventsCache((prev) => {
+          // Only a cache that was empty ends up equal to the snapshot: the merge
+          // deliberately keeps `prev`, so anything a screen upserted while the
+          // disk read was in flight makes this a superset that still deserves
+          // to be written back.
+          cacheMirrorsSnapshotRef.current = Object.keys(prev).length === 0;
+          return { ...toEventsMap(persisted.events), ...prev };
+        });
       }
 
-      const { events, lookbackDate, truncated } = await fetchPromise;
+      let fetched: CacheableEventsFetch;
+      try {
+        fetched = await bootstrap.result;
+      } catch (error) {
+        // A speculative fetch runs before /app/config has confirmed the API
+        // prefix and before the integrity gate has attested, so a non-network
+        // rejection (stale prefix → 404, install token → 401) can just mean
+        // "too early". Retry once now that both have resolved. A network
+        // failure would only fail again, so that one is adopted as final.
+        if (!bootstrap.speculative || isNetworkError(error)) throw error;
+        logger.warn('[GlobalProvider] Speculative events fetch failed; retrying', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        fetched = await fetchAllCacheableEvents(persisted?.etag);
+      }
+
+      const { events, lookbackDate, truncated, notModified, etag } = fetched;
+
+      if (notModified) {
+        // The window is unchanged, so the snapshot just painted IS current.
+        // Keep it, skip the merge, and deliberately skip the re-persist: the
+        // stored snapshot is already this data, and restamping it would reset
+        // the hydration age-out that bounds how long it can be reused.
+        cacheSourceRef.current = 'fresh';
+        if (etag) etagRef.current = etag;
+        // We only ever revalidate a snapshot that covered the window, and the
+        // backend just confirmed that window is unchanged.
+        windowTruncatedRef.current = false;
+        logger.info('[GlobalProvider] Events cache revalidated — window unchanged (304)');
+        return;
+      }
 
       cacheSourceRef.current = 'fresh';
+      cacheMirrorsSnapshotRef.current = false;
+      etagRef.current = etag;
+      windowTruncatedRef.current = truncated;
       setEventsCache((prev) => applyFreshEvents(prev, events, lookbackDate, truncated));
       logger.info('[GlobalProvider] Events cache initialized', { count: events.length });
     } catch (error) {
@@ -410,10 +424,13 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   }, [fetchInitialEvents]);
 
   const upsertEventInCache = useCallback((event: Event): void => {
+    // The cache now holds something the snapshot doesn't — it's worth writing.
+    cacheMirrorsSnapshotRef.current = false;
     setEventsCache((prev) => ({ ...prev, [event.$id]: event }));
   }, []);
 
   const removeEventFromCache = useCallback((eventId: string): void => {
+    cacheMirrorsSnapshotRef.current = false;
     setEventsCache((prev) => {
       if (!(eventId in prev)) return prev;
       const next = { ...prev };
@@ -426,9 +443,15 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     try {
       setEventsLoading(true);
 
-      const { events, lookbackDate, truncated } = await fetchAllCacheableEvents();
+      // Deliberately no If-None-Match: the ETag ignores the view/save/like
+      // counters, so an explicit pull-to-refresh answered with 304 would leave
+      // those counts frozen and read as a broken refresh.
+      const { events, lookbackDate, truncated, etag } = await fetchAllCacheableEvents();
 
       cacheSourceRef.current = 'fresh';
+      cacheMirrorsSnapshotRef.current = false;
+      etagRef.current = etag;
+      windowTruncatedRef.current = truncated;
       setEventsCache((prev) => applyFreshEvents(prev, events, lookbackDate, truncated));
     } finally {
       setEventsLoading(false);
@@ -437,13 +460,18 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
 
   // Mirror every fresh-data cache change (bulk fetches, screen upserts/removes)
   // into the cold-start snapshot, so events created or hydrated mid-session
-  // survive a restart. Hydrated-only states are deliberately not re-persisted —
-  // see cacheSourceRef. An empty cache never clobbers an existing snapshot.
+  // survive a restart. Contents that came from disk are deliberately not written
+  // back — see cacheSourceRef and cacheMirrorsSnapshotRef. An empty cache never
+  // clobbers an existing snapshot.
   useEffect(() => {
     if (cacheSourceRef.current !== 'fresh') return;
+    if (cacheMirrorsSnapshotRef.current) return;
     const events = Object.values(eventsCache);
     if (events.length === 0) return;
-    void persistEvents(events);
+    void persistEvents(events, {
+      etag: etagRef.current,
+      coversWindow: !windowTruncatedRef.current,
+    });
   }, [eventsCache]);
 
   const contextValue = useMemo(

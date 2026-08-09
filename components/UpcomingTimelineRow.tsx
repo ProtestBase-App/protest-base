@@ -11,7 +11,7 @@ import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
 import { formatCompactCount } from '@/utils/calendarTabUtils';
-import { formatEventTime24h } from '@/utils/eventFormatters';
+import { formatEventStartLabel24h } from '@/utils/eventFormatters';
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { getOngoingDayProgress } from '@/utils/upcomingTimelineUtils';
@@ -60,7 +60,7 @@ function UpcomingTimelineRow({ event, ongoing, todayKey, userLanguage }: Upcomin
     >
       <View style={styles.timeRail}>
         <ThemedText style={[ongoing ? styles.nowText : styles.timeText, { color: railColor }]}>
-          {ongoing ? t('myEvents.nowLabel') : formatEventTime24h(event.start_time)}
+          {ongoing ? t('myEvents.nowLabel') : formatEventStartLabel24h(event, userLanguage)}
         </ThemedText>
         {dayProgress && dayProgress.totalDays > 1 && (
           <ThemedText

@@ -26,6 +26,8 @@ export const Routes = {
   CREATE_TEMPLATE: '/create-template',
 
   DRAFT_EVENTS: '/draft-events',
+  /** Full-screen triage deck for the draft backlog (outside the tabs). */
+  DRAFT_TRIAGE: '/draft-triage',
 
   MY_EVENTS: '/my-events',
   MY_EVENTS_UPCOMING: '/upcoming',

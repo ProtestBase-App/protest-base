@@ -34,6 +34,14 @@ export interface Event {
   start_time: string;
   end_time?: string;
 
+  // Date-only event: a date with no clock time. The timestamps above are then a
+  // STORAGE CONVENTION (Brussels 00:00 → 23:59:59.999), not a claim about time.
+  // Always branch on this flag — never infer it from the time being midnight, or
+  // a genuine midnight-starting vigil renders as "All day". Optional here (not in
+  // the API contract, where it is always present) because the persisted events
+  // cache can rehydrate objects written before this field existed.
+  all_day?: boolean;
+
   organization_id?: string;
 
   // organizer_* fields are populated from the authenticated user who created the event.
@@ -58,6 +66,21 @@ export interface Event {
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
 
+  // Origin of the event: 'user' (app/website) or 'automation' (scraper pipeline).
+  // The backend defaults it to 'user' in every response; only drafts surface it
+  // in the UI, where an automation draft is labelled as such.
+  created_via?: EventCreatedVia;
+
+  // Automation drafts only. 0-100 corroboration score with its per-check
+  // breakdown. `null` means NEVER SCORED (human draft, or an uncrawlable
+  // source) and must render nothing — distinct from a scored 0, which means
+  // nothing could be corroborated and renders loudly. Always test with
+  // `hasConfidenceScore()`, never `!score`.
+  confidence_score?: number | null;
+  // Free-form by backend design: the checks live in the automation workflow and
+  // evolve without a backend deploy, so parse defensively.
+  confidence_details?: Record<string, unknown> | null;
+
   // Only populated when includeAvatars=true.
   organizer_avatar?: string | null;
   co_organizer_avatars?: CoOrganizerAvatar[];
@@ -75,6 +98,12 @@ export interface Event {
  */
 export type EventStatus = 'draft' | 'active' | 'cancelled' | 'past';
 
+/**
+ * How the event entered the system. Drafts ingested by the scraping pipeline are
+ * 'automation'; anything a human created in the app or on the website is 'user'.
+ */
+export type EventCreatedVia = 'user' | 'automation';
+
 /** Image object from expo-image-picker. */
 export interface PickedImage {
   uri: string;
@@ -90,6 +119,14 @@ export interface CreateEventRequest {
   start_time: string;
 
   end_time?: string;
+
+  // Date-only event. There is no authoring UI for this — the scraper sets it, and
+  // the app only ever sends it from the edit screens to PRESERVE or CLEAR the flag
+  // on an event that already has it (see the all-day handling in event-edit). The
+  // server ignores any clock time sent alongside `true` and re-pins to the Brussels
+  // day, so sending `false` is the only way to give a scraped event a real time.
+  all_day?: boolean;
+
   street_address?: string;
   city?: string;
   region?: string;

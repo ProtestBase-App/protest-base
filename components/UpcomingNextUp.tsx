@@ -20,7 +20,7 @@ import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Event } from '@/types/event.types';
 import { formatCompactCount } from '@/utils/calendarTabUtils';
-import { formatEventTime24h } from '@/utils/eventFormatters';
+import { formatEventStartLabel24h } from '@/utils/eventFormatters';
 import { t } from '@/utils/i18n';
 import { shareEventWithAlert } from '@/utils/shareHelpers';
 import { ThemeColors, getThemeColors } from '@/utils/themeColors';
@@ -91,7 +91,7 @@ function NextUpCard({ event, width, userLanguage, themeColors }: NextUpCardProps
               style={[styles.cardMeta, { color: themeColors.secondaryText }]}
               numberOfLines={1}
             >
-              {formatEventTime24h(event.start_time)}
+              {formatEventStartLabel24h(event, userLanguage)}
               {cityLabel ? ` · ${cityLabel}` : ' ·'}
             </ThemedText>
             {!cityLabel && (
@@ -213,7 +213,7 @@ export default function UpcomingNextUp({ events, now, userLanguage }: UpcomingNe
   const labelDetail = isCarousel
     ? t('myEvents.nextUpSimultaneous', {
         count: events.length,
-        time: formatEventTime24h(events[0].start_time),
+        time: formatEventStartLabel24h(events[0], userLanguage),
       })
     : t(`myEvents.startsIn.${startsIn.unit}`, { count: startsIn.value });
 

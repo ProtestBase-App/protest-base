@@ -36,6 +36,18 @@ interface UsePaginatedEventsOptions<TApiData, TFormatted> {
    * @default 10
    */
   pageSize?: number;
+
+  /**
+   * Serialized filter state. Whenever it changes the list resets to page 1 and
+   * refetches through `fetchFn` (which is expected to close over the same
+   * filters). Leave undefined for unfiltered lists — they then fetch once on
+   * mount as before.
+   *
+   * The refetch does NOT raise `loading` after the first successful load, so a
+   * filter change keeps the current rows on screen instead of flashing the
+   * screen-level splash (mirrors useExplorePagination).
+   */
+  refetchKey?: string;
 }
 
 interface UsePaginatedEventsReturn<T> {
@@ -45,6 +57,13 @@ interface UsePaginatedEventsReturn<T> {
   loading: boolean;
   /** True during pull-to-refresh */
   refreshing: boolean;
+  /**
+   * True whenever a page-1 fetch is in flight — the initial load, a refresh, or
+   * a `refetchKey` change. Callers with filters need it to tell "no rows because
+   * the new filter hasn't landed yet" from "no rows at all"; `loading` and
+   * `refreshing` are both false during a filter refetch by design.
+   */
+  fetching: boolean;
   /** True when loading more items (pagination) */
   loadingMore: boolean;
   /** Error message if fetch failed, null otherwise */
@@ -92,6 +111,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
   fetchFn,
   formatFn,
   pageSize = 10,
+  refetchKey,
 }: UsePaginatedEventsOptions<TApiData, TFormatted>): UsePaginatedEventsReturn<TFormatted> {
   const { user, isLogged } = useGlobalContext();
   const { userOrganizations, loading: orgsLoading } = useUserOrganizations();
@@ -99,6 +119,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
   const [events, setEvents] = useState<TFormatted[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [fetching, setFetching] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -108,6 +129,9 @@ export function usePaginatedEvents<TApiData, TFormatted>({
   const loadingRef = useRef<boolean>(false);
 
   const hasFetchedRef = useRef<boolean>(false);
+  // Monotonic request id: a filter change can supersede an in-flight fetch, and
+  // the loser's response must not overwrite the winner's rows.
+  const requestIdRef = useRef<number>(0);
 
   // Refs for the callback props so callers can pass inline functions without
   // forcing fetchEvents/handleRefresh to be recreated each render (which would
@@ -145,6 +169,9 @@ export function usePaginatedEvents<TApiData, TFormatted>({
         return;
       }
 
+      const currentRequestId = ++requestIdRef.current;
+      setFetching(true);
+
       try {
         logger.debug(`[usePaginatedEvents] Fetching events`, {
           isRefresh,
@@ -154,6 +181,9 @@ export function usePaginatedEvents<TApiData, TFormatted>({
         setError(null);
 
         const response = await fetchFnRef.current(pageSize, 0, organizationIds);
+
+        // Superseded by a newer fetch (filter change) while in flight — discard.
+        if (currentRequestId !== requestIdRef.current) return;
 
         const formattedEvents = formatFnRef.current(response.events);
 
@@ -168,11 +198,15 @@ export function usePaginatedEvents<TApiData, TFormatted>({
 
         setHasMore(response.total > pageSize);
       } catch (err: any) {
+        if (currentRequestId !== requestIdRef.current) return;
         logger.error('Error fetching events:', { error: err });
         setError(err.message || 'Failed to fetch events');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (currentRequestId === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+          setFetching(false);
+        }
       }
     },
     [user?.$id, pageSize, organizationIds]
@@ -184,6 +218,11 @@ export function usePaginatedEvents<TApiData, TFormatted>({
       return;
     }
 
+    // Snapshot (don't increment): a filter-change fetch landing mid-pagination
+    // must discard this page, which would otherwise append rows from the
+    // previous filter to the new list.
+    const currentRequestId = requestIdRef.current;
+
     try {
       loadingRef.current = true;
       setLoadingMore(true);
@@ -191,6 +230,8 @@ export function usePaginatedEvents<TApiData, TFormatted>({
       const currentOffset = offsetRef.current;
 
       const response = await fetchFnRef.current(pageSize, currentOffset, organizationIds);
+
+      if (currentRequestId !== requestIdRef.current) return;
 
       const formattedEvents = formatFnRef.current(response.events);
 
@@ -229,6 +270,27 @@ export function usePaginatedEvents<TApiData, TFormatted>({
     }
   }, [fetchEvents, isLogged, user?.$id, orgsLoading, organizationIds.length]);
 
+  // Refetch page 1 when the filters change. The mount fetch is owned by the
+  // effect above, so the first run here is skipped — otherwise every filtered
+  // list would fire two requests on mount.
+  const lastRefetchKeyRef = useRef<string | undefined>(refetchKey);
+  useEffect(() => {
+    if (refetchKey === undefined || refetchKey === lastRefetchKeyRef.current) {
+      return;
+    }
+    lastRefetchKeyRef.current = refetchKey;
+
+    if (!hasFetchedRef.current) {
+      return;
+    }
+
+    setOffset(0);
+    setHasMore(true);
+    // Not a "refresh": that flag drives the pull-to-refresh spinner. Rows stay
+    // put until the new page lands.
+    fetchEvents();
+  }, [refetchKey, fetchEvents]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setOffset(0);
@@ -246,6 +308,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
     events,
     loading: loading || orgsLoading,
     refreshing,
+    fetching,
     loadingMore,
     error,
     hasMore,

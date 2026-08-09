@@ -20,7 +20,7 @@ import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColo
 import { Spacing, BorderRadius, Shadows } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { isEventInProgress } from '@/utils/calendarTabUtils';
-import { formatEventDateTime } from '@/utils/eventFormatters';
+import { formatEventDateTimeLabel } from '@/utils/eventFormatters';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
 import { Event } from '@/types/event.types';
 import { t } from '@/utils/i18n';
@@ -86,10 +86,7 @@ function ExploreEventCard({
     <TouchableOpacity
       onPress={handleCardPress}
       accessibilityRole="button"
-      accessibilityLabel={`Event: ${event.title}, ${formatEventDateTime(
-        event.start_time,
-        userLanguage
-      )}`}
+      accessibilityLabel={`Event: ${event.title}, ${formatEventDateTimeLabel(event, userLanguage)}`}
     >
       <ThemedView style={[styles.card, { borderColor: themeColors.cardBorder }]}>
         <Image
@@ -149,7 +146,7 @@ function ExploreEventCard({
           <ThemedView style={styles.metadataRow}>
             <IconSymbol name="calendar" size={16} color={colors.icon} />
             <ThemedText type="cardMetadata" style={{ color: colors.text }}>
-              {formatEventDateTime(event.start_time, userLanguage)}
+              {formatEventDateTimeLabel(event, userLanguage)}
             </ThemedText>
           </ThemedView>
 

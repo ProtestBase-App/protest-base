@@ -39,21 +39,117 @@ describe('eventsCacheStorage', () => {
     const loaded = await loadPersistedEvents();
 
     expect(loaded).not.toBeNull();
-    expect(loaded!.map((e) => e.$id).sort()).toEqual(['e1', 'e2']);
+    expect(loaded!.events.map((e) => e.$id).sort()).toEqual(['e1', 'e2']);
   });
 
   it('returns null when nothing is stored', async () => {
     expect(await loadPersistedEvents()).toBeNull();
   });
 
-  it('drops ended events before persisting', async () => {
-    const ended = makeEvent('ended', -2 * DAY_MS, -1 * DAY_MS);
-    const upcoming = makeEvent('upcoming', DAY_MS);
+  it('round-trips the ETag alongside the events', async () => {
+    await persistEvents([makeEvent('e1', DAY_MS)], { etag: 'W/"abc123"', coversWindow: true });
 
-    await persistEvents([ended, upcoming]);
     const loaded = await loadPersistedEvents();
 
-    expect(loaded!.map((e) => e.$id)).toEqual(['upcoming']);
+    expect(loaded!.etag).toBe('W/"abc123"');
+  });
+
+  it('withholds the ETag when the fetch behind the cache was truncated', async () => {
+    // A 304 would pin the app to this subset, so the snapshot must not offer a
+    // validator it cannot stand behind.
+    await persistEvents([makeEvent('e1', DAY_MS)], { etag: 'W/"abc123"', coversWindow: false });
+
+    expect((await loadPersistedEvents())!.etag).toBeUndefined();
+  });
+
+  it('withholds the ETag when the cap dropped part of the window', async () => {
+    const events = Array.from({ length: 250 }, (_, i) => makeEvent(`evt-${i}`, (i + 1) * HOUR_MS));
+
+    await persistEvents(events, { etag: 'W/"abc123"', coversWindow: true });
+
+    const loaded = await loadPersistedEvents();
+    expect(loaded!.events).toHaveLength(200);
+    expect(loaded!.etag).toBeUndefined();
+  });
+
+  it('requires a positive coversWindow claim before storing an ETag', async () => {
+    await persistEvents([makeEvent('e1', DAY_MS)], { etag: 'W/"abc123"' });
+
+    expect((await loadPersistedEvents())!.etag).toBeUndefined();
+  });
+
+  it('keeps ended events inside the lookback so the snapshot matches the window', async () => {
+    const endedRecently = makeEvent('ended-recent', -2 * DAY_MS, -1 * DAY_MS);
+    const endedLongAgo = makeEvent('ended-old', -25 * DAY_MS, -24 * DAY_MS);
+    const upcoming = makeEvent('upcoming', DAY_MS);
+
+    await persistEvents([endedLongAgo, endedRecently, upcoming], { coversWindow: true });
+
+    const loaded = await loadPersistedEvents();
+    // Upcoming first (that's what the first paint needs), then in-window ended
+    // events as filler. Anything before the 20-day lookback is outside the
+    // window the cold-start fetch asks for, so it is not part of the snapshot.
+    expect(loaded!.events.map((e) => e.$id)).toEqual(['upcoming', 'ended-recent']);
+  });
+
+  it('never lets ended filler crowd out upcoming events at the cap', async () => {
+    const ended = Array.from({ length: 250 }, (_, i) =>
+      makeEvent(`ended-${i}`, -(i + 2) * HOUR_MS, -(i + 1) * HOUR_MS)
+    );
+    const upcoming = Array.from({ length: 10 }, (_, i) => makeEvent(`up-${i}`, (i + 1) * HOUR_MS));
+
+    await persistEvents([...ended, ...upcoming], { coversWindow: true });
+
+    const loaded = await loadPersistedEvents();
+    expect(loaded!.events.slice(0, 10).map((e) => e.$id)).toEqual(upcoming.map((e) => e.$id));
+  });
+
+  it('loads without an ETag when none was persisted', async () => {
+    await persistEvents([makeEvent('e1', DAY_MS)]);
+
+    const loaded = await loadPersistedEvents();
+
+    expect(loaded!.events).toHaveLength(1);
+    expect(loaded!.etag).toBeUndefined();
+  });
+
+  it('ignores a non-string ETag rather than revalidating with garbage', async () => {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.EVENTS_CACHE,
+      JSON.stringify({
+        version: EVENTS_CACHE_SCHEMA_VERSION,
+        events: [makeEvent('e1', DAY_MS)],
+        timestamp: Date.now(),
+        etag: 42,
+      })
+    );
+
+    expect((await loadPersistedEvents())!.etag).toBeUndefined();
+  });
+
+  it('returns null for a snapshot written by the previous schema version', async () => {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.EVENTS_CACHE,
+      JSON.stringify({
+        version: EVENTS_CACHE_SCHEMA_VERSION - 1,
+        events: [makeEvent('old-schema', DAY_MS)],
+        timestamp: Date.now(),
+      })
+    );
+
+    expect(await loadPersistedEvents()).toBeNull();
+  });
+
+  it('drops events that start before the fetch window', async () => {
+    // Deep-linked past events live in the in-memory cache but are outside the
+    // window the cold-start fetch asks for, so they are not part of the snapshot.
+    const outsideWindow = makeEvent('old', -25 * DAY_MS, -24 * DAY_MS);
+    const upcoming = makeEvent('upcoming', DAY_MS);
+
+    await persistEvents([outsideWindow, upcoming]);
+    const loaded = await loadPersistedEvents();
+
+    expect(loaded!.events.map((e) => e.$id)).toEqual(['upcoming']);
   });
 
   it('caps the snapshot to 200 events, soonest first', async () => {
@@ -65,10 +161,10 @@ describe('eventsCacheStorage', () => {
     await persistEvents(events);
     const loaded = await loadPersistedEvents();
 
-    expect(loaded!.length).toBe(200);
+    expect(loaded!.events.length).toBe(200);
     // Soonest kept is +1h; the far-future tail (201h..250h) is dropped.
-    expect(loaded![0].$id).toBe('evt-001');
-    expect(loaded!.some((e) => e.$id === 'evt-250')).toBe(false);
+    expect(loaded!.events[0].$id).toBe('evt-001');
+    expect(loaded!.events.some((e) => e.$id === 'evt-250')).toBe(false);
   });
 
   it('returns null for a snapshot older than the hydration window', async () => {
@@ -110,7 +206,7 @@ describe('eventsCacheStorage', () => {
 
     const loaded = await loadPersistedEvents();
 
-    expect(loaded!.map((e) => e.$id)).toEqual(['valid']);
+    expect(loaded!.events.map((e) => e.$id)).toEqual(['valid']);
   });
 
   it('returns null for an unreadable payload', async () => {
@@ -131,8 +227,8 @@ describe('eventsCacheStorage', () => {
     const loaded = await loadPersistedEvents();
 
     expect(loaded).not.toBeNull();
-    expect(loaded!.length).toBe(100);
-    expect(loaded![0].$id).toBe('evt-001');
+    expect(loaded!.events.length).toBe(100);
+    expect(loaded!.events[0].$id).toBe('evt-001');
   });
 
   it('does not clobber an existing snapshot when nothing upcoming is passed', async () => {
@@ -142,7 +238,7 @@ describe('eventsCacheStorage', () => {
     await persistEvents([makeEvent('ended', -2 * DAY_MS, -1 * DAY_MS)]);
 
     const loaded = await loadPersistedEvents();
-    expect(loaded!.map((e) => e.$id)).toEqual(['keep-me']);
+    expect(loaded!.events.map((e) => e.$id)).toEqual(['keep-me']);
   });
 
   it('swallows write errors and never throws', async () => {

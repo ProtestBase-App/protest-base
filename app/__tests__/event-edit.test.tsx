@@ -20,7 +20,12 @@ jest.mock('@/utils/eventFormatters', () => ({
     startDateFull: event.start_time,
     endDateFull: event.end_time,
     organization_id: event.organization_id,
+    all_day: event.all_day,
   })),
+  // Real: these two ARE the all-day conversion rule under test, and EventForm
+  // calls isBelgiumMidnight on every render.
+  allDaySubmitField: jest.requireActual('@/utils/eventFormatters').allDaySubmitField,
+  isBelgiumMidnight: jest.requireActual('@/utils/eventFormatters').isBelgiumMidnight,
 }));
 
 jest.mock('@/utils/themeColors', () => ({
@@ -375,6 +380,86 @@ describe('EditEvent', () => {
       expect(router.back).toHaveBeenCalled();
 
       alertSpy.mockRestore();
+    });
+  });
+
+  describe('all-day conversion', () => {
+    // Brussels 00:00 on 22 July 2026 (CEST, UTC+2) — the all-day convention.
+    const BRUSSELS_MIDNIGHT = '2026-07-21T22:00:00.000Z';
+    const { updateEvent } = require('@/services/event.service');
+
+    const providerOverrides = {
+      globalContext: {
+        user: mockUser,
+        isLogged: true,
+        loading: false,
+        userLanguage: 'en',
+        eventsCache: {},
+        refetchEvents: jest.fn(),
+        refreshUserEventCounts: jest.fn(),
+      },
+      organizationsContext: { dropdownItems: [] },
+    };
+
+    const renderAllDayEditor = async (startTime: string) => {
+      const allDayEvent = createMockEvent({
+        title: 'Scraped date-only protest',
+        description: 'Imported without a clock time',
+        start_time: startTime,
+        end_time: '2026-07-22T21:59:59.999Z',
+        all_day: true,
+      });
+      getEventByIdBackend.mockResolvedValue(allDayEvent);
+      updateEvent.mockResolvedValue(allDayEvent);
+
+      const utils = renderWithProviders(<EditEvent />, { providerOverrides });
+      await utils.findByDisplayValue(allDayEvent.title);
+      return utils;
+    };
+
+    it('keeps the flag when the start is left at Brussels midnight', async () => {
+      const { getByTestId } = await renderAllDayEditor(BRUSSELS_MIDNIGHT);
+
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({ all_day: true })
+      );
+    });
+
+    it('clears the flag once the start carries a real clock time', async () => {
+      // What the organizer's 14:00 pick leaves in the form.
+      const { getByTestId } = await renderAllDayEditor('2026-07-22T12:00:00.000Z');
+
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({ all_day: false })
+      );
+    });
+
+    it('says nothing about all_day for an ordinary timed event', async () => {
+      const timedEvent = createMockEvent({
+        title: 'Ordinary protest',
+        description: 'Has a real time',
+        start_time: '2026-07-22T12:00:00.000Z',
+      });
+      getEventByIdBackend.mockResolvedValue(timedEvent);
+      updateEvent.mockResolvedValue(timedEvent);
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+      await findByDisplayValue(timedEvent.title);
+
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.not.objectContaining({ all_day: expect.anything() })
+      );
     });
   });
 });

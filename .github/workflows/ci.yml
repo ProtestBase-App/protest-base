@@ -22,11 +22,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check lockfile @emnapi entries
+        run: npm run check:lockfile
 
       - name: Check formatting (Prettier)
         run: npx prettier --check "**/*.{ts,tsx,js,jsx,json}" --ignore-path .gitignore

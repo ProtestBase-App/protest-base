@@ -177,6 +177,21 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     : null;
   const primaryOrgName = org?.Name || event.organizer_name;
 
+  // Tail of the calendar card's time line. An all-day event has no end clock
+  // time, so it keeps only the date range when it spans several days — and
+  // renders nothing at all on a single day, rather than a dangling separator.
+  // Driven by `isMultiDay` (compared in Belgium) and NOT by the UTC
+  // startDateNoFormat/endDateNoFormat pair, which straddles midnight.
+  const endClause = event.all_day
+    ? event.isMultiDay
+      ? `  ›  ${event.end_date}`
+      : ''
+    : event.end_time
+      ? event.isMultiDay
+        ? `  ›  ${event.end_date}, ${event.end_time}`
+        : `  ›  ${event.end_time}`
+      : '';
+
   const proceedWithCalendarAdd = async (
     title: string,
     startDate: string,
@@ -185,7 +200,8 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     address: string | null,
     postalCode: string | null,
     city: string | null,
-    notes: string
+    notes: string,
+    allDay: boolean
   ) => {
     try {
       const { status } = await Calendar.requestCalendarPermissionsAsync();
@@ -201,6 +217,8 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         } else {
           endDateObj = parseAsUTC(endDate);
           if (isNaN(endDateObj.getTime())) {
+            // An all-day event always carries a real end (23:59:59.999 of its
+            // last day), so this invented 2h window is unreachable for one.
             endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
           }
         }
@@ -209,6 +227,9 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           startDate: startDateObj,
           endDate: endDateObj,
           timeZone,
+          // Without this an all-day event exports as a 00:00–23:59 busy bar
+          // instead of the day-header entry the OS has for exactly this case.
+          allDay,
           location: [address, postalCode, city].filter(Boolean).join(', '),
           notes,
         });
@@ -252,7 +273,8 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                   event.street_address ?? null,
                   event.postal_code?.toString() ?? null,
                   cityLabel || null,
-                  event.description
+                  event.description,
+                  event.all_day
                 );
                 setIsAddingToCalendar(false);
               },
@@ -270,7 +292,8 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         event.street_address ?? null,
         event.postal_code?.toString() ?? null,
         cityLabel || null,
-        event.description
+        event.description,
+        event.all_day
       );
     } catch {
       alert(t('calendar.openError'));
@@ -649,10 +672,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <ThemedText style={styles.actionCardPrimary}>{event.start_date}</ThemedText>
               <ThemedText style={[styles.actionCardSecondary, { color: themeColors.subtleText }]}>
                 {event.start_time}
-                {event.end_time &&
-                  (event.startDateNoFormat === event.endDateNoFormat
-                    ? `  ›  ${event.end_time}`
-                    : `  ›  ${event.end_date}, ${event.end_time}`)}
+                {endClause}
                 {' · '}
                 {t('events.addToCalendar')}
               </ThemedText>

@@ -3,12 +3,14 @@ import { parseAsUTC } from '@/utils/eventFormatters';
 /**
  * Client-side publish-readiness check for draft events.
  *
- * A draft cannot be published until it is "complete". This mirrors the backend
- * contract: rules 1–3 are also enforced server-side (publish returns
- * 422 EVENT_INCOMPLETE), but rule 4 (future start_time) is FRONTEND-ONLY — the
- * backend will happily publish a past-dated draft straight into `past`. Running
- * this check before calling publishDraft() reports every problem at once and
- * blocks the past-date footgun.
+ * Two rules mirror the backend's collectPublishReadinessErrors (publish returns
+ * 422 EVENT_INCOMPLETE): a non-empty description and at least one category. The
+ * future start_time rule is FRONTEND-ONLY — the backend will happily publish a
+ * past-dated draft straight into `past`. Running this check before calling
+ * publishDraft() reports every problem at once and blocks the past-date footgun.
+ *
+ * Location is intentionally NOT a rule; see the comment in getPublishIssues.
+ * The website's equivalent util makes the same three-rule choice.
  */
 
 export type PublishIssueCode =
@@ -90,13 +92,12 @@ export function getPublishIssues(
     });
   }
 
-  if (!hasNonEmpty(input.city) && !hasNonEmpty(input.street_address)) {
-    issues.push({
-      field: 'location',
-      code: 'LOCATION_REQUIRED',
-      messageKey: CODE_TO_MESSAGE_KEY.LOCATION_REQUIRED,
-    });
-  }
+  // Location (city/street_address) is deliberately NOT checked: the backend's
+  // collectPublishReadinessErrors gates description + categories only, so gating
+  // it here refused publishes the web dashboard performs happily — and automation
+  // drafts are the class most likely to arrive without a city. LOCATION_REQUIRED
+  // stays in the vocabulary below so a future backend 422 naming a location field
+  // still renders a real label instead of the generic fallback.
 
   if (!isFutureStart(input.start_time, now)) {
     issues.push({

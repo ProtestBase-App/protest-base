@@ -66,13 +66,27 @@ jest.mock('@/utils/logger', () => ({
   },
 }));
 
+// Records every render of the full-screen loader, so the cache-first tests can
+// assert the spinner frame is gone rather than just that content arrives.
+const mockBrandLoaderRender = jest.fn();
+jest.mock('@/components/ui/loaders/BrandLoader', () => ({
+  BrandLoader: (props: Record<string, unknown>) => {
+    mockBrandLoaderRender(props);
+    return null;
+  },
+}));
+
 import React from 'react';
 import { renderWithProviders, createMockEvent, createMockUser } from '@/test-utils/render';
 import EventDetails from '../event/[id]';
 
 // Import router and services for mock access
 const { useLocalSearchParams, router } = require('expo-router');
-const { getEventByIdBackend } = require('@/services/event.service');
+const {
+  getEventByIdBackend,
+  EventNotFoundError,
+  EventNetworkError,
+} = require('@/services/event.service');
 
 describe('EventDetails', () => {
   const mockEvent = createMockEvent();
@@ -200,6 +214,91 @@ describe('EventDetails', () => {
       });
 
       await findByText('common.error');
+    });
+  });
+
+  describe('Cache-first paint', () => {
+    const cached = { ...mockEvent, title: 'Cached title', view_count: 7 };
+
+    function renderWithCache(overrides: Record<string, unknown> = {}) {
+      return renderWithProviders(<EventDetails />, {
+        providerOverrides: {
+          globalContext: {
+            user: mockUser,
+            isLogged: true,
+            loading: false,
+            userLanguage: 'en',
+            eventsCache: { 'event-1': cached },
+            refetchEvents: jest.fn(),
+            refreshUserEventCounts: jest.fn(),
+            ...overrides,
+          },
+          postalCodeContext: {
+            loading: false,
+            getSubMunicipalityName: jest.fn(),
+          },
+        },
+      });
+    }
+
+    it('renders a cached event without ever showing the loader', async () => {
+      getEventByIdBackend.mockImplementation(() => new Promise(() => {}));
+
+      const { getByText } = renderWithCache();
+
+      // Present on the very first commit — no spinner frame, no await.
+      expect(getByText('Cached title')).toBeTruthy();
+      expect(mockBrandLoaderRender).not.toHaveBeenCalled();
+    });
+
+    it('shows the loader when the event is not in the cache', async () => {
+      getEventByIdBackend.mockImplementation(() => new Promise(() => {}));
+
+      renderWithProviders(<EventDetails />, {
+        providerOverrides: {
+          globalContext: {
+            user: mockUser,
+            isLogged: true,
+            loading: false,
+            userLanguage: 'en',
+            eventsCache: {},
+            refetchEvents: jest.fn(),
+            refreshUserEventCounts: jest.fn(),
+          },
+          postalCodeContext: { loading: false, getSubMunicipalityName: jest.fn() },
+        },
+      });
+
+      expect(mockBrandLoaderRender).toHaveBeenCalled();
+    });
+
+    it('revalidates in the background and swaps in the server copy', async () => {
+      getEventByIdBackend.mockResolvedValue({ ...mockEvent, title: 'Server title' });
+
+      const { findByText } = renderWithCache();
+
+      expect(getEventByIdBackend).toHaveBeenCalledWith('event-1', true);
+      await findByText('Server title');
+    });
+
+    it('keeps the cached copy when the background revalidation fails', async () => {
+      getEventByIdBackend.mockRejectedValue(new EventNetworkError('offline'));
+
+      const { findByText, queryByText } = renderWithCache();
+
+      // The screen the user is already reading must not blank out.
+      expect(await findByText('Cached title')).toBeTruthy();
+      expect(queryByText('common.error')).toBeNull();
+    });
+
+    it('clears the screen and evicts the event when the backend confirms a 404', async () => {
+      getEventByIdBackend.mockRejectedValue(new EventNotFoundError('gone'));
+      const removeEventFromCache = jest.fn();
+
+      const { findByText } = renderWithCache({ removeEventFromCache });
+
+      await findByText('common.error');
+      expect(removeEventFromCache).toHaveBeenCalledWith('event-1');
     });
   });
 

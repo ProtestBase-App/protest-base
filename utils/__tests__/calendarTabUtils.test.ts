@@ -441,6 +441,42 @@ describe('calendarTabUtils', () => {
       });
       expect(isEventInProgress(event, todayKey)).toBe(false);
     });
+
+    // An all-day event has no clock time, so it cannot be "not started yet" on
+    // its own day — unlike a timed one, which the cases above keep unbadged.
+    it('returns true for a single-day all-day event today', () => {
+      const event = createMockEvent({
+        // Brussels 00:00 → 23:59:59.999 on 10 June 2026 (CEST, UTC+2).
+        start_time: '2026-06-09T22:00:00.000Z',
+        end_time: '2026-06-10T21:59:59.999Z',
+        all_day: true,
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(true);
+    });
+
+    it('returns true for a multi-day all-day event starting today', () => {
+      const event = createMockEvent({
+        start_time: '2026-06-09T22:00:00.000Z',
+        end_time: '2026-06-13T21:59:59.999Z',
+        all_day: true,
+      });
+      expect(isEventInProgress(event, todayKey)).toBe(true);
+    });
+
+    it('still returns false for an all-day event on a future or past day', () => {
+      const future = createMockEvent({
+        start_time: '2026-06-11T22:00:00.000Z',
+        end_time: '2026-06-12T21:59:59.999Z',
+        all_day: true,
+      });
+      const past = createMockEvent({
+        start_time: '2026-06-07T22:00:00.000Z',
+        end_time: '2026-06-08T21:59:59.999Z',
+        all_day: true,
+      });
+      expect(isEventInProgress(future, todayKey)).toBe(false);
+      expect(isEventInProgress(past, todayKey)).toBe(false);
+    });
   });
 
   // ==========================================================================

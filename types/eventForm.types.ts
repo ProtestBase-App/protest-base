@@ -57,4 +57,11 @@ export interface EventFormProps {
   mode?: EventFormMode;
   /** Optional ref to the parent ScrollView for scrolling to bottom fields */
   scrollViewRef?: React.RefObject<any>;
+  /**
+   * The event being edited is date-only (`all_day`). Only the edit screens set
+   * this, and only from the loaded event — there is no authoring UI for it. The
+   * date fields then show "All day" for as long as the value stays at Brussels
+   * midnight; picking a real time is what converts the event back to timed.
+   */
+  isAllDay?: boolean;
 }

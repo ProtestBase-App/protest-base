@@ -27,6 +27,7 @@ import { IntegrityGate } from '@/components/integrity';
 import { ConnectionGate, OfflineBanner } from '@/components/connection';
 import { ConnectivityProvider } from '@/context/ConnectivityProvider';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
+import { EventsPrefetch } from '@/components/EventsPrefetch';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
 import { Platform, StyleSheet } from 'react-native';
@@ -92,6 +93,12 @@ export default function RootLayout() {
           {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
             pure UI context, so it wraps the data providers harmlessly. */}
           <BottomSheetModalProvider>
+            {/* Starts the events fetch here, outside the gates below: both render
+                a spinner instead of their children while their own request is in
+                flight, so GlobalProvider would otherwise not even mount — let
+                alone fetch — until /app/config and the integrity handshake are
+                done. */}
+            <EventsPrefetch />
             {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
             {/* This ensures version check happens BEFORE authentication */}
             <VersionCheckProvider>
@@ -174,7 +181,19 @@ function RootNavigator() {
           name="event-edit/[id]"
           options={{ headerShown: false, gestureEnabled: false }}
         />
-        <Stack.Screen name="draft-edit/[id]" options={{ headerShown: false }} />
+        {/* gestureEnabled: false so a swipe-back cannot bypass the
+            unsaved-changes guard (mirrors event-edit above). */}
+        <Stack.Screen
+          name="draft-edit/[id]"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        {/* Triage deck: presented modally and outside the tabs, so the tab bar
+            is hidden and the deck owns the whole screen. gestureEnabled: false
+            because a swipe-back would fight the card's own pan gesture. */}
+        <Stack.Screen
+          name="draft-triage"
+          options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
+        />
       </Stack.Protected>
 
       {/* Public routes: always accessible */}

@@ -129,10 +129,7 @@ export interface BypassAttestRequest extends AttestRequestBase {
 }
 
 export type AttestRequest =
-  | IosAttestRequest
-  | AndroidAttestationRequest
-  | AndroidAssertionRequest
-  | BypassAttestRequest;
+  IosAttestRequest | AndroidAttestationRequest | AndroidAssertionRequest | BypassAttestRequest;
 
 export interface InstallTokenResponse {
   installToken: string;

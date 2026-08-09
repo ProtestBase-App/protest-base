@@ -169,11 +169,16 @@ export function expandEventsByDay(events: Event[]): EventsByDay {
  * qualify (their start day IS today), so only multi-day events can show the
  * "in progress" badge — which states a fact about NOW, not about the
  * displayed day.
+ *
+ * All-day events are the exception, and deliberately so: having no clock time,
+ * one cannot be "not started yet" on its own day, so it is in progress for every
+ * day it spans — the first included.
  */
 export function isEventInProgress(event: Event, todayKey: string): boolean {
   if (!event.start_time) return false;
   const startKey = getEventDateKeyInBelgium(event.start_time);
   const endKey = event.end_time ? getEventDateKeyInBelgium(event.end_time) : startKey;
+  if (event.all_day === true) return startKey <= todayKey && endKey >= todayKey;
   return startKey < todayKey && endKey >= todayKey;
 }
 

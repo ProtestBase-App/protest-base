@@ -72,75 +72,40 @@ describe('OrganizerAvatar', () => {
     });
   });
 
-  describe('With avatar URL — image callbacks', () => {
-    it('does not show initials initially when URL is provided', () => {
-      render(<OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Test Org" />);
-      expect(screen.queryByText('TO')).toBeNull();
-    });
-
-    it('shows loading indicator initially while image is loading', () => {
-      render(<OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Test Org" />);
-      expect(screen.toJSON()).toBeTruthy();
-    });
-
-    it('onLoadStart callback sets isLoading to true without crashing', async () => {
+  describe('With avatar URL', () => {
+    it('renders the initials under the image, so a request that never resolves still reads', () => {
       const { UNSAFE_getByType } = render(
-        <OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Org Name" />
+        <OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Test Org" />
       );
       const { Image } = require('expo-image');
-      const imageEl = UNSAFE_getByType(Image);
 
-      await act(async () => {
-        imageEl.props.onLoadStart();
-      });
-
-      expect(screen.toJSON()).toBeTruthy();
+      // No load or error callback ever fires — the hung-request case.
+      expect(screen.getByText('TO')).toBeTruthy();
+      expect(UNSAFE_getByType(Image)).toBeTruthy();
     });
 
-    it('onLoadEnd callback sets isLoading to false', async () => {
+    it('leaves the image transparent so the initials show through', () => {
       const { UNSAFE_getByType } = render(
-        <OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Org Name" />
+        <OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Test Org" />
       );
       const { Image } = require('expo-image');
-      const imageEl = UNSAFE_getByType(Image);
+      const style = ReactNative.StyleSheet.flatten(UNSAFE_getByType(Image).props.style);
 
-      await act(async () => {
-        imageEl.props.onLoadEnd();
-      });
-
-      expect(screen.toJSON()).toBeTruthy();
+      expect(style.backgroundColor).toBeUndefined();
     });
 
-    it('onError shows initials fallback after image fails to load', async () => {
-      const { UNSAFE_getByType } = render(
+    it('onError drops the image and keeps the initials', async () => {
+      const { UNSAFE_getByType, UNSAFE_queryAllByType } = render(
         <OrganizerAvatar avatarUrl="https://example.com/broken.jpg" name="Test Org" />
       );
       const { Image } = require('expo-image');
-      const imageEl = UNSAFE_getByType(Image);
 
       await act(async () => {
-        imageEl.props.onError();
+        UNSAFE_getByType(Image).props.onError();
       });
 
       expect(screen.getByText('TO')).toBeTruthy();
-    });
-
-    it('full lifecycle: onLoadStart → onLoadEnd completes without showing initials', async () => {
-      const { UNSAFE_getByType } = render(
-        <OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Full Lifecycle" />
-      );
-      const { Image } = require('expo-image');
-      const imageEl = UNSAFE_getByType(Image);
-
-      await act(async () => {
-        imageEl.props.onLoadStart();
-      });
-      await act(async () => {
-        imageEl.props.onLoadEnd();
-      });
-
-      expect(screen.toJSON()).toBeTruthy();
-      expect(screen.queryByText('FL')).toBeNull();
+      expect(UNSAFE_queryAllByType(Image)).toHaveLength(0);
     });
   });
 
@@ -151,7 +116,7 @@ describe('OrganizerAvatar', () => {
       expect(screen.getByText('LO')).toBeTruthy();
     });
 
-    it('renders image variant in light mode (covers light brandColor and placeholderBg branches)', () => {
+    it('renders the image variant in light mode', () => {
       useColorSchemeSpy.mockReturnValue('light');
       render(<OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Light Image" />);
       expect(screen.toJSON()).toBeTruthy();
@@ -165,7 +130,7 @@ describe('OrganizerAvatar', () => {
       expect(screen.getByText('DO')).toBeTruthy();
     });
 
-    it('renders image variant in dark mode (covers dark brandColor and placeholderBg branches)', () => {
+    it('renders the image variant in dark mode', () => {
       useColorSchemeSpy.mockReturnValue('dark');
       render(<OrganizerAvatar avatarUrl="https://example.com/avatar.jpg" name="Dark Image" />);
       expect(screen.toJSON()).toBeTruthy();
