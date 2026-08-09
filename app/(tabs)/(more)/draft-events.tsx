@@ -6,6 +6,7 @@ import { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeab
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import DraftBatchBar, {
+  BATCH_BAR_BOTTOM_OFFSET,
   BATCH_BAR_CLEARANCE,
   BATCH_BAR_ROW_CLEARANCE,
 } from '@/components/DraftBatchBar';
@@ -98,6 +99,9 @@ export default function DraftEventsScreen() {
     filters.source !== null ||
     filters.sort !== DEFAULT_DRAFT_FILTERS.sort;
   const hasActiveFilters = search !== '' || sheetFiltersActive || statusFilter !== 'all';
+  // Narrower than `sheetFiltersActive`: sort only reorders the same rows, so it
+  // leaves the account-wide counts (and the triage entry) intact.
+  const dataFiltersActive = search !== '' || filters.category !== null || filters.source !== null;
 
   const clearFilters = useCallback(() => {
     setSearch('');
@@ -610,8 +614,18 @@ export default function DraftEventsScreen() {
   const showRemovePastRow = counts.pastDate > 0;
   const showBatchBar = !showLoading && !error && (showPublishRow || showRemovePastRow);
 
+  // Status chips are views onto the same data, so "Past date" / "Needs work" —
+  // the chips that isolate the queue — keep the entry; hiding it there hid it
+  // exactly where it was wanted. Search, category and source still hide it:
+  // those narrow the fetched set, so the card's counts would stop describing
+  // the account. The visible guard keeps it off a zero-count chip's empty state.
   const showTriageEntry =
-    !showLoading && !error && queueIds.length > 0 && statusFilter === 'all' && !hasActiveFilters;
+    !showLoading &&
+    !error &&
+    queueIds.length > 0 &&
+    visibleDrafts.length > 0 &&
+    statusFilter !== 'ready' &&
+    !dataFiltersActive;
 
   return (
     <ThemedView style={styles.wrapper}>
@@ -685,7 +699,9 @@ export default function DraftEventsScreen() {
                     pastCount={counts.pastDate}
                     readyCount={counts.ready}
                     onStartTriage={() => router.push(Routes.DRAFT_TRIAGE)}
-                    onPublishReady={handlePublishAll}
+                    // Same gate as the batch bar: no publish shortcut while the
+                    // active chip hides the very drafts it would publish.
+                    onPublishReady={showPublishRow ? handlePublishAll : undefined}
                   />
                 ) : null
               }
@@ -734,7 +750,9 @@ export default function DraftEventsScreen() {
             iconColor={themeColors.live}
             durationMs={3200}
             onTimeout={() => setNotice(null)}
-            bottom={showBatchBar ? 160 : 112}
+            // Anchored to the bar's own offset so both track the tab bar, which
+            // only overlays the screen on iOS.
+            bottom={BATCH_BAR_BOTTOM_OFFSET + (showBatchBar ? 65 : 17)}
             testID="draft-notice-toast"
           />
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
 import { Image } from 'expo-image';
@@ -28,92 +28,48 @@ function getInitials(name: string): string {
 /**
  * OrganizerAvatar - Displays an avatar image or initials fallback
  *
- * Features:
- * - Displays avatar image when URL is provided
- * - Shows initials on brand pink background when avatar is null
- * - Uses expo-image with memory-disk caching
- * - Shows loading indicator while image loads
- * - Supports theming for initials text color
+ * The initials are always the base layer and the image fades in on top of them,
+ * so a request that hangs (or fails) leaves a readable avatar rather than a
+ * spinner: `onLoadEnd` is synthesized in JS from the native load/error events,
+ * so a request that never resolves would never clear a loading flag.
  */
 export const OrganizerAvatar: React.FC<OrganizerAvatarProps> = ({ avatarUrl, name, size = 42 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const initials = getInitials(name);
 
   // Calculate font size relative to avatar size
   const fontSize = Math.floor(size * 0.4);
-  const brandColor = themeColors.tint;
-  const placeholderBg = colorScheme === 'dark' ? themeColors.border : themeColors.border;
-
-  // Show initials if no avatar URL or if image failed to load
-  if (!avatarUrl || hasError) {
-    return (
-      <View
-        style={[
-          styles.initialsContainer,
-          {
-            width: size,
-            height: size,
-            borderRadius: BorderRadius.full,
-            backgroundColor: brandColor,
-          },
-        ]}
-      >
-        <ThemedText
-          style={[
-            styles.initialsText,
-            {
-              fontSize,
-              color: '#FFFFFF',
-            },
-          ]}
-        >
-          {initials}
-        </ThemedText>
-      </View>
-    );
-  }
 
   return (
-    <View style={{ width: size, height: size }}>
-      {isLoading && (
-        <View
-          style={[
-            styles.loadingContainer,
-            {
-              width: size,
-              height: size,
-              borderRadius: BorderRadius.full,
-              backgroundColor: placeholderBg,
-            },
-          ]}
-        >
-          <ActivityIndicator size="small" color={brandColor} />
-        </View>
+    <View
+      style={[
+        styles.initialsContainer,
+        {
+          width: size,
+          height: size,
+          borderRadius: BorderRadius.full,
+          backgroundColor: themeColors.tint,
+        },
+      ]}
+    >
+      <ThemedText style={[styles.initialsText, { fontSize, color: '#FFFFFF' }]}>
+        {initials}
+      </ThemedText>
+
+      {!!avatarUrl && !hasError && (
+        <Image
+          source={avatarUrl}
+          // No backgroundColor: it would hide the initials underneath until —
+          // or unless — the image paints.
+          style={[styles.avatar, { width: size, height: size, borderRadius: BorderRadius.full }]}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
+          onError={() => setHasError(true)}
+        />
       )}
-      <Image
-        source={avatarUrl}
-        style={[
-          styles.avatar,
-          {
-            width: size,
-            height: size,
-            borderRadius: BorderRadius.full,
-            backgroundColor: placeholderBg,
-          },
-        ]}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        transition={200}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
-        onError={() => {
-          setIsLoading(false);
-          setHasError(true);
-        }}
-      />
     </View>
   );
 };
@@ -121,12 +77,8 @@ export const OrganizerAvatar: React.FC<OrganizerAvatarProps> = ({ avatarUrl, nam
 const styles = StyleSheet.create({
   avatar: {
     position: 'absolute',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
+    top: 0,
+    left: 0,
   },
   initialsContainer: {
     justifyContent: 'center',

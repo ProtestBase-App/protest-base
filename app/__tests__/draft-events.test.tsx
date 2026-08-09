@@ -525,5 +525,60 @@ describe('DraftEventsScreen', () => {
       await findByTestId('draft-row-draft-1');
       expect(queryByTestId('triage-entry-card')).toBeNull();
     });
+
+    it('keeps the entry under the chips that isolate the queue', async () => {
+      resolveWith([readyDraft(), readyDraft({ $id: 'draft-2', start_time: PAST })]);
+
+      const { findByTestId, getByTestId, queryByTestId } = renderWithProviders(
+        <DraftEventsScreen />,
+        { providerOverrides }
+      );
+
+      await findByTestId('draft-row-draft-2');
+      fireEvent.press(getByTestId('draft-status-chip-pastDate'));
+
+      // The chip that shows only the queue is where triage is most wanted.
+      expect(getByTestId('triage-entry-card')).toBeTruthy();
+      // ...but its ready drafts are hidden, so the publish shortcut goes too.
+      expect(queryByTestId('triage-publish-ready')).toBeNull();
+    });
+
+    it('keeps the entry when only the sort changes', async () => {
+      resolveWith([readyDraft(), readyDraft({ $id: 'draft-2', start_time: PAST })]);
+
+      const { findByTestId, getByTestId, getByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await findByTestId('draft-row-draft-2');
+      fireEvent.press(getByTestId('draft-filters-button'));
+      fireEvent.press(await findByTestId('draft-filter-sort-lastEdited'));
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      // Sorting reorders the same rows, so the counts still hold.
+      await waitFor(() => expect(getByTestId('triage-entry-card')).toBeTruthy());
+    });
+
+    it('hides the triage entry under the ready chip and under a search', async () => {
+      resolveWith([readyDraft(), readyDraft({ $id: 'draft-2', start_time: PAST })]);
+
+      const { findByTestId, getByTestId, queryByTestId } = renderWithProviders(
+        <DraftEventsScreen />,
+        { providerOverrides }
+      );
+
+      await findByTestId('draft-row-draft-2');
+      fireEvent.press(getByTestId('draft-status-chip-ready'));
+      expect(queryByTestId('triage-entry-card')).toBeNull();
+
+      fireEvent.press(getByTestId('draft-status-chip-all'));
+      expect(getByTestId('triage-entry-card')).toBeTruthy();
+      expect(getByTestId('triage-publish-ready')).toBeTruthy();
+
+      // A search narrows the fetched set, so the card's counts would no longer
+      // describe the account.
+      fireEvent.changeText(getByTestId('draft-search-input'), 'vrede');
+      await waitFor(() => expect(queryByTestId('triage-entry-card')).toBeNull());
+    });
   });
 });

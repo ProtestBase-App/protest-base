@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -25,6 +25,21 @@ export interface DraftBatchBarProps {
   /** Progress copy while running, e.g. "3 / 12". */
   progressLabel?: string;
 }
+
+/**
+ * How far the bar floats above the bottom of the screen area it lives in. The
+ * tab bar is `position: absolute` on iOS only (see `app/(tabs)/_layout.tsx`), so
+ * there the bar has to clear its full height; on Android the screen already ends
+ * above the tab bar and the same offset would strand it mid-screen. Same shape as
+ * `bottomStackOffset` in `(tabs)/(maps)/maps.tsx`, which reads the live tab bar
+ * height — a hook this component can't call, since it throws outside a tab
+ * navigator. 83 is the iOS height the previous hardcoded 95 assumed, not a
+ * measurement.
+ */
+const TAB_BAR_CLEARANCE = Platform.OS === 'ios' ? 83 : 0;
+
+/** The bar's distance from the bottom — anything stacked over it starts here. */
+export const BATCH_BAR_BOTTOM_OFFSET = TAB_BAR_CLEARANCE + Spacing.md;
 
 /** Height + gap the list must add to its bottom padding while the bar is up. */
 export const BATCH_BAR_CLEARANCE = 66;
@@ -150,7 +165,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: Spacing.md,
     right: Spacing.md,
-    bottom: 95,
+    bottom: BATCH_BAR_BOTTOM_OFFSET,
     borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',

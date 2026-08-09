@@ -17,13 +17,15 @@ export interface TriageEntryCardProps {
   /** Drafts already ready to publish (not part of the queue). */
   readyCount: number;
   onStartTriage: () => void;
-  onPublishReady: () => void;
+  /** Omit to drop the publish shortcut while still reporting `readyCount`. */
+  onPublishReady?: () => void;
 }
 
 /**
- * Entry point for triage mode, shown above the drafts list whenever the backlog
- * is non-empty. Names the two shapes of work — decisions to make, and drafts
- * that need none — so the user can pick the cheap one.
+ * Entry point for triage mode, shown above the drafts list whenever the queue —
+ * past-dated or incomplete drafts — is non-empty. Names the two shapes of work,
+ * decisions to make and drafts that need none, so the user can pick the cheap
+ * one. Counts are account-wide, as the chip counts are.
  */
 export default function TriageEntryCard({
   queueCount,
@@ -77,7 +79,7 @@ export default function TriageEntryCard({
           <ThemedText style={styles.primaryLabel}>{t('drafts.triageStart')}</ThemedText>
         </Pressable>
 
-        {readyCount > 0 && (
+        {readyCount > 0 && onPublishReady && (
           <Pressable
             onPress={onPublishReady}
             accessibilityRole="button"
