@@ -27,6 +27,19 @@ jest.mock('@/services/event.service', () => ({
       this.name = 'EventNotDraftError';
     }
   },
+  // The screen branches on `instanceof DuplicateEventError`; without it in this
+  // factory the import is undefined and `instanceof` throws a TypeError.
+  DuplicateEventError: class DuplicateEventError extends Error {
+    code = 'DUPLICATE_EVENT';
+    duplicates: unknown[];
+    canOverride: boolean;
+    constructor(message = 'duplicate', duplicates: unknown[] = [], canOverride = true) {
+      super(message);
+      this.name = 'DuplicateEventError';
+      this.duplicates = duplicates;
+      this.canOverride = canOverride;
+    }
+  },
 }));
 
 jest.mock('@/utils/themeColors', () => ({
@@ -53,6 +66,8 @@ jest.mock('@/utils/themeColors', () => ({
     modalBackdrop: '#F1F1F4',
     separator: '#E5E5E5',
     border: '#E5E5E5',
+    link: '#2563EB',
+    buttonSecondaryBackground: '#F2F2F2',
   })),
 }));
 
@@ -85,6 +100,7 @@ const {
   getDraftEventsForOrganizations,
   publishDraft,
   deleteEvent,
+  DuplicateEventError,
   EventNotDraftError,
 } = require('@/services/event.service');
 
@@ -579,6 +595,165 @@ describe('DraftEventsScreen', () => {
       // describe the account.
       fireEvent.changeText(getByTestId('draft-search-input'), 'vrede');
       await waitFor(() => expect(queryByTestId('triage-entry-card')).toBeNull());
+    });
+  });
+  // The backend's duplicate guard in block mode: publish is refused with 409
+  // DUPLICATE_EVENT and nothing is published. That is the exact opposite of the
+  // EVENT_NOT_DRAFT 409 above, which is why the service branches on `code`.
+  describe('publishing a draft the backend calls a duplicate', () => {
+    const duplicate = {
+      id: 'dup-1',
+      title: 'Existing March',
+      start_time: '2099-01-02T10:00:00.000Z',
+      city: 'Brussels',
+      status: 'active',
+      organization_id: 'org-1',
+      relationship: 'own',
+      reason: 'content',
+      strength: 'strong',
+    };
+
+    const publishRow = async (findByTestId: (id: string) => Promise<any>) => {
+      const row = await findByTestId('draft-row-draft-1');
+      await act(async () => {
+        row.props.onAccessibilityAction({ nativeEvent: { actionName: 'publish' } });
+      });
+    };
+
+    it('shows the matches and keeps the row instead of reporting success', async () => {
+      resolveWith([readyDraft()]);
+      publishDraft.mockRejectedValue(new DuplicateEventError('dup', [duplicate], true));
+
+      const { findByTestId, findByText, queryByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await publishRow(findByTestId);
+
+      expect(await findByText('duplicates.publishTitle')).toBeTruthy();
+      expect(await findByText('Existing March')).toBeTruthy();
+      expect(await findByText('duplicates.relationshipOwn')).toBeTruthy();
+      // Not published: the row stays and no success notice is shown.
+      expect(await findByTestId('draft-row-draft-1')).toBeTruthy();
+      expect(queryByText('drafts.published')).toBeNull();
+    });
+
+    it('re-publishes with the override when "Publish anyway" is confirmed', async () => {
+      resolveWith([readyDraft()]);
+      publishDraft.mockRejectedValueOnce(new DuplicateEventError('dup', [duplicate], true));
+
+      const { findByTestId, findByText, queryByTestId } = renderWithProviders(
+        <DraftEventsScreen />,
+        { providerOverrides }
+      );
+
+      await publishRow(findByTestId);
+
+      publishDraft.mockResolvedValueOnce({ $id: 'draft-1', status: 'active' });
+      await act(async () => {
+        fireEvent.press(await findByText('duplicates.publishAnyway'));
+      });
+
+      expect(publishDraft).toHaveBeenCalledTimes(2);
+      expect(publishDraft.mock.calls[1][1]).toMatchObject({ duplicateOverride: true });
+      expect(await findByText('drafts.published')).toBeTruthy();
+      await waitFor(() => expect(queryByTestId('draft-row-draft-1')).toBeNull());
+    });
+
+    it('publishes nothing more when the organizer backs out', async () => {
+      resolveWith([readyDraft()]);
+      publishDraft.mockRejectedValue(new DuplicateEventError('dup', [duplicate], true));
+
+      const { findByTestId, findByText, queryByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await publishRow(findByTestId);
+
+      await act(async () => {
+        fireEvent.press(await findByText('common.goBack'));
+      });
+
+      expect(publishDraft).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(queryByText('duplicates.publishTitle')).toBeNull());
+    });
+
+    it('offers no override button when the backend says it cannot be overridden', async () => {
+      resolveWith([readyDraft()]);
+      publishDraft.mockRejectedValue(new DuplicateEventError('dup', [duplicate], false));
+
+      const { findByTestId, findByText, queryByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await publishRow(findByTestId);
+
+      expect(await findByText('duplicates.notOverridable')).toBeTruthy();
+      expect(queryByText('duplicates.publishAnyway')).toBeNull();
+    });
+
+    // A 409 whose duplicates[] is empty (or all malformed) has nothing to show —
+    // an empty dialog saying "0 events look like this" is worse than the alert.
+    it('falls back to the plain error alert when the 409 lists no matches', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      resolveWith([readyDraft()]);
+      publishDraft.mockRejectedValue(new DuplicateEventError('Already exists', [], true));
+
+      const { findByTestId, queryByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await publishRow(findByTestId);
+
+      expect(queryByText('duplicates.publishTitle')).toBeNull();
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('common.error', 'Already exists'));
+
+      alertSpy.mockRestore();
+    });
+
+    // Warn mode (what production runs today): the publish succeeds and only
+    // carries a note.
+    it('surfaces warnings.possibleDuplicates from a successful publish', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      resolveWith([readyDraft()]);
+      publishDraft.mockImplementation(async (_id: string, options?: any) => {
+        if (options?.report) {
+          options.report.possibleDuplicates = [{ ...duplicate, strength: 'weak' }];
+        }
+        return { $id: 'draft-1', status: 'active' };
+      });
+
+      const { findByTestId } = renderWithProviders(<DraftEventsScreen />, { providerOverrides });
+
+      await publishRow(findByTestId);
+
+      await waitFor(() =>
+        expect(alertSpy).toHaveBeenCalledWith(
+          'common.success',
+          expect.stringContaining('duplicates.warningNote'),
+          expect.any(Array)
+        )
+      );
+
+      alertSpy.mockRestore();
+    });
+
+    // The "behaves exactly as today" clause.
+    it('shows the plain toast and no alert when a publish carries no warnings', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      resolveWith([readyDraft()]);
+      publishDraft.mockResolvedValue({ $id: 'draft-1', status: 'active' });
+
+      const { findByTestId, findByText } = renderWithProviders(<DraftEventsScreen />, {
+        providerOverrides,
+      });
+
+      await publishRow(findByTestId);
+
+      expect(await findByText('drafts.published')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
     });
   });
 });

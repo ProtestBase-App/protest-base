@@ -15,6 +15,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import DuplicateEventModal from '@/components/DuplicateEventModal';
 import TriageCard from '@/components/TriageCard';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -29,6 +30,7 @@ import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import {
   deleteEvent,
   EventIncompleteError,
@@ -37,9 +39,10 @@ import {
   patchEvent,
   publishDraft,
 } from '@/services/event.service';
-import { Event } from '@/types/event.types';
+import { DuplicateWarningReport } from '@/types/event.types';
 import { hexAlpha } from '@/utils/colorAlpha';
 import { getDraftStatus, getRescheduleOptions, sortDrafts } from '@/utils/draftStatusUtils';
+import { duplicateWarningNote } from '@/utils/duplicateEvents';
 import { publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
@@ -78,6 +81,13 @@ export default function DraftTriageScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  // Warn-mode note about a draft that WAS published. It belongs to the card that
+  // just left, not the one on screen, so it goes in a toast rather than in
+  // cardError — and it must never block the deck's rhythm with an alert.
+  const [publishNote, setPublishNote] = useState<string | null>(null);
+  // 409 DUPLICATE_EVENT: the deck stays on this card until the organizer either
+  // backs out or confirms the override.
+  const duplicatePrompt = useDuplicatePrompt({ isOffline });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const draft = currentDraft(state);
@@ -299,52 +309,69 @@ export default function DraftTriageScreen() {
     dispatch({ type: 'undoDelete' });
   }, []);
 
+  const runPublish = useCallback(
+    async (duplicateOverride: boolean) => {
+      if (!draft) return;
+
+      const pendingDate = state.pendingDate[draft.$id];
+      const report: DuplicateWarningReport = {};
+      setBusy(true);
+      setCardError(null);
+
+      try {
+        // A rescheduled draft needs its new date persisted BEFORE publishing, or
+        // the backend would publish the stale (past) date straight into `past`.
+        // Skipped on a duplicate-override retry: that patch already committed.
+        if (pendingDate && !duplicateOverride) {
+          await patchEvent(draft.$id, { start_time: pendingDate });
+        }
+        await publishDraft(draft.$id, { duplicateOverride, report });
+      } catch (err) {
+        // EVENT_NOT_DRAFT means it is already public — the intent is satisfied,
+        // so advance silently rather than making the user dismiss an alert
+        // mid-deck. DUPLICATE_EVENT shares the status but means the opposite.
+        if (!(err instanceof EventNotDraftError)) {
+          if (duplicatePrompt.capture(err)) {
+            // The prompt holds the matches; the card stays put.
+          } else if (err instanceof EventIncompleteError) {
+            const messages = err.fields.length
+              ? err.fields.map((field) => t(publishFieldToMessageKey(field)))
+              : [t('drafts.issueIncomplete')];
+            setCardError(messages.join('\n'));
+          } else if ((err as { isRateLimited?: boolean })?.isRateLimited) {
+            setCardError(t('errors.rateLimit.message'));
+          } else {
+            setCardError((err as Error).message);
+          }
+          setBusy(false);
+          return;
+        }
+      }
+
+      setBusy(false);
+      // Published, but the backend thinks it resembles something. Non-blocking:
+      // the deck advances either way.
+      setPublishNote(duplicateWarningNote(report));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      animateOut('right', () => {
+        dispatch({
+          type: 'decide',
+          id: draft.$id,
+          decision: pendingDate ? 'rescheduled' : 'published',
+        });
+        resetCard();
+      });
+    },
+    [draft, state.pendingDate, animateOut, resetCard, duplicatePrompt]
+  );
+
   const handlePublish = useCallback(async () => {
     if (!draft) return;
     if (!assertOnlineOrAlert(isOffline)) return;
     if (busy) return;
 
-    const pendingDate = state.pendingDate[draft.$id];
-    setBusy(true);
-    setCardError(null);
-
-    try {
-      // A rescheduled draft needs its new date persisted BEFORE publishing, or
-      // the backend would publish the stale (past) date straight into `past`.
-      if (pendingDate) {
-        await patchEvent(draft.$id, { start_time: pendingDate });
-      }
-      await publishDraft(draft.$id);
-    } catch (err) {
-      // 409 means it is already public — the intent is satisfied, so advance
-      // silently rather than making the user dismiss an alert mid-deck.
-      if (!(err instanceof EventNotDraftError)) {
-        if (err instanceof EventIncompleteError) {
-          const messages = err.fields.length
-            ? err.fields.map((field) => t(publishFieldToMessageKey(field)))
-            : [t('drafts.issueIncomplete')];
-          setCardError(messages.join('\n'));
-        } else if ((err as { isRateLimited?: boolean })?.isRateLimited) {
-          setCardError(t('errors.rateLimit.message'));
-        } else {
-          setCardError((err as Error).message);
-        }
-        setBusy(false);
-        return;
-      }
-    }
-
-    setBusy(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    animateOut('right', () => {
-      dispatch({
-        type: 'decide',
-        id: draft.$id,
-        decision: pendingDate ? 'rescheduled' : 'published',
-      });
-      resetCard();
-    });
-  }, [draft, isOffline, busy, state.pendingDate, animateOut, resetCard]);
+    await runPublish(false);
+  }, [draft, isOffline, busy, runPublish]);
 
   // --- Gestures -----------------------------------------------------------
   const pan = useMemo(() => {
@@ -629,6 +656,19 @@ export default function DraftTriageScreen() {
           ) : null}
 
           <Toast
+            visible={publishNote !== null}
+            title={publishNote ?? ''}
+            icon="exclamationmark.triangle"
+            iconColor={themeColors.warning}
+            durationMs={5000}
+            onTimeout={() => setPublishNote(null)}
+            // Stacked above the undo toast: a delete's 5s window can still be
+            // open when the next card is published.
+            bottom={state.pendingDelete !== null ? 110 : 24}
+            testID="triage-publish-note-toast"
+          />
+
+          <Toast
             visible={state.pendingDelete !== null}
             title={t('drafts.deletedToast', { title: state.pendingDelete?.event.title ?? '' })}
             helper={t('drafts.deletedToastHelper')}
@@ -641,6 +681,12 @@ export default function DraftTriageScreen() {
           />
         </SafeAreaView>
       </ThemedView>
+
+      <DuplicateEventModal
+        mode="publish"
+        locale={userLanguage}
+        {...duplicatePrompt.modalProps(() => runPublish(true))}
+      />
 
       {datePickerOpen && draft && (
         <DateTimePicker

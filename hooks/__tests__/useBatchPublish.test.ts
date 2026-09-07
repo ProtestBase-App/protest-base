@@ -16,6 +16,19 @@ jest.mock('@/services/event.service', () => ({
       this.name = 'EventNotDraftError';
     }
   },
+  // The screen branches on `instanceof DuplicateEventError`; without it in this
+  // factory the import is undefined and `instanceof` throws a TypeError.
+  DuplicateEventError: class DuplicateEventError extends Error {
+    code = 'DUPLICATE_EVENT';
+    duplicates: unknown[];
+    canOverride: boolean;
+    constructor(message = 'duplicate', duplicates: unknown[] = [], canOverride = true) {
+      super(message);
+      this.name = 'DuplicateEventError';
+      this.duplicates = duplicates;
+      this.canOverride = canOverride;
+    }
+  },
 }));
 
 jest.mock('@/utils/logger', () => ({

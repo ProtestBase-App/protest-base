@@ -19,7 +19,7 @@ import { useTemplates } from '@/context/TemplatesProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { logout } from '@/services/auth.service';
-import { createEventBackend } from '@/services/event.service';
+import { createEventBackend, DuplicateEventError } from '@/services/event.service';
 import { eventCategories } from '@/constants/EventCategories';
 import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { ExternalLinks } from '@/constants/ExternalLinks';
@@ -155,7 +155,18 @@ export default function MoreScreen() {
         co_organizers: [],
       };
 
-      await createEventBackend(fakeEvent);
+      // Every fake event shares one website_url and start time, so the backend's
+      // duplicate guard refuses the second one once block mode is on. Retry with
+      // the override rather than sending it upfront: an older backend rejects the
+      // unknown field outright (additionalProperties:false), and this is the one
+      // place an automatic retry is right — a __DEV__ generator acknowledging its
+      // own deliberate duplicate, with no user decision to bypass.
+      try {
+        await createEventBackend(fakeEvent);
+      } catch (error) {
+        if (!(error instanceof DuplicateEventError)) throw error;
+        await createEventBackend(fakeEvent, { duplicateOverride: true });
+      }
       Alert.alert(t('common.success'), t('alerts.fakeEventCreated'));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -1368,6 +1368,38 @@ const en: LocaleData = {
   },
 
   // ============================================
+  // Duplicates - backend duplicate-event guard (409 DUPLICATE_EVENT)
+  // ============================================
+  duplicates: {
+    createTitle: 'This looks like an existing event',
+    publishTitle: 'This draft looks like an existing event',
+    createIntro: {
+      one: 'One event already on ProtestBase looks like the one you are creating.',
+      other: '{{count}} events already on ProtestBase look like the one you are creating.',
+    },
+    publishIntro: {
+      one: 'One event already on ProtestBase looks like this draft.',
+      other: '{{count}} events already on ProtestBase look like this draft.',
+    },
+    relationshipOwn: 'You already created this event.',
+    relationshipCoOrganized: 'You are already co-organizing this event.',
+    relationshipOtherOrg:
+      'Already listed by another organization. Ask them to add you as a co-organizer, or list yours separately.',
+    open: 'Open',
+    view: 'View',
+    createAnyway: 'Create anyway',
+    publishAnyway: 'Publish anyway',
+    notOverridable:
+      'This one cannot go through as it is. Open the existing event, or change yours and try again.',
+    warningNote: 'Heads up: this looks similar to “{{title}}”.',
+    warningNoteMany: {
+      one: 'Heads up: this looks similar to “{{title}}” and {{count}} other event.',
+      other: 'Heads up: this looks similar to “{{title}}” and {{count}} other events.',
+    },
+    accessibilityOpen: 'Open “{{title}}”',
+  },
+
+  // ============================================
   // Share - Event sharing
   // ============================================
   share: {

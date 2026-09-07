@@ -18,14 +18,17 @@ import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { getThemeColors } from '@/utils/themeColors';
 import EventForm from '@/components/EventForm';
+import DuplicateEventModal from '@/components/DuplicateEventModal';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
-import type { PickedImage } from '@/types/event.types';
+import type { DuplicateWarningReport, PickedImage } from '@/types/event.types';
 import { Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
+import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -128,6 +131,13 @@ export default function CreateEventModal() {
   const [isSavingDraft, setSavingDraft] = useState(false);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isCheckingDraft, setIsCheckingDraft] = useState(true);
+
+  // 409 DUPLICATE_EVENT. The context records WHICH button was pressed, so
+  // "Create anyway" re-sends that same submission — routing a refused draft save
+  // through the event create would publish something the organizer only meant to
+  // save. The form state is untouched, so the retry re-attaches the images the
+  // refused request never uploaded.
+  const duplicatePrompt = useDuplicatePrompt<'event' | 'draft'>({ isOffline });
 
   const [form, setForm] = useState<FormState>({
     organization_id: '',
@@ -418,19 +428,22 @@ export default function CreateEventModal() {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
+  /** Whitespace-trimmed copy of the form, shared by both submit paths. */
+  const trimForm = () => ({
+    ...form,
+    title: form.title.trim(),
+    description: form.description.trim(),
+    street_address: form.street_address?.trim() || '',
+    city: form.city?.trim() || '',
+    region: form.region?.trim() || '',
+    website_url: form.website_url?.trim() || '',
+    disclaimer: form.disclaimer?.trim() || '',
+    help_description: form.help_description?.trim() || '',
+  });
+
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const trimmedForm = {
-      ...form,
-      title: form.title.trim(),
-      description: form.description.trim(),
-      street_address: form.street_address?.trim() || '',
-      city: form.city?.trim() || '',
-      region: form.region?.trim() || '',
-      website_url: form.website_url?.trim() || '',
-      disclaimer: form.disclaimer?.trim() || '',
-      help_description: form.help_description?.trim() || '',
-    };
+    const trimmedForm = trimForm();
 
     // Form value takes precedence, fall back to context (single-org users)
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
@@ -480,6 +493,18 @@ export default function CreateEventModal() {
       }
     }
 
+    await runCreateEvent(false);
+  };
+
+  /**
+   * Send the create request. Validation has already run; `duplicateOverride`
+   * acknowledges a 409 DUPLICATE_EVENT and is only ever true on a retry the user
+   * explicitly confirmed.
+   */
+  const runCreateEvent = async (duplicateOverride: boolean) => {
+    const trimmedForm = trimForm();
+    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+
     setSubmitting(true);
     try {
       // co_organizers holds org IDs (the dropdown values) — sent through as-is.
@@ -487,33 +512,40 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
+      // Non-blocking duplicate verdicts, when the backend has something to say
+      // about an event it accepted anyway (warn mode, or a weak match).
+      const report: DuplicateWarningReport = {};
+
       // Backend handles image upload, geocoding, URL validation, category
       // formatting; it also fills in organizer_id and organizer_name from the JWT.
       // images may mix freshly picked files with hosted URL strings (template
       // images on create-from-template), attached verbatim by the service.
-      const resultCreateEvent = await createEventBackend({
-        organization_id: effectiveOrgId,
-        title: trimmedForm.title,
-        description: trimmedForm.description,
-        start_time: trimmedForm.start_time,
-        end_time: trimmedForm.end_time || undefined,
-        street_address: trimmedForm.street_address || undefined,
-        city: trimmedForm.city || undefined,
-        region: trimmedForm.region || undefined,
-        country: trimmedForm.country || undefined,
-        postal_code: trimmedForm.postal_code || undefined,
-        // Coordinates of an accepted suggestion (this session only) — the backend
-        // adopts the confirmed pin. Omitted when no street was picked this session.
-        geocod_lat: trimmedForm.geocod_lat ?? undefined,
-        geocod_lng: trimmedForm.geocod_lng ?? undefined,
-        images: trimmedForm.images.length ? trimmedForm.images : undefined, // Omitted → backend uses default
-        website_url: trimmedForm.website_url || undefined,
-        categories: trimmedForm.categories, // Service normalizes string -> string[]
-        disclaimer: trimmedForm.disclaimer || undefined,
-        co_organizers: finalCoOrganizers,
-        help_needed: trimmedForm.help_needed,
-        help_description: trimmedForm.help_description || undefined,
-      });
+      const resultCreateEvent = await createEventBackend(
+        {
+          organization_id: effectiveOrgId,
+          title: trimmedForm.title,
+          description: trimmedForm.description,
+          start_time: trimmedForm.start_time,
+          end_time: trimmedForm.end_time || undefined,
+          street_address: trimmedForm.street_address || undefined,
+          city: trimmedForm.city || undefined,
+          region: trimmedForm.region || undefined,
+          country: trimmedForm.country || undefined,
+          postal_code: trimmedForm.postal_code || undefined,
+          // Coordinates of an accepted suggestion (this session only) — the backend
+          // adopts the confirmed pin. Omitted when no street was picked this session.
+          geocod_lat: trimmedForm.geocod_lat ?? undefined,
+          geocod_lng: trimmedForm.geocod_lng ?? undefined,
+          images: trimmedForm.images.length ? trimmedForm.images : undefined, // Omitted → backend uses default
+          website_url: trimmedForm.website_url || undefined,
+          categories: trimmedForm.categories, // Service normalizes string -> string[]
+          disclaimer: trimmedForm.disclaimer || undefined,
+          co_organizers: finalCoOrganizers,
+          help_needed: trimmedForm.help_needed,
+          help_description: trimmedForm.help_description || undefined,
+        },
+        { duplicateOverride, report }
+      );
 
       await clearEventDraft();
 
@@ -526,8 +558,16 @@ export default function CreateEventModal() {
 
       router.replace(DynamicRoutes.event(resultCreateEvent.$id, { isCreated: true }));
 
-      Alert.alert(t('common.success'), t('alerts.eventCreated'));
+      alertWithDuplicateWarning(
+        t('common.success'),
+        t('alerts.eventCreated'),
+        report,
+        (duplicate) => router.push(duplicateHref(duplicate))
+      );
     } catch (error) {
+      // Block mode refused it: the prompt shows the matches and waits. Never
+      // retried automatically — the override is the organizer's call.
+      if (duplicatePrompt.capture(error, 'event')) return;
       const errorMessage = error instanceof Error ? error.message : String(error);
       Alert.alert(t('common.error'), errorMessage);
     } finally {
@@ -541,17 +581,7 @@ export default function CreateEventModal() {
   // autosave (clearEventDraft below only clears that local snapshot).
   const submitDraft = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const trimmedForm = {
-      ...form,
-      title: form.title.trim(),
-      description: form.description.trim(),
-      street_address: form.street_address?.trim() || '',
-      city: form.city?.trim() || '',
-      region: form.region?.trim() || '',
-      website_url: form.website_url?.trim() || '',
-      disclaimer: form.disclaimer?.trim() || '',
-      help_description: form.help_description?.trim() || '',
-    };
+    const trimmedForm = trimForm();
 
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
 
@@ -581,35 +611,48 @@ export default function CreateEventModal() {
       return;
     }
 
+    await runCreateDraft(false);
+  };
+
+  /** Send the draft-create request; see runCreateEvent for `duplicateOverride`. */
+  const runCreateDraft = async (duplicateOverride: boolean) => {
+    const trimmedForm = trimForm();
+    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+
     setSavingDraft(true);
     try {
       const finalCoOrganizers = trimmedForm.co_organizers?.length
         ? trimmedForm.co_organizers
         : undefined;
 
-      await createDraftEvent({
-        organization_id: effectiveOrgId,
-        title: trimmedForm.title,
-        description: trimmedForm.description || undefined,
-        start_time: trimmedForm.start_time || undefined,
-        end_time: trimmedForm.end_time || undefined,
-        street_address: trimmedForm.street_address || undefined,
-        city: trimmedForm.city || undefined,
-        region: trimmedForm.region || undefined,
-        country: trimmedForm.country || undefined,
-        postal_code: trimmedForm.postal_code || undefined,
-        // Coordinates of an accepted suggestion (this session only) — adopted as
-        // the draft's pin so it stays correct once published.
-        geocod_lat: trimmedForm.geocod_lat ?? undefined,
-        geocod_lng: trimmedForm.geocod_lng ?? undefined,
-        images: trimmedForm.images.length ? trimmedForm.images : undefined,
-        website_url: trimmedForm.website_url || undefined,
-        categories: trimmedForm.categories,
-        disclaimer: trimmedForm.disclaimer || undefined,
-        co_organizers: finalCoOrganizers,
-        help_needed: trimmedForm.help_needed,
-        help_description: trimmedForm.help_description || undefined,
-      });
+      const report: DuplicateWarningReport = {};
+
+      await createDraftEvent(
+        {
+          organization_id: effectiveOrgId,
+          title: trimmedForm.title,
+          description: trimmedForm.description || undefined,
+          start_time: trimmedForm.start_time || undefined,
+          end_time: trimmedForm.end_time || undefined,
+          street_address: trimmedForm.street_address || undefined,
+          city: trimmedForm.city || undefined,
+          region: trimmedForm.region || undefined,
+          country: trimmedForm.country || undefined,
+          postal_code: trimmedForm.postal_code || undefined,
+          // Coordinates of an accepted suggestion (this session only) — adopted as
+          // the draft's pin so it stays correct once published.
+          geocod_lat: trimmedForm.geocod_lat ?? undefined,
+          geocod_lng: trimmedForm.geocod_lng ?? undefined,
+          images: trimmedForm.images.length ? trimmedForm.images : undefined,
+          website_url: trimmedForm.website_url || undefined,
+          categories: trimmedForm.categories,
+          disclaimer: trimmedForm.disclaimer || undefined,
+          co_organizers: finalCoOrganizers,
+          help_needed: trimmedForm.help_needed,
+          help_description: trimmedForm.help_description || undefined,
+        },
+        { duplicateOverride, report }
+      );
 
       // Clear the LOCAL autosave snapshot now that it's persisted server-side.
       await clearEventDraft();
@@ -620,8 +663,15 @@ export default function CreateEventModal() {
       refreshUserEventCounts(orgIds);
 
       router.replace(Routes.DRAFT_EVENTS);
-      Alert.alert(t('common.success'), t('drafts.savedConfirmation'));
+      alertWithDuplicateWarning(
+        t('common.success'),
+        t('drafts.savedConfirmation'),
+        report,
+        (duplicate) => router.push(duplicateHref(duplicate))
+      );
     } catch (error) {
+      // The duplicate guard runs on drafts too — same prompt, same override.
+      if (duplicatePrompt.capture(error, 'draft')) return;
       const errorMessage = error instanceof Error ? error.message : String(error);
       Alert.alert(t('common.error'), errorMessage);
     } finally {
@@ -718,6 +768,13 @@ export default function CreateEventModal() {
           {!isPresented && <Link href="../">{t('common.dismiss')}</Link>}
         </ThemedView>
       </FormScreenScaffold>
+      <DuplicateEventModal
+        mode="create"
+        locale={userLanguage}
+        {...duplicatePrompt.modalProps((submitted) =>
+          submitted === 'draft' ? runCreateDraft(true) : runCreateEvent(true)
+        )}
+      />
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );

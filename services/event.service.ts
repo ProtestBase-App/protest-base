@@ -4,6 +4,11 @@ import {
   Event,
   CreateEventRequest,
   CreateDraftRequest,
+  DuplicateReason,
+  DuplicateRelationship,
+  DuplicateStrength,
+  DuplicateSummary,
+  DuplicateWarningReport,
   EventCreatedVia,
   UpdateEventRequest,
   PublishDraftResponse,
@@ -19,6 +24,8 @@ export type {
   Event,
   CreateEventRequest,
   CreateDraftRequest,
+  DuplicateSummary,
+  DuplicateWarningReport,
   UpdateEventRequest,
   PublishDraftResponse,
   PickedImage,
@@ -517,10 +524,16 @@ function buildEventFormData(
       // strings (the server coerces them back to numbers). The JSON path sends
       // them verbatim as numbers — it does not coerce.
       formData.append(key, String(value));
-    } else if (key === 'help_needed' || key === 'is_draft' || key === 'all_day') {
+    } else if (
+      key === 'help_needed' ||
+      key === 'is_draft' ||
+      key === 'all_day' ||
+      key === 'duplicate_override'
+    ) {
       // Booleans must be listed here explicitly: the string branch below would
       // drop them silently, and `all_day: false` is precisely the value that
-      // converts a scraped date-only event into a timed one.
+      // converts a scraped date-only event into a timed one. `duplicate_override`
+      // is the same trap — dropped here, the override retry 409s again.
       formData.append(key, String(value));
     } else if (typeof value === 'string') {
       formData.append(key, value);
@@ -542,6 +555,152 @@ function buildEventFormData(
   return { payload: formData, headers: { 'Content-Type': 'multipart/form-data' } };
 }
 
+// ---------------------------------------------------------------------------
+// Duplicate-event guard
+//
+// Shared by create (POST /events) and publish (POST /events/:id/publish). The
+// backend runs in one of two modes and the app has to be right in both:
+//
+//   warn  (what production runs today) — nothing is blocked; a 201/200 MAY carry
+//         `warnings.possibleDuplicates[]` next to `data`. A response without it
+//         is byte-identical to before the guard existed.
+//   block — a match is refused with 409 DUPLICATE_EVENT carrying `duplicates[]`
+//         and `canOverride`. The same request re-sent with `duplicate_override`
+//         goes through: the multipart STRING "true" on a multipart create, the
+//         JSON boolean `true` on a JSON create and on publish.
+//
+// Never auto-retry a 409 — the override is an explicit user decision. (The
+// api.ts response interceptor only replays 401 integrity codes and 403
+// UNTRUSTED_INSTALL, so nothing replays a 409 behind our back.)
+// ---------------------------------------------------------------------------
+
+const DUPLICATE_RELATIONSHIPS: DuplicateRelationship[] = ['own', 'co_organized', 'other_org'];
+const DUPLICATE_REASONS: DuplicateReason[] = ['url', 'content', 'url-recurring', 'fuzzy'];
+const DUPLICATE_STRENGTHS: DuplicateStrength[] = ['strong', 'weak'];
+
+const stringOrNull = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value : null;
+
+/**
+ * Narrow one wire entry to a DuplicateSummary, or null when it carries no id.
+ *
+ * Only `id`, `relationship`, `reason` and `strength` are required by the backend
+ * schema; the display fields are nullable and may be missing outright. Unknown
+ * enum values (a backend that grew a fifth `reason`) fall back to the most
+ * conservative option rather than being dropped — a match we cannot label is
+ * still a match worth showing.
+ */
+function parseDuplicateSummary(raw: unknown): DuplicateSummary | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const entry = raw as Record<string, unknown>;
+  const id = stringOrNull(entry.id);
+  if (!id) return null;
+
+  const relationship = DUPLICATE_RELATIONSHIPS.includes(entry.relationship as DuplicateRelationship)
+    ? (entry.relationship as DuplicateRelationship)
+    : 'other_org';
+  const reason = DUPLICATE_REASONS.includes(entry.reason as DuplicateReason)
+    ? (entry.reason as DuplicateReason)
+    : 'content';
+  const strength = DUPLICATE_STRENGTHS.includes(entry.strength as DuplicateStrength)
+    ? (entry.strength as DuplicateStrength)
+    : 'strong';
+
+  return {
+    id,
+    title: stringOrNull(entry.title),
+    start_time: stringOrNull(entry.start_time),
+    city: stringOrNull(entry.city),
+    status: stringOrNull(entry.status),
+    organization_id: stringOrNull(entry.organization_id),
+    relationship,
+    reason,
+    strength,
+    ...(typeof entry.similarity === 'number' ? { similarity: entry.similarity } : {}),
+  };
+}
+
+/** Parse a `duplicates[]` / `possibleDuplicates[]` array, skipping malformed entries. */
+function parseDuplicateSummaries(raw: unknown): DuplicateSummary[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(parseDuplicateSummary)
+    .filter((entry): entry is DuplicateSummary => entry !== null);
+}
+
+/**
+ * Copy `warnings.possibleDuplicates` off a successful response into the caller's
+ * report. A response without warnings leaves the report untouched, so warn mode
+ * with no match behaves exactly as it did before the guard shipped.
+ */
+function collectDuplicateWarnings(
+  responseData: unknown,
+  report: DuplicateWarningReport | undefined,
+  // The backend reports the matches even when the override cleared them, so an
+  // acknowledged duplicate would otherwise be announced again on the success the
+  // user just asked for. Drop them: they have already been seen and dismissed.
+  wasOverridden = false
+): void {
+  if (!report || wasOverridden) return;
+  const warnings = (responseData as { warnings?: { possibleDuplicates?: unknown } } | undefined)
+    ?.warnings?.possibleDuplicates;
+  const parsed = parseDuplicateSummaries(warnings);
+  if (parsed.length > 0) {
+    report.possibleDuplicates = parsed;
+  }
+}
+
+/**
+ * Thrown when create or publish returns 409 DUPLICATE_EVENT — the backend is in
+ * block mode and this submission looks like an event that already exists.
+ *
+ * Carries the matches so the caller can show them, and `canOverride` telling it
+ * whether re-sending with `duplicate_override` would go through. Treated as a
+ * capability signal: absent means "do not offer to override".
+ */
+export class DuplicateEventError extends Error {
+  code = 'DUPLICATE_EVENT' as const;
+  duplicates: DuplicateSummary[];
+  canOverride: boolean;
+  constructor(message: string, duplicates: DuplicateSummary[], canOverride: boolean) {
+    super(message);
+    this.name = 'DuplicateEventError';
+    this.duplicates = duplicates;
+    this.canOverride = canOverride;
+  }
+}
+
+/** True when an axios error is the backend's 409 DUPLICATE_EVENT. */
+function isDuplicateEventResponse(error: {
+  response?: { status?: number; data?: { code?: string } };
+}): boolean {
+  return error.response?.status === 409 && error.response?.data?.code === 'DUPLICATE_EVENT';
+}
+
+/**
+ * Build a DuplicateEventError from the 409 body. The backend's `error` message
+ * is English-only, so callers show localized copy — it is kept as the Error
+ * message purely so an unhandled path still logs something meaningful.
+ */
+function duplicateEventErrorFrom(
+  data: { error?: string; duplicates?: unknown; canOverride?: unknown } | undefined,
+  fallbackMessage: string
+): DuplicateEventError {
+  return new DuplicateEventError(
+    data?.error || fallbackMessage,
+    parseDuplicateSummaries(data?.duplicates),
+    data?.canOverride === true
+  );
+}
+
+/** Options shared by the create entry points. */
+export interface CreateEventOptions {
+  /** Acknowledge a previous 409 DUPLICATE_EVENT and create the event anyway. */
+  duplicateOverride?: boolean;
+  /** Filled with the backend's non-blocking duplicate warnings, when any. */
+  report?: DuplicateWarningReport;
+}
+
 /**
  * Create a new event via backend API.
  * The backend handles image upload, geocoding, URL validation and category
@@ -554,16 +713,28 @@ function buildEventFormData(
  * legacy single image field when `images` is absent.
  *
  * @param eventData - Event data object
+ * @param options - Duplicate-guard override and warnings out-parameter
  * @returns The created event object from the backend
+ * @throws DuplicateEventError on 409 DUPLICATE_EVENT (backend in block mode)
  */
-export async function createEventBackend(eventData: CreateEventRequest): Promise<Event> {
+export async function createEventBackend(
+  eventData: CreateEventRequest,
+  options?: CreateEventOptions
+): Promise<Event> {
   try {
     logger.debug('[EventService] createEventBackend called', {
       title: eventData.title,
       hasImage: !!eventData.image,
       imageCount: eventData.images?.length ?? 0,
+      duplicateOverride: options?.duplicateOverride === true,
     });
     const normalized = normalizeEventPayload(eventData as unknown as Record<string, unknown>);
+    // Only ever sent when acknowledging a 409 — a normal create carries no such
+    // field (the backend schema is additionalProperties:false but tolerates
+    // `false`; omitting it keeps the request identical to today's).
+    if (options?.duplicateOverride) {
+      (normalized as Record<string, unknown>).duplicate_override = true;
+    }
     const hasImagesList = Array.isArray(eventData.images) && eventData.images.length > 0;
     const imagesHasNewFile = hasImagesList && eventData.images!.some(isPickedImage);
     const hasImageFile = !!eventData.image?.uri;
@@ -604,8 +775,19 @@ export async function createEventBackend(eventData: CreateEventRequest): Promise
       throw new Error('Failed to create event');
     }
 
+    collectDuplicateWarnings(response.data, options?.report, options?.duplicateOverride);
+
     return response.data.data;
   } catch (error: any) {
+    // The api.ts interceptor rewrites a 429 into a RateLimitError carrying NO
+    // `.response`, so this MUST come before any error.response read or the flags
+    // are flattened away (see the auth error-swallow contract, and publishDraft).
+    if (error?.isRateLimited || error?.code === 'RATE_LIMIT_EXCEEDED') {
+      throw error;
+    }
+    if (isDuplicateEventResponse(error)) {
+      throw duplicateEventErrorFrom(error.response.data, 'This event already exists');
+    }
     throw new Error(error.response?.data?.error || error.message || 'Failed to create event');
   }
 }
@@ -856,13 +1038,20 @@ async function getDraftsTotalForOrganizations(organizationIds: string[]): Promis
  * draft (status: 'draft') at create time. Drafts may be incomplete — the fields
  * mandatory for a published event are optional here (see CreateDraftRequest).
  *
+ * The duplicate guard runs on drafts too (it is a create), so this can throw
+ * DuplicateEventError in block mode exactly like a published create.
+ *
  * @param eventData - Draft event data (description/start_time optional)
+ * @param options - Duplicate-guard override and warnings out-parameter
  * @returns The created draft event
  */
-export async function createDraftEvent(eventData: CreateDraftRequest): Promise<Event> {
+export async function createDraftEvent(
+  eventData: CreateDraftRequest,
+  options?: CreateEventOptions
+): Promise<Event> {
   // The runtime body-builder tolerates the missing required fields; only the
   // static signature is loosened relative to a published create.
-  return createEventBackend({ ...eventData, is_draft: true } as CreateEventRequest);
+  return createEventBackend({ ...eventData, is_draft: true } as CreateEventRequest, options);
 }
 
 /**
@@ -1086,6 +1275,9 @@ export class EventIncompleteError extends Error {
  * is no longer a draft, i.e. it was already published (typically from the web
  * dashboard, or a duplicate tap) while this client still listed it as one.
  * Callers should treat it as success-in-effect: drop the row and refresh.
+ *
+ * The publish endpoint shares its 409 with DUPLICATE_EVENT, which is the exact
+ * opposite (nothing was published), so the mapping below MUST branch on `code`.
  */
 export class EventNotDraftError extends Error {
   code = 'EVENT_NOT_DRAFT' as const;
@@ -1101,22 +1293,31 @@ export class EventNotDraftError extends Error {
  * past-dated publishes — callers must run the client readiness check first).
  *
  * @param eventId - The ID of the draft to publish
+ * @param options - Duplicate-guard override and warnings out-parameter
  * @returns The resulting { $id, status }
  * @throws EventIncompleteError on 422 (missing required fields)
- * @throws EventNotDraftError on 409 (already published)
+ * @throws EventNotDraftError on 409 EVENT_NOT_DRAFT (already published)
+ * @throws DuplicateEventError on 409 DUPLICATE_EVENT (backend in block mode)
  */
-export async function publishDraft(eventId: string): Promise<PublishDraftResponse> {
+export async function publishDraft(
+  eventId: string,
+  options?: { duplicateOverride?: boolean; report?: DuplicateWarningReport }
+): Promise<PublishDraftResponse> {
   try {
     // Empty object body — Fastify rejects a no-body POST (415); the axios
-    // instance default Content-Type is application/json.
+    // instance default Content-Type is application/json. The override field is
+    // added only when acknowledging a 409, so a normal publish sends `{}` as before.
+    const body = options?.duplicateOverride ? { duplicate_override: true } : {};
     const response = await api.post<{
       success: boolean;
       data: PublishDraftResponse;
-    }>(`/events/${eventId}/publish`, {});
+    }>(`/events/${eventId}/publish`, body);
 
     if (!response.data.success || !response.data.data) {
       throw new Error('Failed to publish draft');
     }
+
+    collectDuplicateWarnings(response.data, options?.report, options?.duplicateOverride);
 
     return response.data.data;
   } catch (error: any) {
@@ -1128,6 +1329,13 @@ export async function publishDraft(eventId: string): Promise<PublishDraftRespons
     }
     if (error.response?.status === 422 && error.response?.data?.code === 'EVENT_INCOMPLETE') {
       throw new EventIncompleteError(error.response.data.fields ?? []);
+    }
+    // Two very different 409s share this status. DUPLICATE_EVENT means nothing
+    // was published; every other 409 (EVENT_NOT_DRAFT, or a 409 with no code at
+    // all — `code` is not required by the error schema) keeps the old meaning:
+    // already public.
+    if (isDuplicateEventResponse(error)) {
+      throw duplicateEventErrorFrom(error.response.data, 'This event already exists');
     }
     if (error.response?.status === 409) {
       throw new EventNotDraftError();

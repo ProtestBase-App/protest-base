@@ -1405,6 +1405,38 @@ const fr: LocaleData = {
   },
 
   // ============================================
+  // Duplicates - garde anti-doublon du backend (409 DUPLICATE_EVENT)
+  // ============================================
+  duplicates: {
+    createTitle: 'Cet événement ressemble à un événement existant',
+    publishTitle: 'Ce brouillon ressemble à un événement existant',
+    createIntro: {
+      one: 'Un événement déjà sur ProtestBase ressemble à celui que vous créez.',
+      other: '{{count}} événements déjà sur ProtestBase ressemblent à celui que vous créez.',
+    },
+    publishIntro: {
+      one: 'Un événement déjà sur ProtestBase ressemble à ce brouillon.',
+      other: '{{count}} événements déjà sur ProtestBase ressemblent à ce brouillon.',
+    },
+    relationshipOwn: 'Vous avez déjà créé cet événement.',
+    relationshipCoOrganized: 'Vous co-organisez déjà cet événement.',
+    relationshipOtherOrg:
+      'Déjà publié par une autre organisation. Demandez-leur de vous ajouter comme co-organisateur, ou publiez le vôtre séparément.',
+    open: 'Ouvrir',
+    view: 'Voir',
+    createAnyway: 'Créer quand même',
+    publishAnyway: 'Publier quand même',
+    notOverridable:
+      "Impossible de continuer tel quel. Ouvrez l'événement existant, ou modifiez le vôtre et réessayez.",
+    warningNote: 'À noter : cet événement ressemble à « {{title}} ».',
+    warningNoteMany: {
+      one: 'À noter : cet événement ressemble à « {{title}} » et à {{count}} autre événement.',
+      other: 'À noter : cet événement ressemble à « {{title}} » et à {{count}} autres événements.',
+    },
+    accessibilityOpen: 'Ouvrir « {{title}} »',
+  },
+
+  // ============================================
   // Share - Event sharing
   // ============================================
   share: {
