@@ -13,7 +13,7 @@ export const BATCH_PUBLISH_CAP = BATCH_CAP;
 export type { BatchStopReason };
 
 export interface BatchPublishResult extends Omit<BatchResult, 'succeededIds'> {
-  /** Ids that are public now (includes 409s — already published counts as done). */
+  /** Ids that are public now (includes EVENT_NOT_DRAFT — already published counts as done). */
   publishedIds: string[];
 }
 
@@ -25,10 +25,18 @@ interface UseBatchPublishReturn extends Omit<UseSequentialBatchReturn, 'run'> {
 /**
  * Batch publish for the drafts list.
  *
- * A 409 counts as success: the draft is already public (typically published from
- * the web dashboard), so the user's intent for it is satisfied and the run should
- * carry on rather than treat it as a failure. Suspend-safety, the 429 stop and
- * the per-item failure policy all come from `useSequentialBatch`.
+ * An EVENT_NOT_DRAFT 409 counts as success: the draft is already public
+ * (typically published from the web dashboard), so the user's intent for it is
+ * satisfied and the run should carry on rather than treat it as a failure.
+ *
+ * A DUPLICATE_EVENT 409 is the opposite — nothing was published — so it stays a
+ * per-item failure and the run reports it honestly in "Published X of Y". There
+ * is deliberately no override here: acknowledging a duplicate is a per-event
+ * decision that needs the matches on screen, which a batch cannot offer. The
+ * organizer publishes those one at a time from the list.
+ *
+ * Suspend-safety, the 429 stop and the per-item failure policy all come from
+ * `useSequentialBatch`.
  */
 export function useBatchPublish(): UseBatchPublishReturn {
   const { running, progressLabel, run } = useSequentialBatch({

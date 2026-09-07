@@ -1681,6 +1681,38 @@ const nl = {
   },
 
   // ============================================
+  // Duplicates - dubbelcheck van de backend (409 DUPLICATE_EVENT)
+  // ============================================
+  duplicates: {
+    createTitle: 'Dit lijkt op een bestaand evenement',
+    publishTitle: 'Dit concept lijkt op een bestaand evenement',
+    createIntro: {
+      one: 'Één evenement op ProtestBase lijkt op het evenement dat je aanmaakt.',
+      other: '{{count}} evenementen op ProtestBase lijken op het evenement dat je aanmaakt.',
+    },
+    publishIntro: {
+      one: 'Één evenement op ProtestBase lijkt op dit concept.',
+      other: '{{count}} evenementen op ProtestBase lijken op dit concept.',
+    },
+    relationshipOwn: 'Je hebt dit evenement al aangemaakt.',
+    relationshipCoOrganized: 'Je bent al mede-organisator van dit evenement.',
+    relationshipOtherOrg:
+      'Al geplaatst door een andere organisatie. Vraag hen om je als mede-organisator toe te voegen, of plaats het jouwe apart.',
+    open: 'Openen',
+    view: 'Bekijken',
+    createAnyway: 'Toch aanmaken',
+    publishAnyway: 'Toch publiceren',
+    notOverridable:
+      'Dit kan zo niet doorgaan. Open het bestaande evenement, of pas het jouwe aan en probeer het opnieuw.',
+    warningNote: 'Let op: dit lijkt op “{{title}}”.',
+    warningNoteMany: {
+      one: 'Let op: dit lijkt op “{{title}}” en {{count}} ander evenement.',
+      other: 'Let op: dit lijkt op “{{title}}” en {{count}} andere evenementen.',
+    },
+    accessibilityOpen: 'Open “{{title}}”',
+  },
+
+  // ============================================
   // Privacy Center - Privacy transparency screen
   // ============================================
   privacyCenter: {

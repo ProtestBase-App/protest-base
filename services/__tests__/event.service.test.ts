@@ -44,11 +44,12 @@ import {
   getDraftEventPreview,
   patchEvent,
   publishDraft,
+  DuplicateEventError,
   EventIncompleteError,
   EventNotFoundError,
   EventNetworkError,
 } from '@/services/event.service';
-import type { Event } from '@/types/event.types';
+import type { DuplicateWarningReport, Event } from '@/types/event.types';
 
 const mockApi = api as jest.Mocked<typeof api>;
 const mockIsEventOngoing = isEventOngoing as jest.Mock;
@@ -1761,6 +1762,425 @@ describe('event.service', () => {
           code: 'RATE_LIMIT_EXCEEDED',
           isRateLimited: true,
         });
+      });
+    });
+  });
+
+  // ============================================================
+  // Duplicate-event guard (backend eventDedup.service.ts)
+  //
+  // Two backend modes, both of which the app has to be right in:
+  //   warn  — production today: nothing blocked, an optional
+  //           `warnings.possibleDuplicates[]` on a 201/200.
+  //   block — 409 DUPLICATE_EVENT carrying `duplicates[]` + `canOverride`,
+  //           re-sendable with `duplicate_override`.
+  // ============================================================
+  describe('duplicate-event guard', () => {
+    const baseCreateData = {
+      organization_id: 'org-1',
+      title: 'Climate March',
+      description: 'A march for the climate',
+      start_time: '2025-06-01T10:00:00Z',
+    };
+
+    const pickedImage = { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' };
+
+    const duplicateSummary = (overrides: Record<string, unknown> = {}) => ({
+      id: 'dup-1',
+      title: 'Climate March',
+      start_time: '2025-06-01T11:00:00Z',
+      city: 'Brussels',
+      status: 'active',
+      organization_id: 'org-1',
+      relationship: 'own',
+      reason: 'content',
+      strength: 'strong',
+      ...overrides,
+    });
+
+    const duplicate409 = (overrides: Record<string, unknown> = {}) => ({
+      response: {
+        status: 409,
+        data: {
+          success: false,
+          code: 'DUPLICATE_EVENT',
+          statusCode: 409,
+          error: 'You already created an event that looks like this one.',
+          canOverride: true,
+          duplicates: [duplicateSummary()],
+          ...overrides,
+        },
+      },
+    });
+
+    // --------------------------------------------------------
+    // 409 -> typed error
+    // --------------------------------------------------------
+    describe('409 mapping', () => {
+      it('createEventBackend throws DuplicateEventError carrying duplicates and canOverride', async () => {
+        mockApi.post.mockRejectedValueOnce(duplicate409());
+
+        const error = await createEventBackend(baseCreateData).catch((e) => e);
+
+        expect(error).toBeInstanceOf(DuplicateEventError);
+        expect(error.code).toBe('DUPLICATE_EVENT');
+        expect(error.canOverride).toBe(true);
+        expect(error.duplicates).toEqual([
+          {
+            id: 'dup-1',
+            title: 'Climate March',
+            start_time: '2025-06-01T11:00:00Z',
+            city: 'Brussels',
+            status: 'active',
+            organization_id: 'org-1',
+            relationship: 'own',
+            reason: 'content',
+            strength: 'strong',
+          },
+        ]);
+      });
+
+      it('createEventBackend maps the 409 on the multipart path too', async () => {
+        mockApi.post.mockRejectedValueOnce(duplicate409());
+
+        await expect(
+          createEventBackend({ ...baseCreateData, image: pickedImage })
+        ).rejects.toBeInstanceOf(DuplicateEventError);
+      });
+
+      it('createDraftEvent throws DuplicateEventError (the guard runs on drafts too)', async () => {
+        mockApi.post.mockRejectedValueOnce(duplicate409());
+
+        await expect(
+          createDraftEvent({ organization_id: 'org-1', title: 'My draft' })
+        ).rejects.toBeInstanceOf(DuplicateEventError);
+      });
+
+      it('publishDraft throws DuplicateEventError on 409 DUPLICATE_EVENT', async () => {
+        mockApi.post.mockRejectedValueOnce(
+          duplicate409({ error: 'An event that looks like this draft already exists.' })
+        );
+
+        const error = await publishDraft('d1').catch((e) => e);
+
+        expect(error).toBeInstanceOf(DuplicateEventError);
+        expect(error.duplicates).toHaveLength(1);
+        expect(error.canOverride).toBe(true);
+      });
+
+      // The publish 409 is SHARED with EVENT_NOT_DRAFT, which means the opposite
+      // (the event is already public). Mapping a duplicate to it would make every
+      // caller report a false success.
+      it('publishDraft still maps 409 EVENT_NOT_DRAFT to EventNotDraftError', async () => {
+        mockApi.post.mockRejectedValueOnce({
+          response: { status: 409, data: { code: 'EVENT_NOT_DRAFT' } },
+        });
+
+        const error = await publishDraft('d1').catch((e) => e);
+
+        expect(error).not.toBeInstanceOf(DuplicateEventError);
+        expect(error.name).toBe('EventNotDraftError');
+      });
+
+      // `code` is not required by the backend's error schema.
+      it('publishDraft maps a 409 with no code to EventNotDraftError', async () => {
+        mockApi.post.mockRejectedValueOnce({ response: { status: 409, data: {} } });
+
+        await expect(publishDraft('d1')).rejects.toMatchObject({ name: 'EventNotDraftError' });
+      });
+
+      // Same contract as publishDraft: the interceptor's RateLimitError has NO
+      // `.response`, so reading error.response first would flatten the flags.
+      it('createEventBackend re-throws the interceptor rate-limit error intact', async () => {
+        mockApi.post.mockRejectedValueOnce(
+          Object.assign(new Error('Too many requests.'), {
+            code: 'RATE_LIMIT_EXCEEDED',
+            isRateLimited: true,
+          })
+        );
+
+        await expect(createEventBackend(baseCreateData)).rejects.toMatchObject({
+          code: 'RATE_LIMIT_EXCEEDED',
+          isRateLimited: true,
+        });
+      });
+
+      it('createEventBackend leaves a 409 with another code as a generic error', async () => {
+        mockApi.post.mockRejectedValueOnce({
+          response: { status: 409, data: { code: 'SOMETHING_ELSE', error: 'Nope' } },
+        });
+
+        const error = await createEventBackend(baseCreateData).catch((e) => e);
+
+        expect(error).not.toBeInstanceOf(DuplicateEventError);
+        expect(error.message).toBe('Nope');
+      });
+
+      it('does not treat a DUPLICATE_EVENT code on a non-409 status as the typed error', async () => {
+        mockApi.post.mockRejectedValueOnce({
+          response: { status: 500, data: { code: 'DUPLICATE_EVENT', error: 'Boom' } },
+        });
+
+        await expect(createEventBackend(baseCreateData)).rejects.not.toBeInstanceOf(
+          DuplicateEventError
+        );
+      });
+
+      it('treats a missing canOverride as "cannot override"', async () => {
+        mockApi.post.mockRejectedValueOnce(duplicate409({ canOverride: undefined }));
+
+        const error = await createEventBackend(baseCreateData).catch((e) => e);
+
+        expect(error.canOverride).toBe(false);
+      });
+
+      it('skips malformed duplicate entries and defaults unknown enum values', async () => {
+        mockApi.post.mockRejectedValueOnce(
+          duplicate409({
+            duplicates: [
+              null,
+              { title: 'no id here' },
+              duplicateSummary({
+                id: 'dup-2',
+                title: null,
+                city: null,
+                relationship: 'brand_new_value',
+                reason: 'brand_new_reason',
+                strength: 'brand_new_strength',
+                similarity: 0.79,
+              }),
+            ],
+          })
+        );
+
+        const error = await createEventBackend(baseCreateData).catch((e) => e);
+
+        expect(error.duplicates).toEqual([
+          {
+            id: 'dup-2',
+            title: null,
+            start_time: '2025-06-01T11:00:00Z',
+            city: null,
+            status: 'active',
+            organization_id: 'org-1',
+            relationship: 'other_org',
+            reason: 'content',
+            strength: 'strong',
+            similarity: 0.79,
+          },
+        ]);
+      });
+    });
+
+    // --------------------------------------------------------
+    // duplicate_override on the retry
+    // --------------------------------------------------------
+    describe('override field', () => {
+      it('sends duplicate_override as the multipart string "true" on a multipart create', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'e1' } } });
+
+        await createEventBackend(
+          { ...baseCreateData, image: pickedImage },
+          { duplicateOverride: true }
+        );
+
+        const [, payload] = mockApi.post.mock.calls[0];
+        expect(payload).toBeInstanceOf(FormData);
+        expect((payload as FormData).getAll('duplicate_override')).toEqual(['true']);
+      });
+
+      it('sends duplicate_override as a JSON boolean on a JSON create', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'e1' } } });
+
+        await createEventBackend(baseCreateData, { duplicateOverride: true });
+
+        const [, payload]: any[] = mockApi.post.mock.calls[0];
+        expect(payload).not.toBeInstanceOf(FormData);
+        expect(payload.duplicate_override).toBe(true);
+      });
+
+      it('sends duplicate_override with the images multipart branch', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'e1' } } });
+
+        await createEventBackend(
+          { ...baseCreateData, images: [pickedImage] },
+          { duplicateOverride: true }
+        );
+
+        const [, payload] = mockApi.post.mock.calls[0];
+        expect((payload as FormData).getAll('duplicate_override')).toEqual(['true']);
+      });
+
+      it('forwards the override through createDraftEvent', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'd1' } } });
+
+        await createDraftEvent(
+          { organization_id: 'org-1', title: 'My draft' },
+          { duplicateOverride: true }
+        );
+
+        const [, payload]: any[] = mockApi.post.mock.calls[0];
+        expect(payload.duplicate_override).toBe(true);
+        expect(payload.is_draft).toBe(true);
+      });
+
+      it('omits duplicate_override entirely on a normal create (JSON and multipart)', async () => {
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'e1' } } });
+        await createEventBackend(baseCreateData);
+        const [, jsonPayload]: any[] = mockApi.post.mock.calls[0];
+        expect('duplicate_override' in jsonPayload).toBe(false);
+
+        mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'e2' } } });
+        await createEventBackend({ ...baseCreateData, image: pickedImage });
+        const [, formPayload] = mockApi.post.mock.calls[1];
+        expect((formPayload as FormData).getAll('duplicate_override')).toEqual([]);
+      });
+
+      it('sends { duplicate_override: true } as the publish JSON body', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'd1', status: 'active' } },
+        });
+
+        await publishDraft('d1', { duplicateOverride: true });
+
+        const [url, body]: any[] = mockApi.post.mock.calls[0];
+        expect(url).toBe('/events/d1/publish');
+        expect(body).toEqual({ duplicate_override: true });
+      });
+
+      it('still posts a bare {} body when publishing without an override', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'd1', status: 'active' } },
+        });
+
+        await publishDraft('d1');
+
+        const [, body]: any[] = mockApi.post.mock.calls[0];
+        expect(body).toEqual({});
+      });
+    });
+
+    // --------------------------------------------------------
+    // warn mode: warnings.possibleDuplicates on a success
+    // --------------------------------------------------------
+    describe('success warnings', () => {
+      it('collects warnings.possibleDuplicates from a 201 create', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'e1', title: 'Climate March' },
+            warnings: { possibleDuplicates: [duplicateSummary({ strength: 'weak' })] },
+          },
+        });
+
+        const report: DuplicateWarningReport = {};
+        const event = await createEventBackend(baseCreateData, { report });
+
+        expect(event.$id).toBe('e1');
+        expect(report.possibleDuplicates).toHaveLength(1);
+        expect(report.possibleDuplicates![0]).toMatchObject({ id: 'dup-1', strength: 'weak' });
+      });
+
+      it('collects warnings.possibleDuplicates from a 200 publish', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'd1', status: 'active' },
+            warnings: { possibleDuplicates: [duplicateSummary({ relationship: 'other_org' })] },
+          },
+        });
+
+        const report: DuplicateWarningReport = {};
+        const result = await publishDraft('d1', { report });
+
+        expect(result).toEqual({ $id: 'd1', status: 'active' });
+        expect(report.possibleDuplicates).toHaveLength(1);
+      });
+
+      // The "behaves exactly as today" clause: warn mode with no match, which is
+      // what production returns for virtually every submission.
+      it('leaves the report untouched and the result unchanged when there are no warnings', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'e1', title: 'Climate March' } },
+        });
+
+        const createReport: DuplicateWarningReport = {};
+        const event = await createEventBackend(baseCreateData, { report: createReport });
+
+        expect(event).toEqual({ $id: 'e1', title: 'Climate March' });
+        expect(createReport).toEqual({});
+
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'd1', status: 'active' } },
+        });
+
+        const publishReport: DuplicateWarningReport = {};
+        const published = await publishDraft('d1', { report: publishReport });
+
+        expect(published).toEqual({ $id: 'd1', status: 'active' });
+        expect(publishReport).toEqual({});
+      });
+
+      it('ignores an empty or malformed warnings payload', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'e1' },
+            warnings: { possibleDuplicates: [] },
+          },
+        });
+
+        const report: DuplicateWarningReport = {};
+        await createEventBackend(baseCreateData, { report });
+        expect(report.possibleDuplicates).toBeUndefined();
+
+        mockApi.post.mockResolvedValueOnce({
+          data: { success: true, data: { $id: 'e2' }, warnings: 'nope' },
+        });
+        const report2: DuplicateWarningReport = {};
+        await createEventBackend(baseCreateData, { report: report2 });
+        expect(report2.possibleDuplicates).toBeUndefined();
+      });
+
+      // The backend still reports the matches on an overridden create/publish
+      // (they were only removed from `blocking`), so re-announcing them would
+      // warn the user about the duplicate they just acknowledged.
+      it('drops the warnings when the request carried an override', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'e1' },
+            warnings: { possibleDuplicates: [duplicateSummary()] },
+          },
+        });
+
+        const report: DuplicateWarningReport = {};
+        await createEventBackend(baseCreateData, { duplicateOverride: true, report });
+        expect(report.possibleDuplicates).toBeUndefined();
+
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'd1', status: 'active' },
+            warnings: { possibleDuplicates: [duplicateSummary()] },
+          },
+        });
+
+        const publishReport: DuplicateWarningReport = {};
+        await publishDraft('d1', { duplicateOverride: true, report: publishReport });
+        expect(publishReport.possibleDuplicates).toBeUndefined();
+      });
+
+      it('works without a report (every existing caller passes none)', async () => {
+        mockApi.post.mockResolvedValueOnce({
+          data: {
+            success: true,
+            data: { $id: 'e1' },
+            warnings: { possibleDuplicates: [duplicateSummary()] },
+          },
+        });
+
+        await expect(createEventBackend(baseCreateData)).resolves.toEqual({ $id: 'e1' });
       });
     });
   });

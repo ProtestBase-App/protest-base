@@ -28,6 +28,19 @@ jest.mock('@/services/event.service', () => ({
       this.name = 'EventNotDraftError';
     }
   },
+  // The screen branches on `instanceof DuplicateEventError`; without it in this
+  // factory the import is undefined and `instanceof` throws a TypeError.
+  DuplicateEventError: class DuplicateEventError extends Error {
+    code = 'DUPLICATE_EVENT';
+    duplicates: unknown[];
+    canOverride: boolean;
+    constructor(message = 'duplicate', duplicates: unknown[] = [], canOverride = true) {
+      super(message);
+      this.name = 'DuplicateEventError';
+      this.duplicates = duplicates;
+      this.canOverride = canOverride;
+    }
+  },
 }));
 
 jest.mock('@/utils/themeColors', () => ({
@@ -70,6 +83,7 @@ const {
   publishDraft,
   patchEvent,
   deleteEvent,
+  DuplicateEventError,
   EventNotDraftError,
 } = require('@/services/event.service');
 
@@ -170,7 +184,10 @@ describe('DraftTriageScreen', () => {
         fireEvent.press(getByTestId('triage-publish'));
       });
 
-      expect(publishDraft).toHaveBeenCalledWith('a');
+      expect(publishDraft).toHaveBeenCalledWith(
+        'a',
+        expect.objectContaining({ duplicateOverride: false })
+      );
       await waitFor(() => expect(getByTestId('triage-card-b')).toBeTruthy());
     });
 
@@ -202,7 +219,10 @@ describe('DraftTriageScreen', () => {
       expect(patchEvent).toHaveBeenCalledTimes(1);
       const [, payload] = patchEvent.mock.calls[0];
       expect(payload.start_time).toBeTruthy();
-      expect(publishDraft).toHaveBeenCalledWith('a');
+      expect(publishDraft).toHaveBeenCalledWith(
+        'a',
+        expect.objectContaining({ duplicateOverride: false })
+      );
       // Publish must come after the patch resolves.
       expect(patchEvent.mock.invocationCallOrder[0]).toBeLessThan(
         publishDraft.mock.invocationCallOrder[0]
@@ -223,6 +243,151 @@ describe('DraftTriageScreen', () => {
       });
 
       // No alert, no error on the card — just the next decision.
+      await waitFor(() => expect(getByTestId('triage-card-b')).toBeTruthy());
+    });
+
+    // A DUPLICATE_EVENT 409 means nothing was published. Advancing the card on
+    // it (as a plain 409 once would have) would silently lose the draft from the
+    // deck while it was still a draft.
+    it('keeps the card and shows the matches when the backend calls it a duplicate', async () => {
+      queueOf([staleDraft('a'), staleDraft('b')]);
+      publishDraft.mockRejectedValue(
+        new DuplicateEventError(
+          'dup',
+          [
+            {
+              id: 'dup-1',
+              title: 'Existing March',
+              start_time: '2099-01-02T10:00:00.000Z',
+              city: 'Brussels',
+              status: 'active',
+              organization_id: 'org-1',
+              relationship: 'own',
+              reason: 'content',
+              strength: 'strong',
+            },
+          ],
+          true
+        )
+      );
+
+      const { findByTestId, getByTestId, findByText, queryByTestId } = renderWithProviders(
+        <DraftTriageScreen />,
+        { providerOverrides }
+      );
+
+      await findByTestId('triage-card-a');
+      await act(async () => {
+        fireEvent.press(getByTestId('triage-publish'));
+      });
+
+      expect(await findByText('Existing March')).toBeTruthy();
+      // Still on card A — the deck did not advance.
+      expect(getByTestId('triage-card-a')).toBeTruthy();
+      expect(queryByTestId('triage-card-b')).toBeNull();
+
+      publishDraft.mockResolvedValueOnce({ $id: 'a', status: 'active' });
+      await act(async () => {
+        fireEvent.press(await findByText('duplicates.publishAnyway'));
+      });
+
+      expect(publishDraft).toHaveBeenLastCalledWith(
+        'a',
+        expect.objectContaining({ duplicateOverride: true })
+      );
+      await waitFor(() => expect(getByTestId('triage-card-b')).toBeTruthy());
+    });
+
+    // The reschedule patch commits on the first attempt; re-running it on the
+    // override retry would be a redundant write of a date already saved.
+    it('does not re-send the reschedule patch on the override retry', async () => {
+      queueOf([staleDraft('a')]);
+      publishDraft.mockRejectedValueOnce(
+        new DuplicateEventError(
+          'dup',
+          [
+            {
+              id: 'dup-1',
+              title: 'Existing March',
+              start_time: '2099-01-02T10:00:00.000Z',
+              city: 'Brussels',
+              status: 'active',
+              organization_id: 'org-1',
+              relationship: 'own',
+              reason: 'content',
+              strength: 'strong',
+            },
+          ],
+          true
+        )
+      );
+
+      const { findByTestId, getByTestId, findByText, UNSAFE_getAllByProps } = renderWithProviders(
+        <DraftTriageScreen />,
+        { providerOverrides }
+      );
+
+      await findByTestId('triage-card-a');
+      const shortcut = UNSAFE_getAllByProps({ accessibilityRole: 'button' }).find(
+        (node: { props: { testID?: string } }) =>
+          node.props.testID?.startsWith('triage-reschedule-')
+      );
+      if (!shortcut) throw new Error('no reschedule shortcut rendered');
+      await act(async () => {
+        fireEvent.press(shortcut);
+      });
+
+      await act(async () => {
+        fireEvent.press(getByTestId('triage-publish'));
+      });
+      expect(patchEvent).toHaveBeenCalledTimes(1);
+
+      publishDraft.mockResolvedValueOnce({ $id: 'a', status: 'active' });
+      await act(async () => {
+        fireEvent.press(await findByText('duplicates.publishAnyway'));
+      });
+
+      expect(publishDraft).toHaveBeenLastCalledWith(
+        'a',
+        expect.objectContaining({ duplicateOverride: true })
+      );
+      expect(patchEvent).toHaveBeenCalledTimes(1);
+    });
+
+    // Warn mode: the publish succeeds and the deck advances, but the note is
+    // surfaced in a toast rather than swallowed.
+    it('shows a toast for warnings.possibleDuplicates on a successful publish', async () => {
+      queueOf([staleDraft('a'), staleDraft('b')]);
+      publishDraft.mockImplementation(async (_id: string, options?: any) => {
+        if (options?.report) {
+          options.report.possibleDuplicates = [
+            {
+              id: 'dup-1',
+              title: 'Existing March',
+              start_time: '2099-01-02T10:00:00.000Z',
+              city: 'Brussels',
+              status: 'active',
+              organization_id: 'org-1',
+              relationship: 'own',
+              reason: 'content',
+              strength: 'weak',
+            },
+          ];
+        }
+        return { $id: 'a', status: 'active' };
+      });
+
+      const { findByTestId, getByTestId } = renderWithProviders(<DraftTriageScreen />, {
+        providerOverrides,
+      });
+
+      await findByTestId('triage-card-a');
+      await act(async () => {
+        fireEvent.press(getByTestId('triage-publish'));
+      });
+
+      expect(await findByTestId('triage-publish-note-toast')).toBeTruthy();
+      // Non-blocking: the deck still advanced.
       await waitFor(() => expect(getByTestId('triage-card-b')).toBeTruthy());
     });
 

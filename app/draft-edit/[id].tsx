@@ -23,12 +23,15 @@ import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import EventForm from '@/components/EventForm';
+import DuplicateEventModal from '@/components/DuplicateEventModal';
 import type { FormState } from '@/types/eventForm.types';
-import type { UpdateEventRequest } from '@/types/event.types';
+import type { DuplicateWarningReport, UpdateEventRequest } from '@/types/event.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
+import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { allDaySubmitField } from '@/utils/eventFormatters';
 import { logger } from '@/utils/logger';
@@ -51,6 +54,9 @@ export default function DraftEdit() {
 
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
+  // 409 DUPLICATE_EVENT. The edits are already saved by the time publish runs,
+  // so the retry re-sends only the publish — never the patch again.
+  const duplicatePrompt = useDuplicatePrompt({ isOffline });
   const [form, setForm] = useState<FormState>({
     organization_id: '',
     title: '',
@@ -257,32 +263,59 @@ export default function DraftEdit() {
     }
 
     setActionBusy(true);
-    // Set when publish reports the event was already published elsewhere; the
-    // success path below runs either way, only the confirmation copy differs.
-    let publishedElsewhere = false;
     try {
       // Persist the latest edits first so the server publishes what the user sees.
       await patchEvent(eventId, buildDraftPatch());
-      await publishDraft(eventId);
     } catch (error) {
-      // Already published elsewhere (commonly the web dashboard). The patch above
+      // The patch failed — nothing was published; keep the editor.
+      alertPublishFailure(error);
+      setActionBusy(false);
+      return;
+    }
+
+    await runPublish(false);
+  };
+
+  /** Alert for a failed save-then-publish; the editor stays open either way. */
+  const alertPublishFailure = (error: unknown) => {
+    if (error instanceof EventIncompleteError) {
+      const messages = error.fields.length
+        ? error.fields.map((field) => t(publishFieldToMessageKey(field)))
+        : [t('drafts.issueIncomplete')];
+      Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
+    } else if ((error as { isRateLimited?: boolean }).isRateLimited) {
+      Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.message'));
+    } else {
+      Alert.alert(t('common.error'), (error as Error).message);
+    }
+  };
+
+  /**
+   * Publish the draft. The edits are already persisted by the time this runs, so
+   * the duplicate-override retry re-sends only this call — never the patch.
+   */
+  const runPublish = async (duplicateOverride: boolean) => {
+    setActionBusy(true);
+    // Set when publish reports the event was already published elsewhere; the
+    // success path below runs either way, only the confirmation copy differs.
+    let publishedElsewhere = false;
+    const report: DuplicateWarningReport = {};
+    try {
+      await publishDraft(eventId, { duplicateOverride, report });
+    } catch (error) {
+      // Already published elsewhere (commonly the web dashboard). The patch
       // succeeded, so the edits are saved and the event is public — fall through
       // to the success path instead of stranding the user in a draft editor for
       // an event that is no longer a draft.
       if (error instanceof EventNotDraftError) {
         publishedElsewhere = true;
+      } else if (duplicatePrompt.capture(error)) {
+        // The opposite of the case above: nothing was published. The prompt now
+        // holds the matches and waits for an explicit "publish anyway".
+        setActionBusy(false);
+        return;
       } else {
-        // patch or publish failed — the draft is NOT published; keep the editor.
-        if (error instanceof EventIncompleteError) {
-          const messages = error.fields.length
-            ? error.fields.map((field) => t(publishFieldToMessageKey(field)))
-            : [t('drafts.issueIncomplete')];
-          Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
-        } else if ((error as { isRateLimited?: boolean }).isRateLimited) {
-          Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.message'));
-        } else {
-          Alert.alert(t('common.error'), (error as Error).message);
-        }
+        alertPublishFailure(error);
         setActionBusy(false);
         return;
       }
@@ -306,9 +339,11 @@ export default function DraftEdit() {
     // The event is now public — route to its detail page (works for both
     // 'active' and 'past' results).
     router.replace(DynamicRoutes.event(eventId, { isCreated: true }));
-    Alert.alert(
+    alertWithDuplicateWarning(
       t('common.success'),
-      publishedElsewhere ? t('drafts.alreadyPublished') : t('drafts.published')
+      publishedElsewhere ? t('drafts.alreadyPublished') : t('drafts.published'),
+      report,
+      (duplicate) => router.push(duplicateHref(duplicate))
     );
   };
 
@@ -424,6 +459,11 @@ export default function DraftEdit() {
           />
         </ThemedView>
       </FormScreenScaffold>
+      <DuplicateEventModal
+        mode="publish"
+        locale={userLanguage}
+        {...duplicatePrompt.modalProps(() => runPublish(true))}
+      />
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );

@@ -20,6 +20,26 @@ jest.mock('@/services/event.service', () => ({
       this.fields = fields;
     }
   },
+  EventNotDraftError: class EventNotDraftError extends Error {
+    code = 'EVENT_NOT_DRAFT';
+    constructor() {
+      super('already published');
+      this.name = 'EventNotDraftError';
+    }
+  },
+  // The screen branches on `instanceof DuplicateEventError`; without it in this
+  // factory the import is undefined and `instanceof` throws a TypeError.
+  DuplicateEventError: class DuplicateEventError extends Error {
+    code = 'DUPLICATE_EVENT';
+    duplicates: unknown[];
+    canOverride: boolean;
+    constructor(message = 'duplicate', duplicates: unknown[] = [], canOverride = true) {
+      super(message);
+      this.name = 'DuplicateEventError';
+      this.duplicates = duplicates;
+      this.canOverride = canOverride;
+    }
+  },
 }));
 
 // Use the REAL readiness util so the publish-gating logic is genuinely exercised.
@@ -54,7 +74,13 @@ import {
 import DraftEdit from '../draft-edit/[id]';
 
 const { useLocalSearchParams } = require('expo-router');
-const { getDraftEventPreview, publishDraft, deleteEvent } = require('@/services/event.service');
+const {
+  getDraftEventPreview,
+  patchEvent,
+  publishDraft,
+  deleteEvent,
+  DuplicateEventError,
+} = require('@/services/event.service');
 
 const loggedInGlobal = {
   user: createMockUser(),
@@ -261,5 +287,83 @@ describe('DraftEdit', () => {
     });
 
     expect(getDraftEventPreview).toHaveBeenCalledWith('draft-42');
+  });
+  // The backend's duplicate guard in block mode. This screen SAVES then
+  // PUBLISHES, so the retry must re-send only the publish — the patch already
+  // committed, and re-running it would be a redundant write.
+  describe('duplicate-event guard', () => {
+    const duplicate = {
+      id: 'dup-1',
+      title: 'Existing March',
+      start_time: '2099-01-02T10:00:00.000Z',
+      city: 'Brussels',
+      status: 'active',
+      organization_id: 'org-1',
+      relationship: 'own',
+      reason: 'content',
+      strength: 'strong',
+    };
+
+    const publishableDraft = () =>
+      createMockEvent({
+        $id: 'draft-1',
+        description: 'A long enough description',
+        categories: ['Protest'],
+        city: 'Brussels',
+        street_address: 'Rue de la Loi 1',
+      });
+
+    const renderAndPublish = async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      getDraftEventPreview.mockResolvedValue(publishableDraft());
+      patchEvent.mockResolvedValue(publishableDraft());
+
+      const utils = renderWithProviders(<DraftEdit />, {
+        providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+      });
+
+      // Await the load OUTSIDE act (the screen shows the loader until the
+      // preview resolves), then press inside it.
+      const publishButton = await utils.findByTestId('btn-draft-publish');
+      await act(async () => {
+        fireEvent.press(publishButton);
+      });
+
+      return { ...utils, alertSpy };
+    };
+
+    it('shows the matches and does not report the draft as published', async () => {
+      publishDraft.mockRejectedValue(new DuplicateEventError('dup', [duplicate], true));
+
+      const { findByText, alertSpy } = await renderAndPublish();
+
+      expect(await findByText('duplicates.publishTitle')).toBeTruthy();
+      expect(await findByText('Existing March')).toBeTruthy();
+      // The old "any 409 means already published" mapping would have fired this.
+      expect(alertSpy).not.toHaveBeenCalledWith('common.success', expect.anything());
+
+      alertSpy.mockRestore();
+    });
+
+    it('re-sends only the publish on "Publish anyway" — never the patch again', async () => {
+      publishDraft.mockRejectedValueOnce(new DuplicateEventError('dup', [duplicate], true));
+
+      const { findByText, alertSpy } = await renderAndPublish();
+
+      expect(patchEvent).toHaveBeenCalledTimes(1);
+
+      publishDraft.mockResolvedValueOnce({ $id: 'draft-1', status: 'active' });
+      await act(async () => {
+        fireEvent.press(await findByText('duplicates.publishAnyway'));
+      });
+
+      expect(publishDraft).toHaveBeenCalledTimes(2);
+      expect(publishDraft.mock.calls[1][1]).toMatchObject({ duplicateOverride: true });
+      // The edits were already committed by the first attempt.
+      expect(patchEvent).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledWith('common.success', 'drafts.published');
+
+      alertSpy.mockRestore();
+    });
   });
 });

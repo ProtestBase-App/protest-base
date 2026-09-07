@@ -19,6 +19,7 @@ import DraftListControls, {
   DraftStatusFilter,
 } from '@/components/DraftListControls';
 import DraftListRow from '@/components/DraftListRow';
+import DuplicateEventModal from '@/components/DuplicateEventModal';
 import TriageEntryCard from '@/components/TriageEntryCard';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -36,6 +37,7 @@ import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BATCH_PUBLISH_CAP, useBatchDelete, useBatchPublish } from '@/hooks/useBatchPublish';
+import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { usePaginatedEvents } from '@/hooks/usePaginatedEvents';
 import {
   deleteEvent,
@@ -44,7 +46,7 @@ import {
   getDraftEventsForOrganizations,
   publishDraft,
 } from '@/services/event.service';
-import { Event } from '@/types/event.types';
+import { DuplicateWarningReport, Event } from '@/types/event.types';
 import {
   DEFAULT_SORT_DIRECTION,
   DraftStatus,
@@ -52,6 +54,7 @@ import {
   getEditedAgoParts,
   sortDrafts,
 } from '@/utils/draftStatusUtils';
+import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
@@ -249,6 +252,63 @@ export default function DraftEventsScreen() {
   // (published elsewhere) — an Alert would demand a tap for nothing.
   const [notice, setNotice] = useState<string | null>(null);
 
+  // 409 DUPLICATE_EVENT. The context is the draft id, so the confirm re-publishes
+  // the row that was refused rather than whichever one is busy now.
+  const duplicatePrompt = useDuplicatePrompt<string>({ isOffline });
+
+  const runPublish = useCallback(
+    async (eventId: string, duplicateOverride: boolean) => {
+      if (mutationBusyRef.current) return;
+
+      mutationBusyRef.current = true;
+      setBusyId(eventId);
+      try {
+        const report: DuplicateWarningReport = {};
+        await publishDraft(eventId, { duplicateOverride, report });
+        // The event is public now — drop the row immediately (the refetch would
+        // otherwise briefly re-enable a row that is no longer a draft) and
+        // refresh the global cache, counts and list.
+        setRemovedIds((prev) => new Set(prev).add(eventId));
+        refreshCountsAndCache(true);
+        refreshAll();
+        // A clean publish gets the transient toast; one the backend flagged gets
+        // an alert instead, since it carries something to read and act on.
+        alertWithDuplicateWarning(
+          t('common.success'),
+          t('drafts.published'),
+          report,
+          (dup) => router.push(duplicateHref(dup)),
+          () => setNotice(t('drafts.published'))
+        );
+      } catch (err) {
+        if (err instanceof EventIncompleteError) {
+          const messages = err.fields.length
+            ? err.fields.map((field) => t(publishFieldToMessageKey(field)))
+            : [t('drafts.issueIncomplete')];
+          Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
+        } else if (duplicatePrompt.capture(err, eventId)) {
+          // Nothing was published — the prompt holds the matches and waits.
+        } else if (err instanceof EventNotDraftError) {
+          // Already published elsewhere (commonly the web dashboard) while this
+          // list still showed it as a draft. The user's intent is satisfied —
+          // drop the stale row and resync rather than reporting a failure.
+          setRemovedIds((prev) => new Set(prev).add(eventId));
+          refreshCountsAndCache(true);
+          refreshAll();
+          setNotice(t('drafts.alreadyPublished'));
+        } else if ((err as { isRateLimited?: boolean }).isRateLimited) {
+          Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.message'));
+        } else {
+          Alert.alert(t('common.error'), (err as Error).message);
+        }
+      } finally {
+        mutationBusyRef.current = false;
+        setBusyId(null);
+      }
+    },
+    [refreshCountsAndCache, refreshAll, duplicatePrompt]
+  );
+
   const handlePublish = useCallback(
     async (event: Event) => {
       if (!assertOnlineOrAlert(isOffline)) return;
@@ -268,42 +328,9 @@ export default function DraftEventsScreen() {
         return;
       }
 
-      mutationBusyRef.current = true;
-      setBusyId(event.$id);
-      try {
-        await publishDraft(event.$id);
-        // The event is public now — drop the row immediately (the refetch would
-        // otherwise briefly re-enable a row that is no longer a draft) and
-        // refresh the global cache, counts and list.
-        setRemovedIds((prev) => new Set(prev).add(event.$id));
-        refreshCountsAndCache(true);
-        refreshAll();
-        setNotice(t('drafts.published'));
-      } catch (err) {
-        if (err instanceof EventIncompleteError) {
-          const messages = err.fields.length
-            ? err.fields.map((field) => t(publishFieldToMessageKey(field)))
-            : [t('drafts.issueIncomplete')];
-          Alert.alert(t('drafts.publishIssuesTitle'), messages.join('\n'));
-        } else if (err instanceof EventNotDraftError) {
-          // Already published elsewhere (commonly the web dashboard) while this
-          // list still showed it as a draft. The user's intent is satisfied —
-          // drop the stale row and resync rather than reporting a failure.
-          setRemovedIds((prev) => new Set(prev).add(event.$id));
-          refreshCountsAndCache(true);
-          refreshAll();
-          setNotice(t('drafts.alreadyPublished'));
-        } else if ((err as { isRateLimited?: boolean }).isRateLimited) {
-          Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.message'));
-        } else {
-          Alert.alert(t('common.error'), (err as Error).message);
-        }
-      } finally {
-        mutationBusyRef.current = false;
-        setBusyId(null);
-      }
+      await runPublish(event.$id, false);
     },
-    [refreshCountsAndCache, refreshAll, isOffline]
+    [runPublish, isOffline]
   );
 
   const handleDelete = useCallback(
@@ -761,6 +788,12 @@ export default function DraftEventsScreen() {
             onClose={() => setFiltersSheetOpen(false)}
             filters={filters}
             onApply={setFilters}
+          />
+
+          <DuplicateEventModal
+            mode="publish"
+            locale={userLanguage}
+            {...duplicatePrompt.modalProps((eventId) => runPublish(eventId, true))}
           />
         </ThemedView>
       </SafeAreaView>

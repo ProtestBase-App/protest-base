@@ -207,3 +207,71 @@ export interface EventDisplay extends Event {
   start_date: string;
   end_date: string;
 }
+
+// ---------------------------------------------------------------------------
+// Duplicate-event guard (backend `eventDedup.service.ts`)
+//
+// The backend runs a duplicate check on create (POST /events) and on publish
+// (POST /events/:id/publish). It has two modes:
+//   - warn  — nothing is blocked; a success response MAY carry
+//             `warnings.possibleDuplicates[]`.
+//   - block — a match returns 409 DUPLICATE_EVENT with `duplicates[]` and
+//             `canOverride`, re-sendable with `duplicate_override`.
+// The app must be correct in both; warn mode is what production runs today.
+// ---------------------------------------------------------------------------
+
+/**
+ * How the submitting organization relates to the matched event.
+ * - `own` — the same organization created it (typically a double submit).
+ * - `co_organized` — the match already lists the submitting org as co-organizer.
+ * - `other_org` — somebody else's event.
+ */
+export type DuplicateRelationship = 'own' | 'co_organized' | 'other_org';
+
+/**
+ * Why the backend considers the two events the same.
+ * - `url` — same link, close in time.
+ * - `content` — same title + place, close in time.
+ * - `url-recurring` — same link, different time (a reused series/campaign page).
+ * - `fuzzy` — similar title, same place, close in time.
+ */
+export type DuplicateReason = 'url' | 'content' | 'url-recurring' | 'fuzzy';
+
+/** `strong` blocks a create; `weak` only annotates one (both block a publish). */
+export type DuplicateStrength = 'strong' | 'weak';
+
+/**
+ * One matched event, as the backend summarizes it. Only `id`, `relationship`,
+ * `reason` and `strength` are guaranteed — every display field is nullable and
+ * may be absent entirely, so render defensively.
+ *
+ * Note there is no `all_day` here, so a date-only match cannot be rendered as
+ * such from this payload alone (see `formatDuplicateWhen`).
+ */
+export interface DuplicateSummary {
+  id: string;
+  title: string | null;
+  start_time: string | null;
+  city: string | null;
+  /** Event status, e.g. 'active' | 'past' | 'draft'. Free-form on the wire. */
+  status: string | null;
+  organization_id: string | null;
+  relationship: DuplicateRelationship;
+  reason: DuplicateReason;
+  strength: DuplicateStrength;
+  /** Trigram similarity, present on `fuzzy` matches only. */
+  similarity?: number;
+}
+
+/**
+ * Out-parameter filled by the create/publish service calls with the backend's
+ * non-blocking duplicate verdicts (`warnings.possibleDuplicates`).
+ *
+ * An out-parameter rather than a changed return type: every existing caller
+ * reads the returned Event / status directly and none of them care about
+ * warnings, and the value is needed AFTER the await (both screens navigate away
+ * as soon as the call resolves), which rules out a callback.
+ */
+export interface DuplicateWarningReport {
+  possibleDuplicates?: DuplicateSummary[];
+}
