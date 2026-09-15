@@ -58,9 +58,32 @@ describe('ExternalLinks', () => {
     });
   });
 
+  describe('OPEN_METEO', () => {
+    it('should be defined', () => {
+      expect(ExternalLinks.OPEN_METEO).toBeDefined();
+    });
+
+    it('should be a non-empty string', () => {
+      expect(typeof ExternalLinks.OPEN_METEO).toBe('string');
+      expect(ExternalLinks.OPEN_METEO.length).toBeGreaterThan(0);
+    });
+
+    it('should start with https://', () => {
+      expect(ExternalLinks.OPEN_METEO).toMatch(/^https:\/\//);
+    });
+
+    it('should point to the open-meteo.com domain', () => {
+      expect(ExternalLinks.OPEN_METEO).toContain('open-meteo.com');
+    });
+
+    it('should have the expected URL value', () => {
+      expect(ExternalLinks.OPEN_METEO).toBe('https://open-meteo.com/');
+    });
+  });
+
   describe('data integrity', () => {
-    it('should have exactly 2 external link constants', () => {
-      expect(Object.keys(ExternalLinks)).toHaveLength(2);
+    it('should have exactly 3 external link constants', () => {
+      expect(Object.keys(ExternalLinks)).toHaveLength(3);
     });
 
     it('should have no duplicate URL values', () => {

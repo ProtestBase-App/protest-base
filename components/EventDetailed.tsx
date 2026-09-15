@@ -22,9 +22,11 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
+import { EventWeatherCard } from '@/components/EventWeatherCard';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { countries } from '@/constants/Countries';
 import { CoOrganizerAvatar } from '@/types/event.types';
+import type { EventWeather } from '@/types/weather.types';
 import { FormattedEvent, parseAsUTC } from '@/utils/eventFormatters';
 import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
@@ -105,6 +107,8 @@ export interface EventDetailedProps {
   topInset: number;
   isEventLiked?: boolean;
   onLike?: () => void;
+  /** "Protest forecast" for this event; null or undefined hides the card. */
+  weather?: EventWeather | null;
 }
 
 const EventDetailed: React.FC<EventDetailedProps> = ({
@@ -123,6 +127,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   topInset,
   isEventLiked = false,
   onLike,
+  weather,
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -726,6 +731,15 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 <IconSymbol name="chevron.right" size={IconSizes.md} color={themeColors.chevron} />
               )}
             </TouchableOpacity>
+          )}
+
+          {weather && (
+            <EventWeatherCard
+              weather={weather}
+              userLanguage={userLanguage}
+              eventStart={event.startDateFull}
+              eventEnd={event.endDateFull}
+            />
           )}
 
           {(event.description || (event.help_needed && event.help_description)) && (

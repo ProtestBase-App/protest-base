@@ -27,6 +27,21 @@ jest.mock('@/services/eventView.service', () => ({
   trackEventView: jest.fn(),
 }));
 
+jest.mock('@/hooks/useEventWeather', () => ({
+  useEventWeather: jest.fn(() => ({ weather: null, refresh: jest.fn() })),
+}));
+
+// The real card needs the full formatter module, which this file stubs down
+// to nothing — a marker is enough to prove the screen passes the forecast on.
+jest.mock('@/components/EventWeatherCard', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    EventWeatherCard: () =>
+      React.createElement(Text, { testID: 'event-weather-card' }, 'weather-card'),
+  };
+});
+
 jest.mock('@/utils/eventPermissions', () => ({
   canUserEditEvent: jest.fn(),
   canUserDeleteEvent: jest.fn(),
@@ -494,6 +509,48 @@ describe('EventDetails', () => {
       await findByText(mockEvent.title);
 
       expect(getEventByIdBackend).toHaveBeenCalledWith('event-1', true);
+    });
+  });
+
+  describe('Weather', () => {
+    const { useEventWeather } = require('@/hooks/useEventWeather');
+
+    afterEach(() => {
+      useEventWeather.mockReturnValue({ weather: null, refresh: jest.fn() });
+    });
+
+    it('asks for the forecast of the loaded event with the connectivity flag', async () => {
+      const { findByText } = renderWithProviders(<EventDetails />);
+      await findByText(mockEvent.title);
+
+      expect(useEventWeather).toHaveBeenCalledWith(mockEvent, { isOffline: false });
+    });
+
+    it('passes the offline flag through', async () => {
+      const { findByText } = renderWithProviders(<EventDetails />, {
+        providerOverrides: { connectivityContext: { isOffline: true } },
+      });
+      await findByText(mockEvent.title);
+
+      expect(useEventWeather).toHaveBeenCalledWith(mockEvent, { isOffline: true });
+    });
+
+    it('renders the forecast card when the hook has one', async () => {
+      useEventWeather.mockReturnValue({
+        weather: { status: 'available', days: [{}] },
+        refresh: jest.fn(),
+      });
+
+      const { findByTestId } = renderWithProviders(<EventDetails />);
+
+      expect(await findByTestId('event-weather-card')).toBeTruthy();
+    });
+
+    it('mounts no card when the hook has nothing', async () => {
+      const { findByText, queryByTestId } = renderWithProviders(<EventDetails />);
+      await findByText(mockEvent.title);
+
+      expect(queryByTestId('event-weather-card')).toBeNull();
     });
   });
 });

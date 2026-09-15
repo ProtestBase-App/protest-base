@@ -32,6 +32,7 @@ import { useLikedEvents } from '@/context/LikedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useEventWeather } from '@/hooks/useEventWeather';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
@@ -76,6 +77,10 @@ export default function EventDetails() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [viewCount, setViewCount] = useState(() => cachedEvent?.view_count ?? 0);
+
+  // Fetched here, not in EventDetailed: the pre-check needs the raw event and
+  // the connectivity flag, and the presentational component stays that way.
+  const { weather, refresh: refreshWeather } = useEventWeather(rawEvent, { isOffline });
 
   const event = useMemo<FormattedEvent | null>(
     () => (rawEvent ? formatEventForDisplay(rawEvent, userLanguage) : null),
@@ -205,6 +210,9 @@ export default function EventDetails() {
     try {
       setRefreshing(true);
       setError(null);
+      // Fire-and-forget: the spinner never waits on the forecast, which can
+      // take a few seconds server-side and can't fail loudly anyway.
+      void refreshWeather();
       const fetchedEvent = await getEventByIdBackend(eventId, true);
       setRawEvent(fetchedEvent);
       upsertEventInCache(fetchedEvent);
@@ -380,6 +388,7 @@ export default function EventDetails() {
             isEventSaved={isEventSaved}
             isEventLiked={isEventLiked}
             viewCount={viewCount}
+            weather={weather}
             onBack={handleBackPress}
             onSave={handleSave}
             onLike={handleLike}

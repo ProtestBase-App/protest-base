@@ -106,6 +106,28 @@ const MAPPING = {
   'chevron.up': 'keyboard-arrow-up',
   // Outline bolt for the Automation label — 'bolt.fill' reads as an alert.
   bolt: 'bolt',
+  // Event weather card (Sep 2026): conditions and tips. Every SF name exists on
+  // the iOS floor (SF Symbols 4.0 / iOS 16 or earlier). The header condition
+  // and the tip rows can show side by side, so each pair keeps distinct
+  // Material glyphs (rain header vs umbrella tip, thermometer header vs heat tip).
+  'sun.max.fill': 'wb-sunny',
+  'moon.stars.fill': 'nights-stay',
+  'cloud.sun.fill': 'wb-cloudy',
+  'cloud.moon.fill': 'cloud',
+  'cloud.fog.fill': 'foggy',
+  'cloud.drizzle.fill': 'grain',
+  'cloud.rain.fill': 'water-drop',
+  'cloud.snow.fill': 'ac-unit',
+  'cloud.bolt.rain.fill': 'thunderstorm',
+  'thermometer.medium': 'thermostat',
+  'thermometer.sun.fill': 'device-thermostat',
+  'thermometer.snowflake': 'severe-cold',
+  wind: 'air',
+  'umbrella.fill': 'umbrella',
+  'drop.fill': 'local-drink',
+  'thermometer.low': 'checkroom',
+  'sunset.fill': 'wb-twilight',
+  sparkles: 'auto-awesome',
 } as Partial<
   Record<
     Extract<import('expo-symbols').SymbolViewProps['name'], string>,
