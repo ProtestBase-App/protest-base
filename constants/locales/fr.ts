@@ -1534,6 +1534,91 @@ const fr: LocaleData = {
     allowAccess: 'Autoriser',
     notNow: 'Pas maintenant',
   },
+
+  // ============================================
+  // Weather - "Protest forecast" card on event detail
+  // ============================================
+  weather: {
+    title: 'Météo de la manif',
+    mayChange: 'Peut encore changer',
+    updatedHoursAgo: 'Mis à jour il y a {{count}} h',
+    // Open-Meteo's CC BY 4.0 terms require a link wherever their data is shown.
+    attribution: "D'après les données d'Open-Meteo",
+    attributionLinkA11y: 'Ouvrir le site Open-Meteo',
+    // Shown only when the forecast does not cover the whole event.
+    windowFromNow: 'De maintenant à {{time}}',
+    windowForDay: 'Prévisions pour {{day}}',
+    metrics: {
+      temp: '{{min}}–{{max}} °C',
+      tempSingle: '{{value}} °C',
+      tempBelowZero: '{{min}} à {{max}} °C',
+      feels: 'ressenti {{min}}–{{max}}°',
+      feelsSingle: 'ressenti {{value}}°',
+      feelsBelowZero: 'ressenti {{min}} à {{max}}°',
+      rain: 'pluie {{value}} %',
+      gusts: 'rafales {{value}} km/h',
+    },
+    conditions: {
+      clear: 'Dégagé',
+      clearNight: 'Nuit dégagée',
+      cloudy: 'Nuageux',
+      fog: 'Brouillard',
+      drizzle: 'Bruine',
+      rain: 'Pluie',
+      snow: 'Neige',
+      thunder: 'Orages',
+      unknown: 'Prévisions',
+    },
+    // Never discourage attending or imply safety. Informal Belgian French
+    // throughout ("tu", dracher, fort chaud, GSM…). Keys ending in _N are
+    // alternative wordings of one situation; the card shows one per event.
+    tips: {
+      thunder: 'Orages possibles — garde un œil sur les infos des organisateur·ices.',
+      thunder_rain_1: 'Orage et pluie : prends un k-way ou un poncho.',
+      thunder_rain_2: "Orage et pluie : mets-toi à l'abri à temps si besoin.",
+      heat_1: 'Il fait fort chaud : prends au moins une gourde.',
+      heat_2: 'Il fait fort chaud : couvre-toi la tête.',
+      heat_3: 'Il fait fort chaud : mets des vêtements légers en lin ou en coton.',
+      freezing_1: 'Ça caille : mets des sous-vêtements thermiques.',
+      freezing_2: 'Ça caille : prends une écharpe et des gants.',
+      freezing_3: "Ça caille : rien ne peut t'arrêter !",
+      freezing_4: 'Ça caille : prends un thermos !',
+      wind_strong:
+        'Fortes rafales : ta banderole risque de se transformer en voile — fixe-la bien ou vois plus petit.',
+      cold_rain_1: 'Froid et pluie : ne te décourage pas — marcher, ça réchauffe.',
+      cold_rain_2: "Froid et pluie : rien ne t'arrête ! Descends dans la rue !",
+      cold_rain_3: 'Froid et pluie : mets de grosses chaussettes et des chaussures imperméables.',
+      cold_rain_4: "Froid et pluie : n'oublie pas ton thermos.",
+      cold_rain_5: 'Froid et pluie : mets un bon imperméable bien chaud.',
+      cold_rain_6: 'Froid et pluie : enfile un pantalon de pluie !',
+      cold_rain_7: "Froid et pluie : un keffieh peut te protéger d'une petite pluie.",
+      cold_rain_8: 'Froid et pluie : avec un parapluie, tu te fais vite des ami·es.',
+      wind_rain: 'Vent et pluie : prends un k-way ou un poncho.',
+      sun_rain_1: 'Soleil et averses : viens paré·e à tout !',
+      sun_rain_2: 'Soleil et averses : gourde + k-way + lunettes de soleil.',
+      rain_1: "Ça drache : au moins, c'est bon pour les plantes.",
+      rain_2: 'Ça drache : prends un k-way ou un poncho.',
+      rain_3: 'Ça drache : mets des chaussures imperméables.',
+      showers: 'Risque de crachin : glisse un k-way dans ton sac.',
+      uv_high: 'Soleil costaud : crème solaire — seule ta détermination doit brûler.',
+      sunny_warm_1: "Soleil et chaleur : n'oublie pas ta gourde — scander, ça donne soif.",
+      sunny_warm_2: 'Soleil et chaleur : un keffieh peut te protéger du soleil.',
+      sunny_warm_3: 'Soleil et chaleur : prends tes lunettes de soleil.',
+      sunny_warm_4: 'Soleil et chaleur : attention aux coups de soleil !',
+      warm: 'Il fait chaud : prends une gourde — scander, ça donne soif.',
+      wind_1: "Du vent : accroche-toi, ne t'envole pas !",
+      wind_2: 'Du vent : tiens bien ta banderole.',
+      wind_3: 'Du vent : rien ne peut te faire vaciller.',
+      cold_1: 'Froid : ne te décourage pas — marcher, ça réchauffe.',
+      cold_2: 'Froid : mets un gros manteau.',
+      cold_3: 'Froid : un thermos peut bien servir.',
+      dark: "Il fera noir à {{time}} — un gilet réfléchissant ou la lampe de ton GSM, c'est malin.",
+      sunny_1: 'Temps parfait pour manifester : aucune excuse pour ne pas venir !',
+      sunny_2: 'Temps parfait pour manifester : prends tes lunettes de soleil.',
+      sunny_3: 'Temps parfait pour manifester : attention aux coups de soleil !',
+      perfect: 'Temps parfait pour manifester : aucune excuse pour ne pas venir !',
+    },
+  },
 };
 
 // Export as default and named export

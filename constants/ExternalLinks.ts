@@ -16,4 +16,10 @@ export const ExternalLinks = {
    * Form for users to submit feedback about the app
    */
   FEEDBACK_FORM: 'https://tally.so/r/wgr7EP/',
+
+  /**
+   * Weather provider credited on the event "Protest forecast" card. Its data
+   * is CC BY 4.0, which requires the attribution to link here.
+   */
+  OPEN_METEO: 'https://open-meteo.com/',
 } as const;

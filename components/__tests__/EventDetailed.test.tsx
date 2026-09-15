@@ -60,10 +60,22 @@ jest.mock('@/utils/eventFormatters', () => ({
   parseAsUTC: jest.fn((dateStr: string) => new Date(dateStr)),
 }));
 
+// The real card needs the full formatter module, which this file stubs down
+// to parseAsUTC — a marker is enough to prove the mount point.
+jest.mock('@/components/EventWeatherCard', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    EventWeatherCard: () =>
+      React.createElement(Text, { testID: 'event-weather-card' }, 'weather-card'),
+  };
+});
+
 import React from 'react';
 import { Linking, Alert } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import EventDetailed from '@/components/EventDetailed';
+import type { EventWeather } from '@/types/weather.types';
 import type { FormattedEvent } from '@/utils/eventFormatters';
 import * as Calendar from 'expo-calendar/legacy';
 
@@ -1023,5 +1035,52 @@ describe('EventDetailed — event without postal code or street address', () => 
     const noStreetEvent = { ...mockEvent, street_address: null };
     render(<EventDetailed {...defaultProps} event={noStreetEvent} />);
     expect(screen.getByText('Climate March 2025')).toBeTruthy();
+  });
+});
+
+describe('EventDetailed — weather card', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const weather: EventWeather = {
+    status: 'available',
+    reason: null,
+    available_from: null,
+    generated_at: '2026-09-13T14:10:00Z',
+    stale: false,
+    attribution: 'open-meteo',
+    days: [
+      {
+        date: '2026-09-20',
+        window_start: '2026-09-20T12:00:00Z',
+        window_end: '2026-09-20T15:00:00Z',
+        confidence: 'high',
+        condition: 'rain',
+        is_night: false,
+        temp_min: 14,
+        temp_max: 17,
+        feels_min: 12,
+        feels_max: 16,
+        precip_probability_max: 70,
+        precip_mm: 2.4,
+        gust_max_kmh: 48,
+        uv_max: 2.1,
+        sunrise: '2026-09-20T05:29:00Z',
+        sunset: '2026-09-20T17:32:00Z',
+      },
+    ],
+  };
+
+  it('mounts the forecast card when a forecast is given', () => {
+    render(<EventDetailed {...defaultProps} weather={weather} />);
+    expect(screen.getByTestId('event-weather-card')).toBeTruthy();
+  });
+
+  it('mounts no card without a forecast', () => {
+    const { unmount } = render(<EventDetailed {...defaultProps} />);
+    expect(screen.queryByTestId('event-weather-card')).toBeNull();
+    unmount();
+
+    render(<EventDetailed {...defaultProps} weather={null} />);
+    expect(screen.queryByTestId('event-weather-card')).toBeNull();
   });
 });

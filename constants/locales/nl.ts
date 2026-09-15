@@ -1798,6 +1798,91 @@ const nl = {
     allowAccess: 'Toestaan',
     notNow: 'Niet nu',
   },
+
+  // ============================================
+  // Weather - "Protest forecast" card on event detail
+  // ============================================
+  weather: {
+    title: 'Betogingsweer',
+    mayChange: 'Kan nog veranderen',
+    updatedHoursAgo: '{{count}} u geleden bijgewerkt',
+    // Open-Meteo's CC BY 4.0 terms require a link wherever their data is shown.
+    attribution: 'Op basis van data van Open-Meteo',
+    attributionLinkA11y: 'Open de website van Open-Meteo',
+    // Shown only when the forecast does not cover the whole event.
+    windowFromNow: 'Vanaf nu tot {{time}}',
+    windowForDay: 'Voorspelling voor {{day}}',
+    metrics: {
+      temp: '{{min}}–{{max}} °C',
+      tempSingle: '{{value}} °C',
+      tempBelowZero: '{{min}} tot {{max}} °C',
+      feels: 'voelt als {{min}}–{{max}}°',
+      feelsSingle: 'voelt als {{value}}°',
+      feelsBelowZero: 'voelt als {{min}} tot {{max}}°',
+      rain: 'regen {{value}}%',
+      gusts: 'rukwinden {{value}} km/u',
+    },
+    conditions: {
+      clear: 'Helder',
+      clearNight: 'Heldere nacht',
+      cloudy: 'Bewolkt',
+      fog: 'Mist',
+      drizzle: 'Motregen',
+      rain: 'Regen',
+      snow: 'Sneeuw',
+      thunder: 'Onweer',
+      unknown: 'Weersverwachting',
+    },
+    // Never discourage attending or imply safety. Informal Belgian Dutch
+    // throughout ("je", drinkbus, fluohesje, gsm…). Keys ending in _N are
+    // alternative wordings of one situation; the card shows one per event.
+    tips: {
+      thunder: 'Kans op onweer — hou de berichten van de organisatie in het oog.',
+      thunder_rain_1: 'Donder en regen: neem een regenjas of poncho mee.',
+      thunder_rain_2: 'Donder en regen: zorg dat je op tijd schuilt als nodig.',
+      heat_1: 'Heet: neem minstens één drinkbus mee.',
+      heat_2: 'Heet: zorg dat je jouw hoofd bedekt.',
+      heat_3: 'Heet: draag luchtige kledij van linnen of katoen.',
+      freezing_1: 'Heel koud: draag thermisch ondergoed.',
+      freezing_2: 'Heel koud: neem een sjaal en handschoenen mee.',
+      freezing_3: 'Heel koud: niets kan jou tegenhouden!',
+      freezing_4: 'Heel koud: neem een thermos mee!',
+      wind_strong:
+        'Felle rukwinden: je grote spandoek wordt een zeil — maak het goed vast of hou het klein.',
+      cold_rain_1: 'Koud en regen: laat je niet demotiveren — van stappen krijg je het warm.',
+      cold_rain_2: 'Koud en regen: niets houdt jou tegen! Ga de straat op!',
+      cold_rain_3: 'Koud en regen: draag dikke sokken en waterdichte schoenen.',
+      cold_rain_4: 'Koud en regen: vergeet je thermos niet.',
+      cold_rain_5: 'Koud en regen: draag een dikke regenjas.',
+      cold_rain_6: 'Koud en regen: een regenbroek aandoen!',
+      cold_rain_7: 'Koud en regen: een keffiyeh kan je beschermen bij lichte regen.',
+      cold_rain_8: 'Koud en regen: met een paraplu maak je snel vrienden.',
+      wind_rain: 'Winderig en regen: neem een regenjas of poncho mee.',
+      sun_rain_1: 'Zon en regen: kom voorbereid op alles!',
+      sun_rain_2: 'Zon en regen: drinkbus + regenjas + zonnebril.',
+      rain_1: 'Regen: dat is goed voor de plantjes.',
+      rain_2: 'Regen: neem een regenjas of poncho mee.',
+      rain_3: 'Regen: neem waterdichte schoenen mee.',
+      showers: 'Kans op een buitje: steek een k-way in je rugzak.',
+      uv_high: 'Felle zon: smeer je in — alleen je strijdlust mag branden.',
+      sunny_warm_1: 'Zonnig en warm: vergeet je drinkbus niet — van roepen krijg je dorst.',
+      sunny_warm_2: 'Zonnig en warm: een keffiyeh kan je beschermen tegen de zon.',
+      sunny_warm_3: 'Zonnig en warm: neem je zonnebril mee.',
+      sunny_warm_4: 'Zonnig en warm: zorg dat je niet verbrandt!',
+      warm: 'Warm: neem een drinkbus mee — van roepen krijg je dorst.',
+      wind_1: 'Winderig: zorg dat je niet wegvliegt!',
+      wind_2: 'Winderig: houd je banner goed vast.',
+      wind_3: 'Winderig: niets kan jou van je stuk brengen.',
+      cold_1: 'Koud: laat je niet demotiveren — van stappen krijg je het warm.',
+      cold_2: 'Koud: draag een dikke jas.',
+      cold_3: 'Koud: een thermos kan van pas komen.',
+      dark: 'Het wordt donker om {{time}} — een fluohesje of het lampje van je gsm helpt.',
+      sunny_1: 'Perfect protestweer: geen excuses om niet te komen!',
+      sunny_2: 'Perfect protestweer: neem je zonnebril mee.',
+      sunny_3: 'Perfect protestweer: zorg dat je niet verbrandt!',
+      perfect: 'Perfect protestweer: geen excuses om niet te komen!',
+    },
+  },
 };
 
 // Export as both default and named export for flexibility

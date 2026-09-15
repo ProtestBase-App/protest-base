@@ -43,7 +43,9 @@ export interface MapFilterContext {
 }
 
 /** Events without geocoded coordinates (incl. online events) are excluded. */
-export function hasMapCoordinates(event: Event): boolean {
+export function hasMapCoordinates<T extends Pick<Event, 'geocod_lat' | 'geocod_lng'>>(
+  event: T
+): event is T & { geocod_lat: number; geocod_lng: number } {
   return (
     typeof event.geocod_lat === 'number' &&
     Number.isFinite(event.geocod_lat) &&
