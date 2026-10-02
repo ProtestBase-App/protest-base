@@ -67,20 +67,6 @@ export const SECURE_STORE_KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   SESSION_ID: 'session_id',
-  /**
-   * Per-install bearer token returned by /auth/integrity/attest after the
-   * backend verifies a Play Integrity / App Attest payload (or honors the
-   * dev bypass header on non-prod builds). Sent on every API call as
-   * `X-Install-Token`. See services/integrity.service.ts.
-   */
-  INSTALL_TOKEN: 'install_token',
-  INSTALL_TOKEN_EXPIRES_AT: 'install_token_expires_at',
-  /**
-   * App Attest key identifier (iOS only). Generated once per install via
-   * `attestKey()` and reused for subsequent assertions. Backend stores the
-   * public key associated with this id on first attestation.
-   */
-  INTEGRITY_KEY_ID: 'integrity_key_id',
 } as const;
 
 /**

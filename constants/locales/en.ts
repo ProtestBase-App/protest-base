@@ -1003,57 +1003,6 @@ const en: LocaleData = {
   },
 
   // ============================================
-  // Integrity - App integrity / install attestation
-  // ============================================
-  integrity: {
-    failed: {
-      title: "We couldn't verify this app",
-      message:
-        "ProtestBase couldn't confirm that this device is running a genuine, unmodified version of the app. This usually happens on rooted devices, sideloaded installs, or unsupported emulators.",
-      button: 'Try Again',
-      badge: 'Verification failed',
-    },
-    retryable: {
-      title: 'Temporary verification issue',
-      message:
-        "We couldn't finish verifying this device. This is usually temporary — please try again in a moment.",
-      button: 'Try Again',
-      badge: 'Verification issue',
-    },
-    deviceStateUnsupported: {
-      title: 'Device security state not supported',
-      message:
-        "ProtestBase can't run on devices with an unlocked bootloader, an unverified OS, or expired or revoked device certificates. If you believe this is an error, please reach out to us.",
-      badge: 'Device blocked',
-    },
-    appConfig: {
-      title: 'App configuration issue',
-      message:
-        'Something about this install is misconfigured — most often this means the app needs to be reinstalled from the official store. Please uninstall and reinstall ProtestBase, then try again.',
-      badge: 'Reinstall required',
-    },
-    devSetup: {
-      title: 'Developer setup needed',
-      message:
-        'EXPO_PUBLIC_DEV_INTEGRITY_BYPASS is missing from your local environment. Add it to .env.local with the value used by the backend, then restart Metro.',
-      button: 'Try Again',
-      badge: 'Setup required',
-    },
-    unsupportedDevice: {
-      title: 'This device is not supported',
-      message:
-        "ProtestBase relies on hardware security features that aren't available on this device. iOS 14 or Android 9 (or newer) is required.",
-      badge: 'Device not supported',
-    },
-    updateRequired: {
-      title: 'Please update ProtestBase',
-      message:
-        'This version of ProtestBase can no longer connect. Please update to the latest version from the App Store or Google Play to keep using the app.',
-      badge: 'Update required',
-    },
-  },
-
-  // ============================================
   // Form - Form validation & messages
   // ============================================
   form: {

@@ -9,7 +9,6 @@
 
 import { getEventsBackend } from '@/services/event.service';
 import { apiPrefixReady, hasKnownApiPrefix } from '@/services/api';
-import { getInstallToken, isBypassMode, isFallbackMode } from '@/services/integrity.service';
 import { loadPersistedEvents, PersistedEventsSnapshot } from '@/services/eventsCacheStorage';
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
@@ -39,8 +38,8 @@ export interface CacheableEventsFetch {
  * Fetch the full browse window (lookback + all upcoming events) in a single
  * request. The calendar and maps tabs browse ALL events from this cache, so we
  * pull up to the backend's documented ceiling (API_LIMITS.EVENTS_MAX) in one
- * round-trip instead of walking pages — one request keeps cold-start latency and
- * the per-request integrity/attestation overhead to a single hit.
+ * round-trip instead of walking pages — one request keeps cold-start latency to
+ * a single hit.
  *
  * @param ifNoneMatch - ETag of the window this device already holds. The
  *   startDate below is a fresh timestamp every launch, so the URL never repeats
@@ -103,7 +102,7 @@ export interface EventsFetch {
    */
   snapshot: Promise<PersistedEventsSnapshot | null>;
   result: Promise<CacheableEventsFetch>;
-  /** True when this started before the version/integrity gates resolved. */
+  /** True when this started before the version gate resolved. */
   speculative: boolean;
 }
 
@@ -123,16 +122,14 @@ function createEventsFetch(speculative: boolean): EventsFetch {
 /**
  * Start the events fetch without waiting for the startup gates.
  *
- * VersionGate and IntegrityGate each render a spinner *instead of* their
- * children while their own request is in flight, so GlobalProvider — and with it
- * the events fetch — does not mount until /app/config (and, on a first launch or
- * after the install-token TTL, the integrity handshake) has completed. The
- * events window is anonymous and depends on neither result, so it can travel
- * alongside them; GlobalProvider adopts it via claimEventsFetch().
+ * VersionGate renders a spinner *instead of* its children while /app/config is
+ * in flight, so GlobalProvider — and with it the events fetch — does not mount
+ * until the version check has completed. The events window is anonymous and
+ * doesn't depend on that result, so it can travel alongside it; GlobalProvider
+ * adopts it via claimEventsFetch().
  *
- * Strictly best-effort: it never throws, and it declines to run unless both the
- * API prefix and the integrity credential are ready — see
- * `isEventsPrefetchSafe`. Await `apiPrefixReady` before calling.
+ * Strictly best-effort: it never throws, and it declines to run until the API
+ * prefix is known. Await `apiPrefixReady` before calling.
  */
 export function startEventsPrefetch(): void {
   // Already started, or GlobalProvider got there first — starting now would add
@@ -146,33 +143,6 @@ export function startEventsPrefetch(): void {
 
   logger.debug('[EventsBootstrap] Prefetching the events window ahead of the startup gates');
   pending = createEventsFetch(true);
-}
-
-/**
- * Whether a request may be sent before IntegrityGate has rendered its children.
- *
- * Mirrors the branching in api.ts's resolveIntegrityHeaders: dev-bypass and
- * fallback modes need no install token, otherwise we must hold one. Waiting on
- * getInstallToken() costs nothing on the common path (a cached token returns
- * immediately) and dedupes into the gate's own attestation otherwise.
- *
- * The point is what happens when attestation *fails*: the interceptor would
- * send the request with no credential at all, and by the time its 401
- * INSTALL_TOKEN_MISSING returns, IntegrityProvider has usually flipped
- * fallbackMode — which routes that 401 into the "backend rejected x-api-key"
- * off-ramp and shows a blocking "please update" screen to a device whose
- * fallback actually works. Declining to prefetch leaves that device on its
- * normal path: the gate enters fallback, and GlobalProvider's own fetch carries
- * x-api-key.
- */
-export async function isEventsPrefetchSafe(): Promise<boolean> {
-  if (isBypassMode() || isFallbackMode()) return true;
-  try {
-    await getInstallToken();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

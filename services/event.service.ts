@@ -570,8 +570,8 @@ function buildEventFormData(
 //         JSON boolean `true` on a JSON create and on publish.
 //
 // Never auto-retry a 409 — the override is an explicit user decision. (The
-// api.ts response interceptor only replays 401 integrity codes and 403
-// UNTRUSTED_INSTALL, so nothing replays a 409 behind our back.)
+// api.ts response interceptor only replays a request after refreshing an
+// expired JWT, so nothing replays a 409 behind our back.)
 // ---------------------------------------------------------------------------
 
 const DUPLICATE_RELATIONSHIPS: DuplicateRelationship[] = ['own', 'co_organized', 'other_org'];

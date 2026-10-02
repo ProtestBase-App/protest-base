@@ -3,7 +3,7 @@
  *
  * Threat model: several URLs handed to `Linking.openURL` originate from the
  * network and are attacker-influenceable:
- *   - the app-update / store URL comes from the anonymous, integrity-exempt
+ *   - the app-update / store URL comes from the anonymous, credential-free
  *     `/app/config` response (a MITM on a hostile network can tamper with it
  *     and pair it with `forceUpdate: true` to drive a blocking "Update" screen);
  *   - an organizer's `website_url` is free-form data set by a (potentially

@@ -113,15 +113,6 @@ export default (): ExpoConfig => {
               },
             }),
       },
-      entitlements: {
-        // App Attest environment. Production builds talk to Apple's production
-        // attestation service; everything else uses the development service so
-        // physical-device test installs (TestFlight, dev clients) keep working.
-        // Non-prod builds skip attestation entirely via the bypass flow, but the
-        // entitlement still has to be declared for the app to link.
-        'com.apple.developer.devicecheck.appattest-environment':
-          appEnv === 'production' ? 'production' : 'development',
-      },
     },
     android: {
       adaptiveIcon: {
@@ -178,25 +169,15 @@ export default (): ExpoConfig => {
         projectId: EAS_PROJECT_ID,
       },
       // Surfaced to runtime via Constants.expoConfig?.extra so services can
-      // branch on environment and read integrity-related build params.
+      // branch on environment and read build params.
       appEnv,
-      // Only embed the dev-bypass secret in development bundles. The runtime
-      // consumers (services/api.ts, services/integrity.service.ts) already send
-      // it only in bypass mode, and the backend honors it only when its own
-      // NODE_ENV !== 'production'. Gating the embed here adds defense in depth:
-      // the secret can never be serialized into a preview/production JS bundle —
-      // and read out of it by anyone who unzips the binary — even if the EAS
-      // environment variable is accidentally scoped to those profiles.
-      devIntegrityBypass:
-        appEnv === 'development' ? process.env.EXPO_PUBLIC_DEV_INTEGRITY_BYPASS : undefined,
-      // Legacy mobile API key, embedded on EVERY build profile (unlike the
-      // dev-bypass secret, which is dev-only). Used solely as the
-      // production-incident fallback when a device can't attest —
-      // services/api.ts attaches it as `x-api-key`. This is a coarse filter, not
-      // a secret, so embedding it in the bundle is acceptable. Must be provided
-      // as an EAS environment variable (EXPO_PUBLIC_API_KEY) for the
-      // development / preview / production environments — EAS does not read
-      // .env.local. The value must equal the backend API_KEY (not WEBSITE_API_KEY).
+      // Mobile API key, sent by services/api.ts as `x-api-key` on every request
+      // except /app/config. A coarse filter, not a secret, so embedding it in the
+      // bundle is acceptable. Must be provided as an EAS environment variable
+      // (EXPO_PUBLIC_API_KEY) for the development / preview / production
+      // environments: a local build whose EAS variables fail to load silently
+      // falls back to .env.local's test key, which the production backend rejects.
+      // The value must equal the backend API_KEY (not WEBSITE_API_KEY).
       apiKey: process.env.EXPO_PUBLIC_API_KEY,
     },
     plugins: [

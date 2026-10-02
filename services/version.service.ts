@@ -39,7 +39,7 @@ const FAIL_OPEN_RESULT: VersionCheckResult = {
  */
 export async function checkAppVersion(): Promise<VersionCheckResult> {
   try {
-    // Integrity-exempt endpoint; runs anonymously before attestation.
+    // Credential-free bootstrap endpoint (no x-api-key); runs before any other request.
     const response = await api.get<AppConfigResponse>('/app/config');
 
     if (!response.data.success) {

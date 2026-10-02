@@ -17,17 +17,16 @@ The app is built around a simple idea: surfacing collective action shouldn't req
 
 ## Features
 
-| Feature             | Description                                                                                              |
-| ------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Event Discovery** | Browse, search, and filter upcoming protests and events                                                  |
-| **Save Events**     | Keep track of events you're interested in — encrypted on-device, never synced to our servers             |
-| **Event Creation**  | Verified organizers can create, edit, and manage events                                                  |
-| **Event Templates** | Save and reuse event templates for recurring protests                                                    |
-| **Map Integration** | View event locations on OpenFreeMap (no Google dependency)                                               |
-| **Deep Linking**    | Share event links that open directly in the app                                                          |
-| **Multi-language**  | Full support for English, French, and Dutch                                                              |
-| **Dark/Light Mode** | Automatic theme switching based on system preference                                                     |
-| **App Integrity**   | Hardware Key Attestation (Android) + App Attest (iOS) — GrapheneOS-friendly, no Play Services dependency |
+| Feature             | Description                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| **Event Discovery** | Browse, search, and filter upcoming protests and events                                      |
+| **Save Events**     | Keep track of events you're interested in — encrypted on-device, never synced to our servers |
+| **Event Creation**  | Verified organizers can create, edit, and manage events                                      |
+| **Event Templates** | Save and reuse event templates for recurring protests                                        |
+| **Map Integration** | View event locations on OpenFreeMap (no Google dependency)                                   |
+| **Deep Linking**    | Share event links that open directly in the app                                              |
+| **Multi-language**  | Full support for English, French, and Dutch                                                  |
+| **Dark/Light Mode** | Automatic theme switching based on system preference                                         |
 
 ## Privacy
 
@@ -61,34 +60,22 @@ Verified organizers do log in to manage events. For those accounts we store logi
 
 Our source code is publicly available so anyone can audit how we handle data. Trust, but verify.
 
-## Security & App Integrity
+## Security
 
-Authentication runs on on-device attestation, not floating API keys. At enrollment the app proves possession of a hardware-backed key by signing a server challenge (App Attest on iOS, AndroidKeyStore attestation on Android); the backend verifies it and issues a short-lived per-install token. Each subsequent API call carries that install token, so backend access stays bound to an attested install rather than a shared, copyable API key.
-
-| Platform | Mechanism                           |
-| -------- | ----------------------------------- |
-| iOS      | Apple App Attest                    |
-| Android  | Hardware Key Attestation (KeyStore) |
-
-On Android we deliberately **do not** use Google Play Integrity. Attestation goes through the AndroidKeyStore directly, which means:
-
-- It works on **GrapheneOS** and other privacy-focused Android distributions — no Google Play Services dependency.
-- It works on devices that sideload the app — no Play Store install requirement.
-- The backend can verify the certificate chain end-to-end against Google's hardware roots plus a GrapheneOS allowlist.
-
-This is an unusual choice for an app distributed through the Play Store. We made it deliberately: supporting users who opt out of the Google ecosystem mattered more than relying on a service that locks them out.
+- **Organizer accounts:** creating, editing and publishing events requires a signed-in session with short-lived access tokens and rotating refresh tokens, kept in the device's encrypted secure storage.
+- **API access:** the app identifies itself to the API with a static app key. It only filters out anonymous scanner traffic and is not treated as a security boundary: the backend relies on user sessions, rate limiting and automatic abuse blocking instead.
+- **No device identifiers:** the app never generates or sends a device or install ID. Requests carry only the app version, plus your session when you are signed in.
 
 ## Tech Stack
 
-| Category    | Technology                                                                                                           |
-| ----------- | -------------------------------------------------------------------------------------------------------------------- |
-| Framework   | [Expo SDK 56](https://expo.dev)                                                                                      |
-| UI          | [React Native 0.85](https://reactnative.dev)                                                                         |
-| Navigation  | [Expo Router 56](https://docs.expo.dev/router/introduction/) (SDK-aligned versioning)                                |
-| Language    | [TypeScript 6.0](https://www.typescriptlang.org)                                                                     |
-| State       | React Context API                                                                                                    |
-| HTTP        | [Axios](https://axios-http.com) + custom install-token interceptors                                                  |
-| Maps        | [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) + [OpenFreeMap](https://openfreemap.org)  |
-| Storage     | AsyncStorage + SecureStore (with chunked encryption for list payloads)                                               |
-| Attestation | [`@expo/app-integrity`](https://docs.expo.dev/versions/latest/sdk/app-integrity/) (iOS) + local `expo-hka` (Android) |
-| Testing     | Jest + React Testing Library                                                                                         |
+| Category   | Technology                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| Framework  | [Expo SDK 56](https://expo.dev)                                                                                     |
+| UI         | [React Native 0.85](https://reactnative.dev)                                                                        |
+| Navigation | [Expo Router 56](https://docs.expo.dev/router/introduction/) (SDK-aligned versioning)                               |
+| Language   | [TypeScript 6.0](https://www.typescriptlang.org)                                                                    |
+| State      | React Context API                                                                                                   |
+| HTTP       | [Axios](https://axios-http.com) + JWT refresh interceptors                                                          |
+| Maps       | [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) + [OpenFreeMap](https://openfreemap.org) |
+| Storage    | AsyncStorage + SecureStore (with chunked encryption for list payloads)                                              |
+| Testing    | Jest + React Testing Library                                                                                        |

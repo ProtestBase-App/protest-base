@@ -16,15 +16,6 @@ jest.mock('@/services/api', () => ({
   hasKnownApiPrefix: () => mockHasKnownApiPrefix(),
 }));
 
-const mockGetInstallToken = jest.fn();
-const mockIsBypassMode = jest.fn();
-const mockIsFallbackMode = jest.fn();
-jest.mock('@/services/integrity.service', () => ({
-  getInstallToken: () => mockGetInstallToken(),
-  isBypassMode: () => mockIsBypassMode(),
-  isFallbackMode: () => mockIsFallbackMode(),
-}));
-
 jest.mock('@/utils/logger', () => ({
   logger: {
     debug: jest.fn(),
@@ -57,9 +48,6 @@ beforeEach(() => {
   mockLoadPersistedEvents.mockResolvedValue(null);
   mockGetEventsBackend.mockResolvedValue({ events: [event], total: 1, limit: 500, offset: 0 });
   mockHasKnownApiPrefix.mockReturnValue(true);
-  mockGetInstallToken.mockResolvedValue('install-token');
-  mockIsBypassMode.mockReturnValue(false);
-  mockIsFallbackMode.mockReturnValue(false);
 });
 
 describe('eventsBootstrap', () => {
@@ -118,38 +106,12 @@ describe('eventsBootstrap', () => {
     });
 
     it('propagates a prefetch failure to the claimer', async () => {
-      mockGetEventsBackend.mockRejectedValue(new Error('INSTALL_TOKEN_MISSING'));
+      mockGetEventsBackend.mockRejectedValue(new Error('Request failed with status code 503'));
       const mod = loadModule();
 
       mod.startEventsPrefetch();
 
-      await expect(mod.claimEventsFetch().result).rejects.toThrow('INSTALL_TOKEN_MISSING');
-    });
-  });
-
-  describe('isEventsPrefetchSafe', () => {
-    it('is safe once an install token is in hand', async () => {
-      await expect(loadModule().isEventsPrefetchSafe()).resolves.toBe(true);
-    });
-
-    it('is safe in dev-bypass and fallback modes, which need no install token', async () => {
-      mockIsBypassMode.mockReturnValue(true);
-      await expect(loadModule().isEventsPrefetchSafe()).resolves.toBe(true);
-
-      mockIsBypassMode.mockReturnValue(false);
-      mockIsFallbackMode.mockReturnValue(true);
-      await expect(loadModule().isEventsPrefetchSafe()).resolves.toBe(true);
-
-      expect(mockGetInstallToken).not.toHaveBeenCalled();
-    });
-
-    it('is NOT safe when attestation fails', async () => {
-      // A token-less request would 401 INSTALL_TOKEN_MISSING after the gate has
-      // entered fallback, which the interceptor turns into the "please update"
-      // off-ramp — on a device whose x-api-key fallback works fine.
-      mockGetInstallToken.mockRejectedValue(new Error('attestation failed'));
-
-      await expect(loadModule().isEventsPrefetchSafe()).resolves.toBe(false);
+      await expect(mod.claimEventsFetch().result).rejects.toThrow('status code 503');
     });
   });
 

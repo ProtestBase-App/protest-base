@@ -18,23 +18,9 @@ import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { isNetworkError } from '@/utils/networkError';
 import { getInstalledAppVersion } from '@/utils/appVersion';
 
-// integrity.service.ts also imports from this module, so use a deferred require
-// inside the interceptors to avoid a circular import at module-eval time.
-type IntegrityModule = typeof import('@/services/integrity.service');
-let integrityModuleCache: IntegrityModule | null = null;
-function getIntegrityModule(): IntegrityModule {
-  if (!integrityModuleCache) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    integrityModuleCache = require('@/services/integrity.service') as IntegrityModule;
-  }
-  return integrityModuleCache;
-}
-
-const DEV_INTEGRITY_BYPASS = Constants.expoConfig?.extra?.devIntegrityBypass as string | undefined;
-
-// Legacy mobile API key, sent as `x-api-key` only in fallback mode (see
-// resolveIntegrityHeaders). Trimmed so a stray newline in the EAS env var can't
-// 401 every fallback request.
+// Mobile API key, sent as `x-api-key` on every request except the /app/config
+// bootstrap. Trimmed so a stray newline in the EAS env var can't 401 every
+// request — each of which the backend counts toward an IP ban.
 const API_KEY = (
   ((Constants.expoConfig?.extra?.apiKey as string | undefined) ||
     process.env.EXPO_PUBLIC_API_KEY) ??
@@ -65,10 +51,6 @@ function normalizePrefix(prefix: string | null | undefined): string {
   if (!value) return '';
   if (!value.startsWith('/')) value = `/${value}`;
   return value.replace(/\/+$/, '');
-}
-
-export function getApiPrefix(): string {
-  return apiPrefix;
 }
 
 export async function setApiPrefix(prefix: string): Promise<void> {
@@ -130,65 +112,18 @@ const api = axios.create({
   timeout: 10000,
 });
 
+function isBootstrapPath(url: string | undefined): boolean {
+  return (url ?? '').split('?')[0] === BOOTSTRAP_PATH;
+}
+
 // Returns the baseURL the request should resolve against. The bootstrap path always uses
 // the bare API_BASE_URL; everything else gets the dynamic prefix appended. Setting baseURL
 // (instead of mutating config.url) keeps the interceptor idempotent on retries — important
 // because the response interceptor calls api(originalRequest) after refreshing tokens, and
 // mutating the URL there would double-prefix it.
 function resolveBaseUrl(url: string | undefined): string | undefined {
-  const isBootstrap = url === BOOTSTRAP_PATH || (url ?? '').startsWith(`${BOOTSTRAP_PATH}?`);
-  if (isBootstrap || !apiPrefix) return API_BASE_URL;
+  if (isBootstrapPath(url) || !apiPrefix) return API_BASE_URL;
   return `${API_BASE_URL}${apiPrefix}`;
-}
-
-// Endpoints that must not carry an integrity header — they are the integrity
-// flow itself (called via raw axios in integrity.service.ts) and the bootstrap
-// /app/config request (anonymous; runs before integrity has a chance to attest).
-const INTEGRITY_EXEMPT_PATHS = new Set([
-  BOOTSTRAP_PATH,
-  '/auth/integrity/nonce',
-  '/auth/integrity/attest',
-]);
-
-function isIntegrityExempt(url: string | undefined): boolean {
-  if (!url) return false;
-  if (INTEGRITY_EXEMPT_PATHS.has(url)) return true;
-  // Some callers may pass query strings.
-  const base = url.split('?')[0];
-  return INTEGRITY_EXEMPT_PATHS.has(base);
-}
-
-// 401 error codes that share the same recovery: drop the cached install token
-// and retry once. The request interceptor refetches the token on the replay.
-const INTEGRITY_RETRY_401_CODES: ReadonlySet<string> = new Set([
-  'INSTALL_TOKEN_EXPIRED',
-  'INSTALL_TOKEN_INVALID',
-  'INSTALL_TOKEN_MISSING',
-]);
-
-// Attestation header for an outgoing request, by mode: dev-bypass →
-// X-Dev-Integrity-Bypass, fallback → x-api-key, normal → X-Install-Token.
-// Never throws: on attestation error it returns {} so the backend answers
-// INSTALL_TOKEN_MISSING and the normal 401 retry kicks in.
-async function resolveIntegrityHeaders(): Promise<Record<string, string>> {
-  const integrity = getIntegrityModule();
-
-  if (integrity.isBypassMode()) {
-    return DEV_INTEGRITY_BYPASS ? { 'X-Dev-Integrity-Bypass': DEV_INTEGRITY_BYPASS } : {};
-  }
-
-  if (integrity.isFallbackMode()) {
-    return API_KEY ? { 'x-api-key': API_KEY } : {};
-  }
-
-  try {
-    return { 'X-Install-Token': await integrity.getInstallToken() };
-  } catch (error) {
-    logger.warn('[API] Failed to attach install token; sending request without it', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return {};
-  }
 }
 
 // Requests can opt out of the Bearer token by setting `skipAuth: true` on the
@@ -204,20 +139,17 @@ api.interceptors.request.use(
       }
     }
 
-    // Backend logs this in fallback events so rollout adoption can be measured
-    // by app version. Attach to every request, including bootstrap and
-    // integrity-exempt endpoints.
+    // The backend measures adoption by app version (it drives the force-update
+    // floor), so attach it to every request, including the bootstrap.
     const appVersion = getInstalledAppVersion();
     if (appVersion) {
       config.headers['X-App-Version'] = appVersion;
     }
 
-    // Integrity header on every call except the integrity-flow + bootstrap paths.
-    if (!isIntegrityExempt(config.url)) {
-      const integrityHeaders = await resolveIntegrityHeaders();
-      for (const [name, value] of Object.entries(integrityHeaders)) {
-        config.headers[name] = value;
-      }
+    // /app/config is served without a credential, so the version gate and
+    // maintenance mode keep working even if a build ships a bad key.
+    if (API_KEY && !isBootstrapPath(config.url)) {
+      config.headers['x-api-key'] = API_KEY;
     }
 
     config.baseURL = resolveBaseUrl(config.url);
@@ -234,14 +166,6 @@ let tokenExpirationCallback: ((reason?: string) => void) | null = null;
 
 export const setTokenExpirationCallback = (callback: (reason?: string) => void) => {
   tokenExpirationCallback = callback;
-};
-
-// Fired when a fallback (x-api-key) request is rejected — the server kill-switch
-// is off. IntegrityProvider uses it to show the "please update" off-ramp.
-let integrityFallbackRejectedCallback: (() => void) | null = null;
-
-export const setIntegrityFallbackRejectedCallback = (callback: () => void) => {
-  integrityFallbackRejectedCallback = callback;
 };
 
 let isRefreshing = false;
@@ -282,40 +206,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const errorCode = error.response?.data?.code;
 
-      // Fallback off-ramp: the backend stopped honoring x-api-key. Don't retry —
-      // a token-less replay just earns threat violations (→ IP ban). Show the
-      // off-ramp and never-settle so the error doesn't flash before the gate
-      // unmounts the screen.
-      if (INTEGRITY_RETRY_401_CODES.has(errorCode) && getIntegrityModule().isFallbackMode()) {
-        logger.warn('[API] Fallback API key rejected by backend; surfacing off-ramp', {
-          code: errorCode,
-        });
-        integrityFallbackRejectedCallback?.();
-        return new Promise(() => {});
-      }
-
-      // INSTALL_TOKEN_{EXPIRED,INVALID,MISSING} all use the same recovery shape:
-      // drop the cached install token and replay the request once. The request
-      // interceptor will re-fetch a fresh token via getInstallToken() — either
-      // by re-attesting (EXPIRED/INVALID) or by attaching the just-minted
-      // token that the interceptor previously failed to attach (MISSING).
-      // Never in fallback mode — those 401s take the off-ramp above.
-      if (
-        INTEGRITY_RETRY_401_CODES.has(errorCode) &&
-        !originalRequest._integrityRetry &&
-        !getIntegrityModule().isFallbackMode()
-      ) {
-        originalRequest._integrityRetry = true;
-        try {
-          await getIntegrityModule().clearInstallToken();
-        } catch (clearError) {
-          logger.warn('[API] Failed to clear install token before retry', {
-            error: clearError instanceof Error ? clearError.message : String(clearError),
-          });
-        }
-        return api(originalRequest);
-      }
-
+      // INVALID_API_KEY / INSTALL_TOKEN_MISSING are never replayed: the backend
+      // counts each one toward an IP ban, so they fall through to the reject.
       if (errorCode === 'TOKEN_EXPIRED' && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
@@ -338,8 +230,8 @@ api.interceptors.response.use(
             throw new Error('No refresh token available');
           }
 
-          // Attach the integrity header manually since this call bypasses the
-          // request interceptor (to avoid recursion if refresh itself 401s).
+          // Attach the API key manually since this call bypasses the request
+          // interceptor (to avoid recursion if refresh itself 401s).
           const refreshHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
           };
@@ -347,7 +239,9 @@ api.interceptors.response.use(
           if (refreshAppVersion) {
             refreshHeaders['X-App-Version'] = refreshAppVersion;
           }
-          Object.assign(refreshHeaders, await resolveIntegrityHeaders());
+          if (API_KEY) {
+            refreshHeaders['x-api-key'] = API_KEY;
+          }
 
           const response = await axios.post(
             `${API_BASE_URL}${apiPrefix}/auth/token/refresh`,
@@ -432,28 +326,6 @@ api.interceptors.response.use(
         // The global handler navigates away, unmounting all callers
         return new Promise(() => {});
       }
-    }
-
-    // 403 UNTRUSTED_INSTALL — token is structurally valid but the trust level
-    // is too low (e.g. dev-bypass token hitting a production-only endpoint, or
-    // attestation degraded after issuance). Same recovery as the 401 integrity
-    // codes: drop the cached token, re-attest, retry once. Skipped in fallback
-    // mode (no install token to re-attest).
-    if (
-      error.response?.status === 403 &&
-      error.response?.data?.code === 'UNTRUSTED_INSTALL' &&
-      !originalRequest._integrityRetry &&
-      !getIntegrityModule().isFallbackMode()
-    ) {
-      originalRequest._integrityRetry = true;
-      try {
-        await getIntegrityModule().clearInstallToken();
-      } catch (clearError) {
-        logger.warn('[API] Failed to clear install token before UNTRUSTED_INSTALL retry', {
-          error: clearError instanceof Error ? clearError.message : String(clearError),
-        });
-      }
-      return api(originalRequest);
     }
 
     // ACCOUNT_LOCKED is the account-lockout signal (backend ships it as 429, but

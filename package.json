@@ -18,7 +18,6 @@
     "check:lockfile": "node scripts/check-lockfile-emnapi.js"
   },
   "dependencies": {
-    "@expo/app-integrity": "^57.0.1",
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "5.2.14",
     "@maplibre/maplibre-react-native": "^11.3.4",

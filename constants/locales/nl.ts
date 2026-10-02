@@ -1106,57 +1106,6 @@ const nl = {
   },
 
   // ============================================
-  // Integrity - App-integriteit / installatieverificatie
-  // ============================================
-  integrity: {
-    failed: {
-      title: 'We konden deze app niet verifiëren',
-      message:
-        'ProtestBase kon niet bevestigen dat dit apparaat een echte, ongewijzigde versie van de app draait. Dit gebeurt meestal op gerootete toestellen, sideloaded installaties of niet-ondersteunde emulators.',
-      button: 'Opnieuw proberen',
-      badge: 'Verificatie mislukt',
-    },
-    retryable: {
-      title: 'Tijdelijk verificatieprobleem',
-      message:
-        'We konden de verificatie van dit apparaat niet voltooien. Dit is meestal tijdelijk — probeer het zo dadelijk opnieuw.',
-      button: 'Opnieuw proberen',
-      badge: 'Verificatieprobleem',
-    },
-    deviceStateUnsupported: {
-      title: 'Apparaatbeveiligingsstatus niet ondersteund',
-      message:
-        'ProtestBase kan niet draaien op apparaten met een ontgrendelde bootloader, een niet-geverifieerd besturingssysteem, of verlopen of ingetrokken apparaatcertificaten. Denk je dat dit een fout is? Neem dan contact met ons op.',
-      badge: 'Apparaat geblokkeerd',
-    },
-    appConfig: {
-      title: 'Configuratieprobleem met de app',
-      message:
-        'Er klopt iets niet aan deze installatie — meestal moet de app opnieuw worden geïnstalleerd vanuit de officiële store. Verwijder ProtestBase en installeer het opnieuw, en probeer het dan nog eens.',
-      badge: 'Opnieuw installeren',
-    },
-    devSetup: {
-      title: 'Setup voor ontwikkelaar vereist',
-      message:
-        'EXPO_PUBLIC_DEV_INTEGRITY_BYPASS ontbreekt in je lokale omgeving. Voeg het toe aan .env.local met de waarde die de backend gebruikt en herstart Metro.',
-      button: 'Opnieuw proberen',
-      badge: 'Setup vereist',
-    },
-    unsupportedDevice: {
-      title: 'Dit apparaat wordt niet ondersteund',
-      message:
-        'ProtestBase gebruikt hardwarebeveiligingsfuncties die op dit apparaat niet beschikbaar zijn. iOS 14 of Android 9 (of nieuwer) is vereist.',
-      badge: 'Apparaat niet ondersteund',
-    },
-    updateRequired: {
-      title: 'Werk ProtestBase bij',
-      message:
-        'Deze versie van ProtestBase kan geen verbinding meer maken. Installeer de nieuwste versie uit de App Store of Google Play om de app te blijven gebruiken.',
-      badge: 'Update vereist',
-    },
-  },
-
-  // ============================================
   // Become Organizer
   // ============================================
   becomeOrganizer: {
