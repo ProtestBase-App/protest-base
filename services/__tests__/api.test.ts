@@ -21,8 +21,7 @@ jest.mock('expo-constants', () => {
     expoConfig: {
       extra: {
         apiBaseUrl: 'https://api.example.com',
-        // Captured into API_KEY at api.ts module load — exercised by the
-        // fallback-mode header tests below. Inert for non-fallback tests.
+        // Captured into API_KEY at api.ts module load.
         apiKey: 'test-api-key',
       },
     },
@@ -46,18 +45,6 @@ jest.mock('@/utils/logger', () => ({
 jest.mock('@/utils/appVersion', () => ({
   __esModule: true,
   getInstalledAppVersion: jest.fn(() => '1.2.3'),
-}));
-
-// Mock the local HKA Expo module because the integrity service (loaded lazily
-// by the api response interceptor) imports it; loading the real module would
-// try to bind to a native Kotlin class that doesn't exist in Jest.
-jest.mock('@/modules/expo-hka/src', () => ({
-  __esModule: true,
-  isSupported: jest.fn(() => false),
-  attest: jest.fn(),
-  sign: jest.fn(),
-  hasKey: jest.fn(() => false),
-  clear: jest.fn(),
 }));
 
 jest.mock('axios', () => {
@@ -110,12 +97,8 @@ jest.mock('axios', () => {
 
 // Import modules AFTER all mocks are declared
 import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
 import axios from 'axios';
-import { setTokenExpirationCallback, setIntegrityFallbackRejectedCallback } from '@/services/api';
-// Real integrity.service (only @/modules/expo-hka/src is mocked above) — drives
-// the bypass/fallback/normal header branch the interceptors take.
-import { setFallbackMode } from '@/services/integrity.service';
+import { setTokenExpirationCallback } from '@/services/api';
 
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockAxios = axios as jest.Mocked<typeof axios>;
@@ -232,13 +215,32 @@ describe('services/api.ts', () => {
       expect(result.headers['X-App-Version']).toBe('1.2.3');
     });
 
-    it('attaches X-App-Version even on integrity-exempt bootstrap path', async () => {
+    it('attaches X-App-Version even on the /app/config bootstrap path', async () => {
       mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
 
       const config = { headers: {}, method: 'get', url: '/app/config' };
       const result = await getStore().requestFulfilled(config);
 
       expect(result.headers['X-App-Version']).toBe('1.2.3');
+    });
+
+    it('attaches x-api-key to API requests', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
+
+      const config = { headers: {}, method: 'get', url: '/events' };
+      const result = await getStore().requestFulfilled(config);
+
+      expect(result.headers['x-api-key']).toBe('test-api-key');
+      expect(result.headers['X-Install-Token']).toBeUndefined();
+    });
+
+    it('does not attach x-api-key to the credential-free /app/config bootstrap', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      for (const url of ['/app/config', '/app/config?platform=ios']) {
+        const result = await getStore().requestFulfilled({ headers: {}, method: 'get', url });
+        expect(result.headers['x-api-key']).toBeUndefined();
+      }
     });
 
     it('omits X-App-Version when getInstalledAppVersion returns null', async () => {
@@ -306,10 +308,17 @@ describe('services/api.ts', () => {
       await getStore().responseRejected(error);
 
       expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('refresh_token');
+      // The raw refresh call bypasses the request interceptor, so it must carry
+      // the API key itself.
       expect(mockAxios.post).toHaveBeenCalledWith(
         'https://api.example.com/auth/token/refresh',
         { refreshToken: 'old-refresh-token' },
-        expect.any(Object)
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'x-api-key': 'test-api-key',
+            'X-App-Version': '1.2.3',
+          }),
+        })
       );
       expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
         'access_token',
@@ -537,223 +546,42 @@ describe('services/api.ts', () => {
   });
 
   // ============================================================
-  // Response interceptor - install-token recovery (401 codes + 403 UNTRUSTED_INSTALL)
+  // Response interceptor - API key rejections
   // ============================================================
-  describe('Response interceptor (rejected handler) - install-token recovery', () => {
-    const integrityRetry401Codes = [
-      'INSTALL_TOKEN_EXPIRED',
-      'INSTALL_TOKEN_INVALID',
-      'INSTALL_TOKEN_MISSING',
-    ];
+  describe('Response interceptor (rejected handler) - API key rejections', () => {
+    // The backend records a threat violation for each of these (3 per hour
+    // bans the IP), so a replay would only speed up the ban.
+    ['INVALID_API_KEY', 'INSTALL_TOKEN_MISSING'].forEach((code) => {
+      it(`rejects 401 ${code} without retrying or touching the session`, async () => {
+        const tokenExpiredCallback = jest.fn();
+        setTokenExpirationCallback(tokenExpiredCallback);
 
-    integrityRetry401Codes.forEach((code) => {
-      it(`clears the install token and retries once on 401 ${code}`, async () => {
-        getStore().retryFn.mockResolvedValueOnce({ data: { success: true } });
-
-        const originalRequest = { headers: {}, method: 'get', url: '/protected' } as Record<
-          string,
-          unknown
-        >;
         const error = {
-          config: originalRequest,
+          config: { headers: {}, method: 'get', url: '/events' },
           response: { status: 401, data: { code } },
           message: 'Unauthorized',
         };
 
-        await getStore().responseRejected(error);
+        await expect(getStore().responseRejected(error)).rejects.toEqual(error);
 
-        expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token');
-        expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token_expires_at');
-        expect(getStore().retryFn).toHaveBeenCalledWith(originalRequest);
-        expect(originalRequest._integrityRetry).toBe(true);
+        expect(getStore().retryFn).not.toHaveBeenCalled();
+        expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+        expect(tokenExpiredCallback).not.toHaveBeenCalled();
+
+        setTokenExpirationCallback(() => {});
       });
     });
 
-    it('clears the install token and retries once on 403 UNTRUSTED_INSTALL', async () => {
-      getStore().retryFn.mockResolvedValueOnce({ data: { success: true } });
-
-      const originalRequest = { headers: {}, method: 'post', url: '/events' } as Record<
-        string,
-        unknown
-      >;
+    it('rejects a code-less 403 (banned IP) without retrying', async () => {
       const error = {
-        config: originalRequest,
-        response: { status: 403, data: { code: 'UNTRUSTED_INSTALL' } },
-        message: 'Forbidden',
-      };
-
-      await getStore().responseRejected(error);
-
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token');
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token_expires_at');
-      expect(getStore().retryFn).toHaveBeenCalledWith(originalRequest);
-      expect(originalRequest._integrityRetry).toBe(true);
-    });
-
-    it('does NOT retry a second time when the same code repeats after retry flag set', async () => {
-      const originalRequest = {
-        _integrityRetry: true,
-        headers: {},
-        method: 'get',
-        url: '/protected',
-      };
-      const error = {
-        config: originalRequest,
-        response: { status: 401, data: { code: 'INSTALL_TOKEN_EXPIRED' } },
-        message: 'Unauthorized',
-      };
-
-      await expect(getStore().responseRejected(error)).rejects.toEqual(error);
-
-      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
-      expect(getStore().retryFn).not.toHaveBeenCalled();
-    });
-
-    it('does NOT retry repeated 403 UNTRUSTED_INSTALL after retry flag set', async () => {
-      const originalRequest = {
-        _integrityRetry: true,
-        headers: {},
-        method: 'post',
-        url: '/events',
-      };
-      const error = {
-        config: originalRequest,
-        response: { status: 403, data: { code: 'UNTRUSTED_INSTALL' } },
+        config: { headers: {}, method: 'get', url: '/events' },
+        response: { status: 403, data: { success: false, error: 'Forbidden' } },
         message: 'Forbidden',
       };
 
       await expect(getStore().responseRejected(error)).rejects.toEqual(error);
 
       expect(getStore().retryFn).not.toHaveBeenCalled();
-    });
-
-    it('does NOT clear the install token for a generic 403 with no UNTRUSTED_INSTALL code', async () => {
-      const error = {
-        config: { headers: {}, method: 'delete', url: '/events/123' },
-        response: { status: 403, data: { code: 'FORBIDDEN' } },
-        message: 'Forbidden',
-      };
-
-      await expect(getStore().responseRejected(error)).rejects.toEqual(error);
-
-      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
-      expect(getStore().retryFn).not.toHaveBeenCalled();
-    });
-  });
-
-  // ============================================================
-  // Fallback mode — production-incident x-api-key safety net
-  // ============================================================
-  describe('Fallback mode (x-api-key safety net)', () => {
-    // The real integrity.service reads appEnv from this shared mock object;
-    // mutate it per-test and reset afterwards.
-    const extra = (Constants as unknown as { expoConfig: { extra: Record<string, unknown> } })
-      .expoConfig.extra;
-
-    afterEach(() => {
-      setFallbackMode(false);
-      delete extra.appEnv; // back to default (development → bypass mode)
-      setIntegrityFallbackRejectedCallback(() => {});
-    });
-
-    it('attaches x-api-key instead of X-Install-Token in fallback mode', async () => {
-      // Non-bypass build + fallback engaged → resolveIntegrityHeaders picks x-api-key.
-      extra.appEnv = 'production';
-      setFallbackMode(true);
-      mockSecureStore.getItemAsync.mockResolvedValue(null);
-
-      const config = { headers: {}, method: 'get', url: '/events' };
-      const result = await getStore().requestFulfilled(config);
-
-      expect(result.headers['x-api-key']).toBe('test-api-key');
-      expect(result.headers['X-Install-Token']).toBeUndefined();
-    });
-
-    it('does not attach any integrity header on exempt paths even in fallback', async () => {
-      extra.appEnv = 'production';
-      setFallbackMode(true);
-      mockSecureStore.getItemAsync.mockResolvedValue(null);
-
-      const config = { headers: {}, method: 'get', url: '/app/config' };
-      const result = await getStore().requestFulfilled(config);
-
-      expect(result.headers['x-api-key']).toBeUndefined();
-      expect(result.headers['X-Install-Token']).toBeUndefined();
-    });
-
-    it('off-ramps without retrying on 401 INSTALL_TOKEN_MISSING in fallback mode', async () => {
-      extra.appEnv = 'production';
-      setFallbackMode(true);
-
-      const offRamp = jest.fn();
-      setIntegrityFallbackRejectedCallback(offRamp);
-
-      const originalRequest = { headers: {}, method: 'get', url: '/protected' } as Record<
-        string,
-        unknown
-      >;
-      const error = {
-        config: originalRequest,
-        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
-        message: 'Unauthorized',
-      };
-
-      // The handler returns a never-settling promise; fire-and-forget then
-      // assert side effects after a tick.
-      getStore().responseRejected(error);
-      await new Promise((resolve) => setTimeout(resolve, 20));
-
-      expect(offRamp).toHaveBeenCalledTimes(1);
-      // Must NOT retry or clear a token — repeated token-less requests are
-      // recorded as threat violations.
-      expect(getStore().retryFn).not.toHaveBeenCalled();
-      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
-      expect(originalRequest._integrityRetry).toBeUndefined();
-    });
-
-    it('off-ramps every concurrent 401 (no retry) while fallback stays engaged', async () => {
-      // Regression guard: as long as fallbackMode stays true, a burst of 401s
-      // all take the off-ramp — none falls through to the token-less retry loop.
-      extra.appEnv = 'production';
-      setFallbackMode(true);
-      const offRamp = jest.fn();
-      setIntegrityFallbackRejectedCallback(offRamp);
-
-      const makeError = (url: string) => ({
-        config: { headers: {}, method: 'get', url } as Record<string, unknown>,
-        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
-        message: 'Unauthorized',
-      });
-
-      getStore().responseRejected(makeError('/a'));
-      getStore().responseRejected(makeError('/b'));
-      getStore().responseRejected(makeError('/c'));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-
-      expect(offRamp).toHaveBeenCalledTimes(3);
-      expect(getStore().retryFn).not.toHaveBeenCalled();
-      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalledWith('install_token');
-    });
-
-    it('still clears the token and retries on 401 INSTALL_TOKEN_MISSING when NOT in fallback', async () => {
-      setFallbackMode(false);
-      getStore().retryFn.mockResolvedValueOnce({ data: { success: true } });
-
-      const originalRequest = { headers: {}, method: 'get', url: '/protected' } as Record<
-        string,
-        unknown
-      >;
-      const error = {
-        config: originalRequest,
-        response: { status: 401, data: { code: 'INSTALL_TOKEN_MISSING' } },
-        message: 'Unauthorized',
-      };
-
-      await getStore().responseRejected(error);
-
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('install_token');
-      expect(getStore().retryFn).toHaveBeenCalledWith(originalRequest);
-      expect(originalRequest._integrityRetry).toBe(true);
     });
   });
 

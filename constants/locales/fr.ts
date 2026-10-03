@@ -1025,57 +1025,6 @@ const fr: LocaleData = {
   },
 
   // ============================================
-  // Integrity - Vérification d'intégrité de l'app
-  // ============================================
-  integrity: {
-    failed: {
-      title: "Impossible de vérifier l'application",
-      message:
-        "ProtestBase n'a pas pu confirmer que cet appareil exécute une version authentique et non modifiée de l'application. Cela arrive généralement sur les appareils rootés, les installations non officielles ou les émulateurs non pris en charge.",
-      button: 'Réessayer',
-      badge: 'Vérification échouée',
-    },
-    retryable: {
-      title: 'Problème de vérification temporaire',
-      message:
-        "Nous n'avons pas pu terminer la vérification de cet appareil. C'est généralement temporaire — veuillez réessayer dans un moment.",
-      button: 'Réessayer',
-      badge: 'Vérification échouée',
-    },
-    deviceStateUnsupported: {
-      title: "État de sécurité de l'appareil non pris en charge",
-      message:
-        "ProtestBase ne peut pas s'exécuter sur des appareils avec un bootloader déverrouillé, un système d'exploitation non vérifié, ou des certificats d'appareil expirés ou révoqués. Si vous pensez qu'il s'agit d'une erreur, contactez-nous.",
-      badge: 'Appareil bloqué',
-    },
-    appConfig: {
-      title: "Problème de configuration de l'application",
-      message:
-        "Quelque chose dans cette installation est mal configuré — le plus souvent il faut réinstaller l'application depuis le store officiel. Désinstallez puis réinstallez ProtestBase, puis réessayez.",
-      badge: 'Réinstallation nécessaire',
-    },
-    devSetup: {
-      title: 'Configuration développeur requise',
-      message:
-        'EXPO_PUBLIC_DEV_INTEGRITY_BYPASS est manquant dans votre environnement local. Ajoutez-le à .env.local avec la valeur utilisée par le backend, puis redémarrez Metro.',
-      button: 'Réessayer',
-      badge: 'Configuration requise',
-    },
-    unsupportedDevice: {
-      title: "Cet appareil n'est pas pris en charge",
-      message:
-        'ProtestBase utilise des fonctions de sécurité matérielles qui ne sont pas disponibles sur cet appareil. iOS 14 ou Android 9 (ou plus récent) est requis.',
-      badge: 'Appareil non pris en charge',
-    },
-    updateRequired: {
-      title: 'Veuillez mettre à jour ProtestBase',
-      message:
-        "Cette version de ProtestBase ne peut plus se connecter. Veuillez installer la dernière version depuis l'App Store ou Google Play pour continuer à utiliser l'application.",
-      badge: 'Mise à jour requise',
-    },
-  },
-
-  // ============================================
   // Form - Form validation & messages
   // ============================================
   form: {

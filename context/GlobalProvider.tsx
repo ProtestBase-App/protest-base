@@ -340,10 +340,9 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
         fetched = await bootstrap.result;
       } catch (error) {
         // A speculative fetch runs before /app/config has confirmed the API
-        // prefix and before the integrity gate has attested, so a non-network
-        // rejection (stale prefix → 404, install token → 401) can just mean
-        // "too early". Retry once now that both have resolved. A network
-        // failure would only fail again, so that one is adopted as final.
+        // prefix, so a non-network rejection (stale prefix → 404) can just mean
+        // "too early". Retry once now that it has resolved. A network failure
+        // would only fail again, so that one is adopted as final.
         if (!bootstrap.speculative || isNetworkError(error)) throw error;
         logger.warn('[GlobalProvider] Speculative events fetch failed; retrying', {
           error: error instanceof Error ? error.message : String(error),

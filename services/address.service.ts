@@ -35,7 +35,7 @@ function isCanceled(error: unknown): boolean {
 /**
  * Search BE/NL addresses via the backend Photon proxy. Mirrors `getEventsBackend`'s
  * GET pattern; the shared Axios interceptor already attaches `Authorization: Bearer`
- * + `X-Install-Token`, so the auth-gated route works with no extra work here.
+ * + `x-api-key`, so the auth-gated route works with no extra work here.
  *
  * Privacy: the query is never logged (the backend doesn't log it either).
  *

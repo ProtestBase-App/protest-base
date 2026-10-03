@@ -22,8 +22,6 @@ import { UserOrganizationsProvider } from '@/context/UserOrganizationsProvider';
 import { ExploreTabProvider } from '@/context/ExploreTabProvider';
 import { VersionCheckProvider } from '@/context/VersionCheckProvider';
 import { VersionGate } from '@/components/version';
-import { IntegrityProvider } from '@/context/IntegrityProvider';
-import { IntegrityGate } from '@/components/integrity';
 import { ConnectionGate, OfflineBanner } from '@/components/connection';
 import { ConnectivityProvider } from '@/context/ConnectivityProvider';
 import { NotificationsBootstrap } from '@/components/NotificationsBootstrap';
@@ -93,61 +91,51 @@ export default function RootLayout() {
           {/* Provides the modal host for @gorhom/bottom-sheet filter sheets;
             pure UI context, so it wraps the data providers harmlessly. */}
           <BottomSheetModalProvider>
-            {/* Starts the events fetch here, outside the gates below: both render
-                a spinner instead of their children while their own request is in
-                flight, so GlobalProvider would otherwise not even mount — let
-                alone fetch — until /app/config and the integrity handshake are
-                done. */}
+            {/* Starts the events fetch here, outside VersionGate: it renders a
+                spinner instead of its children while /app/config is in flight, so
+                GlobalProvider would otherwise not even mount — let alone fetch —
+                until the version check is done. */}
             <EventsPrefetch />
             {/* VersionCheckProvider MUST be outermost - before GlobalProvider */}
             {/* This ensures version check happens BEFORE authentication */}
             <VersionCheckProvider>
               <VersionGate>
-                {/* IntegrityGate runs after the version check (which uses /app/config */}
-                {/* on the bootstrap path) but before GlobalProvider so the install token */}
-                {/* exists for every authenticated request. */}
-                <IntegrityProvider>
-                  <IntegrityGate>
-                    <GlobalProvider>
-                      <ConnectionGate>
-                        <ConnectivityProvider>
-                          <UserOrganizationsProvider>
-                            <SavedEventsProvider>
-                              <LikedEventsProvider>
-                                <FollowedOrgsProvider>
-                                  <PastEventsProvider>
-                                    <TemplatesProvider>
-                                      <OrganizationsProvider>
-                                        <PostalCodeProvider>
-                                          <HomeAreaProvider>
-                                            <ThemeProvider
-                                              value={
-                                                colorScheme === 'dark' ? DarkTheme : DefaultTheme
-                                              }
-                                            >
-                                              <ExploreTabProvider>
-                                                <NotificationsBootstrap />
-                                                <RootNavigator />
-                                                <OfflineBanner />
-                                                <StatusBar
-                                                  style={colorScheme === 'dark' ? 'light' : 'dark'}
-                                                />
-                                              </ExploreTabProvider>
-                                            </ThemeProvider>
-                                          </HomeAreaProvider>
-                                        </PostalCodeProvider>
-                                      </OrganizationsProvider>
-                                    </TemplatesProvider>
-                                  </PastEventsProvider>
-                                </FollowedOrgsProvider>
-                              </LikedEventsProvider>
-                            </SavedEventsProvider>
-                          </UserOrganizationsProvider>
-                        </ConnectivityProvider>
-                      </ConnectionGate>
-                    </GlobalProvider>
-                  </IntegrityGate>
-                </IntegrityProvider>
+                <GlobalProvider>
+                  <ConnectionGate>
+                    <ConnectivityProvider>
+                      <UserOrganizationsProvider>
+                        <SavedEventsProvider>
+                          <LikedEventsProvider>
+                            <FollowedOrgsProvider>
+                              <PastEventsProvider>
+                                <TemplatesProvider>
+                                  <OrganizationsProvider>
+                                    <PostalCodeProvider>
+                                      <HomeAreaProvider>
+                                        <ThemeProvider
+                                          value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+                                        >
+                                          <ExploreTabProvider>
+                                            <NotificationsBootstrap />
+                                            <RootNavigator />
+                                            <OfflineBanner />
+                                            <StatusBar
+                                              style={colorScheme === 'dark' ? 'light' : 'dark'}
+                                            />
+                                          </ExploreTabProvider>
+                                        </ThemeProvider>
+                                      </HomeAreaProvider>
+                                    </PostalCodeProvider>
+                                  </OrganizationsProvider>
+                                </TemplatesProvider>
+                              </PastEventsProvider>
+                            </FollowedOrgsProvider>
+                          </LikedEventsProvider>
+                        </SavedEventsProvider>
+                      </UserOrganizationsProvider>
+                    </ConnectivityProvider>
+                  </ConnectionGate>
+                </GlobalProvider>
               </VersionGate>
             </VersionCheckProvider>
           </BottomSheetModalProvider>

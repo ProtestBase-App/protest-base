@@ -12,7 +12,6 @@ jest.mock('@/services/api', () => ({
     },
   },
   setApiPrefix: jest.fn().mockResolvedValue(undefined),
-  getApiPrefix: jest.fn().mockReturnValue(''),
   API_BASE_URL: 'http://test',
 }));
 

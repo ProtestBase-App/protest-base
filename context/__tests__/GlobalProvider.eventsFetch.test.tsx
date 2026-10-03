@@ -2,7 +2,7 @@
  * GlobalProvider — launch events fetch
  *
  * Covers how the provider adopts the fetch that eventsBootstrap starts ahead of
- * the version/integrity gates. eventsBootstrap is mocked here (unlike in
+ * the version gate. eventsBootstrap is mocked here (unlike in
  * GlobalProvider.test.tsx, which drives the real one through the API boundary)
  * so the speculative-failure paths can be produced deterministically.
  */
@@ -143,8 +143,8 @@ describe('GlobalProvider launch events fetch', () => {
   });
 
   it('retries once when the speculative request fails for a non-network reason', async () => {
-    // What a stale API prefix (404) or a not-yet-attested install token (401)
-    // looks like: the request was simply issued too early.
+    // What a stale API prefix (404) looks like: the request was simply issued
+    // too early.
     mockClaimEventsFetch.mockReturnValue(
       bootstrap({
         result: Promise.reject(new Error('Request failed with status code 404')),
