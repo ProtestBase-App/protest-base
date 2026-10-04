@@ -9,14 +9,18 @@ import React, {
   useRef,
 } from 'react';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
+import { isLuxembourgEnabled } from '@/utils/featureFlags';
 import { logger } from '@/utils/logger';
 import {
   buildLocationFilterOptions,
+  buildLocationMatch,
   expandLocationTokens,
   isLocationSelectionTooBroad,
   resolveLocationLabel,
   type Lang,
   type LocationFilterOption,
+  type LocationMatch,
 } from '@/utils/locationFilterOptions';
 
 export type Country = 'belgium' | 'netherlands';
@@ -53,6 +57,8 @@ interface PostalCodeContextType {
   resolveLocationLabel: (value: string) => string;
   /** True when a selection would expand past the backend-safe postal-code limit. */
   isLocationSelectionTooBroad: (values: string[]) => boolean;
+  /** Prepare a selection for matching events on the device (country-scoped, like the server). */
+  buildLocationMatch: (values: string[]) => LocationMatch;
 }
 
 const PostalCodeContext = createContext<PostalCodeContextType>({
@@ -65,6 +71,11 @@ const PostalCodeContext = createContext<PostalCodeContextType>({
   expandLocationTokens: () => ({ codes: [], truncated: false }),
   resolveLocationLabel: (value) => value,
   isLocationSelectionTooBroad: () => false,
+  buildLocationMatch: () => ({
+    codesByCountry: new Map(),
+    wholeCountries: new Set(),
+    rawCodes: new Set(),
+  }),
 });
 
 interface PostalCodeProviderProps {
@@ -82,9 +93,33 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
   const [cacheVersion, setCacheVersion] = useState(0);
   // Ref-tracked so we can no-op without triggering a dependency change.
   const loadedCountriesRef = useRef<Set<Country>>(new Set());
+  // Luxembourg areas feed only the location options; display uses the stored city.
+  const [luxembourgAreas, setLuxembourgAreas] = useState<{
+    cantons: LuxembourgCanton[];
+    communes: LuxembourgCommune[];
+  } | null>(null);
+  const luxembourgRequestedRef = useRef(false);
 
   const loadPostalCodesForCountry = useCallback(
     async (country: string) => {
+      if (country === 'luxembourg') {
+        // Never touch the shared loading flag while Luxembourg is off.
+        if (!isLuxembourgEnabled() || luxembourgRequestedRef.current) return;
+        luxembourgRequestedRef.current = true;
+        setLoading(true);
+        try {
+          const module = await import('@/constants/PostalCodes_LU');
+          setLuxembourgAreas({ cantons: module.LU_CANTONS, communes: module.LU_COMMUNES });
+          setCacheVersion((v) => v + 1);
+        } catch (error) {
+          luxembourgRequestedRef.current = false;
+          logger.error('Failed to load postal codes for country:', { country, error });
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       if (!isValidCountry(country)) {
         return;
       }
@@ -136,6 +171,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
         await Promise.all([
           loadPostalCodesForCountry('belgium'),
           loadPostalCodesForCountry('netherlands'),
+          loadPostalCodesForCountry('luxembourg'),
         ]);
       } catch (error) {
         logger.error('Failed to preload postal codes:', { error });
@@ -194,9 +230,10 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
     return buildLocationFilterOptions({
       belgiumRows: postalCodesCache.belgium,
       netherlandsRows: postalCodesCache.netherlands,
+      luxembourg: luxembourgAreas ?? undefined,
       lang,
     });
-  }, [postalCodesCache, userLanguage]);
+  }, [postalCodesCache, luxembourgAreas, userLanguage]);
 
   const resolveRawCode = useCallback(
     (code: string): string => {
@@ -222,6 +259,11 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
     [locationData]
   );
 
+  const buildLocationMatchCb = useCallback(
+    (values: string[]) => buildLocationMatch(values, locationData.tokenToCodes),
+    [locationData]
+  );
+
   const contextValue = useMemo(
     () => ({
       getSubMunicipalityName,
@@ -233,6 +275,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       expandLocationTokens: expandLocationTokensCb,
       resolveLocationLabel: resolveLocationLabelCb,
       isLocationSelectionTooBroad: isLocationSelectionTooBroadCb,
+      buildLocationMatch: buildLocationMatchCb,
     }),
     [
       getSubMunicipalityName,
@@ -244,6 +287,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       expandLocationTokensCb,
       resolveLocationLabelCb,
       isLocationSelectionTooBroadCb,
+      buildLocationMatchCb,
     ]
   );
 

@@ -1,4 +1,6 @@
 import { logger } from '@/utils/logger';
+import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
+import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
 
 /**
  * Administrative-hierarchy location options for the /explore filter.
@@ -8,10 +10,12 @@ import { logger } from '@/utils/logger';
  *
  *   - Belgium: region (3) -> province (10) -> municipality (578)
  *   - Netherlands: province (12) -> sub-municipality (351)
+ *   - Luxembourg, while selectable: country (1) -> canton (12) -> commune (100)
  *
- * Selecting an area filters by ALL of its member postal codes. Tokens are
- * resolved back to postal codes by {@link expandLocationTokens} before the
- * request reaches the backend, which already accepts the comma-joined list.
+ * Selecting an area filters by ALL of its member postal codes. Explore sends the
+ * tokens themselves as `areas` and the backend expands them per country;
+ * {@link expandLocationTokens} remains for the legacy `postalCodes` request, and
+ * {@link buildLocationMatch} applies the same rule to events on the device.
  *
  * Token scheme (collision-free, verified against the bundled datasets):
  *
@@ -20,9 +24,12 @@ import { logger } from '@/utils/logger';
  *   p:nl:<slug>     NL province   e.g. p:nl:zuid-holland
  *   m:be:<minCode>  municipality  e.g. m:be:7500  (Tournai)
  *   m:nl:<minCode>  sub-municip.  e.g. m:nl:1011
+ *   c:lu            LU country    (matches on the country alone)
+ *   p:lu:<slug>     LU canton     e.g. p:lu:esch-sur-alzette
+ *   m:lu:<slug>     LU commune    e.g. m:lu:kaerjeng
  *
- * Municipalities/sub-municipalities are keyed by the minimum member postal
- * code. The postal-code -> municipality partition is byte-identical across the
+ * BE/NL municipalities/sub-municipalities are keyed by the minimum member postal
+ * code; LU communes by slug, because some LU codes belong to two communes. The postal-code -> municipality partition is byte-identical across the
  * three Belgian language files, so the min-code token is language-independent
  * and these options can be built from whichever single BE file is loaded at
  * runtime.
@@ -32,7 +39,7 @@ import { logger } from '@/utils/logger';
  */
 
 export type Lang = 'en' | 'fr' | 'nl';
-export type LocationTier = 'region' | 'province' | 'municipality';
+export type LocationTier = 'country' | 'region' | 'province' | 'municipality';
 
 export interface LocationFilterOption {
   /** Hierarchy token (see token scheme above). */
@@ -63,12 +70,28 @@ export interface LocationFilterData {
 }
 
 /**
- * Maximum comma-joined postal-code length we allow a single explore request to
- * carry. The backend caps the param at 4000 chars; we guard below it so any
- * single region/province (Wallonia, the largest, ~615 codes ~3,075 chars)
- * passes while multi-region stacking is blocked client-side.
+ * Maximum comma-joined postal-code length we allow a legacy `postalCodes`
+ * request to carry. The backend caps that param at 4000 chars; we guard below
+ * it so any single region/province (Wallonia, the largest, ~615 codes ~3,075
+ * chars) passes. Selections sent as `areas` tokens are not subject to it.
  */
 export const BACKEND_SAFE_LIMIT = 3800;
+
+/**
+ * An area token as the backend's `areas` filter accepts it (mirror of the
+ * backend grammar). Anything else, e.g. a raw postal code from older saved
+ * state, turns the whole `areas` request into a 400.
+ */
+export const AREA_TOKEN_PATTERN =
+  /^(c:(be|nl|lu)|r:be:[a-z0-9-]+|p:(be|nl|lu):[a-z0-9-]+|m:(be|nl):\d{1,4}|m:lu:[a-z0-9-]+)$/;
+export const MAX_AREA_TOKENS = 50;
+export const MAX_AREA_TOKEN_LENGTH = 64;
+
+const TOKEN_COUNTRY: Record<string, string> = {
+  be: 'belgium',
+  nl: 'netherlands',
+  lu: 'luxembourg',
+};
 
 // ---------------------------------------------------------------------------
 // Curated trilingual tables
@@ -152,7 +175,27 @@ const NL_PROVINCE_SLUG: Record<string, string> = {
   Zeeland: 'zeeland',
 };
 
-const TIER_RANK: Record<LocationTier, number> = { region: 0, province: 1, municipality: 2 };
+// Luxembourg, once selectable, is also a country, a canton and a commune; these
+// labels keep its rows apart from each other and from the Belgian province.
+const BE_LUXEMBOURG_PROVINCE_QUALIFIED: Record<Lang, string> = {
+  en: 'Luxembourg (Belgium)',
+  fr: 'Luxembourg (Belgique)',
+  nl: 'Luxemburg (België)',
+};
+const LU_COUNTRY_LABEL: Record<Lang, string> = {
+  en: 'Luxembourg (country)',
+  fr: 'Luxembourg (pays)',
+  nl: 'Luxemburg (land)',
+};
+const LU_CANTON_PREFIX: Record<Lang, string> = { en: 'Canton', fr: 'Canton', nl: 'Kanton' };
+const LU_CANTON_NAME_NL: Record<string, string> = { luxembourg: 'Luxemburg' };
+
+const TIER_RANK: Record<LocationTier, number> = {
+  country: 0,
+  region: 1,
+  province: 2,
+  municipality: 3,
+};
 
 /** Locate a field by prefix (handles the per-language `*_english/_french/_dutch` suffixes). */
 function findKey(row: Record<string, unknown>, prefix: string): string | undefined {
@@ -162,6 +205,8 @@ function findKey(row: Record<string, unknown>, prefix: string): string | undefin
 interface BuildParams {
   belgiumRows?: Record<string, unknown>[];
   netherlandsRows?: Record<string, unknown>[];
+  /** Luxembourg areas; only passed while Luxembourg is selectable. */
+  luxembourg?: { cantons: LuxembourgCanton[]; communes: LuxembourgCommune[] };
   lang: Lang;
 }
 
@@ -172,6 +217,7 @@ interface BuildParams {
 export function buildLocationFilterOptions({
   belgiumRows,
   netherlandsRows,
+  luxembourg,
   lang,
 }: BuildParams): LocationFilterData {
   const tokenToCodes = new Map<string, string[]>();
@@ -248,13 +294,18 @@ export function buildLocationFilterOptions({
     for (const [slug, codes] of regionCodes) {
       register(`r:be:${slug}`, BE_REGION_LABEL[slug]?.[lang] ?? slug, 'region', codes);
     }
+    const beProvinceLabel = (slug: string) =>
+      slug === 'luxembourg' && luxembourg
+        ? BE_LUXEMBOURG_PROVINCE_QUALIFIED[lang]
+        : (BE_PROVINCE_LABEL[slug]?.[lang] ?? slug);
+
     for (const [slug, codes] of provCodes) {
-      register(`p:be:${slug}`, BE_PROVINCE_LABEL[slug]?.[lang] ?? slug, 'province', codes);
+      register(`p:be:${slug}`, beProvinceLabel(slug), 'province', codes);
     }
     for (const [muni, codes] of muniCodes) {
       const minCode = Math.min(...codes);
       const provSlug = muniProvinceSlug.get(muni);
-      const provLabel = provSlug ? (BE_PROVINCE_LABEL[provSlug]?.[lang] ?? '') : '';
+      const provLabel = provSlug ? beProvinceLabel(provSlug) : '';
       register(`m:be:${minCode}`, muni, 'municipality', codes, provLabel);
     }
   }
@@ -305,6 +356,39 @@ export function buildLocationFilterOptions({
     }
   }
 
+  if (luxembourg && luxembourg.communes.length > 0) {
+    const cantonLabel = (slug: string) => {
+      const name = luxembourg.cantons.find((canton) => canton.slug === slug)?.name ?? slug;
+      return `${LU_CANTON_PREFIX[lang]} ${lang === 'nl' ? (LU_CANTON_NAME_NL[slug] ?? name) : name}`;
+    };
+    const countryCodes = new Set<number>();
+    const cantonCodes = new Map<string, Set<number>>();
+    for (const commune of luxembourg.communes) {
+      if (!cantonCodes.has(commune.canton)) cantonCodes.set(commune.canton, new Set());
+      for (const code of commune.codes) {
+        countryCodes.add(code);
+        cantonCodes.get(commune.canton)!.add(code);
+      }
+    }
+
+    // c:lu matches on the country alone; its codes only feed the count and the
+    // legacy fallback, which is too broad for them and so never sends.
+    register('c:lu', LU_COUNTRY_LABEL[lang], 'country', countryCodes);
+    for (const canton of luxembourg.cantons) {
+      const codes = cantonCodes.get(canton.slug);
+      if (codes) register(`p:lu:${canton.slug}`, cantonLabel(canton.slug), 'province', codes);
+    }
+    for (const commune of luxembourg.communes) {
+      register(
+        `m:lu:${commune.slug}`,
+        commune.name,
+        'municipality',
+        new Set(commune.codes),
+        cantonLabel(commune.canton)
+      );
+    }
+  }
+
   options.sort((a, b) => {
     if (TIER_RANK[a.tier] !== TIER_RANK[b.tier]) return TIER_RANK[a.tier] - TIER_RANK[b.tier];
     return a.label.localeCompare(b.label);
@@ -342,15 +426,90 @@ export function expandLocationTokens(
   return { codes, truncated: joinedLength(codes) > BACKEND_SAFE_LIMIT };
 }
 
+/** True when the selection can go to the backend as `areas`: only tokens, within its limits. */
+export function isAreaTokenSelection(values: string[]): boolean {
+  return (
+    values.length > 0 &&
+    values.length <= MAX_AREA_TOKENS &&
+    values.every((value) => value.length <= MAX_AREA_TOKEN_LENGTH && AREA_TOKEN_PATTERN.test(value))
+  );
+}
+
 /**
- * True when the selection would expand past the safe limit. Used by the filter
- * screen to block over-broad selections before any request is fired.
+ * True when the selection can only go out as a postal-code list and that list
+ * would pass the safe limit. Used by the filter screens to block over-broad
+ * selections before any request is fired.
  */
 export function isLocationSelectionTooBroad(
   values: string[],
   tokenToCodes: Map<string, string[]>
 ): boolean {
+  if (isAreaTokenSelection(values)) return false;
   return expandLocationTokens(values, tokenToCodes).truncated;
+}
+
+/** A location selection prepared for matching events on the device. */
+export interface LocationMatch {
+  /** Member postal codes per canonical country, from area tokens. */
+  codesByCountry: Map<string, Set<string>>;
+  /** Countries selected whole (`c:*` tokens). */
+  wholeCountries: Set<string>;
+  /** Raw postal codes from older saved state; they carry no country. */
+  rawCodes: Set<string>;
+}
+
+/**
+ * Prepare a selection for {@link matchesLocationFilter}. Unknown tokens add
+ * nothing, so they match no event, as on the server.
+ */
+export function buildLocationMatch(
+  values: string[],
+  tokenToCodes: Map<string, string[]>
+): LocationMatch {
+  const match: LocationMatch = {
+    codesByCountry: new Map(),
+    wholeCountries: new Set(),
+    rawCodes: new Set(),
+  };
+  for (const value of values) {
+    if (!AREA_TOKEN_PATTERN.test(value)) {
+      match.rawCodes.add(value);
+      continue;
+    }
+    const [tier, countryCode] = value.split(':');
+    const country = TOKEN_COUNTRY[countryCode];
+    if (tier === 'c') {
+      match.wholeCountries.add(country);
+      continue;
+    }
+    const codes = tokenToCodes.get(value);
+    if (!codes) continue;
+    if (!match.codesByCountry.has(country)) match.codesByCountry.set(country, new Set());
+    const countryCodes = match.codesByCountry.get(country)!;
+    for (const code of codes) countryCodes.add(code);
+  }
+  return match;
+}
+
+/**
+ * The backend's `areas` rule, applied on the device: the event's country must be
+ * the token's country, and its postcode one of the area's codes (a whole-country
+ * token needs no postcode). Events without a recognised country never match a
+ * token. Raw postal codes keep their legacy meaning: the code, in any country.
+ */
+export function matchesLocationFilter(
+  event: { country?: string | null; postal_code?: string | number | null },
+  match: LocationMatch
+): boolean {
+  const code =
+    event.postal_code === null || event.postal_code === undefined
+      ? null
+      : normalizeEventPostcode(event.postal_code);
+  if (code && match.rawCodes.has(code)) return true;
+  const country = canonicalCountry(event.country);
+  if (!country) return false;
+  if (match.wholeCountries.has(country)) return true;
+  return code !== null && (match.codesByCountry.get(country)?.has(code) ?? false);
 }
 
 /**

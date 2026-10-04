@@ -92,6 +92,7 @@ export interface MockPostalCodeContext {
   expandLocationTokens?: jest.Mock;
   resolveLocationLabel?: jest.Mock;
   isLocationSelectionTooBroad?: jest.Mock;
+  buildLocationMatch?: jest.Mock;
 }
 
 export interface MockHomeAreaContext {
@@ -256,6 +257,11 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
   expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
   resolveLocationLabel: jest.fn((value: string) => value),
   isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+  buildLocationMatch: jest.fn().mockReturnValue({
+    codesByCountry: new Map(),
+    wholeCountries: new Set(),
+    rawCodes: new Set(),
+  }),
 };
 
 const defaultHomeAreaContext: Required<MockHomeAreaContext> = {

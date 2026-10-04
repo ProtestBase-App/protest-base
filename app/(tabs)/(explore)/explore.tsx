@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { StyleSheet, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,6 +32,7 @@ import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { FormattedEventListItem } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
 
 function LoadingFooter() {
   return (
@@ -82,14 +83,6 @@ export default function ExploreTab() {
   // changes when the Belgium-TZ day flips.
   const todayKey = getTodayDateKeyInBelgium();
 
-  // Hierarchy tokens (e.g. r:be:brussels) are expanded to their member postal
-  // codes here; the backend receives the comma-joined code list. Raw codes pass
-  // through unchanged.
-  const expandedPostalCodes = useMemo(
-    () => expandLocationTokens(appliedFilters.locations).codes,
-    [expandLocationTokens, appliedFilters.locations]
-  );
-
   const {
     events: displayedEvents,
     loading,
@@ -102,9 +95,12 @@ export default function ExploreTab() {
   } = useExplorePagination({
     pageSize: 20,
     isOffline,
+    // Hierarchy tokens (e.g. r:be:brussels) go to the backend as `areas`; the
+    // expander only serves the legacy postal-code fallback.
+    expandLocations: expandLocationTokens,
     filters: {
       dateFilter: appliedFilters.dateFilter,
-      postalCodes: expandedPostalCodes,
+      locations: appliedFilters.locations,
       organizers: appliedFilters.organizations,
       category: appliedFilters.category,
       search: searchQuery,
@@ -225,10 +221,7 @@ export default function ExploreTab() {
         event = await getEventByIdBackend(eventId);
       }
 
-      const cityLabel =
-        event.postal_code && event.country
-          ? getSubMunicipalityNameRef.current(String(event.postal_code), event.country, event.city)
-          : undefined;
+      const cityLabel = resolveEventCityLabel(event, getSubMunicipalityNameRef.current);
 
       await shareEventWithAlert(event, userLanguageRef.current, cityLabel);
     } catch (err) {
@@ -262,10 +255,7 @@ export default function ExploreTab() {
         help_needed: item.help_needed,
       };
 
-      const cityLabel =
-        item.postal_code && item.country
-          ? getSubMunicipalityNameRef.current(String(item.postal_code), item.country, item.city)
-          : '';
+      const cityLabel = resolveEventCityLabel(item, getSubMunicipalityNameRef.current);
 
       return (
         <ExploreEventCard

@@ -19,6 +19,7 @@ import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { isEventOngoing } from '@/utils/eventStatus';
 import { isNetworkError } from '@/utils/networkError';
 import { logger } from '@/utils/logger';
+import { isAreaTokenSelection } from '@/utils/locationFilterOptions';
 
 export type {
   Event,
@@ -46,6 +47,11 @@ export interface EventFilterParams {
   dateFilter?: 'today' | 'tomorrow' | 'thisWeek' | 'thisWeekend' | 'thisMonth';
   /** Array of postal codes to filter by (will be sent as comma-separated string) */
   postalCodes?: string[];
+  /**
+   * Area tokens (e.g. r:be:brussels), sent as one comma-separated string; the
+   * backend expands them per country. Never combined with `postalCodes` (400).
+   */
+  areas?: string[];
   /** Array of organization IDs to filter by (will be sent as comma-separated string) */
   organizers?: string[];
   /** Category filter: 'Protest', 'Act', 'Learn', 'Support', 'Strike' */
@@ -74,6 +80,8 @@ export interface EventsPageResponse {
    * with `ifNoneMatch`.
    */
   notModified?: boolean;
+  /** The filters the backend applied. A backend that predates `areas` never lists it. */
+  filters_applied?: Record<string, unknown>;
 }
 
 /**
@@ -131,6 +139,7 @@ export async function getEventsBackend(
       offset = 0,
       dateFilter,
       postalCodes,
+      areas,
       organizers,
       category,
       search,
@@ -145,6 +154,7 @@ export async function getEventsBackend(
       offset,
       dateFilter,
       postalCodes,
+      areas,
       organizers,
       category,
       search,
@@ -168,6 +178,10 @@ export async function getEventsBackend(
 
     if (postalCodes && postalCodes.length > 0) {
       params.postalCodes = postalCodes.join(',');
+    }
+
+    if (areas && areas.length > 0) {
+      params.areas = areas.join(',');
     }
 
     if (organizers && organizers.length > 0) {
@@ -250,6 +264,41 @@ export async function getEventsBackend(
     }
     throw new Error(error.response?.data?.error || error.message || 'Failed to fetch events');
   }
+}
+
+/** A selection that can only go out as postal codes, and too many of them for the backend. */
+export class LocationSelectionTooBroadError extends Error {
+  constructor() {
+    super('Location selection is too broad');
+    this.name = 'LocationSelectionTooBroadError';
+  }
+}
+
+/**
+ * An events page filtered by an explore location selection. Area tokens go out
+ * as `areas`, which the backend matches per country. The legacy `postalCodes`
+ * list is used instead when the selection holds raw postal codes, or when the
+ * backend predates `areas`: such a backend drops the param and returns the
+ * unfiltered feed, which shows as a `filters_applied` without `areas`.
+ *
+ * @throws {LocationSelectionTooBroadError} when the postal-code list would pass the backend cap.
+ */
+export async function getEventsForLocations(
+  filters: EventFilterParams,
+  locations: string[],
+  expandToPostalCodes: (values: string[]) => { codes: string[]; truncated: boolean }
+): Promise<EventsPageResponse> {
+  if (locations.length === 0) return getEventsBackend(filters);
+
+  if (isAreaTokenSelection(locations)) {
+    const response = await getEventsBackend({ ...filters, areas: locations });
+    if (response.filters_applied && 'areas' in response.filters_applied) return response;
+    logger.info('[EventService] Backend ignored areas; retrying with postal codes');
+  }
+
+  const { codes, truncated } = expandToPostalCodes(locations);
+  if (truncated) throw new LocationSelectionTooBroadError();
+  return getEventsBackend({ ...filters, postalCodes: codes });
 }
 
 /**

@@ -185,12 +185,12 @@ describe('MapFiltersSheet', () => {
       // Arrange — one Belgian event and one Dutch event so buildCountryOptions yields two chips.
       const belgianEvent = createMockEvent({
         country: 'belgium',
-        postal_code: 1000,
+        postal_code: '1000',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
       const dutchEvent = createMockEvent({
         country: 'netherlands',
-        postal_code: 1234,
+        postal_code: '1234',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
 

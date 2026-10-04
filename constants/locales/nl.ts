@@ -632,6 +632,8 @@ const nl = {
     selectCountry: 'Selecteer een land',
     postalCodePlaceholder: 'Postcode',
     searchPostalCode: 'Zoek op postcode of gemeente...',
+    localityLabel: 'Plaats',
+    searchLocality: 'Zoek een plaats...',
     searchNoResults: 'Geen resultaten',
     searchMinLength: 'Typ minstens {{count}} tekens',
     streetAddressPlaceholder: 'Straat en huisnummer',
@@ -660,6 +662,7 @@ const nl = {
     endTimeHelper: 'Laat leeg als de duur van het evenement flexibel is',
     locationHelper:
       'Begin met het adres — de postcode wordt automatisch ingevuld. Je kunt deze ook handmatig instellen.',
+    locationHelperLu: 'Zoek het adres, of kies hieronder de plaats.',
     imageHelper: 'Voeg tot 5 afbeeldingen toe — de eerste is de omslagfoto van je evenement',
     eventLinkHelper: 'Deel een link naar je evenementpagina, inschrijfformulier of meer informatie',
     coOrganizersHelper: 'Organisaties die samenwerken aan dit evenement',

@@ -64,7 +64,7 @@ const mockEvent: Event = {
   city: 'Brussels',
   street_address: '123 Main St',
   country: 'belgium',
-  postal_code: 1000,
+  postal_code: '1000',
   categories: ['Climate'],
   image: 'https://example.com/image.jpg',
   help_needed: false,
@@ -159,6 +159,17 @@ describe('ExploreEventCard', () => {
     const helpEvent = { ...mockEvent, help_needed: true };
     render(<ExploreEventCard {...defaultProps} event={helpEvent} />);
     expect(screen.getByText('Help Needed')).toBeTruthy();
+  });
+
+  it('shows the city without a trailing comma when there is no postal code', () => {
+    render(
+      <ExploreEventCard
+        {...defaultProps}
+        event={{ ...defaultProps.event, postal_code: null }}
+        cityLabel="Arlon"
+      />
+    );
+    expect(screen.getByText('Arlon')).toBeTruthy();
   });
 
   it('does not show city row when cityLabel is empty', () => {

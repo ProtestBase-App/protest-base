@@ -24,6 +24,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
 
 // Matches common URL patterns, with or without protocol/www.
 const URL_REGEX =
@@ -117,15 +118,7 @@ export default function EditEvent() {
   // Populate form once event data is available.
   useEffect(() => {
     if (eventDetail && eventDetail.length > 0) {
-      let postalCode = null;
-      if (eventDetail[0].postal_code) {
-        postalCode =
-          typeof eventDetail[0].postal_code === 'number'
-            ? eventDetail[0].postal_code
-            : parseInt(eventDetail[0].postal_code);
-
-        if (isNaN(postalCode)) postalCode = null;
-      }
+      const postalCode = toPostalCodeString(eventDetail[0].postal_code);
 
       wasAllDayRef.current = eventDetail[0].all_day === true;
 
@@ -248,6 +241,7 @@ export default function EditEvent() {
     try {
       // co_organizers holds org IDs (the dropdown values) — sent through as-is.
       const finalCoOrganizers = form.co_organizers?.length ? form.co_organizers : undefined;
+      const locationUpdate = buildLocationUpdate(form, initialFormRef.current);
 
       // organizer_name is intentionally not sent — it's tied to the creator.
       await updateEvent(eventId, {
@@ -255,15 +249,13 @@ export default function EditEvent() {
         description: form.description,
         start_time: form.start_time,
         end_time: form.end_time || undefined,
-        street_address: form.street_address || undefined,
-        city: form.city || undefined,
-        region: form.region || undefined,
-        country: form.country || undefined,
-        postal_code: form.postal_code || undefined,
+        // Emptied fields go as '' (clear); untouched blank ones are omitted.
+        ...locationUpdate,
         // Re-picking the street this session adopts the confirmed pin (healing a
-        // stale/wrong one); omitted when the street wasn't re-picked.
-        geocod_lat: form.geocod_lat ?? undefined,
-        geocod_lng: form.geocod_lng ?? undefined,
+        // stale/wrong one); omitted when the street wasn't re-picked or is cleared.
+        ...(locationUpdate.street_address
+          ? { geocod_lat: form.geocod_lat ?? undefined, geocod_lng: form.geocod_lng ?? undefined }
+          : {}),
         // Authoritative full ordered list (kept URLs + new files); an emptied
         // list is an explicit removal of every image.
         images: form.images.length ? form.images : null,

@@ -154,7 +154,7 @@ function ExploreEventCard({
             <ThemedView style={styles.metadataRow}>
               <IconSymbol name="map" size={16} color={colors.icon} />
               <ThemedText type="cardMetadata" style={{ color: colors.text }}>
-                {cityLabel}, {event.postal_code}
+                {[cityLabel, event.postal_code].filter(Boolean).join(', ')}
               </ThemedText>
             </ThemedView>
           )}

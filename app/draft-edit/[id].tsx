@@ -37,6 +37,7 @@ import { allDaySubmitField } from '@/utils/eventFormatters';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
 
 // Matches common URL patterns, with or without protocol/www.
 const URL_REGEX =
@@ -125,7 +126,9 @@ export default function DraftEdit() {
             website_url: event.website_url || '',
             categories: event.categories?.[0] ?? '',
             disclaimer: event.disclaimer || '',
-            postal_code: typeof event.postal_code === 'number' ? event.postal_code : null,
+            // The API sends postcodes as strings; dropping them here would turn every
+            // save into a clear now that emptied fields are sent as ''.
+            postal_code: toPostalCodeString(event.postal_code),
             co_organizers: event.co_organizers || [],
             help_needed: event.help_needed || false,
             help_description: event.help_description || '',
@@ -190,20 +193,19 @@ export default function DraftEdit() {
   // Build the partial update payload from the current form (empty optionals omitted).
   const buildDraftPatch = useCallback((): UpdateEventRequest => {
     const finalCoOrganizers = form.co_organizers?.length ? form.co_organizers : undefined;
+    const locationUpdate = buildLocationUpdate(form, initialFormRef.current);
     return {
       title: form.title || undefined,
       description: form.description || undefined,
       start_time: form.start_time || undefined,
       end_time: form.end_time || undefined,
-      street_address: form.street_address || undefined,
-      city: form.city || undefined,
-      region: form.region || undefined,
-      country: form.country || undefined,
-      postal_code: form.postal_code || undefined,
+      // Emptied fields go as '' (clear); untouched blank ones are omitted.
+      ...locationUpdate,
       // Re-picking the street this session adopts the confirmed pin (e.g. setting
-      // it on an automation draft that had none); omitted when not re-picked.
-      geocod_lat: form.geocod_lat ?? undefined,
-      geocod_lng: form.geocod_lng ?? undefined,
+      // it on an automation draft that had none); omitted when not re-picked or cleared.
+      ...(locationUpdate.street_address
+        ? { geocod_lat: form.geocod_lat ?? undefined, geocod_lng: form.geocod_lng ?? undefined }
+        : {}),
       // Authoritative full ordered list (kept URLs + new files); an emptied
       // list is an explicit removal of every image.
       images: form.images.length ? form.images : null,

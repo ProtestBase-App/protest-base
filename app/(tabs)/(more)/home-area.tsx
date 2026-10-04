@@ -33,13 +33,16 @@ export default function HomeAreaScreen() {
     () =>
       loading
         ? []
-        : locationFilterOptions.map((option) => ({
-            value: option.value,
-            label: option.label,
-            searchText: option.searchText,
-            sublabel:
-              option.provinceLabel || t('filters.postalCodesCount', { count: option.count }),
-          })),
+        : locationFilterOptions
+            // A whole country is no "area": nothing to rank by or center on.
+            .filter((option) => option.tier !== 'country')
+            .map((option) => ({
+              value: option.value,
+              label: option.label,
+              searchText: option.searchText,
+              sublabel:
+                option.provinceLabel || t('filters.postalCodesCount', { count: option.count }),
+            })),
     [loading, locationFilterOptions]
   );
 

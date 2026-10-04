@@ -2,7 +2,7 @@ jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockRetur
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
 jest.mock('@/services/event.service', () => ({
   getEventByIdBackend: jest.fn(),
-  getEventsBackend: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
+  getEventsForLocations: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
 }));
 jest.mock('@/hooks/useDebouncedValue', () => ({
   useDebouncedValue: jest.fn((value) => value),
@@ -22,7 +22,7 @@ jest.mock('@/hooks/useExplorePagination', () => ({
 import React from 'react';
 import { renderWithProviders, fireEvent, waitFor, act, createMockEvent } from '@/test-utils/render';
 import ExploreTab from '@/app/(tabs)/(explore)/explore';
-import { getEventByIdBackend, getEventsBackend } from '@/services/event.service';
+import { getEventByIdBackend, getEventsForLocations } from '@/services/event.service';
 import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
@@ -156,6 +156,27 @@ describe('Explore Screen', () => {
       expect(queryByText('homeArea.scopeChip')).toBeNull();
     });
 
+    it('hands the selected tokens themselves to the pagination hook', () => {
+      const expandLocationTokens = jest.fn().mockReturnValue({ codes: [], truncated: false });
+      renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          postalCodeContext: { expandLocationTokens },
+          exploreTabContext: {
+            appliedFilters: { ...emptyFilters, locations: ['m:be:7500'] },
+          },
+        },
+      });
+
+      expect(useExplorePagination).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ locations: ['m:be:7500'] }),
+          expandLocations: expandLocationTokens,
+        })
+      );
+      // Expansion is only the hook's legacy fallback, never done up front.
+      expect(expandLocationTokens).not.toHaveBeenCalled();
+    });
+
     it('does not render the chip when no home area is set', () => {
       const { queryByText } = renderWithProviders(<ExploreTab />, {
         providerOverrides: { homeAreaContext: { homeAreaToken: null } },
@@ -200,7 +221,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };
@@ -238,7 +259,7 @@ describe('Explore Screen', () => {
             organizer_name: 'Org',
             organization_id: 'org-1',
             co_organizers: [],
-            postal_code: 1000,
+            postal_code: '1000',
             view_count: 0,
             help_needed: false,
           },
@@ -291,7 +312,7 @@ describe('Explore Screen', () => {
             organizer_name: 'Org',
             organization_id: 'org-1',
             co_organizers: [],
-            postal_code: 1000,
+            postal_code: '1000',
             view_count: 0,
             help_needed: false,
           },
@@ -407,8 +428,10 @@ describe('Explore Screen', () => {
         jest.advanceTimersByTime(400);
       });
 
-      expect(getEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 1, offset: 0, includeEnded: false })
+      expect(getEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 1, offset: 0, includeEnded: false }),
+        [],
+        expect.any(Function)
       );
       // Mock returns total: 0 -> "no events" apply label
       expect(getByText('home.filterApplyNone')).toBeTruthy();
@@ -593,7 +616,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };
@@ -643,7 +666,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };

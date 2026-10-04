@@ -13,6 +13,7 @@ import {
   isEventInProgress,
   matchesCalendarFilters,
 } from '../calendarTabUtils';
+import { buildLocationMatch } from '@/utils/locationFilterOptions';
 
 // ============================================================================
 // Helpers
@@ -23,7 +24,17 @@ function filtersWith(overrides: Partial<CalendarFilters> = {}): CalendarFilters 
 }
 
 function contextWith(overrides: Partial<CalendarFilterContext> = {}): CalendarFilterContext {
-  return { isSaved: () => false, postalCodeSet: null, ...overrides };
+  return { isSaved: () => false, locationMatch: null, ...overrides };
+}
+
+// Brussels 1060 (Saint-Gilles) is also an Amsterdam postcode.
+const TOKEN_TO_CODES = new Map([
+  ['r:be:brussels', ['1000', '1050', '1060']],
+  ['p:nl:noord-holland', ['1011', '1060']],
+]);
+
+function locationsWith(values: string[]) {
+  return contextWith({ locationMatch: buildLocationMatch(values, TOKEN_TO_CODES) });
 }
 
 describe('calendarTabUtils', () => {
@@ -128,35 +139,79 @@ describe('calendarTabUtils', () => {
       });
     });
 
-    describe('locations (postalCodeSet)', () => {
-      it('matches a numeric postal_code against the string set via String() coercion', () => {
-        const event = createMockEvent({ postal_code: 1000 });
-        const context = contextWith({ postalCodeSet: new Set(['1000', '1050']) });
-        expect(matchesCalendarFilters(event, filtersWith(), context)).toBe(true);
+    describe('locations (country-scoped, like the server)', () => {
+      it('matches an event in the selected area', () => {
+        const event = createMockEvent({ country: 'belgium', postal_code: '1050' });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['r:be:brussels']))).toBe(
+          true
+        );
       });
 
-      it('rejects when the postal code is not in the set', () => {
-        const event = createMockEvent({ postal_code: 2000 });
-        const context = contextWith({ postalCodeSet: new Set(['1000']) });
-        expect(matchesCalendarFilters(event, filtersWith(), context)).toBe(false);
+      it('rejects a postcode outside the area', () => {
+        const event = createMockEvent({ country: 'belgium', postal_code: '2000' });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['r:be:brussels']))).toBe(
+          false
+        );
       });
 
-      it('drops events with undefined postal_code when the set is active', () => {
+      it('keeps a Dutch event with a shared postcode out of a Belgian area', () => {
+        const amsterdam = createMockEvent({ country: 'netherlands', postal_code: '1060' });
+        const context = locationsWith(['r:be:brussels']);
+        expect(matchesCalendarFilters(amsterdam, filtersWith(), context)).toBe(false);
+        expect(
+          matchesCalendarFilters(amsterdam, filtersWith(), locationsWith(['p:nl:noord-holland']))
+        ).toBe(true);
+      });
+
+      it('accepts the country spellings the backend accepts', () => {
+        const event = createMockEvent({ country: 'Belgique', postal_code: '1000' });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['r:be:brussels']))).toBe(
+          true
+        );
+      });
+
+      it('compares the 4-digit part of a legacy NL postcode', () => {
+        const event = createMockEvent({ country: 'netherlands', postal_code: '1011 AB' });
+        expect(
+          matchesCalendarFilters(event, filtersWith(), locationsWith(['p:nl:noord-holland']))
+        ).toBe(true);
+      });
+
+      it('never matches a token for an event without a country', () => {
+        const event = createMockEvent({ country: '', postal_code: '1000' });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['r:be:brussels']))).toBe(
+          false
+        );
+      });
+
+      it('drops events without a postcode for an area token', () => {
+        const event = createMockEvent({ country: 'belgium', postal_code: null });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['r:be:brussels']))).toBe(
+          false
+        );
+      });
+
+      it('matches a whole-country token without a postcode', () => {
+        const event = createMockEvent({ country: 'belgium', postal_code: null });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['c:be']))).toBe(true);
+      });
+
+      it('matches nothing for an unknown token', () => {
+        const event = createMockEvent({ country: 'belgium', postal_code: '1000' });
+        expect(matchesCalendarFilters(event, filtersWith(), locationsWith(['m:be:1']))).toBe(false);
+      });
+
+      it('keeps the legacy meaning of a raw postcode: the code, in any country', () => {
+        const dutch = createMockEvent({ country: 'netherlands', postal_code: '1060' });
+        const unknown = createMockEvent({ country: '', postal_code: '1060' });
+        const context = locationsWith(['1060']);
+        expect(matchesCalendarFilters(dutch, filtersWith(), context)).toBe(true);
+        expect(matchesCalendarFilters(unknown, filtersWith(), context)).toBe(true);
+      });
+
+      it('skips the location check entirely when no location filter is active', () => {
         const event = createMockEvent({ postal_code: undefined });
-        const context = contextWith({ postalCodeSet: new Set(['1000']) });
-        expect(matchesCalendarFilters(event, filtersWith(), context)).toBe(false);
-      });
-
-      it('drops events with null postal_code when the set is active', () => {
-        const event = createMockEvent({ postal_code: null });
-        const context = contextWith({ postalCodeSet: new Set(['1000']) });
-        expect(matchesCalendarFilters(event, filtersWith(), context)).toBe(false);
-      });
-
-      it('skips the location check entirely when postalCodeSet is null', () => {
-        const event = createMockEvent({ postal_code: undefined });
-        const context = contextWith({ postalCodeSet: null });
-        expect(matchesCalendarFilters(event, filtersWith(), context)).toBe(true);
+        expect(matchesCalendarFilters(event, filtersWith(), contextWith())).toBe(true);
       });
     });
 
@@ -223,7 +278,7 @@ describe('calendarTabUtils', () => {
     it('requires ALL active filter groups to pass (AND across groups)', () => {
       const event = createMockEvent({
         categories: ['Strike'],
-        postal_code: 1000,
+        postal_code: '1000',
         organization_id: 'org-1',
         help_needed: true,
       });
@@ -235,14 +290,14 @@ describe('calendarTabUtils', () => {
       });
       const matchingContext = contextWith({
         isSaved: () => true,
-        postalCodeSet: new Set(['1000']),
+        locationMatch: buildLocationMatch(['r:be:brussels'], TOKEN_TO_CODES),
       });
       expect(matchesCalendarFilters(event, filters, matchingContext)).toBe(true);
 
       // Flip just one group (saved state) and the event no longer matches.
       const notSavedContext = contextWith({
         isSaved: () => false,
-        postalCodeSet: new Set(['1000']),
+        locationMatch: buildLocationMatch(['r:be:brussels'], TOKEN_TO_CODES),
       });
       expect(matchesCalendarFilters(event, filters, notSavedContext)).toBe(false);
     });

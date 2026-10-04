@@ -1,5 +1,6 @@
 import { Event } from '@/types/event.types';
 import { TemplateEventData } from '@/types/template.types';
+import { toPostalCodeString } from '@/utils/eventLocation';
 
 /**
  * Extracts template-compatible fields from an Event.
@@ -27,7 +28,8 @@ export function extractTemplateData(event: Event): TemplateEventData {
   if (event.city) templateData.city = event.city;
   if (event.region) templateData.region = event.region;
   if (event.country) templateData.country = event.country;
-  if (event.postal_code) templateData.postal_code = event.postal_code;
+  const postalCode = toPostalCodeString(event.postal_code);
+  if (postalCode) templateData.postal_code = postalCode;
   if (event.website_url) templateData.website_url = event.website_url;
   if (event.categories?.length) templateData.categories = event.categories;
   if (event.disclaimer) templateData.disclaimer = event.disclaimer;

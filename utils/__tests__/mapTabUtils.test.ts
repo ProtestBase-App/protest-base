@@ -40,7 +40,7 @@ function geocodedEvent(overrides: Parameters<typeof createMockEvent>[0] = {}) {
     geocod_lat: 50.8466,
     geocod_lng: 4.3528,
     country: 'belgium',
-    postal_code: 1000,
+    postal_code: '1000',
     ...overrides,
   });
 }
@@ -191,7 +191,7 @@ describe('mapTabUtils', () => {
     it('prefixes the code with the country so BE/NL codes cannot collide', () => {
       expect(postalTokenForEvent(geocodedEvent())).toBe('belgium:1000');
       expect(
-        postalTokenForEvent(geocodedEvent({ country: 'netherlands', postal_code: 1012 }))
+        postalTokenForEvent(geocodedEvent({ country: 'netherlands', postal_code: '1012' }))
       ).toBe('netherlands:1012');
     });
 
@@ -251,7 +251,7 @@ describe('mapTabUtils', () => {
 
     it('filters by postal-code tokens', () => {
       const brussels = geocodedEvent();
-      const ghent = geocodedEvent({ postal_code: 9000 });
+      const ghent = geocodedEvent({ postal_code: '9000' });
       const filters = filtersWith({ postalCodes: ['belgium:1000'] });
       expect(matchesMapFilters(brussels, filters, contextWith())).toBe(true);
       expect(matchesMapFilters(ghent, filters, contextWith())).toBe(false);
@@ -379,7 +379,7 @@ describe('mapTabUtils', () => {
       const events = [
         geocodedEvent(),
         geocodedEvent(), // duplicate postal code — deduped
-        geocodedEvent({ country: 'netherlands', postal_code: 1012, city: 'Amsterdam' }),
+        geocodedEvent({ country: 'netherlands', postal_code: '1012', city: 'Amsterdam' }),
       ];
       expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([
         {
@@ -398,7 +398,7 @@ describe('mapTabUtils', () => {
     });
 
     it('falls back to the bare code when no commune resolves', () => {
-      const events = [geocodedEvent({ postal_code: 9000, city: null })];
+      const events = [geocodedEvent({ postal_code: '9000', city: null })];
       expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([
         { value: 'belgium:9000', label: '9000', searchText: '9000', country: 'belgium' },
       ]);

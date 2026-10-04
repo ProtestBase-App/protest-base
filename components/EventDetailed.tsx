@@ -36,6 +36,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
 
 // Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
 // import time, which throws when the native modules are missing (Expo Go,
@@ -152,10 +153,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     }
   }, [event.country, loadPostalCodesForCountry]);
 
-  const cityLabel =
-    event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
-      : '';
+  const cityLabel = resolveEventCityLabel(event, getSubMunicipalityName);
 
   const fullAddress = [event.street_address, event.postal_code, cityLabel, countryLabel]
     .filter(Boolean)
@@ -235,7 +233,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           // Without this an all-day event exports as a 00:00–23:59 busy bar
           // instead of the day-header entry the OS has for exactly this case.
           allDay,
-          location: [address, postalCode, city].filter(Boolean).join(', '),
+          location: [address, postalCode, city, countryLabel].filter(Boolean).join(', '),
           notes,
         });
         if (

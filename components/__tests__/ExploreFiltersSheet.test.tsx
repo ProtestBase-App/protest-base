@@ -7,16 +7,18 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
 });
 
 jest.mock('@/services/event.service', () => ({
-  getEventsBackend: jest.fn(),
+  getEventsForLocations: jest.fn(),
 }));
 
 import React from 'react';
 import { renderWithProviders, fireEvent, act } from '@/test-utils/render';
 import { ExploreFiltersSheet } from '@/components/ExploreFiltersSheet';
 import { DEFAULT_EXPLORE_FILTERS } from '@/context/ExploreTabProvider';
-import { getEventsBackend } from '@/services/event.service';
+import { getEventsForLocations } from '@/services/event.service';
 
-const mockGetEventsBackend = getEventsBackend as jest.MockedFunction<typeof getEventsBackend>;
+const mockGetEventsForLocations = getEventsForLocations as jest.MockedFunction<
+  typeof getEventsForLocations
+>;
 
 const countResponse = (total: number) => ({ events: [], total, limit: 1, offset: 0 });
 
@@ -27,7 +29,7 @@ const SECTION_LABEL_KEYS = [
   'filters.organization',
 ];
 
-/** Flush the 400ms count debounce and settle the getEventsBackend promise. */
+/** Flush the 400ms count debounce and settle the count request promise. */
 async function settleCount() {
   act(() => {
     jest.advanceTimersByTime(400);
@@ -48,7 +50,7 @@ describe('ExploreFiltersSheet', () => {
     jest.clearAllMocks();
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
-    mockGetEventsBackend.mockResolvedValue(countResponse(7));
+    mockGetEventsForLocations.mockResolvedValue(countResponse(7));
   });
 
   afterEach(() => {
@@ -184,7 +186,7 @@ describe('ExploreFiltersSheet', () => {
     });
 
     it('shows the no-matches label when the count resolves to 0', async () => {
-      mockGetEventsBackend.mockResolvedValue(countResponse(0));
+      mockGetEventsForLocations.mockResolvedValue(countResponse(0));
       const { getByText, queryByText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />
       );
@@ -219,14 +221,12 @@ describe('ExploreFiltersSheet', () => {
       fireEvent.press(getByText('categories.protest'));
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
-      expect(mockGetEventsBackend).toHaveBeenCalledWith({
-        limit: 1,
-        offset: 0,
-        includeEnded: false,
-        category: 'Protest',
-        search: 'rally',
-      });
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        { limit: 1, offset: 0, includeEnded: false, category: 'Protest', search: 'rally' },
+        [],
+        expect.any(Function)
+      );
     });
 
     it('coalesces rapid draft changes into a single debounced request', async () => {
@@ -235,13 +235,15 @@ describe('ExploreFiltersSheet', () => {
       fireEvent.press(getByText('categories.protest'));
       fireEvent.press(getByText('categories.strike'));
 
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'Strike' })
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'Strike' }),
+        [],
+        expect.any(Function)
       );
     });
   });
@@ -323,7 +325,7 @@ describe('ExploreFiltersSheet', () => {
       // Advance past the debounce — the effect must have early-returned without
       // calling the backend.
       await settleCount();
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
 
       // Apply Pressable is disabled when tooBroad — pressing it is a silent
       // no-op so onApply is never called.
@@ -333,7 +335,7 @@ describe('ExploreFiltersSheet', () => {
   });
 
   describe('Location selection → count request', () => {
-    it('includes expanded postalCodes in the count request', async () => {
+    it('passes the selected locations to the count request', async () => {
       const { getByPlaceholderText, getByLabelText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />,
         {
@@ -366,8 +368,11 @@ describe('ExploreFiltersSheet', () => {
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ postalCodes: ['1000'] })
+      // The selection itself goes to the service, which sends it as `areas`.
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.not.objectContaining({ postalCodes: expect.anything() }),
+        ['be-1000'],
+        expect.any(Function)
       );
     });
   });
@@ -392,15 +397,17 @@ describe('ExploreFiltersSheet', () => {
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ organizers: ['org-1'] })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ organizers: ['org-1'] }),
+        [],
+        expect.any(Function)
       );
     });
   });
 
   describe('Count fetch error path', () => {
     it('handles a rejected count fetch gracefully and keeps the fallback label', async () => {
-      mockGetEventsBackend.mockRejectedValue(new Error('boom'));
+      mockGetEventsForLocations.mockRejectedValue(new Error('boom'));
 
       const { getByText, queryByText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />

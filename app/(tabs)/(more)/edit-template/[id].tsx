@@ -22,6 +22,7 @@ import type { FormState } from '@/types/eventForm.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { toPostalCodeString } from '@/utils/eventLocation';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -211,7 +212,7 @@ export default function EditTemplateScreen() {
             ? eventData.categories[0] || ''
             : eventData.categories || '',
           disclaimer: eventData.disclaimer || '',
-          postal_code: eventData.postal_code || null,
+          postal_code: toPostalCodeString(eventData.postal_code),
           co_organizers: eventData.co_organizers || [],
           help_needed: eventData.help_needed || false,
           help_description: eventData.help_description || '',

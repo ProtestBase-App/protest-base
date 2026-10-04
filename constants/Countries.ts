@@ -15,4 +15,12 @@ export const countries = [
     },
     value: 'netherlands',
   },
+  {
+    label: {
+      en: 'Luxembourg',
+      fr: 'Luxembourg',
+      nl: 'Luxemburg',
+    },
+    value: 'luxembourg',
+  },
 ];

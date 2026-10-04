@@ -335,7 +335,7 @@ describe('CreateEventModal', () => {
       website_url: '',
       categories: 'Protest',
       disclaimer: '',
-      postal_code: 1000,
+      postal_code: '1000',
       co_organizers: [],
       help_needed: false,
       help_description: '',

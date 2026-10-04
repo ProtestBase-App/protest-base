@@ -18,7 +18,7 @@ import { eventCategories } from '@/constants/EventCategories';
 import { DEFAULT_EXPLORE_FILTERS, ExploreAppliedFilters } from '@/context/ExploreTabProvider';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
-import { EventFilterParams, getEventsBackend } from '@/services/event.service';
+import { EventFilterParams, getEventsForLocations } from '@/services/event.service';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 
@@ -152,9 +152,6 @@ export function ExploreFiltersSheet({
         if (draft.dateFilter) {
           params.dateFilter = draft.dateFilter as EventFilterParams['dateFilter'];
         }
-        if (draft.locations.length > 0) {
-          params.postalCodes = expandLocationTokens(draft.locations).codes;
-        }
         if (draft.organizations.length > 0) {
           params.organizers = draft.organizations;
         }
@@ -165,7 +162,7 @@ export function ExploreFiltersSheet({
           params.search = searchQuery.trim();
         }
 
-        const response = await getEventsBackend(params);
+        const response = await getEventsForLocations(params, draft.locations, expandLocationTokens);
 
         // Discard if a newer count request was issued while this one was in flight.
         if (currentRequestId !== requestIdRef.current) return;

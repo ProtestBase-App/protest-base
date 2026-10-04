@@ -72,15 +72,10 @@ function createShareMessage(
   const formattedEvent = formatEventForList(event, userLanguage);
   const shareStrings = getShareStrings(userLanguage);
 
-  const locationLine =
-    cityLabel && event.postal_code
-      ? `📍 ${cityLabel}, ${event.postal_code}`
-      : event.postal_code
-        ? `📍 ${event.postal_code}`
-        : '';
+  const locationLine = [cityLabel, event.postal_code].filter(Boolean).join(', ');
 
   const eventDetails = `📣 ${event.title}\n\n📅 ${formattedEvent.start_time}${
-    locationLine ? `\n${locationLine}` : ''
+    locationLine ? `\n📍 ${locationLine}` : ''
   }`;
 
   // Cancelled/past events stay shareable (the link spreads the word), but the

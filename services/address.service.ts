@@ -33,14 +33,14 @@ function isCanceled(error: unknown): boolean {
 }
 
 /**
- * Search BE/NL addresses via the backend Photon proxy. Mirrors `getEventsBackend`'s
+ * Search BE/NL/LU addresses via the backend Photon proxy. Mirrors `getEventsBackend`'s
  * GET pattern; the shared Axios interceptor already attaches `Authorization: Bearer`
  * + `x-api-key`, so the auth-gated route works with no extra work here.
  *
  * Privacy: the query is never logged (the backend doesn't log it either).
  *
  * @param q          Search text, 3–100 chars (the caller should debounce + gate on ≥3).
- * @param country    Lowercase ISO code selecting the Photon instance ("be" | "nl").
+ * @param country    Lowercase ISO code selecting the Photon instance ("be" | "nl" | "lu").
  * @param lang       Optional language hint for returned names.
  * @param postalCode Optional postcode hint. When set, the backend scopes/biases the
  *                   Photon search to it, killing cross-town street-name collisions

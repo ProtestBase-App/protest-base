@@ -15,7 +15,8 @@ export interface TemplateEventData {
   city?: string;
   region?: string;
   country?: string;
-  postal_code?: number;
+  // New templates store a string; templates saved by older app versions hold a number.
+  postal_code?: string | number;
 
   website_url?: string;
 

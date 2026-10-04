@@ -16,7 +16,7 @@ export interface FormState {
   website_url: string;
   categories: string;
   disclaimer: string;
-  postal_code: number | null;
+  postal_code: string | null;
   co_organizers: string[];
   help_needed: boolean;
   help_description: string | null;

@@ -1,3 +1,11 @@
+let mockApplicationId: string | null = null;
+jest.mock('expo-application', () => ({
+  __esModule: true,
+  get applicationId() {
+    return mockApplicationId;
+  },
+}));
+
 // Stable mock object so tests can mutate `extra` without re-importing the SUT.
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -11,7 +19,7 @@ jest.mock('expo-constants', () => ({
 }));
 
 import Constants from 'expo-constants';
-import { getAppEnv } from '@/utils/featureFlags';
+import { getAppEnv, isLuxembourgEnabled } from '@/utils/featureFlags';
 
 type MutableExtra = Record<string, unknown>;
 
@@ -38,6 +46,32 @@ describe('featureFlags', () => {
     it('defaults to development when extra is undefined', () => {
       setExtra(undefined);
       expect(getAppEnv()).toBe('development');
+    });
+  });
+
+  describe('isLuxembourgEnabled', () => {
+    it.each(['development', 'preview'])('is on in %s builds', (appEnv) => {
+      setExtra({ appEnv });
+      expect(isLuxembourgEnabled()).toBe(true);
+    });
+
+    it('is off in production builds until the launch', () => {
+      setExtra({ appEnv: 'production' });
+      expect(isLuxembourgEnabled()).toBe(false);
+    });
+
+    it('stays off in the store app even if an update ships without appEnv', () => {
+      mockApplicationId = 'be.protestbase.app';
+      setExtra({ appEnv: 'development' });
+      expect(isLuxembourgEnabled()).toBe(false);
+      mockApplicationId = null;
+    });
+
+    it('is on in the preview app', () => {
+      mockApplicationId = 'be.protestbase.app.preview';
+      setExtra({ appEnv: 'preview' });
+      expect(isLuxembourgEnabled()).toBe(true);
+      mockApplicationId = null;
     });
   });
 });

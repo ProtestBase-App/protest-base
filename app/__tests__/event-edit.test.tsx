@@ -383,6 +383,70 @@ describe('EditEvent', () => {
     });
   });
 
+  describe('location on save', () => {
+    const { updateEvent } = require('@/services/event.service');
+
+    const providerOverrides = {
+      globalContext: {
+        user: mockUser,
+        isLogged: true,
+        loading: false,
+        userLanguage: 'en',
+        eventsCache: {},
+        refetchEvents: jest.fn(),
+        refreshUserEventCounts: jest.fn(),
+      },
+      organizationsContext: { dropdownItems: [] },
+    };
+
+    const renderBelgianEvent = async () => {
+      const belgianEvent = createMockEvent({
+        title: 'Brussels march',
+        description: 'Through the centre',
+        start_time: '2026-07-22T12:00:00.000Z',
+        country: 'belgium',
+        city: 'Brussels',
+        region: 'Brussels-Capital',
+        street_address: 'Rue de la Loi 16',
+        postal_code: '1000',
+      });
+      getEventByIdBackend.mockResolvedValue(belgianEvent);
+      updateEvent.mockResolvedValue(belgianEvent);
+      const utils = renderWithProviders(<EditEvent />, { providerOverrides });
+      await utils.findByDisplayValue(belgianEvent.title);
+      return utils;
+    };
+
+    it('re-sends the loaded string postcode unchanged', async () => {
+      const { getByTestId } = await renderBelgianEvent();
+
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({ postal_code: '1000', country: 'belgium' })
+      );
+    });
+
+    it("sends '' for the address it emptied on a country switch, and no stale pin", async () => {
+      const { getByTestId } = await renderBelgianEvent();
+
+      fireEvent.press(getByTestId('country-chip-netherlands'));
+      fireEvent.press(getByTestId('button-save'));
+
+      const [, update] = updateEvent.mock.calls[0];
+      expect(update).toMatchObject({
+        country: 'netherlands',
+        street_address: '',
+        city: '',
+        region: '',
+        postal_code: '',
+      });
+      expect(update).not.toHaveProperty('geocod_lat');
+      expect(update).not.toHaveProperty('geocod_lng');
+    });
+  });
+
   describe('all-day conversion', () => {
     // Brussels 00:00 on 22 July 2026 (CEST, UTC+2) — the all-day convention.
     const BRUSSELS_MIDNIGHT = '2026-07-21T22:00:00.000Z';

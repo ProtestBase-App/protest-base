@@ -1,5 +1,6 @@
-import { HOME_AREA_CENTROIDS } from '@/constants/HomeAreaCentroids';
+import { HOME_AREA_CENTROIDS, homeAreaZoomForToken } from '@/constants/HomeAreaCentroids';
 import { POSTAL_CODES_EN } from '@/constants/PostalCodes_BE_EN';
+import { LU_CANTONS, LU_COMMUNES } from '@/constants/PostalCodes_LU';
 import { createMockEvent } from '@/test-utils/render';
 import {
   buildLocationFilterOptions,
@@ -51,7 +52,7 @@ const OPTIONS: LocationFilterOption[] = [
   option('m:be:7500', 'municipality'),
 ];
 
-function beEvent(postalCode: number, overrides: Parameters<typeof createMockEvent>[0] = {}) {
+function beEvent(postalCode: string, overrides: Parameters<typeof createMockEvent>[0] = {}) {
   return createMockEvent({ country: 'belgium', postal_code: postalCode, ...overrides });
 }
 
@@ -198,6 +199,39 @@ describe('home-area centering — real BE dataset integration', () => {
   });
 });
 
+describe('home area — real LU dataset integration', () => {
+  const { options, tokenToCodes } = buildLocationFilterOptions({
+    luxembourg: { cantons: LU_CANTONS, communes: LU_COMMUNES },
+    lang: 'en',
+  });
+  const expand = (values: string[]) => expandLocationTokens(values, tokenToCodes);
+
+  it('resolves a commune to its canton, in Luxembourg', () => {
+    const match = buildHomeAreaMatch('m:lu:kaerjeng', options, expand)!;
+    expect(match.country).toBe('luxembourg');
+    expect(match.provinceToken).toBe('p:lu:capellen');
+  });
+
+  it('centers a commune without its own centroid on its canton capital', () => {
+    const match = buildHomeAreaMatch('m:lu:kiischpelt', options, expand)!;
+    expect(resolveHomeAreaCenter(match)).toEqual(HOME_AREA_CENTROIDS['p:lu:wiltz']);
+  });
+
+  it('keeps a Belgian event with a shared postcode out of a Luxembourg home area', () => {
+    // 1140 is both Evere (Brussels) and a Luxembourg City street code.
+    const match = buildHomeAreaMatch('m:lu:luxembourg', options, expand)!;
+    const lux = createMockEvent({ country: 'luxembourg', postal_code: '1140' });
+    const evere = createMockEvent({ country: 'belgium', postal_code: '1140' });
+    expect(rankEventByHomeArea(lux, match)).toBe(0);
+    expect(rankEventByHomeArea(evere, match)).toBe(3);
+  });
+
+  it('zooms closer on a canton than on a Belgian or Dutch province', () => {
+    expect(homeAreaZoomForToken('p:lu:wiltz')).toBe(10);
+    expect(homeAreaZoomForToken('p:be:hainaut')).toBe(9);
+  });
+});
+
 // ============================================================================
 // HOME_AREA_CENTROIDS coordinate sanity — every value is hand-entered, so guard
 // against the silent failure mode: a transposed [lat, lng] or wrong-country
@@ -255,19 +289,19 @@ describe('rankEventByHomeArea', () => {
   const match = buildHomeAreaMatch('m:be:7500', OPTIONS, mockExpand)!;
 
   it('ranks 0 for a same-municipality event', () => {
-    expect(rankEventByHomeArea(beEvent(7500), match)).toBe(0);
+    expect(rankEventByHomeArea(beEvent('7500'), match)).toBe(0);
   });
 
   it('ranks 1 for a same-province (not same-municipality) event', () => {
-    expect(rankEventByHomeArea(beEvent(7000), match)).toBe(1);
+    expect(rankEventByHomeArea(beEvent('7000'), match)).toBe(1);
   });
 
   it('ranks 2 for a same-region (not same-province) event', () => {
-    expect(rankEventByHomeArea(beEvent(5000), match)).toBe(2);
+    expect(rankEventByHomeArea(beEvent('5000'), match)).toBe(2);
   });
 
   it('ranks 3 for an event elsewhere in the same country', () => {
-    expect(rankEventByHomeArea(beEvent(9000), match)).toBe(3);
+    expect(rankEventByHomeArea(beEvent('9000'), match)).toBe(3);
   });
 
   it('ranks 3 for an event with no postal code', () => {
@@ -276,8 +310,19 @@ describe('rankEventByHomeArea', () => {
 
   it('ranks 3 for a colliding NL postcode — country gate (regression)', () => {
     // Dutch event with postcode 7500 must NOT match Belgian Tournai/Hainaut.
-    const nlEvent = createMockEvent({ country: 'netherlands', postal_code: 7500 });
+    const nlEvent = createMockEvent({ country: 'netherlands', postal_code: '7500' });
     expect(rankEventByHomeArea(nlEvent, match)).toBe(3);
+  });
+
+  it('passes the country gate for any spelling the backend accepts', () => {
+    const spelledInFrench = createMockEvent({ country: 'Belgique', postal_code: '7500' });
+    expect(rankEventByHomeArea(spelledInFrench, match)).toBe(0);
+  });
+
+  it('ranks 3 for an event without a country', () => {
+    expect(rankEventByHomeArea(createMockEvent({ country: '', postal_code: '7500' }), match)).toBe(
+      3
+    );
   });
 
   it('matches NL events despite the "5611 EC" alphanumeric postcode format', () => {
@@ -286,7 +331,7 @@ describe('rankEventByHomeArea', () => {
     const nlMatch = buildHomeAreaMatch('p:nl:overijssel', OPTIONS, mockExpand)!;
     const nlEvent = createMockEvent({
       country: 'netherlands',
-      postal_code: '7500 AB' as unknown as number,
+      postal_code: '7500 AB',
     });
     expect(rankEventByHomeArea(nlEvent, nlMatch)).toBe(1); // same NL province
   });
@@ -302,20 +347,20 @@ describe('sortEventsByHomeArea', () => {
 
   it('orders by rank first, then chronologically', () => {
     // A far event sooner in time still sorts after a near event later in time.
-    const nearLater = beEvent(7500, { $id: 'near', start_time: t('2026-07-10T10:00:00Z') });
-    const farSooner = beEvent(9000, { $id: 'far', start_time: t('2026-07-01T10:00:00Z') });
+    const nearLater = beEvent('7500', { $id: 'near', start_time: t('2026-07-10T10:00:00Z') });
+    const farSooner = beEvent('9000', { $id: 'far', start_time: t('2026-07-01T10:00:00Z') });
     const sorted = sortEventsByHomeArea([farSooner, nearLater], match);
     expect(sorted.map((e) => e.$id)).toEqual(['near', 'far']);
   });
 
   it('breaks ties on $id for a stable order (same rank, same start_time)', () => {
-    const a = beEvent(7500, { $id: 'aaa', start_time: t('2026-07-01T10:00:00Z') });
-    const b = beEvent(7500, { $id: 'bbb', start_time: t('2026-07-01T10:00:00Z') });
+    const a = beEvent('7500', { $id: 'aaa', start_time: t('2026-07-01T10:00:00Z') });
+    const b = beEvent('7500', { $id: 'bbb', start_time: t('2026-07-01T10:00:00Z') });
     expect(sortEventsByHomeArea([b, a], match).map((e) => e.$id)).toEqual(['aaa', 'bbb']);
   });
 
   it('does not mutate the input array', () => {
-    const input = [beEvent(9000, { $id: 'x' }), beEvent(7500, { $id: 'y' })];
+    const input = [beEvent('9000', { $id: 'x' }), beEvent('7500', { $id: 'y' })];
     const snapshot = input.map((e) => e.$id);
     sortEventsByHomeArea(input, match);
     expect(input.map((e) => e.$id)).toEqual(snapshot);
@@ -331,26 +376,26 @@ describe('deriveHomeAreaCenter', () => {
 
   it('returns the mean of in-municipality geocoded events', () => {
     const events = [
-      beEvent(7500, { geocod_lng: 3.0, geocod_lat: 50.0 }),
-      beEvent(7501, { geocod_lng: 4.0, geocod_lat: 51.0 }),
+      beEvent('7500', { geocod_lng: 3.0, geocod_lat: 50.0 }),
+      beEvent('7501', { geocod_lng: 4.0, geocod_lat: 51.0 }),
     ];
     expect(deriveHomeAreaCenter(events, match)).toEqual([3.5, 50.5]);
   });
 
   it('excludes events without coordinates from the mean', () => {
     const events = [
-      beEvent(7500, { geocod_lng: 3.0, geocod_lat: 50.0 }),
-      beEvent(7501), // no coordinates → ignored
+      beEvent('7500', { geocod_lng: 3.0, geocod_lat: 50.0 }),
+      beEvent('7501'), // no coordinates → ignored
     ];
     expect(deriveHomeAreaCenter(events, match)).toEqual([3.0, 50.0]);
   });
 
   it('excludes colliding NL events via the country gate', () => {
     const events = [
-      beEvent(7500, { geocod_lng: 3.0, geocod_lat: 50.0 }),
+      beEvent('7500', { geocod_lng: 3.0, geocod_lat: 50.0 }),
       createMockEvent({
         country: 'netherlands',
-        postal_code: 7500,
+        postal_code: '7500',
         geocod_lng: 6.9,
         geocod_lat: 52.2,
       }),
@@ -361,14 +406,14 @@ describe('deriveHomeAreaCenter', () => {
 
   it('falls back to province events when no municipality event has coordinates', () => {
     const events = [
-      beEvent(7500), // muni, no coords
-      beEvent(7000, { geocod_lng: 3.5, geocod_lat: 50.5 }), // province only
+      beEvent('7500'), // muni, no coords
+      beEvent('7000', { geocod_lng: 3.5, geocod_lat: 50.5 }), // province only
     ];
     expect(deriveHomeAreaCenter(events, match)).toEqual([3.5, 50.5]);
   });
 
   it('returns null when no in-area event has coordinates', () => {
-    const events = [beEvent(9000, { geocod_lng: 5.0, geocod_lat: 51.0 })];
+    const events = [beEvent('9000', { geocod_lng: 5.0, geocod_lat: 51.0 })];
     expect(deriveHomeAreaCenter(events, match)).toBeNull();
   });
 
@@ -377,7 +422,7 @@ describe('deriveHomeAreaCenter', () => {
     const events = [
       createMockEvent({
         country: 'netherlands',
-        postal_code: '7500 AB' as unknown as number,
+        postal_code: '7500 AB',
         geocod_lng: 6.9,
         geocod_lat: 52.2,
       }),
