@@ -12,8 +12,8 @@ import {
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { DROPDOWN_HEADROOM } from '@/components/FormScreenScaffold';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { DROPDOWN_HEADROOM } from '@/utils/keyboardReveal';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography, Spacing, BorderRadius } from '@/constants/DesignTokens';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';

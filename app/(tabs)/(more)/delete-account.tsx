@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Dimensions,
-  TouchableOpacity,
-  Alert,
-  Pressable,
-  Keyboard,
-} from 'react-native';
+import { StyleSheet, Dimensions, TouchableOpacity, Alert, Pressable, Keyboard } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -28,6 +19,10 @@ import { Typography, Spacing } from '@/constants/DesignTokens';
 import { Routes } from '@/constants/Routes';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+
+// Room kept between a focused field and the keyboard, so the confirm button
+// under the password field stays reachable while typing.
+const KEYBOARD_BOTTOM_OFFSET = 112;
 
 export default function DeleteAccountScreen() {
   const { user, clearAuthState } = useGlobalContext();
@@ -113,104 +108,100 @@ export default function DeleteAccountScreen() {
   return (
     <ThemedView style={styles.wrapper}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+        <KeyboardAwareScrollView
+          bottomOffset={KEYBOARD_BOTTOM_OFFSET}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <Pressable onPress={Keyboard.dismiss}>
-              <ThemedView
-                style={[styles.container, { minHeight: Dimensions.get('window').height - 100 }]}
-              >
-                <ThemedView style={styles.titleContainer}>
-                  <ThemedText style={styles.title}>{t('account.deleteTitle')}</ThemedText>
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => {
-                      router.back();
-                    }}
-                  >
-                    <IconSymbol
-                      name="xmark"
-                      size={22}
-                      color={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
-                    />
-                  </TouchableOpacity>
-                </ThemedView>
-
-                <ThemedView
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}
+          <Pressable onPress={Keyboard.dismiss}>
+            <ThemedView
+              style={[styles.container, { minHeight: Dimensions.get('window').height - 100 }]}
+            >
+              <ThemedView style={styles.titleContainer}>
+                <ThemedText style={styles.title}>{t('account.deleteTitle')}</ThemedText>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    router.back();
+                  }}
                 >
-                  <IconSymbol name="exclamationmark.triangle" size={36} color={'red'} />
-                  <ThemedText
-                    style={{
-                      marginLeft: 14,
-                      fontFamily: Typography.families.semiBold,
-                      fontSize: Typography.sizes.base,
-                    }}
-                  >
-                    {t('account.deleteWarning')}
-                  </ThemedText>
-                </ThemedView>
-
-                <ThemedView style={{ alignItems: 'flex-start', marginLeft: 40, marginRight: 10 }}>
-                  <ThemedText style={styles.bullets}>
-                    {' '}
-                    • {t('account.deleteWarningItems.loginInfo')}
-                  </ThemedText>
-                  <ThemedText style={styles.bullets}>
-                    {' '}
-                    • {t('account.deleteWarningItems.accountInfo')}
-                  </ThemedText>
-                  <ThemedText style={styles.bullets}>
-                    {' '}
-                    • {t('account.deleteWarningItems.eventsData')}
-                  </ThemedText>
-                  <ThemedText style={styles.bullets}>
-                    {' '}
-                    • {t('account.deleteWarningItems.images')}
-                  </ThemedText>
-                </ThemedView>
-
-                <FormField
-                  title={t('account.deleteConfirmation')}
-                  value={form.email}
-                  placeholder={t('account.email')}
-                  handleChangeText={(value) => setForm({ ...form, email: value })}
-                  otherStyles={styles.formField}
-                  maxLength={75}
-                  hasError={emptyFields.email}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  disableKeyboardShortcuts={true}
-                  inputMode="email"
-                  keyboardType="email-address"
-                  contextMenuHidden={true}
-                  selectTextOnFocus={false}
-                />
-
-                <FormField
-                  title={t('account.deletePasswordConfirmation')}
-                  value={form.password}
-                  placeholder={t('auth.password')}
-                  handleChangeText={(value) => setForm({ ...form, password: value })}
-                  otherStyles={styles.formField}
-                  maxLength={128}
-                  hasError={emptyFields.password}
-                  isPassword={true}
-                />
-
-                <CustomButton
-                  title={t('account.confirmButton')}
-                  handlePress={handleDeleteAccount}
-                  isLoading={isSubmitting}
-                />
+                  <IconSymbol
+                    name="xmark"
+                    size={22}
+                    color={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+                  />
+                </TouchableOpacity>
               </ThemedView>
-            </Pressable>
-          </ScrollView>
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        </KeyboardAvoidingView>
+
+              <ThemedView style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                <IconSymbol name="exclamationmark.triangle" size={36} color={'red'} />
+                <ThemedText
+                  style={{
+                    marginLeft: 14,
+                    fontFamily: Typography.families.semiBold,
+                    fontSize: Typography.sizes.base,
+                  }}
+                >
+                  {t('account.deleteWarning')}
+                </ThemedText>
+              </ThemedView>
+
+              <ThemedView style={{ alignItems: 'flex-start', marginLeft: 40, marginRight: 10 }}>
+                <ThemedText style={styles.bullets}>
+                  {' '}
+                  • {t('account.deleteWarningItems.loginInfo')}
+                </ThemedText>
+                <ThemedText style={styles.bullets}>
+                  {' '}
+                  • {t('account.deleteWarningItems.accountInfo')}
+                </ThemedText>
+                <ThemedText style={styles.bullets}>
+                  {' '}
+                  • {t('account.deleteWarningItems.eventsData')}
+                </ThemedText>
+                <ThemedText style={styles.bullets}>
+                  {' '}
+                  • {t('account.deleteWarningItems.images')}
+                </ThemedText>
+              </ThemedView>
+
+              <FormField
+                title={t('account.deleteConfirmation')}
+                value={form.email}
+                placeholder={t('account.email')}
+                handleChangeText={(value) => setForm({ ...form, email: value })}
+                otherStyles={styles.formField}
+                maxLength={75}
+                hasError={emptyFields.email}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect={false}
+                disableKeyboardShortcuts={true}
+                inputMode="email"
+                keyboardType="email-address"
+                contextMenuHidden={true}
+                selectTextOnFocus={false}
+              />
+
+              <FormField
+                title={t('account.deletePasswordConfirmation')}
+                value={form.password}
+                placeholder={t('auth.password')}
+                handleChangeText={(value) => setForm({ ...form, password: value })}
+                otherStyles={styles.formField}
+                maxLength={128}
+                hasError={emptyFields.password}
+                isPassword={true}
+              />
+
+              <CustomButton
+                title={t('account.confirmButton')}
+                handlePress={handleDeleteAccount}
+                isLoading={isSubmitting}
+              />
+            </ThemedView>
+          </Pressable>
+        </KeyboardAwareScrollView>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       </SafeAreaView>
     </ThemedView>
   );
