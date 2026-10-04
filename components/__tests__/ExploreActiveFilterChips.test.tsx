@@ -15,6 +15,7 @@ import { DEFAULT_EXPLORE_FILTERS, ExploreAppliedFilters } from '@/context/Explor
 const ACTIVE_FILTERS: ExploreAppliedFilters = {
   category: 'Protest',
   dateFilter: 'today',
+  country: 'belgium',
   locations: ['province:vlaams-brabant'],
   organizations: ['org-1'],
 };
@@ -22,10 +23,12 @@ const ACTIVE_FILTERS: ExploreAppliedFilters = {
 function makeProps(overrides: Partial<React.ComponentProps<typeof ExploreActiveFilterChips>> = {}) {
   return {
     filters: ACTIVE_FILTERS,
+    resolveCountryLabel: jest.fn().mockReturnValue('Belgium'),
     resolveLocationLabel: jest.fn().mockReturnValue('Vlaams-Brabant'),
     resolveOrganizationLabel: jest.fn().mockReturnValue('Amnesty International'),
     onRemoveCategory: jest.fn(),
     onRemoveDate: jest.fn(),
+    onRemoveCountry: jest.fn(),
     onRemoveLocation: jest.fn(),
     onRemoveOrganization: jest.fn(),
     ...overrides,
@@ -47,15 +50,17 @@ describe('ExploreActiveFilterChips', () => {
     expect(queryByText('filters.today')).toBeNull();
   });
 
-  it('renders a chip for each active filter, resolving location and organization labels', () => {
+  it('renders a chip for each active filter, resolving country, location and organization labels', () => {
     const props = makeProps();
     const { getByText } = renderWithProviders(<ExploreActiveFilterChips {...props} />);
 
     expect(getByText('categories.protest')).toBeTruthy();
     expect(getByText('filters.today')).toBeTruthy();
+    expect(getByText('Belgium')).toBeTruthy();
     expect(getByText('Vlaams-Brabant')).toBeTruthy();
     expect(getByText('Amnesty International')).toBeTruthy();
 
+    expect(props.resolveCountryLabel).toHaveBeenCalledWith('belgium');
     expect(props.resolveLocationLabel).toHaveBeenCalledWith('province:vlaams-brabant');
     expect(props.resolveOrganizationLabel).toHaveBeenCalledWith('org-1');
   });
@@ -80,6 +85,29 @@ describe('ExploreActiveFilterChips', () => {
 
     expect(props.onRemoveDate).toHaveBeenCalledTimes(1);
     expect(props.onRemoveCategory).not.toHaveBeenCalled();
+  });
+
+  it('renders only the country chip when country is the only active filter', () => {
+    const props = makeProps({
+      filters: { ...DEFAULT_EXPLORE_FILTERS, country: 'netherlands' },
+      resolveCountryLabel: jest.fn().mockReturnValue('Netherlands'),
+    });
+    const { getByText, queryByText } = renderWithProviders(<ExploreActiveFilterChips {...props} />);
+
+    expect(getByText('Netherlands')).toBeTruthy();
+    expect(props.resolveCountryLabel).toHaveBeenCalledWith('netherlands');
+    expect(queryByText('categories.protest')).toBeNull();
+  });
+
+  it('calls onRemoveCountry when the country chip is tapped', () => {
+    const props = makeProps();
+    const { getByText } = renderWithProviders(<ExploreActiveFilterChips {...props} />);
+
+    fireEvent.press(getByText('Belgium'));
+
+    expect(props.onRemoveCountry).toHaveBeenCalledTimes(1);
+    expect(props.onRemoveCategory).not.toHaveBeenCalled();
+    expect(props.onRemoveLocation).not.toHaveBeenCalled();
   });
 
   it('calls onRemoveLocation with the location token when a location chip is tapped', () => {

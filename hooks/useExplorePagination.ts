@@ -4,6 +4,7 @@ import {
   EventFilterParams,
   LocationSelectionTooBroadError,
 } from '@/services/event.service';
+import type { EventCountry } from '@/types/event.types';
 import { formatEventForList, FormattedEventListItem } from '@/utils/eventFormatters';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { isNetworkError } from '@/utils/networkError';
@@ -13,6 +14,8 @@ import { t } from '@/utils/i18n';
 export interface ExploreFilters {
   /** Date filter preset: 'today', 'tomorrow', 'thisWeek', 'thisWeekend' or null for all dates */
   dateFilter: string | null;
+  /** Canonical country value or null for all countries */
+  country: EventCountry | null;
   /** Area tokens (or legacy raw postal codes) to filter by */
   locations: string[];
   /** Array of organization IDs to filter by */
@@ -114,13 +117,17 @@ export function useExplorePagination({
         params.category = filters.category;
       }
 
+      if (filters.country) {
+        params.country = filters.country;
+      }
+
       if (filters.search && filters.search.trim()) {
         params.search = filters.search.trim();
       }
 
       return params;
     },
-    [pageSize, filters.dateFilter, filters.category, filters.search, organizersKey]
+    [pageSize, filters.dateFilter, filters.category, filters.country, filters.search, organizersKey]
   );
 
   // Tokens never contain commas, so the key round-trips to the same selection.
@@ -251,7 +258,14 @@ export function useExplorePagination({
 
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFilter, filters.category, filters.search, locationsKey, organizersKey]);
+  }, [
+    filters.dateFilter,
+    filters.category,
+    filters.country,
+    filters.search,
+    locationsKey,
+    organizersKey,
+  ]);
 
   const handleRefresh = useCallback(() => {
     fetchEvents(true);

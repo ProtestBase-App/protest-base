@@ -61,6 +61,7 @@ describe('ExploreTabProvider', () => {
       result.current.setAppliedFilters({
         category: 'Protest',
         dateFilter: 'thisWeek',
+        country: 'belgium',
         locations: ['BE.BRU'],
         organizations: ['org-1'],
       });
@@ -69,6 +70,7 @@ describe('ExploreTabProvider', () => {
     expect(result.current.appliedFilters).toEqual({
       category: 'Protest',
       dateFilter: 'thisWeek',
+      country: 'belgium',
       locations: ['BE.BRU'],
       organizations: ['org-1'],
     });
@@ -84,6 +86,7 @@ describe('ExploreTabProvider', () => {
     expect(result.current.appliedFilters).toEqual({
       category: null,
       dateFilter: null,
+      country: null,
       locations: [],
       organizations: ['org-2'],
     });
@@ -116,6 +119,7 @@ describe('ExploreTabProvider', () => {
     expect(result.current.searchQuery).toBe('protest');
     expect(result.current.appliedFilters.category).toBe('Environment');
     // Other fields remain at defaults
+    expect(result.current.appliedFilters.country).toBeNull();
     expect(result.current.appliedFilters.locations).toEqual([]);
     expect(result.current.appliedFilters.organizations).toEqual([]);
     expect(result.current.shouldScrollToTop).toBe(false);
@@ -128,6 +132,7 @@ describe('ExploreTabProvider', () => {
       result.current.setAppliedFilters({
         category: 'Strike',
         dateFilter: 'today',
+        country: 'netherlands',
         locations: ['NL.NH'],
         organizations: ['org-3'],
       });
@@ -136,6 +141,7 @@ describe('ExploreTabProvider', () => {
     expect(DEFAULT_EXPLORE_FILTERS).toEqual({
       category: null,
       dateFilter: null,
+      country: null,
       locations: [],
       organizations: [],
     });

@@ -33,6 +33,8 @@ import { t } from '@/utils/i18n';
 import { FormattedEventListItem } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
+import { countryOfLocationToken } from '@/utils/locationFilterOptions';
+import { getCountryLabel } from '@/utils/countryOptions';
 
 function LoadingFooter() {
   return (
@@ -67,11 +69,12 @@ export default function ExploreTab() {
 
   const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
 
-  // Filter-button badge: categories/date count 1 each, locations and
+  // Filter-button badge: category/date/country count 1 each, locations and
   // organizations count one per selection (same rule as the calendar tab).
   const activeFilterCount =
     (appliedFilters.category ? 1 : 0) +
     (appliedFilters.dateFilter ? 1 : 0) +
+    (appliedFilters.country ? 1 : 0) +
     appliedFilters.locations.length +
     appliedFilters.organizations.length;
 
@@ -100,6 +103,7 @@ export default function ExploreTab() {
     expandLocations: expandLocationTokens,
     filters: {
       dateFilter: appliedFilters.dateFilter,
+      country: appliedFilters.country,
       locations: appliedFilters.locations,
       organizers: appliedFilters.organizations,
       category: appliedFilters.category,
@@ -142,6 +146,11 @@ export default function ExploreTab() {
     [organizationItems]
   );
 
+  const resolveCountryLabel = useCallback(
+    (country: string) => getCountryLabel(country, userLanguage),
+    [userLanguage]
+  );
+
   // Every applied-filter mutation (sheet apply or chip removal) refetches page
   // 1 server-side, so the list must also reset to the top.
   const mutateAppliedFilters = useCallback(
@@ -163,7 +172,13 @@ export default function ExploreTab() {
   // "My area" quick-scope: append the home token to the existing location
   // filter (reusing the server-side postcode expansion). Once applied it shows
   // as a normal removable location chip, so no separate clear is needed.
-  const showMyAreaChip = !!homeAreaToken && !appliedFilters.locations.includes(homeAreaToken);
+  // Hidden while another country is selected: the backend ANDs the two, so the
+  // home area could never match.
+  const homeAreaCountry = homeAreaToken ? countryOfLocationToken(homeAreaToken) : null;
+  const showMyAreaChip =
+    !!homeAreaToken &&
+    !appliedFilters.locations.includes(homeAreaToken) &&
+    (!appliedFilters.country || !homeAreaCountry || homeAreaCountry === appliedFilters.country);
 
   const applyMyArea = useCallback(() => {
     if (!homeAreaToken) return;
@@ -181,6 +196,10 @@ export default function ExploreTab() {
   );
   const removeDateFilter = useCallback(
     () => mutateAppliedFilters((prev) => ({ ...prev, dateFilter: null })),
+    [mutateAppliedFilters]
+  );
+  const removeCountryFilter = useCallback(
+    () => mutateAppliedFilters((prev) => ({ ...prev, country: null })),
     [mutateAppliedFilters]
   );
   const removeLocationFilter = useCallback(
@@ -345,10 +364,12 @@ export default function ExploreTab() {
 
         <ExploreActiveFilterChips
           filters={appliedFilters}
+          resolveCountryLabel={resolveCountryLabel}
           resolveLocationLabel={resolveLocationLabel}
           resolveOrganizationLabel={resolveOrganizationLabel}
           onRemoveCategory={removeCategoryFilter}
           onRemoveDate={removeDateFilter}
+          onRemoveCountry={removeCountryFilter}
           onRemoveLocation={removeLocationFilter}
           onRemoveOrganization={removeOrganizationFilter}
         />

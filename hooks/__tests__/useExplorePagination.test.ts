@@ -62,6 +62,7 @@ import { t } from '@/utils/i18n';
 
 const defaultFilters: ExploreFilters = {
   dateFilter: null,
+  country: null,
   locations: [],
   organizers: [],
   category: null,
@@ -368,6 +369,41 @@ describe('useExplorePagination', () => {
       );
     });
 
+    it('sends country when set, alongside the location selection', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
+
+      const filters: ExploreFilters = {
+        ...defaultFilters,
+        country: 'belgium',
+        locations: ['r:be:brussels'],
+      };
+
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ country: 'belgium' }),
+        ['r:be:brussels'],
+        expect.any(Function)
+      );
+    });
+
+    it('does not send country when value is null', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
+
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const callArgs = mockGetEventsForLocations.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('country');
+    });
+
     it('sends trimmed search when not empty', async () => {
       mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
@@ -438,6 +474,29 @@ describe('useExplorePagination', () => {
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches page 1 with the new country when country changes', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
+
+      let filters: ExploreFilters = { ...defaultFilters };
+
+      const { result, rerender } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+
+      filters = { ...filters, country: 'netherlands' };
+      rerender({});
+
+      await waitFor(() => expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2));
+      expect(mockGetEventsForLocations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ country: 'netherlands', offset: 0 }),
+        [],
+        expect.any(Function)
+      );
     });
 
     it('replaces events when filters change', async () => {

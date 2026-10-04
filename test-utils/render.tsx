@@ -20,6 +20,7 @@ import React from 'react';
 import { render, RenderOptions } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { LocationFilterOption } from '@/utils/locationFilterOptions';
+import type { ExploreAppliedFilters } from '@/context/ExploreTabProvider';
 
 // Re-export everything from testing library
 export * from '@testing-library/react-native';
@@ -112,12 +113,7 @@ export interface MockConnectivityContext {
 export interface MockExploreTabContext {
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
-  appliedFilters?: {
-    category: string | null;
-    dateFilter: string | null;
-    locations: string[];
-    organizations: string[];
-  };
+  appliedFilters?: ExploreAppliedFilters;
   setAppliedFilters?: jest.Mock;
   shouldScrollToTop?: boolean;
   setShouldScrollToTop?: jest.Mock;
@@ -281,7 +277,13 @@ const defaultConnectivityContext: Required<MockConnectivityContext> = {
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
   searchQuery: '',
   setSearchQuery: jest.fn(),
-  appliedFilters: { category: null, dateFilter: null, locations: [], organizations: [] },
+  appliedFilters: {
+    category: null,
+    dateFilter: null,
+    country: null,
+    locations: [],
+    organizations: [],
+  },
   setAppliedFilters: jest.fn(),
   shouldScrollToTop: false,
   setShouldScrollToTop: jest.fn(),

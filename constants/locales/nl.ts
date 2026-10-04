@@ -31,8 +31,6 @@ const nl = {
     timeWeek: '7 dagen',
     today: 'Vandaag',
     actionType: 'Soort actie',
-    country: 'Land',
-    countryAll: 'Alle',
     postalCode: 'Postcode',
     searchPostalCode: 'Zoek een postcode...',
     filterApplyCount: {
@@ -66,6 +64,8 @@ const nl = {
   // ============================================
   filters: {
     title: 'Filters',
+    country: 'Land',
+    countryAll: 'Alle',
     location: 'Locatie',
     date: 'Datum',
     organization: 'Organisatie',

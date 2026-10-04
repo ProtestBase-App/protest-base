@@ -8,6 +8,9 @@ export interface CoOrganizerAvatar {
   avatar: string | null;
 }
 
+/** Canonical country value the events API filters on (`GET /events?country=`). */
+export type EventCountry = 'belgium' | 'netherlands' | 'luxembourg';
+
 /** Event data as returned by the API. */
 export interface Event {
   $id: string;

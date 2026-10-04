@@ -12,12 +12,15 @@ import { getThemeColors } from '@/utils/themeColors';
 
 export interface ExploreActiveFilterChipsProps {
   filters: ExploreAppliedFilters;
+  /** Maps a canonical country value to its display label. */
+  resolveCountryLabel: (country: string) => string;
   /** Maps a location token to its display label. */
   resolveLocationLabel: (token: string) => string;
   /** Maps an organization ID to its display name. */
   resolveOrganizationLabel: (id: string) => string;
   onRemoveCategory: () => void;
   onRemoveDate: () => void;
+  onRemoveCountry: () => void;
   onRemoveLocation: (token: string) => void;
   onRemoveOrganization: (id: string) => void;
 }
@@ -28,10 +31,12 @@ export interface ExploreActiveFilterChipsProps {
  */
 export function ExploreActiveFilterChips({
   filters,
+  resolveCountryLabel,
   resolveLocationLabel,
   resolveOrganizationLabel,
   onRemoveCategory,
   onRemoveDate,
+  onRemoveCountry,
   onRemoveLocation,
   onRemoveOrganization,
 }: ExploreActiveFilterChipsProps) {
@@ -41,6 +46,7 @@ export function ExploreActiveFilterChips({
   const hasActiveFilters =
     filters.category !== null ||
     filters.dateFilter !== null ||
+    filters.country !== null ||
     filters.locations.length > 0 ||
     filters.organizations.length > 0;
 
@@ -75,6 +81,17 @@ export function ExploreActiveFilterChips({
             accessibilityLabel={`Remove ${t('filters.' + filters.dateFilter)}`}
             onPress={onRemoveDate}
             leading={<IconSymbol name="calendar" size={11} color={themeColors.tint} />}
+          />
+        )}
+        {filters.country !== null && (
+          <FilterChip
+            small
+            active
+            removable
+            label={resolveCountryLabel(filters.country)}
+            accessibilityLabel={`Remove ${resolveCountryLabel(filters.country)}`}
+            onPress={onRemoveCountry}
+            leading={<IconSymbol name="globe.europe.africa" size={11} color={themeColors.tint} />}
           />
         )}
         {filters.locations.map((token) => (

@@ -33,8 +33,6 @@ const en: LocaleData = {
     timeWeek: '7 days',
     today: 'Today',
     actionType: 'Action type',
-    country: 'Country',
-    countryAll: 'All',
     postalCode: 'Postal code',
     searchPostalCode: 'Search a postal code...',
     filterApplyCount: {
@@ -68,6 +66,8 @@ const en: LocaleData = {
   // ============================================
   filters: {
     title: 'Filters',
+    country: 'Country',
+    countryAll: 'All',
     location: 'Location',
     date: 'Date',
     organization: 'Organization',

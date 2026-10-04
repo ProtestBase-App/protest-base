@@ -9,6 +9,7 @@ import {
   MAX_AREA_TOKENS,
   buildLocationFilterOptions,
   buildLocationMatch,
+  countryOfLocationToken,
   expandLocationTokens,
   isAreaTokenSelection,
   isLocationSelectionTooBroad,
@@ -190,6 +191,26 @@ describe('area tokens on the wire', () => {
     expect(isAreaTokenSelection(['r:nl:holland'])).toBe(false);
     expect(isAreaTokenSelection([])).toBe(false);
     expect(isAreaTokenSelection(Array(MAX_AREA_TOKENS + 1).fill('c:be'))).toBe(false);
+  });
+});
+
+describe('countryOfLocationToken', () => {
+  it('maps every token tier to its canonical country', () => {
+    expect(countryOfLocationToken('r:be:brussels')).toBe('belgium');
+    expect(countryOfLocationToken('p:be:luxembourg')).toBe('belgium');
+    expect(countryOfLocationToken('m:be:7500')).toBe('belgium');
+    expect(countryOfLocationToken('p:nl:zuid-holland')).toBe('netherlands');
+    expect(countryOfLocationToken('m:nl:1011')).toBe('netherlands');
+    expect(countryOfLocationToken('c:lu')).toBe('luxembourg');
+    expect(countryOfLocationToken('p:lu:esch-sur-alzette')).toBe('luxembourg');
+    expect(countryOfLocationToken('m:lu:kaerjeng')).toBe('luxembourg');
+  });
+
+  it('returns null for raw postal codes and malformed tokens', () => {
+    expect(countryOfLocationToken('1000')).toBeNull();
+    expect(countryOfLocationToken('r:nl:holland')).toBeNull();
+    expect(countryOfLocationToken('R:BE:BRUSSELS')).toBeNull();
+    expect(countryOfLocationToken('')).toBeNull();
   });
 });
 

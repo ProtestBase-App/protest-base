@@ -111,6 +111,7 @@ describe('Explore Screen', () => {
     const emptyFilters = {
       category: null,
       dateFilter: null,
+      country: null,
       locations: [] as string[],
       organizations: [] as string[],
     };
@@ -175,6 +176,28 @@ describe('Explore Screen', () => {
       );
       // Expansion is only the hook's legacy fallback, never done up front.
       expect(expandLocationTokens).not.toHaveBeenCalled();
+    });
+
+    it('hides the chip while a different country is applied', () => {
+      const { queryByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: { appliedFilters: { ...emptyFilters, country: 'netherlands' } },
+        },
+      });
+
+      expect(queryByText('homeArea.scopeChip')).toBeNull();
+    });
+
+    it('keeps the chip while the home area country is applied', () => {
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: { appliedFilters: { ...emptyFilters, country: 'belgium' } },
+        },
+      });
+
+      expect(getByText('homeArea.scopeChip')).toBeTruthy();
     });
 
     it('does not render the chip when no home area is set', () => {
@@ -461,6 +484,7 @@ describe('Explore Screen', () => {
       expect(mockSetAppliedFilters).toHaveBeenCalledWith({
         category: 'Protest',
         dateFilter: null,
+        country: null,
         locations: [],
         organizations: [],
       });
@@ -490,6 +514,7 @@ describe('Explore Screen', () => {
             appliedFilters: {
               category: 'Protest',
               dateFilter: null,
+              country: null,
               locations: ['m:be:1000', 'm:be:2000'],
               organizations: [],
             },
@@ -501,6 +526,76 @@ describe('Explore Screen', () => {
       expect(getByText('3')).toBeTruthy();
     });
 
+    it('counts an applied country in the badge', () => {
+      const { getByLabelText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: 'Protest',
+              dateFilter: null,
+              country: 'belgium',
+              locations: [],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(getByLabelText('filters.title (2)')).toBeTruthy();
+    });
+
+    it('passes the applied country to the pagination hook', () => {
+      renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: null,
+              dateFilter: null,
+              country: 'netherlands',
+              locations: [],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(useExplorePagination).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ country: 'netherlands' }),
+        })
+      );
+    });
+
+    it('shows the country chip in the user language and clears only the country when pressed', () => {
+      const mockSetAppliedFilters = jest.fn();
+      const mockSetShouldScrollToTop = jest.fn();
+      const applied = {
+        category: 'Protest',
+        dateFilter: null,
+        country: 'netherlands' as const,
+        locations: ['m:nl:1011'],
+        organizations: [],
+      };
+
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          globalContext: { userLanguage: 'fr' },
+          exploreTabContext: {
+            appliedFilters: applied,
+            setAppliedFilters: mockSetAppliedFilters,
+            setShouldScrollToTop: mockSetShouldScrollToTop,
+          },
+        },
+      });
+
+      fireEvent.press(getByText('Pays-Bas'));
+
+      expect(mockSetAppliedFilters).toHaveBeenCalledTimes(1);
+      const updater = mockSetAppliedFilters.mock.calls[0][0];
+      expect(updater(applied)).toEqual({ ...applied, country: null });
+      expect(mockSetShouldScrollToTop).toHaveBeenCalledWith(true);
+    });
+
     it('renders a chip for each active filter', () => {
       const { getByText } = renderWithProviders(<ExploreTab />, {
         providerOverrides: {
@@ -508,6 +603,7 @@ describe('Explore Screen', () => {
             appliedFilters: {
               category: 'Protest',
               dateFilter: 'today',
+              country: null,
               locations: ['m:be:1000'],
               organizations: [],
             },
@@ -523,7 +619,13 @@ describe('Explore Screen', () => {
 
     it('clears the category filter when its chip is pressed', () => {
       const mockSetAppliedFilters = jest.fn();
-      const applied = { category: 'Protest', dateFilter: null, locations: [], organizations: [] };
+      const applied = {
+        category: 'Protest',
+        dateFilter: null,
+        country: null,
+        locations: [],
+        organizations: [],
+      };
 
       const { getByText } = renderWithProviders(<ExploreTab />, {
         providerOverrides: {
@@ -541,6 +643,7 @@ describe('Explore Screen', () => {
       expect(updater(applied)).toEqual({
         category: null,
         dateFilter: null,
+        country: null,
         locations: [],
         organizations: [],
       });
@@ -551,6 +654,7 @@ describe('Explore Screen', () => {
       const applied = {
         category: null,
         dateFilter: null,
+        country: null,
         locations: ['m:be:1000', 'm:be:2000'],
         organizations: [],
       };
@@ -571,6 +675,7 @@ describe('Explore Screen', () => {
       expect(updater(applied)).toEqual({
         category: null,
         dateFilter: null,
+        country: null,
         locations: ['m:be:2000'],
         organizations: [],
       });

@@ -8,10 +8,10 @@
  * device timezone).
  */
 
-import { countries } from '@/constants/Countries';
-import { Event } from '@/types/event.types';
+import { Event, EventCountry } from '@/types/event.types';
 import { getEventDateKeyInBelgium } from '@/utils/calendarUtils';
 import { EVENT_TIMEZONE, parseAsUTC } from '@/utils/eventFormatters';
+import { canonicalCountry } from '@/utils/eventLocation';
 import { isEventOngoing } from '@/utils/eventStatus';
 
 export type MapTimeFilter = 'all' | 'today' | 'week';
@@ -19,8 +19,8 @@ export type MapTimeFilter = 'all' | 'today' | 'week';
 export interface MapFilters {
   /** Backend category values, e.g. ['Protest', 'Strike']. Empty = all. */
   categories: string[];
-  /** Backend country value ('belgium' | 'netherlands') or null = all. */
-  country: string | null;
+  /** Canonical country value or null = all. */
+  country: EventCountry | null;
   /** Postal-code tokens (see `postalTokenForEvent`). Empty = all. */
   postalCodes: string[];
   /** Organization IDs. Empty = all. */
@@ -101,13 +101,16 @@ export function matchesTimeWindow(
 }
 
 /**
- * Postal-code filter token. Prefixed with the country value so identical
- * numeric codes in Belgium and the Netherlands don't collide.
+ * Postal-code filter token. Prefixed with the canonical country (spelling
+ * variants like 'Belgique' fold into 'belgium') so identical numeric codes in
+ * Belgium and the Netherlands don't collide; an unknown country keeps its
+ * lowercased value.
  */
 export function postalTokenForEvent(event: Event): string | null {
   if (event.postal_code === null || event.postal_code === undefined) return null;
   if (!event.country) return null;
-  return `${event.country.toLowerCase()}:${event.postal_code}`;
+  const country = canonicalCountry(event.country) ?? event.country.toLowerCase();
+  return `${country}:${event.postal_code}`;
 }
 
 /** Country value a postal token belongs to ('belgium:1000' → 'belgium'). */
@@ -131,9 +134,9 @@ export function matchesMapFilters(
     }
   }
 
-  if (filters.country) {
-    if (!event.country || event.country.toLowerCase() !== filters.country) return false;
-  }
+  // Same rule as the backend's `country` filter: any stored spelling of the
+  // country matches, an unknown or missing one never does.
+  if (filters.country && canonicalCountry(event.country) !== filters.country) return false;
 
   if (filters.postalCodes.length > 0) {
     const token = postalTokenForEvent(event);
@@ -181,42 +184,6 @@ export function hasActiveMapFilters(filters: MapFilters): boolean {
   return countActiveMapFilters(filters) > 0;
 }
 
-export interface MapCountryOption {
-  /** Backend country value, e.g. 'belgium'. */
-  value: string;
-  /** Localized country name. */
-  label: string;
-}
-
-/** Localized label for a backend country value; falls back to the raw value. */
-export function getCountryLabel(value: string, locale: string): string {
-  const entry = countries.find((country) => country.value === value.toLowerCase());
-  if (!entry) return value;
-  return entry.label[locale as keyof typeof entry.label] ?? entry.label.en;
-}
-
-/**
- * Distinct countries among the given (geocoded, upcoming) events, ordered as
- * in `constants/Countries.ts`. Unknown country values are listed last, as-is.
- */
-export function buildCountryOptions(events: Event[], locale: string): MapCountryOption[] {
-  const present = new Set<string>();
-  for (const event of events) {
-    if (event.country) present.add(event.country.toLowerCase());
-  }
-
-  const known = countries
-    .filter((country) => present.has(country.value))
-    .map((country) => ({ value: country.value, label: getCountryLabel(country.value, locale) }));
-
-  const unknown = [...present]
-    .filter((value) => !countries.some((country) => country.value === value))
-    .sort()
-    .map((value) => ({ value, label: value }));
-
-  return [...known, ...unknown];
-}
-
 export interface MapPostalCodeOption {
   /** Filter token, e.g. 'belgium:1000'. */
   value: string;
@@ -242,7 +209,7 @@ export function buildPostalCodeOptions(
     const token = postalTokenForEvent(event);
     if (!token || byToken.has(token)) continue;
 
-    const country = event.country!.toLowerCase();
+    const country = countryOfPostalToken(token);
     const code = String(event.postal_code);
     const commune = resolveCommune(code, country, event.city);
     const label = commune ? `${code} · ${commune}` : code;

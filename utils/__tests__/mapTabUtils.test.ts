@@ -1,13 +1,11 @@
 import { createMockEvent } from '@/test-utils/render';
 import {
   addDaysToDateKey,
-  buildCountryOptions,
   buildPostalCodeOptions,
   countActiveMapFilters,
   countryOfPostalToken,
   DEFAULT_MAP_FILTERS,
   formatMapCardDateLabel,
-  getCountryLabel,
   hasActiveMapFilters,
   hasMapCoordinates,
   isNotEnded,
@@ -195,6 +193,18 @@ describe('mapTabUtils', () => {
       ).toBe('netherlands:1012');
     });
 
+    it('folds country spelling variants into the canonical prefix', () => {
+      expect(postalTokenForEvent(geocodedEvent({ country: 'Belgique' }))).toBe('belgium:1000');
+      expect(postalTokenForEvent(geocodedEvent({ country: ' be ' }))).toBe('belgium:1000');
+      expect(
+        postalTokenForEvent(geocodedEvent({ country: 'Nederland', postal_code: '1012' }))
+      ).toBe('netherlands:1012');
+    });
+
+    it('keeps an unknown country lowercased', () => {
+      expect(postalTokenForEvent(geocodedEvent({ country: 'Germany' }))).toBe('germany:1000');
+    });
+
     it('returns null without a postal code or country', () => {
       expect(postalTokenForEvent(geocodedEvent({ postal_code: null }))).toBeNull();
       expect(postalTokenForEvent(geocodedEvent({ country: '' }))).toBeNull();
@@ -242,11 +252,56 @@ describe('mapTabUtils', () => {
       );
     });
 
+    it('matches any stored spelling of the country, like the backend filter', () => {
+      for (const country of ['Belgique', 'BE', 'België', ' belgium ']) {
+        expect(
+          matchesMapFilters(
+            geocodedEvent({ country }),
+            filtersWith({ country: 'belgium' }),
+            contextWith()
+          )
+        ).toBe(true);
+      }
+      expect(
+        matchesMapFilters(
+          geocodedEvent({ country: 'Nederland' }),
+          filtersWith({ country: 'netherlands' }),
+          contextWith()
+        )
+      ).toBe(true);
+      expect(
+        matchesMapFilters(
+          geocodedEvent({ country: 'Luxemburg' }),
+          filtersWith({ country: 'luxembourg' }),
+          contextWith()
+        )
+      ).toBe(true);
+    });
+
     it('drops events without a country when a country filter is active', () => {
       const event = geocodedEvent({ country: '' });
       expect(matchesMapFilters(event, filtersWith({ country: 'belgium' }), contextWith())).toBe(
         false
       );
+    });
+
+    it('drops events with an unknown country when a country filter is active', () => {
+      const event = geocodedEvent({ country: 'Germany' });
+      expect(matchesMapFilters(event, filtersWith({ country: 'belgium' }), contextWith())).toBe(
+        false
+      );
+      expect(matchesMapFilters(event, DEFAULT_MAP_FILTERS, contextWith())).toBe(true);
+    });
+
+    it('matches a variant-stored event against its canonical postal token', () => {
+      const event = geocodedEvent({ country: 'Belgique' });
+      expect(
+        matchesMapFilters(
+          event,
+          filtersWith({ country: 'belgium', postalCodes: ['belgium:1000'] }),
+          contextWith()
+        )
+      ).toBe(true);
     });
 
     it('filters by postal-code tokens', () => {
@@ -345,30 +400,6 @@ describe('mapTabUtils', () => {
   // option derivation
   // ==========================================================================
 
-  describe('buildCountryOptions', () => {
-    it('lists distinct known countries with localized labels, Belgium first', () => {
-      const events = [
-        geocodedEvent({ country: 'netherlands' }),
-        geocodedEvent({ country: 'belgium' }),
-        geocodedEvent({ country: 'belgium' }),
-      ];
-      expect(buildCountryOptions(events, 'fr')).toEqual([
-        { value: 'belgium', label: 'Belgique' },
-        { value: 'netherlands', label: 'Pays-Bas' },
-      ]);
-    });
-
-    it('ignores events without a country and appends unknown values as-is', () => {
-      const events = [geocodedEvent({ country: '' }), geocodedEvent({ country: 'germany' })];
-      expect(buildCountryOptions(events, 'en')).toEqual([{ value: 'germany', label: 'germany' }]);
-    });
-
-    it('getCountryLabel falls back to English, then the raw value', () => {
-      expect(getCountryLabel('belgium', 'nl')).toBe('België');
-      expect(getCountryLabel('atlantis', 'fr')).toBe('atlantis');
-    });
-  });
-
   describe('buildPostalCodeOptions', () => {
     const resolveCommune = (code: string, country: string, fallbackCity?: string | null) => {
       if (country === 'belgium' && code === '1000') return 'Bruxelles';
@@ -401,6 +432,18 @@ describe('mapTabUtils', () => {
       const events = [geocodedEvent({ postal_code: '9000', city: null })];
       expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([
         { value: 'belgium:9000', label: '9000', searchText: '9000', country: 'belgium' },
+      ]);
+    });
+
+    it('groups variant-stored events under one canonical option', () => {
+      const events = [geocodedEvent(), geocodedEvent({ country: 'Belgique' })];
+      expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([
+        {
+          value: 'belgium:1000',
+          label: '1000 · Bruxelles',
+          searchText: '1000 · bruxelles',
+          country: 'belgium',
+        },
       ]);
     });
 

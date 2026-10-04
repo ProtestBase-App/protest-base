@@ -9,6 +9,7 @@ import {
   DuplicateStrength,
   DuplicateSummary,
   DuplicateWarningReport,
+  EventCountry,
   EventCreatedVia,
   UpdateEventRequest,
   PublishDraftResponse,
@@ -56,6 +57,8 @@ export interface EventFilterParams {
   organizers?: string[];
   /** Category filter: 'Protest', 'Act', 'Learn', 'Support', 'Strike' */
   category?: string;
+  /** Canonical country value; ANDed with every other filter, `areas` included. */
+  country?: EventCountry;
   /** Full-text search query */
   search?: string;
   /** Include events that have already ended (default: false) */
@@ -142,6 +145,7 @@ export async function getEventsBackend(
       areas,
       organizers,
       category,
+      country,
       search,
       includeEnded,
       organizerId,
@@ -157,6 +161,7 @@ export async function getEventsBackend(
       areas,
       organizers,
       category,
+      country,
       search,
       includeEnded,
       organizerId,
@@ -190,6 +195,10 @@ export async function getEventsBackend(
 
     if (category) {
       params.category = category;
+    }
+
+    if (country) {
+      params.country = country;
     }
 
     if (search && search.trim()) {

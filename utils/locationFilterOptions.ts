@@ -435,6 +435,12 @@ export function isAreaTokenSelection(values: string[]): boolean {
   );
 }
 
+/** Canonical country of an area token ('r:be:brussels' → 'belgium'); null for raw postal codes. */
+export function countryOfLocationToken(value: string): string | null {
+  if (!AREA_TOKEN_PATTERN.test(value)) return null;
+  return TOKEN_COUNTRY[value.split(':')[1]] ?? null;
+}
+
 /**
  * True when the selection can only go out as a postal-code list and that list
  * would pass the safe limit. Used by the filter screens to block over-broad

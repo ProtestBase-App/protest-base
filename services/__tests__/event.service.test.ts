@@ -180,6 +180,28 @@ describe('event.service', () => {
       });
     });
 
+    it('passes country param', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+      });
+
+      await getEventsBackend({ country: 'netherlands', areas: ['m:nl:1011'] });
+
+      expect(mockApi.get).toHaveBeenCalledWith('/events', {
+        params: expect.objectContaining({ country: 'netherlands', areas: 'm:nl:1011' }),
+      });
+    });
+
+    it('omits country param when not set', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+      });
+
+      await getEventsBackend({ category: 'Protest' });
+
+      expect((mockApi.get.mock.calls[0][1] as any).params).not.toHaveProperty('country');
+    });
+
     it('trims and passes search param', async () => {
       mockApi.get.mockResolvedValueOnce({
         data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
@@ -1334,6 +1356,22 @@ describe('event.service', () => {
       expect(mockApi.get).toHaveBeenCalledTimes(2);
       expect(paramsOfCall(1).postalCodes).toBe('1000,1060');
       expect(paramsOfCall(1)).not.toHaveProperty('areas');
+    });
+
+    it('keeps the country on both the areas request and the postal-code retry', async () => {
+      mockApi.get
+        .mockResolvedValueOnce(page({ country: 'belgium' }))
+        .mockResolvedValueOnce(page({ country: 'belgium' }));
+
+      await getEventsForLocations({ limit: 20, country: 'belgium' }, ['r:be:brussels'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+      expect(paramsOfCall(0)).toEqual(
+        expect.objectContaining({ country: 'belgium', areas: 'r:be:brussels' })
+      );
+      expect(paramsOfCall(1)).toEqual(
+        expect.objectContaining({ country: 'belgium', postalCodes: '1000,1060' })
+      );
     });
 
     it('treats a response without filters_applied as an old backend', async () => {

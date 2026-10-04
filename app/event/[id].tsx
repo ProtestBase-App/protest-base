@@ -41,7 +41,7 @@ import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 import { logger } from '@/utils/logger';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
-import { getCountryLabel } from '@/utils/mapTabUtils';
+import { getCountryLabel } from '@/utils/countryOptions';
 
 export default function EventDetails() {
   const {
