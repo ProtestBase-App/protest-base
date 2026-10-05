@@ -38,6 +38,7 @@ export default function CancelEventModal({
       }}
       destructive
       submitting={submitting}
+      testID="cancel-event-dialog"
     />
   );
 }

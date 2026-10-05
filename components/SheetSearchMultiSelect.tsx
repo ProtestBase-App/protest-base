@@ -274,6 +274,7 @@ export function SheetSearchMultiSelect({
           underlineColorAndroid="transparent"
           accessibilityLabel={placeholder}
           accessibilityState={{ disabled }}
+          testID={testID ? `${testID}-input` : undefined}
         />
         {!disabled &&
           (query.length > 0 ? (
@@ -305,6 +306,7 @@ export function SheetSearchMultiSelect({
             visibleOptions.map((option, index) => (
               <Pressable
                 key={option.value}
+                testID={testID ? `${testID}-option-${index}` : undefined}
                 style={[
                   styles.optionRow,
                   index > 0 && { borderTopWidth: 0.5, borderTopColor: themeColors.separator },

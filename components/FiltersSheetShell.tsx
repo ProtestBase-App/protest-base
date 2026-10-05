@@ -260,6 +260,7 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
           <View style={styles.headerRow}>
             <ThemedText style={styles.title}>{title}</ThemedText>
             <Pressable
+              testID="filters-close"
               style={[styles.closeButton, { backgroundColor: themeColors.badgeBg }]}
               onPress={onClose}
               accessibilityRole="button"
@@ -333,6 +334,7 @@ export function FiltersSheetFooter({
   return (
     <View style={styles.footer}>
       <Pressable
+        testID="filters-reset"
         style={[
           styles.resetButton,
           {
@@ -357,6 +359,7 @@ export function FiltersSheetFooter({
       </Pressable>
 
       <Pressable
+        testID="filters-apply"
         style={[
           styles.applyButton,
           {

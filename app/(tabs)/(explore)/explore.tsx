@@ -250,7 +250,7 @@ export default function ExploreTab() {
   }, []);
 
   const renderEventCard = useCallback(
-    ({ item }: { item: FormattedEventListItem }) => {
+    ({ item, index }: { item: FormattedEventListItem; index: number }) => {
       const eventForCard: Event = {
         $id: item.$id,
         id: item.$id,
@@ -285,6 +285,7 @@ export default function ExploreTab() {
           onShare={handleShareEvent}
           userLanguage={userLanguageRef.current}
           cityLabel={cityLabel}
+          testID={`explore-card-${index}`}
         />
       );
     },
@@ -313,9 +314,14 @@ export default function ExploreTab() {
         </ThemedView>
 
         <ThemedView style={styles.searchContainer}>
-          <SearchInput onSearch={handleTextInputSearch} styleProps={styles.searchInput} />
+          <SearchInput
+            testID="explore-search-input"
+            onSearch={handleTextInputSearch}
+            styleProps={styles.searchInput}
+          />
 
           <TouchableOpacity
+            testID="explore-filters-button"
             onPress={() => setFiltersSheetOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={
@@ -354,6 +360,7 @@ export default function ExploreTab() {
           <ThemedView style={styles.myAreaRow}>
             <FilterChip
               small
+              testID="explore-my-area-chip"
               label={t('homeArea.scopeChip')}
               accessibilityLabel={t('homeArea.scopeChip')}
               onPress={applyMyArea}
@@ -385,6 +392,7 @@ export default function ExploreTab() {
                 {t('explore.refreshFailedMessage')}
               </ThemedText>
               <TouchableOpacity
+                testID="explore-retry"
                 style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
                 onPress={handleRefresh}
               >

@@ -41,6 +41,8 @@ export interface CalendarEventRowProps {
    * (`getDisplayCategory`) while category filters are active.
    */
   displayCategory?: string;
+  /** Prefix for the row's E2E ids: `${testID}` and `${testID}-save`. */
+  testID?: string;
 }
 
 function CalendarEventRow({
@@ -53,6 +55,7 @@ function CalendarEventRow({
   cityLabel,
   showAttendees = true,
   displayCategory,
+  testID,
 }: CalendarEventRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -95,6 +98,7 @@ function CalendarEventRow({
 
   return (
     <Pressable
+      testID={testID}
       onPress={() => onPress(event.$id)}
       accessibilityRole="button"
       accessibilityLabel={event.title}
@@ -183,6 +187,7 @@ function CalendarEventRow({
       </View>
 
       <Pressable
+        testID={testID ? `${testID}-save` : undefined}
         onPress={(e) => {
           e.stopPropagation();
           onToggleSave(event, isSaved);
@@ -301,6 +306,7 @@ export default memo(CalendarEventRow, (prevProps, nextProps) => {
     prevProps.showAttendees === nextProps.showAttendees &&
     prevProps.displayCategory === nextProps.displayCategory &&
     prevProps.onPress === nextProps.onPress &&
-    prevProps.onToggleSave === nextProps.onToggleSave
+    prevProps.onToggleSave === nextProps.onToggleSave &&
+    prevProps.testID === nextProps.testID
   );
 });

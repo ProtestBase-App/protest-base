@@ -135,6 +135,7 @@ export function CalendarFiltersSheet({
             return (
               <FilterChip
                 key={value}
+                testID={`filter-category-${value}`}
                 label={t('categories.' + value.toLowerCase())}
                 active={active}
                 activeColor={categoryColors.color}
@@ -195,6 +196,7 @@ export function CalendarFiltersSheet({
             </ThemedText>
           </View>
           <Switch
+            testID="filter-saved-only"
             value={draft.savedOnly}
             onValueChange={(value) => setDraft((prev) => ({ ...prev, savedOnly: value }))}
             trackColor={{ true: themeColors.tint }}
@@ -210,6 +212,7 @@ export function CalendarFiltersSheet({
             </ThemedText>
           </View>
           <Switch
+            testID="filter-help-needed"
             value={draft.helpNeeded}
             onValueChange={(value) => setDraft((prev) => ({ ...prev, helpNeeded: value }))}
             trackColor={{ true: themeColors.tint }}

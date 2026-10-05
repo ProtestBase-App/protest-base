@@ -110,7 +110,9 @@ export default function PastEventsScreen() {
   }, [refreshPastEvents]);
 
   const renderItem = useCallback(
-    ({ item }: { item: PastEventSummaryItem }) => <PastEventSummaryCard event={item} />,
+    ({ item, index }: { item: PastEventSummaryItem; index: number }) => (
+      <PastEventSummaryCard event={item} testID={`past-row-${index}`} />
+    ),
     []
   );
 

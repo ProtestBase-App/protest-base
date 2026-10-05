@@ -428,6 +428,7 @@ export default function EventDetails() {
                         borderColor: themeColors.cardBorder,
                       },
                     ]}
+                    testID="event-sticky-manage"
                     onPress={() => setMenuOpen(true)}
                     accessibilityRole="button"
                     accessibilityLabel={t('events.manage')}
@@ -435,6 +436,7 @@ export default function EventDetails() {
                     <IconSymbol name="ellipsis" size={IconSizes.md} color={themeColors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity
+                    testID="event-sticky-edit"
                     style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
                     onPress={handleOpenEdit}
                     activeOpacity={0.85}
@@ -457,6 +459,7 @@ export default function EventDetails() {
                         borderColor: isEventSaved ? themeColors.tint : themeColors.cardBorder,
                       },
                     ]}
+                    testID="event-sticky-save"
                     onPress={handleSave}
                     accessibilityRole="button"
                     accessibilityLabel={

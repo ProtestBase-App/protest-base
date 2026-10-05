@@ -238,6 +238,7 @@ export function ExploreFiltersSheet({
             return (
               <FilterChip
                 key={value}
+                testID={`filter-category-${value}`}
                 label={t('categories.' + value.toLowerCase())}
                 active={active}
                 activeColor={categoryColors.color}
@@ -263,6 +264,7 @@ export function ExploreFiltersSheet({
           {DATE_PRESETS.map(({ value, labelKey }) => (
             <FilterChip
               key={value}
+              testID={`filter-date-${value}`}
               label={t(labelKey)}
               active={draft.dateFilter === value}
               onPress={() => toggleDateFilter(value)}
@@ -281,6 +283,7 @@ export function ExploreFiltersSheet({
         <FiltersSheetSectionLabel label={t('filters.location')} />
         <SheetSearchMultiSelect
           inBottomSheet
+          testID="filter-location"
           options={locationOptions}
           selected={draft.locations}
           onChange={(next) => setDraft((prev) => ({ ...prev, locations: next }))}
@@ -296,6 +299,7 @@ export function ExploreFiltersSheet({
         <FiltersSheetSectionLabel label={t('filters.organization')} />
         <SheetSearchMultiSelect
           inBottomSheet
+          testID="filter-organization"
           options={organizationOptions}
           selected={draft.organizations}
           onChange={(next) => setDraft((prev) => ({ ...prev, organizations: next }))}

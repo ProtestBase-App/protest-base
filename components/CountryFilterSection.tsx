@@ -36,6 +36,7 @@ export function CountryFilterSection({
       <FiltersSheetSectionLabel label={t('filters.country')} />
       <View style={styles.chipRow}>
         <FilterChip
+          testID="filter-country-all"
           label={t('filters.countryAll')}
           active={selected === null}
           onPress={() => onSelect(null)}
@@ -43,6 +44,7 @@ export function CountryFilterSection({
         {options.map((option) => (
           <FilterChip
             key={option.value}
+            testID={`filter-country-${option.value}`}
             label={option.label}
             active={selected === option.value}
             onPress={() => onSelect(option.value)}

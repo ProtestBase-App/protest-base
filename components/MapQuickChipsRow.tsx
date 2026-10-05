@@ -37,6 +37,7 @@ interface OverlayChipProps {
   activeBackground?: string;
   activeTextColor?: string;
   dotColor?: string;
+  testID?: string;
 }
 
 function OverlayChip({
@@ -48,6 +49,7 @@ function OverlayChip({
   activeBackground,
   activeTextColor,
   dotColor,
+  testID,
 }: OverlayChipProps) {
   const backgroundColor = active
     ? (activeBackground ?? TIME_CHIP_ACTIVE_BG)
@@ -61,6 +63,7 @@ function OverlayChip({
 
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -110,6 +113,7 @@ export function MapQuickChipsRow({
       {showNearMe && onToggleNearMe && (
         <>
           <OverlayChip
+            testID="map-chip-near-me"
             label={t('maps.nearMe')}
             active={nearMeActive}
             onPress={onToggleNearMe}
@@ -123,6 +127,7 @@ export function MapQuickChipsRow({
       {TIME_OPTIONS.map((option) => (
         <OverlayChip
           key={option.value}
+          testID={`map-chip-time-${option.value}`}
           label={t(option.labelKey)}
           active={timeFilter === option.value}
           onPress={() => onTimeFilterChange(option.value)}
@@ -138,6 +143,7 @@ export function MapQuickChipsRow({
         return (
           <OverlayChip
             key={value}
+            testID={`map-chip-category-${value}`}
             label={t('categories.' + value.toLowerCase())}
             active={selectedCategories.includes(value)}
             onPress={() => onToggleCategory(value)}

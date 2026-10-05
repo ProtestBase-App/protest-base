@@ -194,6 +194,7 @@ export default function DeleteAccountScreen() {
               />
 
               <CustomButton
+                testID="btn-delete-account-confirm"
                 title={t('account.confirmButton')}
                 handlePress={handleDeleteAccount}
                 isLoading={isSubmitting}

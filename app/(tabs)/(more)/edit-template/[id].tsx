@@ -369,6 +369,7 @@ export default function EditTemplateScreen() {
                 isLoading={false}
               />
               <CustomButton
+                testID="btn-edit-template-save"
                 title={t('common.save')}
                 handlePress={handleSave}
                 containerStyles={styles.buttonSave}
@@ -395,6 +396,7 @@ export default function EditTemplateScreen() {
 
           <ThemedView style={styles.templateMetaSection}>
             <FormField
+              testID="input-edit-template-name"
               title={t('template.nameLabel')}
               value={templateName}
               placeholder={t('template.namePlaceholder')}
@@ -431,7 +433,12 @@ export default function EditTemplateScreen() {
             mode="edit-template"
           />
 
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} activeOpacity={0.7}>
+          <TouchableOpacity
+            testID="btn-edit-template-delete"
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
             <IconSymbol name="trash" size={18} color="#EF4444" />
             <ThemedText style={styles.deleteButtonText}>{t('template.deleteButton')}</ThemedText>
           </TouchableOpacity>

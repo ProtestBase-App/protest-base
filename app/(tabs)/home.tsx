@@ -402,9 +402,10 @@ export default function HomeTab() {
 
   const renderDayEntries = (entries: CalendarDayEntry[]) => (
     <View style={styles.rowsContainer}>
-      {entries.map((entry) => (
+      {entries.map((entry, index) => (
         <CalendarEventRow
           key={`${entry.event.$id}-${entry.dayIndex}`}
+          testID={`calendar-row-${index}`}
           entry={entry}
           todayKey={todayKey}
           isSaved={isSaved(entry.event.$id)}
