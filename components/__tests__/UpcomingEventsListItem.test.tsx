@@ -44,7 +44,7 @@ const mockEvent: FormattedEventListItem = {
   endDateFull: '2025-03-15T16:00:00Z',
   city: 'Brussels',
   country: 'belgium',
-  postal_code: 1000,
+  postal_code: '1000',
   categories: ['Education'],
   image: 'https://example.com/image.jpg',
   help_needed: false,
@@ -98,13 +98,21 @@ describe('UpcomingEventsListItem', () => {
     expect(screen.getByText('categories.education')).toBeTruthy();
   });
 
-  it('does not show city when postal code is missing', () => {
-    const noCityEvent = { ...mockEvent, postal_code: undefined as any, country: undefined as any };
+  it('shows the stored city when postal code is missing', () => {
+    const noPostalEvent = { ...mockEvent, postal_code: null, city: 'Brussels' };
+    const getSubMunicipalityName = jest.fn(() => '');
+    (usePostalCodes as jest.Mock).mockReturnValue({ getSubMunicipalityName });
+    render(<UpcomingEventsListItem event={noPostalEvent} />);
+    expect(screen.getByText('Brussels')).toBeTruthy();
+    expect(getSubMunicipalityName).not.toHaveBeenCalled();
+  });
+
+  it('shows no city row when neither postal code nor city is set', () => {
+    const noLocationEvent = { ...mockEvent, postal_code: null, city: '' };
     (usePostalCodes as jest.Mock).mockReturnValue({
       getSubMunicipalityName: jest.fn(() => ''),
     });
-    render(<UpcomingEventsListItem event={noCityEvent} />);
-    // The city label row should not appear
+    render(<UpcomingEventsListItem event={noLocationEvent} />);
     expect(screen.queryByText('Brussels')).toBeNull();
   });
 

@@ -33,8 +33,6 @@ const en: LocaleData = {
     timeWeek: '7 days',
     today: 'Today',
     actionType: 'Action type',
-    country: 'Country',
-    countryAll: 'All',
     postalCode: 'Postal code',
     searchPostalCode: 'Search a postal code...',
     filterApplyCount: {
@@ -68,6 +66,8 @@ const en: LocaleData = {
   // ============================================
   filters: {
     title: 'Filters',
+    country: 'Country',
+    countryAll: 'All',
     location: 'Location',
     date: 'Date',
     organization: 'Organization',
@@ -589,6 +589,8 @@ const en: LocaleData = {
     selectCountry: 'Select country',
     postalCodePlaceholder: 'Postal code',
     searchPostalCode: 'Search by postal code or municipality...',
+    localityLabel: 'Town or village',
+    searchLocality: 'Search a town or village...',
     searchNoResults: 'No matches found',
     searchMinLength: 'Type at least {{count}} characters',
     streetAddressPlaceholder: 'Street name and number',
@@ -617,6 +619,7 @@ const en: LocaleData = {
     endTimeHelper: 'Leave blank if the event duration is flexible',
     locationHelper:
       'Search for the address — the postal code fills in automatically. You can also set it manually.',
+    locationHelperLu: 'Search for the address, or pick the town or village below.',
     imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',

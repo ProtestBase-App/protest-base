@@ -36,6 +36,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
 
 // Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
 // import time, which throws when the native modules are missing (Expo Go,
@@ -152,10 +153,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     }
   }, [event.country, loadPostalCodesForCountry]);
 
-  const cityLabel =
-    event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
-      : '';
+  const cityLabel = resolveEventCityLabel(event, getSubMunicipalityName);
 
   const fullAddress = [event.street_address, event.postal_code, cityLabel, countryLabel]
     .filter(Boolean)
@@ -235,7 +233,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           // Without this an all-day event exports as a 00:00–23:59 busy bar
           // instead of the day-header entry the OS has for exactly this case.
           allDay,
-          location: [address, postalCode, city].filter(Boolean).join(', '),
+          location: [address, postalCode, city, countryLabel].filter(Boolean).join(', '),
           notes,
         });
         if (
@@ -409,6 +407,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           <View style={[styles.heroNav, { paddingTop: topInset + 8 }]}>
             <TouchableOpacity
+              testID="event-back"
               onPress={onBack}
               accessibilityRole="button"
               accessibilityLabel={t('common.back')}
@@ -422,6 +421,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               {/* Share is offered to every viewer, creator or not, so it stays
                   outside the creator/visitor branch below. */}
               <TouchableOpacity
+                testID="event-share"
                 onPress={onShare}
                 accessibilityRole="button"
                 accessibilityLabel={t('events.share')}
@@ -433,6 +433,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
               {isCreator ? (
                 <TouchableOpacity
+                  testID="event-creator-menu"
                   style={[styles.creatorPill, { backgroundColor: themeColors.tint }]}
                   onPress={onOpenCreatorMenu}
                   accessibilityRole="button"
@@ -445,6 +446,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 <>
                   {onLike && (
                     <TouchableOpacity
+                      testID="event-like"
                       onPress={onLike}
                       accessibilityRole="button"
                       accessibilityLabel={
@@ -468,6 +470,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
+                    testID="event-save"
                     onPress={onSave}
                     accessibilityRole="button"
                     accessibilityLabel={
@@ -495,6 +498,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           </View>
 
           <ThemedText
+            testID="event-title"
             style={[styles.heroTitle, hasMultipleImages && styles.heroTitleWithDots]}
             numberOfLines={3}
             pointerEvents="none"
@@ -652,6 +656,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
           )}
 
           <TouchableOpacity
+            testID="event-calendar-card"
             onPress={createEventCalendar}
             style={[
               styles.actionCard,
@@ -691,6 +696,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           {(hasAddress || hasMap) && (
             <TouchableOpacity
+              testID="event-location-card"
               onPress={
                 hasMap
                   ? () => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)
@@ -798,6 +804,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
               {primaryOrgName && (
                 <OrganizerRow
+                  testID="event-organizer-0"
                   name={primaryOrgName}
                   avatarUrl={event.organizer_avatar}
                   navigable={!!event.organization_id}
@@ -815,6 +822,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 .map((co: CoOrganizerAvatar, i: number) => (
                   <OrganizerRow
                     key={`co-${i}`}
+                    testID={`event-organizer-${i + 1}`}
                     name={co.name}
                     avatarUrl={co.avatar}
                     navigable={!!co.id}
@@ -981,9 +989,17 @@ interface OrganizerRowProps {
   navigable: boolean;
   onPress?: () => void;
   themeColors: ReturnType<typeof getThemeColors>;
+  testID?: string;
 }
 
-function OrganizerRow({ name, avatarUrl, navigable, onPress, themeColors }: OrganizerRowProps) {
+function OrganizerRow({
+  name,
+  avatarUrl,
+  navigable,
+  onPress,
+  themeColors,
+  testID,
+}: OrganizerRowProps) {
   const rowContent = (
     <>
       <OrganizerAvatar avatarUrl={avatarUrl} name={name} size={44} />
@@ -1014,6 +1030,7 @@ function OrganizerRow({ name, avatarUrl, navigable, onPress, themeColors }: Orga
   if (navigable && onPress) {
     return (
       <TouchableOpacity
+        testID={testID}
         style={rowStyle}
         onPress={onPress}
         activeOpacity={0.75}
@@ -1025,7 +1042,11 @@ function OrganizerRow({ name, avatarUrl, navigable, onPress, themeColors }: Orga
     );
   }
 
-  return <View style={rowStyle}>{rowContent}</View>;
+  return (
+    <View testID={testID} style={rowStyle}>
+      {rowContent}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

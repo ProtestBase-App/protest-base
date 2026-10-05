@@ -11,6 +11,7 @@
 import { Event } from '@/types/event.types';
 import { getEventDateKeyInBelgium } from '@/utils/calendarUtils';
 import { parseAsUTC } from '@/utils/eventFormatters';
+import { matchesLocationFilter, type LocationMatch } from '@/utils/locationFilterOptions';
 
 export interface CalendarFilters {
   /** Backend category values, e.g. ['Protest', 'Strike']. Empty = all. */
@@ -52,16 +53,16 @@ export function hasActiveCalendarFilters(filters: CalendarFilters): boolean {
 export interface CalendarFilterContext {
   isSaved: (eventId: string) => boolean;
   /**
-   * Postal codes expanded from `filters.locations` tokens (via
-   * `expandLocationTokens`), or null when no location filter is active.
+   * `filters.locations` prepared by `buildLocationMatch`, or null when no
+   * location filter is active.
    */
-  postalCodeSet: Set<string> | null;
+  locationMatch: LocationMatch | null;
 }
 
 /**
- * Client-side equivalent of the explore filters for the calendar tab.
- * Mirrors explore semantics: location matching drops events without a postal
- * code; organization matching uses `organization_id`.
+ * Client-side equivalent of the explore filters for the calendar tab. Location
+ * matching follows the backend's `areas` rule (country-scoped, see
+ * `matchesLocationFilter`); organization matching uses `organization_id`.
  */
 export function matchesCalendarFilters(
   event: Event,
@@ -75,9 +76,8 @@ export function matchesCalendarFilters(
     }
   }
 
-  if (context.postalCodeSet) {
-    if (event.postal_code === null || event.postal_code === undefined) return false;
-    if (!context.postalCodeSet.has(String(event.postal_code))) return false;
+  if (context.locationMatch && !matchesLocationFilter(event, context.locationMatch)) {
+    return false;
   }
 
   if (filters.organizations.length > 0) {

@@ -44,6 +44,7 @@ export default function CreatorActionSheet({
             <View style={[styles.handle, { backgroundColor: themeColors.separator }]} />
 
             <ActionRow
+              testID="creator-action-edit"
               icon="pencil"
               label={t('events.editDetails')}
               description={t('events.editDetailsDesc')}
@@ -57,6 +58,7 @@ export default function CreatorActionSheet({
             <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
 
             <ActionRow
+              testID="creator-action-notify"
               icon="bell.badge"
               label={t('events.notifyParticipants')}
               description={t('events.notifyParticipantsDesc')}
@@ -68,6 +70,7 @@ export default function CreatorActionSheet({
             <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
 
             <ActionRow
+              testID="creator-action-preview"
               icon="eye"
               label={t('events.visitorPreview')}
               description={t('events.visitorPreviewDesc')}
@@ -79,6 +82,7 @@ export default function CreatorActionSheet({
             <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
 
             <ActionRow
+              testID="creator-action-cancel"
               icon="xmark.circle"
               label={t('events.cancelEvent')}
               description={t('events.cancelEventDesc')}
@@ -109,6 +113,7 @@ interface ActionRowProps {
   labelColor?: string;
   disabled?: boolean;
   onPress: () => void;
+  testID?: string;
 }
 
 function ActionRow({
@@ -119,12 +124,14 @@ function ActionRow({
   labelColor,
   disabled,
   onPress,
+  testID,
 }: ActionRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
   return (
     <Pressable
+      testID={testID}
       style={[styles.row, disabled && styles.rowDisabled]}
       onPress={onPress}
       accessibilityRole="button"

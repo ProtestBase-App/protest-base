@@ -17,9 +17,10 @@ export interface PastEventSummaryItem {
 
 interface PastEventSummaryCardProps {
   event: PastEventSummaryItem;
+  testID?: string;
 }
 
-export default function PastEventSummaryCard({ event }: PastEventSummaryCardProps) {
+export default function PastEventSummaryCard({ event, testID }: PastEventSummaryCardProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
@@ -27,7 +28,11 @@ export default function PastEventSummaryCard({ event }: PastEventSummaryCardProp
   const formattedDate = event.startDateNoFormat;
 
   return (
-    <TouchableOpacity onPress={() => router.push(`/event/${event.id}` as any)} activeOpacity={0.7}>
+    <TouchableOpacity
+      testID={testID}
+      onPress={() => router.push(`/event/${event.id}` as any)}
+      activeOpacity={0.7}
+    >
       <ThemedView style={[styles.cardContainer, { borderColor: themeColors.cardBorder }]}>
         {/* Green checkmark icon */}
         <View style={styles.checkmarkContainer}>

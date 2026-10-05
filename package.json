@@ -1,7 +1,7 @@
 {
   "name": "protest-base",
   "main": "expo-router/entry",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "scripts": {
     "start": "expo start",
     "start:mcp": "EXPO_UNSTABLE_MCP_SERVER=1 expo start",
@@ -14,6 +14,7 @@
     "test:ci": "jest --config jest.ci.config.js --ci --maxWorkers=2",
     "test:integration": "jest --testPathPattern='__integration_tests__'",
     "test:e2e": "maestro test .maestro",
+    "test:e2e:organizer": "maestro test .maestro/organizer",
     "lint": "expo lint",
     "check:lockfile": "node scripts/check-lockfile-emnapi.js"
   },

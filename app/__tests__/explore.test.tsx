@@ -2,7 +2,7 @@ jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockRetur
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
 jest.mock('@/services/event.service', () => ({
   getEventByIdBackend: jest.fn(),
-  getEventsBackend: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
+  getEventsForLocations: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
 }));
 jest.mock('@/hooks/useDebouncedValue', () => ({
   useDebouncedValue: jest.fn((value) => value),
@@ -22,7 +22,7 @@ jest.mock('@/hooks/useExplorePagination', () => ({
 import React from 'react';
 import { renderWithProviders, fireEvent, waitFor, act, createMockEvent } from '@/test-utils/render';
 import ExploreTab from '@/app/(tabs)/(explore)/explore';
-import { getEventByIdBackend, getEventsBackend } from '@/services/event.service';
+import { getEventByIdBackend, getEventsForLocations } from '@/services/event.service';
 import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
@@ -111,6 +111,7 @@ describe('Explore Screen', () => {
     const emptyFilters = {
       category: null,
       dateFilter: null,
+      country: null,
       locations: [] as string[],
       organizations: [] as string[],
     };
@@ -154,6 +155,49 @@ describe('Explore Screen', () => {
       });
 
       expect(queryByText('homeArea.scopeChip')).toBeNull();
+    });
+
+    it('hands the selected tokens themselves to the pagination hook', () => {
+      const expandLocationTokens = jest.fn().mockReturnValue({ codes: [], truncated: false });
+      renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          postalCodeContext: { expandLocationTokens },
+          exploreTabContext: {
+            appliedFilters: { ...emptyFilters, locations: ['m:be:7500'] },
+          },
+        },
+      });
+
+      expect(useExplorePagination).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ locations: ['m:be:7500'] }),
+          expandLocations: expandLocationTokens,
+        })
+      );
+      // Expansion is only the hook's legacy fallback, never done up front.
+      expect(expandLocationTokens).not.toHaveBeenCalled();
+    });
+
+    it('hides the chip while a different country is applied', () => {
+      const { queryByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: { appliedFilters: { ...emptyFilters, country: 'netherlands' } },
+        },
+      });
+
+      expect(queryByText('homeArea.scopeChip')).toBeNull();
+    });
+
+    it('keeps the chip while the home area country is applied', () => {
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          homeAreaContext: { homeAreaToken: 'm:be:7500' },
+          exploreTabContext: { appliedFilters: { ...emptyFilters, country: 'belgium' } },
+        },
+      });
+
+      expect(getByText('homeArea.scopeChip')).toBeTruthy();
     });
 
     it('does not render the chip when no home area is set', () => {
@@ -200,7 +244,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };
@@ -238,7 +282,7 @@ describe('Explore Screen', () => {
             organizer_name: 'Org',
             organization_id: 'org-1',
             co_organizers: [],
-            postal_code: 1000,
+            postal_code: '1000',
             view_count: 0,
             help_needed: false,
           },
@@ -291,7 +335,7 @@ describe('Explore Screen', () => {
             organizer_name: 'Org',
             organization_id: 'org-1',
             co_organizers: [],
-            postal_code: 1000,
+            postal_code: '1000',
             view_count: 0,
             help_needed: false,
           },
@@ -407,8 +451,10 @@ describe('Explore Screen', () => {
         jest.advanceTimersByTime(400);
       });
 
-      expect(getEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 1, offset: 0, includeEnded: false })
+      expect(getEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 1, offset: 0, includeEnded: false }),
+        [],
+        expect.any(Function)
       );
       // Mock returns total: 0 -> "no events" apply label
       expect(getByText('home.filterApplyNone')).toBeTruthy();
@@ -438,6 +484,7 @@ describe('Explore Screen', () => {
       expect(mockSetAppliedFilters).toHaveBeenCalledWith({
         category: 'Protest',
         dateFilter: null,
+        country: null,
         locations: [],
         organizations: [],
       });
@@ -467,6 +514,7 @@ describe('Explore Screen', () => {
             appliedFilters: {
               category: 'Protest',
               dateFilter: null,
+              country: null,
               locations: ['m:be:1000', 'm:be:2000'],
               organizations: [],
             },
@@ -478,6 +526,76 @@ describe('Explore Screen', () => {
       expect(getByText('3')).toBeTruthy();
     });
 
+    it('counts an applied country in the badge', () => {
+      const { getByLabelText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: 'Protest',
+              dateFilter: null,
+              country: 'belgium',
+              locations: [],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(getByLabelText('filters.title (2)')).toBeTruthy();
+    });
+
+    it('passes the applied country to the pagination hook', () => {
+      renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          exploreTabContext: {
+            appliedFilters: {
+              category: null,
+              dateFilter: null,
+              country: 'netherlands',
+              locations: [],
+              organizations: [],
+            },
+          },
+        },
+      });
+
+      expect(useExplorePagination).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ country: 'netherlands' }),
+        })
+      );
+    });
+
+    it('shows the country chip in the user language and clears only the country when pressed', () => {
+      const mockSetAppliedFilters = jest.fn();
+      const mockSetShouldScrollToTop = jest.fn();
+      const applied = {
+        category: 'Protest',
+        dateFilter: null,
+        country: 'netherlands' as const,
+        locations: ['m:nl:1011'],
+        organizations: [],
+      };
+
+      const { getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          globalContext: { userLanguage: 'fr' },
+          exploreTabContext: {
+            appliedFilters: applied,
+            setAppliedFilters: mockSetAppliedFilters,
+            setShouldScrollToTop: mockSetShouldScrollToTop,
+          },
+        },
+      });
+
+      fireEvent.press(getByText('Pays-Bas'));
+
+      expect(mockSetAppliedFilters).toHaveBeenCalledTimes(1);
+      const updater = mockSetAppliedFilters.mock.calls[0][0];
+      expect(updater(applied)).toEqual({ ...applied, country: null });
+      expect(mockSetShouldScrollToTop).toHaveBeenCalledWith(true);
+    });
+
     it('renders a chip for each active filter', () => {
       const { getByText } = renderWithProviders(<ExploreTab />, {
         providerOverrides: {
@@ -485,6 +603,7 @@ describe('Explore Screen', () => {
             appliedFilters: {
               category: 'Protest',
               dateFilter: 'today',
+              country: null,
               locations: ['m:be:1000'],
               organizations: [],
             },
@@ -500,7 +619,13 @@ describe('Explore Screen', () => {
 
     it('clears the category filter when its chip is pressed', () => {
       const mockSetAppliedFilters = jest.fn();
-      const applied = { category: 'Protest', dateFilter: null, locations: [], organizations: [] };
+      const applied = {
+        category: 'Protest',
+        dateFilter: null,
+        country: null,
+        locations: [],
+        organizations: [],
+      };
 
       const { getByText } = renderWithProviders(<ExploreTab />, {
         providerOverrides: {
@@ -518,6 +643,7 @@ describe('Explore Screen', () => {
       expect(updater(applied)).toEqual({
         category: null,
         dateFilter: null,
+        country: null,
         locations: [],
         organizations: [],
       });
@@ -528,6 +654,7 @@ describe('Explore Screen', () => {
       const applied = {
         category: null,
         dateFilter: null,
+        country: null,
         locations: ['m:be:1000', 'm:be:2000'],
         organizations: [],
       };
@@ -548,6 +675,7 @@ describe('Explore Screen', () => {
       expect(updater(applied)).toEqual({
         category: null,
         dateFilter: null,
+        country: null,
         locations: ['m:be:2000'],
         organizations: [],
       });
@@ -593,7 +721,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };
@@ -643,7 +771,7 @@ describe('Explore Screen', () => {
         organizer_name: 'Test Org',
         organization_id: 'org-1',
         co_organizers: [],
-        postal_code: 1000,
+        postal_code: '1000',
         view_count: 0,
         help_needed: false,
       };

@@ -1,4 +1,5 @@
 // Mock dependencies BEFORE imports
+jest.mock('@/utils/mapHelpers', () => ({ openMap: jest.fn() }));
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn().mockReturnValue('light'),
 }));
@@ -92,7 +93,12 @@ jest.mock('@/components/ui/loaders/BrandLoader', () => ({
 }));
 
 import React from 'react';
-import { renderWithProviders, createMockEvent, createMockUser } from '@/test-utils/render';
+import {
+  renderWithProviders,
+  createMockEvent,
+  createMockUser,
+  fireEvent,
+} from '@/test-utils/render';
 import EventDetails from '../event/[id]';
 
 // Import router and services for mock access
@@ -181,6 +187,45 @@ describe('EventDetails', () => {
 
       expect(getEventByIdBackend).toHaveBeenCalledWith('event-1', true);
       await findByText(mockEvent.title);
+    });
+
+    it('opens directions with the country in the address', async () => {
+      const { openMap } = require('@/utils/mapHelpers');
+      getEventByIdBackend.mockResolvedValue(
+        createMockEvent({
+          title: 'Rally at the Gare',
+          street_address: 'Avenue de la Gare 10',
+          city: 'Luxembourg',
+          country: 'luxembourg',
+          postal_code: '1611',
+          geocod_status: 'OK',
+          geocod_lat: 49.6042,
+          geocod_lng: 6.1331,
+        })
+      );
+      const { findByText, getByTestId } = renderWithProviders(<EventDetails />, {
+        providerOverrides: {
+          globalContext: {
+            user: mockUser,
+            isLogged: true,
+            loading: false,
+            userLanguage: 'en',
+            eventsCache: {},
+            refetchEvents: jest.fn(),
+            refreshUserEventCounts: jest.fn(),
+          },
+          postalCodeContext: { loading: false, getSubMunicipalityName: jest.fn(() => '') },
+        },
+      });
+      await findByText('Rally at the Gare');
+
+      fireEvent.press(getByTestId('button-directions'));
+
+      expect(openMap).toHaveBeenCalledWith(
+        49.6042,
+        6.1331,
+        'Avenue de la Gare 10, 1611, Luxembourg, Luxembourg'
+      );
     });
 
     it('should show error state when event fails to load', async () => {

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
-  ScrollView,
   Image,
   Alert,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -32,6 +32,9 @@ import { Typography, Spacing, BorderRadius, IconSizes } from '@/constants/Design
 
 const MODAL_FADE_ANIMATION_DURATION = 300; // ms — must match the modal's fade animation
 const INPUT_FOCUS_DELAY = 100; // ms
+// Room kept between a focused field and the keyboard, so the Sign In button
+// under the password field stays reachable while typing.
+const KEYBOARD_BOTTOM_OFFSET = 112;
 
 // Escalating cooldown between failed attempts, indexed by attempt count. This is
 // client-side only: it smooths repeat-tapping from the app itself and does not
@@ -280,144 +283,136 @@ export default function SignIn() {
   return (
     <ThemedView style={styles.wrapper}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.flex1}
+        <KeyboardAwareScrollView
+          bottomOffset={KEYBOARD_BOTTOM_OFFSET}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
         >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
-          >
-            <ThemedView style={styles.container}>
-              <ThemedView style={styles.logoContainer}>
-                <TouchableOpacity
-                  onPress={handleBackPress}
-                  style={styles.iconContainer}
-                  accessibilityLabel="Go back"
-                  accessibilityRole="button"
-                >
-                  <IconSymbol name="arrow.backward" size={24} color={themeColors.text} />
-                </TouchableOpacity>
-                <Image source={logoSource} style={styles.logo} />
-              </ThemedView>
-              <ThemedText type="title" style={styles.text1}>
-                {t('auth.signIn')}
-              </ThemedText>
-              <FormField
-                title={t('auth.email')}
-                value={form.email}
-                placeholder={t('auth.emailPlaceholder')}
-                handleChangeText={handleLoginEmailChange}
-                otherStyles={styles.margintop}
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                hasError={emptyFields.email}
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                testID="input-sign-in-email"
-              />
-              <FormField
-                title={t('auth.password')}
-                value={form.password}
-                placeholder={t('auth.passwordPlaceholder')}
-                handleChangeText={(e) => setForm({ ...form, password: e })}
-                otherStyles={styles.margintop}
-                textContentType="password"
-                hasError={emptyFields.password}
-                isPassword={true}
-                maxLength={128}
-                testID="input-sign-in-password"
-              />
-              <CustomButton
-                title={
-                  cooldownRemaining > 0
-                    ? t('auth.tryAgainIn', { seconds: cooldownRemaining })
-                    : t('auth.signInButton')
-                }
-                handlePress={submit}
-                containerStyles={
-                  canSubmit && cooldownRemaining === 0
-                    ? styles.margintop
-                    : { backgroundColor: 'rgba(128, 128, 128, 0.4)', marginTop: 24 }
-                }
-                isLoading={!canSubmit || isSubmitting || cooldownRemaining > 0}
-                testID="btn-sign-in-submit"
-              />
-
-              {failedAttempts >= NUDGE_AFTER_FAILURES && (
-                <TouchableOpacity
-                  style={[
-                    styles.nudgeBanner,
-                    {
-                      backgroundColor: themeColors.highlightBackground,
-                      borderColor: themeColors.highlightBorder,
-                    },
-                  ]}
-                  onPress={() => handleOpenModal('forgot')}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
-                  testID="nudge-reset-password"
-                >
-                  <ThemedView
-                    style={[
-                      styles.nudgeIconWrap,
-                      { backgroundColor: themeColors.highlightIconBackground },
-                    ]}
-                  >
-                    <IconSymbol
-                      name="questionmark.circle"
-                      size={IconSizes.md}
-                      color={themeColors.tint}
-                    />
-                  </ThemedView>
-                  <ThemedView style={styles.nudgeTextWrap}>
-                    <ThemedText style={styles.nudgeTitle}>
-                      {t('auth.troubleSigningInTitle')}
-                    </ThemedText>
-                    <ThemedText style={[styles.nudgeBody, { color: themeColors.secondaryText }]}>
-                      {t('auth.troubleSigningInBody')}
-                    </ThemedText>
-                  </ThemedView>
-                  <IconSymbol
-                    name="chevron.right"
-                    size={IconSizes.sm}
-                    color={themeColors.chevron}
-                  />
-                </TouchableOpacity>
-              )}
-
+          <ThemedView style={styles.container}>
+            <ThemedView style={styles.logoContainer}>
               <TouchableOpacity
-                style={styles.forgetPasswordButton}
-                onPress={() => handleOpenModal('forgot')}
+                onPress={handleBackPress}
+                style={styles.iconContainer}
+                accessibilityLabel="Go back"
+                accessibilityRole="button"
               >
-                <ThemedText style={[styles.forgotPasswordText, { color: themeColors.tint }]}>
-                  {t('auth.forgotPassword')}
-                </ThemedText>
+                <IconSymbol name="arrow.backward" size={24} color={themeColors.text} />
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.firstTimeButton}
-                onPress={() => handleOpenModal('firstTime')}
-              >
-                <ThemedText style={[styles.firstTimeText, { color: themeColors.tint }]}>
-                  {t('auth.firstTimeLogin')}
-                </ThemedText>
-              </TouchableOpacity>
-
-              <ThemedView style={styles.container2}>
-                <ThemedText style={styles.text2}>{t('auth.noAccount')}</ThemedText>
-                <ExternalLink
-                  href={onboardingFormUrl}
-                  style={[styles.link, { color: themeColors.tint }]}
-                >
-                  {t('auth.requestAccess')}
-                </ExternalLink>
-              </ThemedView>
+              <Image source={logoSource} style={styles.logo} />
             </ThemedView>
-          </ScrollView>
-        </KeyboardAvoidingView>
+            <ThemedText type="title" style={styles.text1}>
+              {t('auth.signIn')}
+            </ThemedText>
+            <FormField
+              title={t('auth.email')}
+              value={form.email}
+              placeholder={t('auth.emailPlaceholder')}
+              handleChangeText={handleLoginEmailChange}
+              otherStyles={styles.margintop}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              hasError={emptyFields.email}
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              testID="input-sign-in-email"
+            />
+            <FormField
+              title={t('auth.password')}
+              value={form.password}
+              placeholder={t('auth.passwordPlaceholder')}
+              handleChangeText={(e) => setForm({ ...form, password: e })}
+              otherStyles={styles.margintop}
+              textContentType="password"
+              hasError={emptyFields.password}
+              isPassword={true}
+              maxLength={128}
+              testID="input-sign-in-password"
+            />
+            <CustomButton
+              title={
+                cooldownRemaining > 0
+                  ? t('auth.tryAgainIn', { seconds: cooldownRemaining })
+                  : t('auth.signInButton')
+              }
+              handlePress={submit}
+              containerStyles={
+                canSubmit && cooldownRemaining === 0
+                  ? styles.margintop
+                  : { backgroundColor: 'rgba(128, 128, 128, 0.4)', marginTop: 24 }
+              }
+              isLoading={!canSubmit || isSubmitting || cooldownRemaining > 0}
+              testID="btn-sign-in-submit"
+            />
+
+            {failedAttempts >= NUDGE_AFTER_FAILURES && (
+              <TouchableOpacity
+                style={[
+                  styles.nudgeBanner,
+                  {
+                    backgroundColor: themeColors.highlightBackground,
+                    borderColor: themeColors.highlightBorder,
+                  },
+                ]}
+                onPress={() => handleOpenModal('forgot')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
+                testID="nudge-reset-password"
+              >
+                <ThemedView
+                  style={[
+                    styles.nudgeIconWrap,
+                    { backgroundColor: themeColors.highlightIconBackground },
+                  ]}
+                >
+                  <IconSymbol
+                    name="questionmark.circle"
+                    size={IconSizes.md}
+                    color={themeColors.tint}
+                  />
+                </ThemedView>
+                <ThemedView style={styles.nudgeTextWrap}>
+                  <ThemedText style={styles.nudgeTitle}>
+                    {t('auth.troubleSigningInTitle')}
+                  </ThemedText>
+                  <ThemedText style={[styles.nudgeBody, { color: themeColors.secondaryText }]}>
+                    {t('auth.troubleSigningInBody')}
+                  </ThemedText>
+                </ThemedView>
+                <IconSymbol name="chevron.right" size={IconSizes.sm} color={themeColors.chevron} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.forgetPasswordButton}
+              onPress={() => handleOpenModal('forgot')}
+            >
+              <ThemedText style={[styles.forgotPasswordText, { color: themeColors.tint }]}>
+                {t('auth.forgotPassword')}
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.firstTimeButton}
+              onPress={() => handleOpenModal('firstTime')}
+            >
+              <ThemedText style={[styles.firstTimeText, { color: themeColors.tint }]}>
+                {t('auth.firstTimeLogin')}
+              </ThemedText>
+            </TouchableOpacity>
+
+            <ThemedView style={styles.container2}>
+              <ThemedText style={styles.text2}>{t('auth.noAccount')}</ThemedText>
+              <ExternalLink
+                href={onboardingFormUrl}
+                style={[styles.link, { color: themeColors.tint }]}
+              >
+                {t('auth.requestAccess')}
+              </ExternalLink>
+            </ThemedView>
+          </ThemedView>
+        </KeyboardAwareScrollView>
 
         <Modal
           visible={modalVisible}

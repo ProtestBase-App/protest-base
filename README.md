@@ -1,11 +1,11 @@
 # ProtestBase
 
 [![CI](https://github.com/ProtestBase-App/protest-base/actions/workflows/ci.yml/badge.svg)](https://github.com/ProtestBase-App/protest-base/actions/workflows/ci.yml)
-[![Expo SDK](https://img.shields.io/badge/Expo-SDK%2056-blue)](https://expo.dev)
-[![React Native](https://img.shields.io/badge/React%20Native-0.85-61dafb)](https://reactnative.dev)
+[![Expo SDK](https://img.shields.io/badge/Expo-SDK%2057-blue)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.86-61dafb)](https://reactnative.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)](https://www.typescriptlang.org)
 
-A mobile app that helps people discover and organize protest events in Belgium and the Netherlands. Available on iOS and Android.
+A mobile app that helps people discover and organize protest events in Belgium, the Netherlands and Luxembourg. Available on iOS and Android.
 
 Website: **[protestbase.be](https://protestbase.be)**
 
@@ -70,9 +70,9 @@ Our source code is publicly available so anyone can audit how we handle data. Tr
 
 | Category   | Technology                                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------------------------- |
-| Framework  | [Expo SDK 56](https://expo.dev)                                                                                     |
-| UI         | [React Native 0.85](https://reactnative.dev)                                                                        |
-| Navigation | [Expo Router 56](https://docs.expo.dev/router/introduction/) (SDK-aligned versioning)                               |
+| Framework  | [Expo SDK 57](https://expo.dev)                                                                                     |
+| UI         | [React Native 0.86](https://reactnative.dev)                                                                        |
+| Navigation | [Expo Router 57](https://docs.expo.dev/router/introduction/) (SDK-aligned versioning)                               |
 | Language   | [TypeScript 6.0](https://www.typescriptlang.org)                                                                    |
 | State      | React Context API                                                                                                   |
 | HTTP       | [Axios](https://axios-http.com) + JWT refresh interceptors                                                          |

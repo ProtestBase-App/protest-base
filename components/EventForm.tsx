@@ -32,6 +32,11 @@ import { getCategoryColors } from '@/constants/CategoryColors';
 import { MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { countries } from '@/constants/Countries';
+import type {
+  LuxembourgCanton,
+  LuxembourgCommune,
+  LuxembourgLocality,
+} from '@/constants/PostalCodes_LU';
 import type { EventFormProps } from '@/types/eventForm.types';
 import { isBelgiumMidnight } from '@/utils/eventFormatters';
 import type { PickedImage } from '@/types/event.types';
@@ -42,6 +47,7 @@ import { logger } from '@/utils/logger';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { optimizeImageForUpload } from '@/utils/imageOptimization';
+import { isLuxembourgEnabled } from '@/utils/featureFlags';
 
 // LayoutAnimation is opt-in on Android.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -56,6 +62,13 @@ function safeParseDate(dateString: string | undefined, fallback: Date = new Date
   const parsed = new Date(dateString);
   return isNaN(parsed.getTime()) ? fallback : parsed;
 }
+
+// Form country → the address endpoint's lowercase ISO code.
+const ADDRESS_COUNTRY_CODES: Record<string, AddressCountryCode> = {
+  belgium: 'be',
+  netherlands: 'nl',
+  luxembourg: 'lu',
+};
 
 const EventForm: React.FC<EventFormProps> = ({
   form,
@@ -95,6 +108,13 @@ const EventForm: React.FC<EventFormProps> = ({
 
   const [postalCodesData, setPostalCodesData] = React.useState<any[]>([]);
   const [postalCodesLoading, setPostalCodesLoading] = React.useState(false);
+  // Luxembourg postal codes are per street, so there the picker lists towns and
+  // villages instead of codes.
+  const [luxembourgData, setLuxembourgData] = React.useState<{
+    localities: LuxembourgLocality[];
+    communes: LuxembourgCommune[];
+    cantons: LuxembourgCanton[];
+  } | null>(null);
   const [isPickingImage, setIsPickingImage] = React.useState(false);
   // True once a street suggestion *carrying a postcode* is accepted this session:
   // the postal confirmation card then captions the value as derived from the
@@ -175,6 +195,14 @@ const EventForm: React.FC<EventFormProps> = ({
             postalCodesModule = await import('@/constants/PostalCodes_BE_EN');
             setPostalCodesData(postalCodesModule.POSTAL_CODES_EN || []);
           }
+        } else if (form.country === 'luxembourg') {
+          const luxembourgModule = await import('@/constants/PostalCodes_LU');
+          setLuxembourgData({
+            localities: luxembourgModule.LU_LOCALITIES,
+            communes: luxembourgModule.LU_COMMUNES,
+            cantons: luxembourgModule.LU_CANTONS,
+          });
+          setPostalCodesData([]);
         }
       } catch (error) {
         logger.warn('Failed to load postal codes for country', {
@@ -224,14 +252,75 @@ const EventForm: React.FC<EventFormProps> = ({
     return [];
   }, [postalCodesData, userLang, form.country]);
 
+  // value ("<locality>|<commune slug>", unique: a few village names exist in two
+  // communes) → picker option plus what a pick writes to the form.
+  const luxembourgEntries = useMemo(() => {
+    const entries = new Map<
+      string,
+      { option: SheetSearchMultiSelectOption; locality: LuxembourgLocality; region: string }
+    >();
+    if (!luxembourgData) return entries;
+    const communeBySlug = new Map(luxembourgData.communes.map((c) => [c.slug, c]));
+    const cantonBySlug = new Map(luxembourgData.cantons.map((c) => [c.slug, c]));
+    for (const locality of luxembourgData.localities) {
+      const commune = communeBySlug.get(locality.commune);
+      const canton = commune ? cantonBySlug.get(commune.canton) : undefined;
+      const value = `${locality.name}|${locality.commune}`;
+      const label =
+        commune && commune.name !== locality.name
+          ? `${locality.name} (${commune.name})`
+          : locality.name;
+      entries.set(value, {
+        locality,
+        // Stored the way address search stores it, in every app language.
+        region: canton ? `Canton ${canton.name}` : '',
+        option: {
+          value,
+          label,
+          searchText: [locality.name, commune?.name, canton?.name].join(' ').toLowerCase(),
+        },
+      });
+    }
+    return entries;
+  }, [luxembourgData]);
+
+  const isLuxembourg = form.country === 'luxembourg';
+  // Luxembourg is offered only while enabled, but an event already set to it
+  // keeps its chip so the form shows what is stored.
+  const selectableCountries = countries.filter(
+    (c) => c.value !== 'luxembourg' || isLuxembourgEnabled() || isLuxembourg
+  );
+
   const postalCodeOptions = useMemo<SheetSearchMultiSelectOption[]>(
     () =>
-      listPostalCodes.map((item) => ({
-        value: item.value,
-        label: item.label,
-        searchText: item.label.toLowerCase(),
-      })),
-    [listPostalCodes]
+      isLuxembourg
+        ? [...luxembourgEntries.values()].map((entry) => entry.option)
+        : listPostalCodes.map((item) => ({
+            value: item.value,
+            label: item.label,
+            searchText: item.label.toLowerCase(),
+          })),
+    [isLuxembourg, luxembourgEntries, listPostalCodes]
+  );
+
+  // The picked locality, found back from the stored city and code. A city filled
+  // in by address search (a commune) has no entry; nothing then shows as picked.
+  const selectedLuxembourgValue = useMemo(() => {
+    if (!isLuxembourg || !form.postal_code) return null;
+    for (const [value, entry] of luxembourgEntries) {
+      if (
+        entry.locality.name === form.city &&
+        String(entry.locality.postCode) === form.postal_code
+      ) {
+        return value;
+      }
+    }
+    return null;
+  }, [isLuxembourg, form.city, form.postal_code, luxembourgEntries]);
+
+  const resolveLuxembourgLabel = useCallback(
+    (value: string) => luxembourgEntries.get(value)?.option.label ?? value,
+    [luxembourgEntries]
   );
 
   // value → label for the selected chip; SheetSearchMultiSelect filters the full
@@ -277,8 +366,7 @@ const EventForm: React.FC<EventFormProps> = ({
 
   // Map the form's country value to the address endpoint's lowercase ISO code.
   // null when no (or an unsupported) country is selected — gates the autocomplete.
-  const addressCountryCode: AddressCountryCode | null =
-    form.country === 'belgium' ? 'be' : form.country === 'netherlands' ? 'nl' : null;
+  const addressCountryCode: AddressCountryCode | null = ADDRESS_COUNTRY_CODES[form.country] ?? null;
 
   // userLanguage is en/fr/nl in this app; pass it through only when it's a value
   // the endpoint accepts (it 400s on unknown langs).
@@ -300,8 +388,10 @@ const EventForm: React.FC<EventFormProps> = ({
       // Lock only to a suggestion whose postcode parses; a postal-less POI keeps
       // manual picking available (and the prior postal set). A trusted postcode
       // also ends any in-progress manual re-pick — the confirmation card returns.
-      const parsed = s.postal_code != null ? parseInt(s.postal_code, 10) : NaN;
-      const hasTrustedPostal = !Number.isNaN(parsed);
+      // Leading digits only ("1234 AB" → "1234"), kept as a string so no
+      // leading zero is lost.
+      const trustedPostal = s.postal_code?.match(/^\s*(\d+)/)?.[1] ?? null;
+      const hasTrustedPostal = trustedPostal !== null;
       setPostalLocked(hasTrustedPostal);
       if (hasTrustedPostal) setPostalManualOverride(false);
       setForm((f) => {
@@ -318,7 +408,7 @@ const EventForm: React.FC<EventFormProps> = ({
           street_address: s.street_address,
           city: s.city ?? '',
           region: s.region ?? '',
-          postal_code: hasTrustedPostal ? parsed : f.postal_code,
+          postal_code: hasTrustedPostal ? trustedPostal : f.postal_code,
           geocod_lat: s.lat,
           geocod_lng: s.lng,
         };
@@ -354,17 +444,35 @@ const EventForm: React.FC<EventFormProps> = ({
   // present value renders as the confirmation card again.
   const handlePostalManualChange = useCallback(
     (next: string[]) => {
-      const code = next[0];
-      setForm((f) => ({ ...f, postal_code: code ? Number(code) : null }));
+      const value = next[0];
+      const luxembourgEntry = value ? luxembourgEntries.get(value) : undefined;
+      if (luxembourgEntry) {
+        setForm((f) => ({
+          ...f,
+          postal_code: String(luxembourgEntry.locality.postCode),
+          city: luxembourgEntry.locality.name,
+          region: luxembourgEntry.region,
+        }));
+      } else {
+        setForm((f) => ({ ...f, postal_code: value || null }));
+      }
       setPostalManualOverride(false);
     },
-    [setForm]
+    [setForm, luxembourgEntries]
   );
 
   // Filled → render the read-only confirmation card instead of the search
   // picker (whether the value came from the address or a manual pick), unless
   // the user is mid-"Change".
   const postalConfirmed = form.postal_code != null && !postalManualOverride;
+  // A picked Luxembourg locality shows by name: its code is only representative.
+  const postalConfirmedLabel = selectedLuxembourgValue
+    ? resolveLuxembourgLabel(selectedLuxembourgValue)
+    : resolvePostalLabel(String(form.postal_code));
+  // The code narrows address search, so only a real one is passed: never a
+  // Luxembourg locality's representative code.
+  const addressPostalHint =
+    form.postal_code && (!isLuxembourg || postalLocked) ? String(form.postal_code) : undefined;
 
   // Scroll to end when the disclaimer focuses; delay lets the keyboard appear first.
   const handleDisclaimerFocus = useCallback(() => {
@@ -726,7 +834,7 @@ const EventForm: React.FC<EventFormProps> = ({
         {t('createEvent.country')} ({t('common.optional')})
       </ThemedText>
       <ThemedView style={styles.chipRow}>
-        {countries.map((c) => {
+        {selectableCountries.map((c) => {
           const active = form.country === c.value;
           return (
             <FilterChip
@@ -751,7 +859,7 @@ const EventForm: React.FC<EventFormProps> = ({
             value={form.street_address}
             countryCode={addressCountryCode}
             lang={addressLang}
-            postalCode={form.postal_code ? String(form.postal_code) : undefined}
+            postalCode={addressPostalHint}
             onSelect={handleAddressSelect}
             onClear={handleAddressClear}
             onEdit={handleAddressEdit}
@@ -771,7 +879,8 @@ const EventForm: React.FC<EventFormProps> = ({
               mid-"Change") shows the manual picker. One postal per event. */}
           <ThemedView style={[styles.labelWithLoadingWrapper, styles.fieldSpacingNested]}>
             <ThemedText style={styles.fieldLabel}>
-              {t('createEvent.postalCode')} ({t('common.optional')})
+              {isLuxembourg ? t('createEvent.localityLabel') : t('createEvent.postalCode')} (
+              {t('common.optional')})
             </ThemedText>
             {postalCodesLoading && (
               <ActivityIndicator
@@ -797,7 +906,7 @@ const EventForm: React.FC<EventFormProps> = ({
                 <IconSymbol name="checkmark.circle.fill" size={18} color={themeColors.success} />
                 <View style={styles.postalFilledTextGroup}>
                   <ThemedText style={styles.postalFilledValue} numberOfLines={1}>
-                    {resolvePostalLabel(String(form.postal_code))}
+                    {postalConfirmedLabel}
                   </ThemedText>
                   {postalLocked && (
                     <ThemedText
@@ -823,12 +932,24 @@ const EventForm: React.FC<EventFormProps> = ({
               <SheetSearchMultiSelect
                 testID="dropdown-event-postal-code"
                 options={postalCodeOptions}
-                selected={form.postal_code ? [String(form.postal_code)] : []}
+                selected={
+                  isLuxembourg
+                    ? selectedLuxembourgValue
+                      ? [selectedLuxembourgValue]
+                      : []
+                    : form.postal_code
+                      ? [String(form.postal_code)]
+                      : []
+                }
                 onChange={handlePostalManualChange}
                 placeholder={
-                  postalCodesLoading ? t('common.loading') : t('createEvent.searchPostalCode')
+                  postalCodesLoading
+                    ? t('common.loading')
+                    : isLuxembourg
+                      ? t('createEvent.searchLocality')
+                      : t('createEvent.searchPostalCode')
                 }
-                resolveSelectedLabel={resolvePostalLabel}
+                resolveSelectedLabel={isLuxembourg ? resolveLuxembourgLabel : resolvePostalLabel}
                 leadingIconName="mappin.and.ellipse"
                 minSearchLength={2}
                 minLengthHintText={t('createEvent.searchMinLength', { count: 2 })}
@@ -842,7 +963,12 @@ const EventForm: React.FC<EventFormProps> = ({
           {/* The search/auto-fill explainer only makes sense while the picker
               shows — the confirmation card speaks for itself. */}
           {!postalConfirmed && (
-            <HelperText text={t('createEvent.locationHelper')} isDark={isDark} />
+            <HelperText
+              text={
+                isLuxembourg ? t('createEvent.locationHelperLu') : t('createEvent.locationHelper')
+              }
+              isDark={isDark}
+            />
           )}
         </ThemedView>
       )}

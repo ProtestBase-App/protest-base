@@ -6,11 +6,20 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
   return (props: any) => React.createElement('MaterialIcons', props);
 });
 
+jest.mock('@/utils/featureFlags', () => ({
+  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
+}));
+
 import React from 'react';
 import { Switch } from 'react-native';
 import { renderWithProviders, fireEvent, createMockEvent } from '@/test-utils/render';
 import { MapFiltersSheet } from '@/components/MapFiltersSheet';
 import { DEFAULT_MAP_FILTERS } from '@/utils/mapTabUtils';
+import { isLuxembourgEnabled } from '@/utils/featureFlags';
+
+const mockIsLuxembourgEnabled = isLuxembourgEnabled as jest.MockedFunction<
+  typeof isLuxembourgEnabled
+>;
 
 const CATEGORY_KEYS = [
   'categories.protest',
@@ -35,6 +44,7 @@ describe('MapFiltersSheet', () => {
     jest.clearAllMocks();
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
+    mockIsLuxembourgEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -55,9 +65,9 @@ describe('MapFiltersSheet', () => {
 
       expect(getByText('filters.title')).toBeTruthy();
       expect(getByText('maps.actionType')).toBeTruthy();
-      expect(getByText('maps.country')).toBeTruthy();
+      expect(getByText('filters.country')).toBeTruthy();
       expect(getByText('maps.postalCode')).toBeTruthy();
-      expect(getByText('maps.countryAll')).toBeTruthy();
+      expect(getByText('filters.countryAll')).toBeTruthy();
     });
   });
 
@@ -180,21 +190,90 @@ describe('MapFiltersSheet', () => {
     });
   });
 
+  describe('Country chips (same list as Explore)', () => {
+    it('offers Belgium and the Netherlands even when no event is loaded', () => {
+      const { getByLabelText, queryByLabelText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} events={[]} />
+      );
+
+      expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
+      expect(getByLabelText('Belgium')).toBeTruthy();
+      expect(getByLabelText('Netherlands')).toBeTruthy();
+      expect(queryByLabelText('Luxembourg')).toBeNull();
+    });
+
+    it('offers Luxembourg only while it is enabled', () => {
+      mockIsLuxembourgEnabled.mockReturnValue(true);
+      const { getByLabelText } = renderWithProviders(<MapFiltersSheet {...defaultProps} />);
+
+      expect(getByLabelText('Luxembourg')).toBeTruthy();
+    });
+
+    it('never lists an unknown country from the events', () => {
+      const germanEvent = createMockEvent({ country: 'germany', postal_code: '1000' });
+      const { queryByLabelText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} events={[germanEvent]} />
+      );
+
+      expect(queryByLabelText('germany')).toBeNull();
+    });
+
+    it('labels countries in the user language', () => {
+      const { getByLabelText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} userLanguage="nl" />
+      );
+
+      expect(getByLabelText('België')).toBeTruthy();
+      expect(getByLabelText('Nederland')).toBeTruthy();
+    });
+
+    it('applies the selected country, clears it on re-tap or All, and counts the draft', () => {
+      const onApply = jest.fn();
+      const countMatches = jest.fn().mockReturnValue(4);
+      const { getByLabelText, getByText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} onApply={onApply} countMatches={countMatches} />
+      );
+
+      fireEvent.press(getByLabelText('Netherlands'));
+      expect(countMatches).toHaveBeenLastCalledWith(
+        expect.objectContaining({ country: 'netherlands' })
+      );
+
+      fireEvent.press(getByLabelText('Netherlands'));
+      expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
+
+      fireEvent.press(getByLabelText('Belgium'));
+      fireEvent.press(getByLabelText('filters.countryAll'));
+      fireEvent.press(getByLabelText('Belgium'));
+      fireEvent.press(getByText('maps.filterApplyCount'));
+
+      expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ country: 'belgium' }));
+    });
+
+    it('enables Reset for a country-only draft', () => {
+      const { getByLabelText } = renderWithProviders(<MapFiltersSheet {...defaultProps} />);
+
+      fireEvent.press(getByLabelText('Belgium'));
+
+      expect(getByLabelText('common.reset').props.accessibilityState.disabled).toBe(false);
+    });
+  });
+
   describe('Country selection scopes postal codes', () => {
     it('prunes out-of-country postal tokens and sets country when a country chip is tapped', () => {
-      // Arrange — one Belgian event and one Dutch event so buildCountryOptions yields two chips.
+      // Arrange — one Belgian event and one Dutch event, each with a postal code.
       const belgianEvent = createMockEvent({
         country: 'belgium',
-        postal_code: 1000,
+        postal_code: '1000',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
       const dutchEvent = createMockEvent({
         country: 'netherlands',
-        postal_code: 1234,
+        postal_code: '1234',
         start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
 
-      // Token format: `${country.toLowerCase()}:${postal_code}` (countryOfPostalToken / postalTokenForEvent)
+      // Token format: `${canonical country}:${postal_code}` (countryOfPostalToken / postalTokenForEvent)
       const belgiumToken = 'belgium:1000';
       const netherlandsToken = 'netherlands:1234';
 
@@ -231,6 +310,23 @@ describe('MapFiltersSheet', () => {
       expect(onApply).not.toHaveBeenCalledWith(
         expect.objectContaining({ postalCodes: expect.arrayContaining([netherlandsToken]) })
       );
+    });
+  });
+
+  describe('Country selection with variant-stored countries', () => {
+    it('scopes postal options to the selected country whatever the stored spelling', () => {
+      const belgianEvent = createMockEvent({ country: 'Belgique', postal_code: '1000' });
+      const dutchEvent = createMockEvent({ country: 'Nederland', postal_code: '1234' });
+
+      const { getByLabelText, getByPlaceholderText, queryByText, getByText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} events={[belgianEvent, dutchEvent]} />
+      );
+
+      fireEvent.press(getByLabelText('Belgium'));
+      fireEvent(getByPlaceholderText('maps.searchPostalCode'), 'focus');
+
+      expect(getByText(/^1000/)).toBeTruthy();
+      expect(queryByText(/^1234/)).toBeNull();
     });
   });
 

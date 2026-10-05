@@ -11,6 +11,7 @@ import { Spacing, Typography, BorderRadius, Shadows, IconSizes } from '@/constan
 import { FormattedEventListItem } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
 import { t } from '@/utils/i18n';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
 
 export interface UpcomingEventsListItemProps {
   event: FormattedEventListItem;
@@ -22,10 +23,7 @@ export default function UpcomingEventsListItem({ event }: UpcomingEventsListItem
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  const cityLabel =
-    event.postal_code && event.country
-      ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
-      : '';
+  const cityLabel = resolveEventCityLabel(event, getSubMunicipalityName);
 
   return (
     <TouchableOpacity onPress={() => router.push(`/event/${event.id}` as any)} activeOpacity={0.7}>

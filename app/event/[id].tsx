@@ -40,6 +40,8 @@ import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 
 import { logger } from '@/utils/logger';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
+import { getCountryLabel } from '@/utils/countryOptions';
 
 export default function EventDetails() {
   const {
@@ -318,7 +320,13 @@ export default function EventDetails() {
       event.postal_code && event.country
         ? getSubMunicipalityName(String(event.postal_code), event.country, event.city)
         : '';
-    const address = [event.street_address, event.postal_code, cityLabel || event.city]
+    // The country disambiguates same-named places (a "Grand-Rue" in Belgium or Luxembourg).
+    const address = [
+      event.street_address,
+      event.postal_code,
+      cityLabel || event.city,
+      event.country ? getCountryLabel(event.country, userLanguage) : '',
+    ]
       .filter(Boolean)
       .join(', ');
     openMap(event.geocod_lat, event.geocod_lng, address);
@@ -335,10 +343,7 @@ export default function EventDetails() {
       // shareEventWithAlert re-formats the event itself, so it needs the raw
       // Event (not the FormattedEvent). cityLabel is resolved the same way as
       // directions/sharing elsewhere so the shared message stays consistent.
-      const cityLabel =
-        rawEvent.postal_code && rawEvent.country
-          ? getSubMunicipalityName(String(rawEvent.postal_code), rawEvent.country, rawEvent.city)
-          : undefined;
+      const cityLabel = resolveEventCityLabel(rawEvent, getSubMunicipalityName);
       await shareEventWithAlert(rawEvent, userLanguage, cityLabel);
     } finally {
       isSharingRef.current = false;
@@ -423,6 +428,7 @@ export default function EventDetails() {
                         borderColor: themeColors.cardBorder,
                       },
                     ]}
+                    testID="event-sticky-manage"
                     onPress={() => setMenuOpen(true)}
                     accessibilityRole="button"
                     accessibilityLabel={t('events.manage')}
@@ -430,6 +436,7 @@ export default function EventDetails() {
                     <IconSymbol name="ellipsis" size={IconSizes.md} color={themeColors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity
+                    testID="event-sticky-edit"
                     style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
                     onPress={handleOpenEdit}
                     activeOpacity={0.85}
@@ -452,6 +459,7 @@ export default function EventDetails() {
                         borderColor: isEventSaved ? themeColors.tint : themeColors.cardBorder,
                       },
                     ]}
+                    testID="event-sticky-save"
                     onPress={handleSave}
                     accessibilityRole="button"
                     accessibilityLabel={
@@ -466,6 +474,7 @@ export default function EventDetails() {
                   </TouchableOpacity>
                   {event.geocod_lat != null && event.geocod_lng != null && (
                     <TouchableOpacity
+                      testID="button-directions"
                       style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
                       onPress={handleOpenDirections}
                       activeOpacity={0.85}

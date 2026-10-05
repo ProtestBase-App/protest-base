@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 
+import { CountryFilterSection } from '@/components/CountryFilterSection';
 import {
   FiltersSheetFooter,
   FiltersSheetSectionLabel,
@@ -19,10 +20,9 @@ import { eventCategories } from '@/constants/EventCategories';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Event } from '@/types/event.types';
+import { Event, EventCountry } from '@/types/event.types';
 import { t } from '@/utils/i18n';
 import {
-  buildCountryOptions,
   buildPostalCodeOptions,
   countryOfPostalToken,
   DEFAULT_MAP_FILTERS,
@@ -33,7 +33,7 @@ import { getThemeColors } from '@/utils/themeColors';
 export interface MapFiltersSheetProps {
   visible: boolean;
   initialFilters: MapFilters;
-  /** Geocoded upcoming events — the source for country/postal-code options. */
+  /** Geocoded upcoming events — the source for the postal-code options. */
   events: Event[];
   userLanguage: string;
   onApply: (filters: MapFilters) => void;
@@ -59,8 +59,9 @@ function isDraftDefault(draft: MapFilters): boolean {
  * close button, back gesture) discards the draft.
  *
  * Unlike the calendar sheet, location filtering follows the maps handoff:
- * a single-select country row plus a postal-code multi-select scoped to the
- * selected country (out-of-country selections are dropped automatically).
+ * a single-select country row (the same fixed list as the Explore sheet) plus a
+ * postal-code multi-select scoped to the selected country (out-of-country
+ * selections are dropped automatically).
  */
 export function MapFiltersSheet({
   visible,
@@ -100,7 +101,7 @@ export function MapFiltersSheet({
 
   // Re-tapping the selected country deselects it (back to all); postal codes
   // outside the newly selected country are dropped automatically.
-  const selectCountry = useCallback((value: string | null) => {
+  const selectCountry = useCallback((value: EventCountry | null) => {
     setDraft((prev) => {
       const country = prev.country === value ? null : value;
       return {
@@ -112,11 +113,6 @@ export function MapFiltersSheet({
       };
     });
   }, []);
-
-  const countryOptions = useMemo(
-    () => buildCountryOptions(events, userLanguage),
-    [events, userLanguage]
-  );
 
   const allPostalOptions = useMemo(
     () => buildPostalCodeOptions(events, getSubMunicipalityName),
@@ -173,6 +169,7 @@ export function MapFiltersSheet({
             return (
               <FilterChip
                 key={value}
+                testID={`filter-category-${value}`}
                 label={t('categories.' + value.toLowerCase())}
                 active={active}
                 activeColor={categoryColors.color}
@@ -192,24 +189,11 @@ export function MapFiltersSheet({
         </View>
       </View>
 
-      <View style={styles.section}>
-        <FiltersSheetSectionLabel label={t('maps.country')} />
-        <View style={styles.chipRow}>
-          <FilterChip
-            label={t('maps.countryAll')}
-            active={draft.country === null}
-            onPress={() => selectCountry(null)}
-          />
-          {countryOptions.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              active={draft.country === option.value}
-              onPress={() => selectCountry(option.value)}
-            />
-          ))}
-        </View>
-      </View>
+      <CountryFilterSection
+        selected={draft.country}
+        onSelect={selectCountry}
+        userLanguage={userLanguage}
+      />
 
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('maps.postalCode')} />
@@ -249,6 +233,7 @@ export function MapFiltersSheet({
             </ThemedText>
           </View>
           <Switch
+            testID="filter-saved-only"
             value={draft.savedOnly}
             onValueChange={(value) => setDraft((prev) => ({ ...prev, savedOnly: value }))}
             trackColor={{ true: themeColors.tint }}
@@ -264,6 +249,7 @@ export function MapFiltersSheet({
             </ThemedText>
           </View>
           <Switch
+            testID="filter-help-needed"
             value={draft.helpNeeded}
             onValueChange={(value) => setDraft((prev) => ({ ...prev, helpNeeded: value }))}
             trackColor={{ true: themeColors.tint }}

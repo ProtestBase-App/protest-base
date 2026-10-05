@@ -18,7 +18,8 @@
  * Token scheme mirrors `utils/locationFilterOptions.ts`:
  *   r:be:<slug>     region        m:be:<minCode>  municipality (min member code)
  *   p:be:<slug>     BE province   m:nl:<minCode>  NL sub-municipality
- *   p:nl:<slug>     NL province
+ *   p:nl:<slug>     NL province   p:lu:<slug>     LU canton
+ *   m:lu:<slug>     LU commune (slug: some LU codes belong to two communes)
  *
  * Municipality min-code tokens were verified against the bundled BE_EN / NL
  * datasets (they are language-independent). Coordinates are [lng, lat] to match
@@ -104,6 +105,39 @@ export const HOME_AREA_CENTROIDS: Record<string, [number, number]> = {
   'm:nl:9401': [6.5649, 52.9925], // Assen
   'm:nl:1336': [5.4714, 52.5185], // Lelystad
   'm:nl:4331': [3.6136, 51.4988], // Middelburg
+
+  // --- Luxembourg: cantons (canton capital) ---
+  // Coordinates from the ACT "localités avec coordonnées" file (CC0), via
+  // local/tools/generate-lu-postal-data.mjs.
+  'p:lu:capellen': [5.9883, 49.6428], // Capellen
+  'p:lu:clervaux': [6.0255, 50.0562], // Clervaux
+  'p:lu:diekirch': [6.1531, 49.8707], // Diekirch
+  'p:lu:echternach': [6.4136, 49.8148], // Echternach
+  'p:lu:esch-sur-alzette': [5.979, 49.4971], // Esch-sur-Alzette
+  'p:lu:grevenmacher': [6.4372, 49.6803], // Grevenmacher
+  'p:lu:luxembourg': [6.1338, 49.6116], // Luxembourg
+  'p:lu:mersch': [6.1066, 49.7504], // Mersch
+  'p:lu:redange': [5.8856, 49.763], // Redange
+  'p:lu:remich': [6.3677, 49.5489], // Remich
+  'p:lu:vianden': [6.2045, 49.9343], // Vianden
+  'p:lu:wiltz': [5.9372, 49.9623], // Wiltz
+
+  // --- Luxembourg: major communes ---
+  'm:lu:luxembourg': [6.1338, 49.6116], // Luxembourg
+  'm:lu:esch-sur-alzette': [5.979, 49.4971], // Esch-sur-Alzette
+  'm:lu:differdange': [5.8928, 49.5209], // Differdange
+  'm:lu:dudelange': [6.0879, 49.4856], // Dudelange
+  'm:lu:hesperange': [6.154, 49.5705], // Hesperange
+  'm:lu:petange': [5.8735, 49.5567], // Pétange
+  'm:lu:sanem': [5.9283, 49.5482], // Sanem
+  'm:lu:mamer': [6.0255, 49.6284], // Mamer
+  'm:lu:diekirch': [6.1531, 49.8707], // Diekirch
+  'm:lu:bettembourg': [6.1057, 49.5212], // Bettembourg
+  'm:lu:echternach': [6.4136, 49.8148], // Echternach
+  'm:lu:mersch': [6.1066, 49.7504], // Mersch
+  'm:lu:grevenmacher': [6.4372, 49.6803], // Grevenmacher
+  'm:lu:kaerjeng': [5.8944, 49.5825], // Käerjeng
+  'm:lu:ettelbruck': [6.1056, 49.8498], // Ettelbruck
 };
 
 /**
@@ -115,6 +149,8 @@ export const HOME_AREA_CENTROIDS: Record<string, [number, number]> = {
 export function homeAreaZoomForToken(token: string | null): number | null {
   if (!token) return null;
   if (token.startsWith('m:')) return 11.5;
+  // Luxembourg cantons are a fraction of a Belgian or Dutch province.
+  if (token.startsWith('p:lu:')) return 10;
   if (token.startsWith('p:')) return 9;
   if (token.startsWith('r:')) return token === 'r:be:brussels' ? 10.5 : 8;
   return null;

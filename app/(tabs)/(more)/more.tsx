@@ -139,7 +139,7 @@ export default function MoreScreen() {
         city: undefined,
         region: undefined,
         country: 'belgium',
-        postal_code: 1000,
+        postal_code: '1000',
         // Explicit Gare du Nord (Brussels-North) coordinates: the backend adopts
         // these and skips geocoding. Without them the vague "Gare du Nord" string
         // mis-geocodes to the Ardennes, leaving a Brussels-postcode event with

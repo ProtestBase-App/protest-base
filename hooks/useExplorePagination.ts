@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { getEventsBackend, EventFilterParams } from '@/services/event.service';
+import {
+  getEventsForLocations,
+  EventFilterParams,
+  LocationSelectionTooBroadError,
+} from '@/services/event.service';
+import type { EventCountry } from '@/types/event.types';
 import { formatEventForList, FormattedEventListItem } from '@/utils/eventFormatters';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { isNetworkError } from '@/utils/networkError';
@@ -9,8 +14,10 @@ import { t } from '@/utils/i18n';
 export interface ExploreFilters {
   /** Date filter preset: 'today', 'tomorrow', 'thisWeek', 'thisWeekend' or null for all dates */
   dateFilter: string | null;
-  /** Array of postal codes to filter by */
-  postalCodes: string[];
+  /** Canonical country value or null for all countries */
+  country: EventCountry | null;
+  /** Area tokens (or legacy raw postal codes) to filter by */
+  locations: string[];
   /** Array of organization IDs to filter by */
   organizers: string[];
   /** Category filter or null for all categories */
@@ -27,6 +34,8 @@ interface UseExplorePaginationOptions {
   /** When true, all network fetches short-circuit so loaded pages stay put
    * instead of being wiped by a doomed request. */
   isOffline?: boolean;
+  /** Expands the selection to postal codes, for the legacy `postalCodes` request. */
+  expandLocations: (values: string[]) => { codes: string[]; truncated: boolean };
 }
 
 interface UseExplorePaginationReturn {
@@ -54,6 +63,7 @@ export function useExplorePagination({
   pageSize = 20,
   filters,
   isOffline = false,
+  expandLocations,
 }: UseExplorePaginationOptions): UseExplorePaginationReturn {
   const { userLanguage } = useGlobalContext();
 
@@ -78,9 +88,13 @@ export function useExplorePagination({
   const userLanguageRef = useRef(userLanguage);
   userLanguageRef.current = userLanguage;
 
+  // Only the legacy fallback reads it; a new identity (datasets loading) must not refetch.
+  const expandLocationsRef = useRef(expandLocations);
+  expandLocationsRef.current = expandLocations;
+
   // Stabilize array filter values by content rather than reference so changes
   // to the array's identity (but not its contents) don't refetch.
-  const postalCodesKey = useMemo(() => filters.postalCodes.join(','), [filters.postalCodes]);
+  const locationsKey = useMemo(() => filters.locations.join(','), [filters.locations]);
   const organizersKey = useMemo(() => filters.organizers.join(','), [filters.organizers]);
 
   const buildFilterParams = useCallback(
@@ -95,10 +109,6 @@ export function useExplorePagination({
         params.dateFilter = filters.dateFilter as EventFilterParams['dateFilter'];
       }
 
-      if (filters.postalCodes && filters.postalCodes.length > 0) {
-        params.postalCodes = filters.postalCodes;
-      }
-
       if (filters.organizers && filters.organizers.length > 0) {
         params.organizers = filters.organizers;
       }
@@ -107,13 +117,26 @@ export function useExplorePagination({
         params.category = filters.category;
       }
 
+      if (filters.country) {
+        params.country = filters.country;
+      }
+
       if (filters.search && filters.search.trim()) {
         params.search = filters.search.trim();
       }
 
       return params;
     },
-    [pageSize, filters.dateFilter, filters.category, filters.search, postalCodesKey, organizersKey]
+    [pageSize, filters.dateFilter, filters.category, filters.country, filters.search, organizersKey]
+  );
+
+  // Tokens never contain commas, so the key round-trips to the same selection.
+  const fetchPage = useCallback(
+    (params: EventFilterParams) =>
+      getEventsForLocations(params, locationsKey ? locationsKey.split(',') : [], (values) =>
+        expandLocationsRef.current(values)
+      ),
+    [locationsKey]
   );
 
   // Fetch events (initial load or refresh). Uses requestId to discard stale
@@ -148,7 +171,7 @@ export function useExplorePagination({
 
         logger.debug('[useExplorePagination] Fetching events', { isRefresh, params });
 
-        const response = await getEventsBackend(params);
+        const response = await fetchPage(params);
 
         // Discard if a newer request was issued while this one was in flight.
         if (currentRequestId !== requestIdRef.current) return;
@@ -166,7 +189,11 @@ export function useExplorePagination({
         if (currentRequestId !== requestIdRef.current) return;
         const logAtLevel = isNetworkError(err) ? logger.warn : logger.error;
         logAtLevel('[useExplorePagination] Error fetching events:', { error: err });
-        setError(err.message || 'Failed to fetch events');
+        setError(
+          err instanceof LocationSelectionTooBroadError
+            ? t('filters.selectionTooBroad')
+            : err.message || 'Failed to fetch events'
+        );
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setLoading(false);
@@ -175,7 +202,7 @@ export function useExplorePagination({
         }
       }
     },
-    [buildFilterParams, pageSize]
+    [buildFilterParams, fetchPage, pageSize]
   );
 
   // Load more for infinite scroll. Uses loadingRef to coalesce duplicate
@@ -193,7 +220,7 @@ export function useExplorePagination({
 
       const params = buildFilterParams(offset);
 
-      const response = await getEventsBackend(params);
+      const response = await fetchPage(params);
 
       // Discard if a filter-change fetch happened while paginating.
       if (currentRequestId !== requestIdRef.current) return;
@@ -218,7 +245,7 @@ export function useExplorePagination({
         loadingRef.current = false;
       }
     }
-  }, [buildFilterParams, offset, hasMore, pageSize]);
+  }, [buildFilterParams, fetchPage, offset, hasMore, pageSize]);
 
   // Fetch on mount and whenever filters change. Resets to page 1.
   useEffect(() => {
@@ -231,7 +258,14 @@ export function useExplorePagination({
 
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFilter, filters.category, filters.search, postalCodesKey, organizersKey]);
+  }, [
+    filters.dateFilter,
+    filters.category,
+    filters.country,
+    filters.search,
+    locationsKey,
+    organizersKey,
+  ]);
 
   const handleRefresh = useCallback(() => {
     fetchEvents(true);

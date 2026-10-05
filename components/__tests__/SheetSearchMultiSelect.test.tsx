@@ -5,6 +5,11 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
   return (props: any) => React.createElement('MaterialIcons', props);
 });
 
+const mockRevealFocusedInput = jest.fn();
+jest.mock('@/components/FiltersSheetShell', () => ({
+  useFiltersSheetKeyboard: () => ({ revealFocusedInput: mockRevealFocusedInput }),
+}));
+
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import {
@@ -594,6 +599,18 @@ describe('SheetSearchMultiSelect', () => {
       });
 
       expect(onFocusChange).not.toHaveBeenCalledWith(false);
+    });
+  });
+
+  // Moving focus between sheet inputs keeps the keyboard up, so the sheet hears
+  // about the newly focused input only through this request.
+  describe('inside a filter sheet', () => {
+    it('asks the sheet to reveal the input on focus', () => {
+      render(<SheetSearchMultiSelect {...defaultProps} inBottomSheet />);
+
+      fireEvent(getInput(), 'focus');
+
+      expect(mockRevealFocusedInput).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -12,14 +12,18 @@ import {
   SheetSearchMultiSelectOption,
 } from '@/components/SheetSearchMultiSelect';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { CountryFilterSection } from '@/components/CountryFilterSection';
 import { getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing } from '@/constants/DesignTokens';
 import { eventCategories } from '@/constants/EventCategories';
 import { DEFAULT_EXPLORE_FILTERS, ExploreAppliedFilters } from '@/context/ExploreTabProvider';
+import { useGlobalContext } from '@/context/GlobalProvider';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
-import { EventFilterParams, getEventsBackend } from '@/services/event.service';
+import { EventFilterParams, getEventsForLocations } from '@/services/event.service';
+import type { EventCountry } from '@/types/event.types';
 import { t } from '@/utils/i18n';
+import { countryOfLocationToken } from '@/utils/locationFilterOptions';
 import { logger } from '@/utils/logger';
 
 export interface ExploreFiltersSheetProps {
@@ -45,6 +49,7 @@ function isDraftDefault(draft: ExploreAppliedFilters): boolean {
   return (
     draft.category === DEFAULT_EXPLORE_FILTERS.category &&
     draft.dateFilter === DEFAULT_EXPLORE_FILTERS.dateFilter &&
+    draft.country === DEFAULT_EXPLORE_FILTERS.country &&
     draft.locations.length === DEFAULT_EXPLORE_FILTERS.locations.length &&
     draft.organizations.length === DEFAULT_EXPLORE_FILTERS.organizations.length
   );
@@ -57,6 +62,10 @@ function isDraftDefault(draft: ExploreAppliedFilters): boolean {
  *
  * Unlike the calendar sheet, explore filters server-side, so the live result
  * count for the Apply button comes from a debounced limit-1 backend request.
+ *
+ * Like the maps sheet, the country row is single-select and scopes the location
+ * picker; location areas outside the selected country are dropped from the draft
+ * because the backend ANDs the two and they could never match.
  */
 export function ExploreFiltersSheet({
   visible,
@@ -73,6 +82,7 @@ export function ExploreFiltersSheet({
     loading,
   } = usePostalCodes();
   const { dropdownItems, loading: organizationsLoading, ensureOrganizations } = useOrganizations();
+  const { userLanguage } = useGlobalContext();
 
   const [draft, setDraft] = useState<ExploreAppliedFilters>(initialFilters);
 
@@ -94,18 +104,40 @@ export function ExploreFiltersSheet({
     setDraft((prev) => ({ ...prev, dateFilter: prev.dateFilter === value ? null : value }));
   }, []);
 
+  // Re-tapping the selected country deselects it (back to all). Raw postal codes
+  // from older saved state carry no country, so they are kept.
+  const selectCountry = useCallback((value: EventCountry | null) => {
+    setDraft((prev) => {
+      const country = prev.country === value ? null : value;
+      return {
+        ...prev,
+        country,
+        locations: country
+          ? prev.locations.filter((token) => {
+              const tokenCountry = countryOfLocationToken(token);
+              return tokenCountry === null || tokenCountry === country;
+            })
+          : prev.locations,
+      };
+    });
+  }, []);
+
   const locationOptions = useMemo<SheetSearchMultiSelectOption[]>(
     () =>
       loading
         ? []
-        : locationFilterOptions.map((option) => ({
-            value: option.value,
-            label: option.label,
-            searchText: option.searchText,
-            sublabel:
-              option.provinceLabel || t('filters.postalCodesCount', { count: option.count }),
-          })),
-    [loading, locationFilterOptions]
+        : locationFilterOptions
+            .filter(
+              (option) => !draft.country || countryOfLocationToken(option.value) === draft.country
+            )
+            .map((option) => ({
+              value: option.value,
+              label: option.label,
+              searchText: option.searchText,
+              sublabel:
+                option.provinceLabel || t('filters.postalCodesCount', { count: option.count }),
+            })),
+    [loading, locationFilterOptions, draft.country]
   );
 
   const organizationOptions = useMemo<SheetSearchMultiSelectOption[]>(
@@ -152,20 +184,20 @@ export function ExploreFiltersSheet({
         if (draft.dateFilter) {
           params.dateFilter = draft.dateFilter as EventFilterParams['dateFilter'];
         }
-        if (draft.locations.length > 0) {
-          params.postalCodes = expandLocationTokens(draft.locations).codes;
-        }
         if (draft.organizations.length > 0) {
           params.organizers = draft.organizations;
         }
         if (draft.category) {
           params.category = draft.category;
         }
+        if (draft.country) {
+          params.country = draft.country;
+        }
         if (searchQuery.trim()) {
           params.search = searchQuery.trim();
         }
 
-        const response = await getEventsBackend(params);
+        const response = await getEventsForLocations(params, draft.locations, expandLocationTokens);
 
         // Discard if a newer count request was issued while this one was in flight.
         if (currentRequestId !== requestIdRef.current) return;
@@ -206,6 +238,7 @@ export function ExploreFiltersSheet({
             return (
               <FilterChip
                 key={value}
+                testID={`filter-category-${value}`}
                 label={t('categories.' + value.toLowerCase())}
                 active={active}
                 activeColor={categoryColors.color}
@@ -231,6 +264,7 @@ export function ExploreFiltersSheet({
           {DATE_PRESETS.map(({ value, labelKey }) => (
             <FilterChip
               key={value}
+              testID={`filter-date-${value}`}
               label={t(labelKey)}
               active={draft.dateFilter === value}
               onPress={() => toggleDateFilter(value)}
@@ -239,10 +273,17 @@ export function ExploreFiltersSheet({
         </View>
       </View>
 
+      <CountryFilterSection
+        selected={draft.country}
+        onSelect={selectCountry}
+        userLanguage={userLanguage}
+      />
+
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.location')} />
         <SheetSearchMultiSelect
           inBottomSheet
+          testID="filter-location"
           options={locationOptions}
           selected={draft.locations}
           onChange={(next) => setDraft((prev) => ({ ...prev, locations: next }))}
@@ -258,6 +299,7 @@ export function ExploreFiltersSheet({
         <FiltersSheetSectionLabel label={t('filters.organization')} />
         <SheetSearchMultiSelect
           inBottomSheet
+          testID="filter-organization"
           options={organizationOptions}
           selected={draft.organizations}
           onChange={(next) => setDraft((prev) => ({ ...prev, organizations: next }))}

@@ -9,11 +9,15 @@
 // Mocks (must be hoisted before imports)
 // ============================================
 
-const mockGetEventsBackend = jest.fn();
+const mockGetEventsForLocations = jest.fn();
 
-jest.mock('@/services/event.service', () => ({
-  getEventsBackend: (...args: any[]) => mockGetEventsBackend(...args),
-}));
+jest.mock('@/services/event.service', () => {
+  class LocationSelectionTooBroadError extends Error {}
+  return {
+    getEventsForLocations: (...args: any[]) => mockGetEventsForLocations(...args),
+    LocationSelectionTooBroadError,
+  };
+});
 
 const mockUserLanguage = 'en';
 
@@ -50,6 +54,7 @@ jest.mock('@/utils/logger', () => ({
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useExplorePagination, ExploreFilters } from '@/hooks/useExplorePagination';
+import { t } from '@/utils/i18n';
 
 // ============================================
 // Helpers
@@ -57,11 +62,14 @@ import { useExplorePagination, ExploreFilters } from '@/hooks/useExplorePaginati
 
 const defaultFilters: ExploreFilters = {
   dateFilter: null,
-  postalCodes: [],
+  country: null,
+  locations: [],
   organizers: [],
   category: null,
   search: '',
 };
+
+const mockExpand = jest.fn((values: string[]) => ({ codes: values, truncated: false }));
 
 function makeApiResponse(count: number, total: number, startId = 1) {
   return {
@@ -94,10 +102,10 @@ describe('useExplorePagination', () => {
 
   describe('initial load', () => {
     it('starts with loading=true, empty events, no error', () => {
-      mockGetEventsBackend.mockReturnValue(new Promise(() => {})); // never resolves
+      mockGetEventsForLocations.mockReturnValue(new Promise(() => {})); // never resolves
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       expect(result.current.loading).toBe(true);
@@ -106,10 +114,10 @@ describe('useExplorePagination', () => {
     });
 
     it('sets events, total, and turns off loading after successful fetch', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(3, 3));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(3, 3));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => {
@@ -122,10 +130,10 @@ describe('useExplorePagination', () => {
     });
 
     it('sets hasMore=true when total exceeds pageSize', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(20, 50));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(20, 50));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -135,10 +143,10 @@ describe('useExplorePagination', () => {
     });
 
     it('sets hasMore=false when total equals pageSize', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(20, 20));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(20, 20));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -147,10 +155,10 @@ describe('useExplorePagination', () => {
     });
 
     it('sets hasMore=false when total is less than pageSize', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(5, 5));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(5, 5));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -159,10 +167,10 @@ describe('useExplorePagination', () => {
     });
 
     it('sets error when fetch fails', async () => {
-      mockGetEventsBackend.mockRejectedValue(new Error('Network failure'));
+      mockGetEventsForLocations.mockRejectedValue(new Error('Network failure'));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -172,10 +180,10 @@ describe('useExplorePagination', () => {
     });
 
     it('uses fallback error message when error has no message property', async () => {
-      mockGetEventsBackend.mockRejectedValue({});
+      mockGetEventsForLocations.mockRejectedValue({});
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -184,10 +192,10 @@ describe('useExplorePagination', () => {
     });
 
     it('formats events using formatEventForList with userLanguage', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -202,178 +210,308 @@ describe('useExplorePagination', () => {
 
   describe('filter params sent to API', () => {
     it('sends dateFilter when set', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
         ...defaultFilters,
         dateFilter: 'today',
       };
 
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ dateFilter: 'today' })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ dateFilter: 'today' }),
+        expect.any(Array),
+        expect.any(Function)
       );
     });
 
     it('does not send dateFilter when value is null', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      const callArgs = mockGetEventsBackend.mock.calls[0][0];
+      const callArgs = mockGetEventsForLocations.mock.calls[0][0];
       expect(callArgs).not.toHaveProperty('dateFilter');
     });
 
-    it('sends postalCodes when provided', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+    it('passes the location selection to the area-aware fetch', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
         ...defaultFilters,
-        postalCodes: ['1000', '9000'],
+        locations: ['r:be:brussels', 'm:be:9000'],
       };
 
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ postalCodes: ['1000', '9000'] })
-      );
+      const [params, locations] = mockGetEventsForLocations.mock.calls[0];
+      expect(locations).toEqual(['r:be:brussels', 'm:be:9000']);
+      // The service decides between `areas` and `postalCodes`; the hook sends neither.
+      expect(params).not.toHaveProperty('areas');
+      expect(params).not.toHaveProperty('postalCodes');
     });
 
-    it('does not send postalCodes when array is empty', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+    it('passes an empty selection when no location filter is set', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      const callArgs = mockGetEventsBackend.mock.calls[0][0];
-      expect(callArgs).not.toHaveProperty('postalCodes');
+      expect(mockGetEventsForLocations.mock.calls[0][1]).toEqual([]);
+    });
+
+    it('shows the too-broad message when the selection cannot be sent', async () => {
+      const { LocationSelectionTooBroadError } = jest.requireMock('@/services/event.service');
+      mockGetEventsForLocations.mockRejectedValue(new LocationSelectionTooBroadError());
+
+      const filters: ExploreFilters = { ...defaultFilters, locations: ['1000', '9000'] };
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error).toBe(t('filters.selectionTooBroad'));
+    });
+
+    it('does not refetch when only the expander changes (postal data loading)', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
+      const filters: ExploreFilters = { ...defaultFilters, locations: ['r:be:brussels'] };
+
+      const { result, rerender } = renderHook(
+        ({ expand }: { expand: typeof mockExpand }) =>
+          useExplorePagination({ expandLocations: expand, filters, pageSize: 20 }),
+        { initialProps: { expand: mockExpand } }
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      rerender({ expand: jest.fn((values: string[]) => ({ codes: values, truncated: false })) });
+
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the same selection when loading more pages', async () => {
+      mockGetEventsForLocations
+        .mockResolvedValueOnce(makeApiResponse(20, 40))
+        .mockResolvedValueOnce(makeApiResponse(20, 40, 21));
+      const filters: ExploreFilters = { ...defaultFilters, locations: ['p:nl:fryslan'] };
+
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        result.current.handleEndReached();
+      });
+
+      await waitFor(() => expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2));
+      expect(mockGetEventsForLocations.mock.calls[1][1]).toEqual(['p:nl:fryslan']);
+      expect(mockGetEventsForLocations.mock.calls[1][0]).toEqual(
+        expect.objectContaining({ offset: 20 })
+      );
     });
 
     it('sends organizers when provided', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
         ...defaultFilters,
         organizers: ['org-1', 'org-2'],
       };
 
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ organizers: ['org-1', 'org-2'] })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ organizers: ['org-1', 'org-2'] }),
+        expect.any(Array),
+        expect.any(Function)
       );
     });
 
     it('sends category when set', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
         ...defaultFilters,
         category: 'Climate',
       };
 
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'Climate' })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'Climate' }),
+        expect.any(Array),
+        expect.any(Function)
       );
     });
 
+    it('sends country when set, alongside the location selection', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
+
+      const filters: ExploreFilters = {
+        ...defaultFilters,
+        country: 'belgium',
+        locations: ['r:be:brussels'],
+      };
+
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ country: 'belgium' }),
+        ['r:be:brussels'],
+        expect.any(Function)
+      );
+    });
+
+    it('does not send country when value is null', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
+
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const callArgs = mockGetEventsForLocations.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('country');
+    });
+
     it('sends trimmed search when not empty', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const filters: ExploreFilters = {
         ...defaultFilters,
         search: '  climate  ',
       };
 
-      const { result } = renderHook(() => useExplorePagination({ filters, pageSize: 20 }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ search: 'climate' })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'climate' }),
+        expect.any(Array),
+        expect.any(Function)
       );
     });
 
     it('does not send search when string is empty', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      const callArgs = mockGetEventsBackend.mock.calls[0][0];
+      const callArgs = mockGetEventsForLocations.mock.calls[0][0];
       expect(callArgs).not.toHaveProperty('search');
     });
 
     it('always sends includeEnded: false', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ includeEnded: false })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ includeEnded: false }),
+        expect.any(Array),
+        expect.any(Function)
       );
     });
   });
 
   describe('filter changes trigger re-fetch', () => {
     it('re-fetches when dateFilter changes', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
 
       let filters: ExploreFilters = { ...defaultFilters };
 
       const { result, rerender } = renderHook(() =>
-        useExplorePagination({ filters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
 
       // Change filter
       filters = { ...filters, dateFilter: 'today' };
       rerender({});
 
       await waitFor(() => expect(result.current.loading).toBe(false));
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(2);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches page 1 with the new country when country changes', async () => {
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
+
+      let filters: ExploreFilters = { ...defaultFilters };
+
+      const { result, rerender } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
+      );
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+
+      filters = { ...filters, country: 'netherlands' };
+      rerender({});
+
+      await waitFor(() => expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2));
+      expect(mockGetEventsForLocations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ country: 'netherlands', offset: 0 }),
+        [],
+        expect.any(Function)
+      );
     });
 
     it('replaces events when filters change', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(3, 3));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(3, 3));
 
       let filters: ExploreFilters = { ...defaultFilters };
       const { result, rerender } = renderHook(() =>
-        useExplorePagination({ filters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(result.current.events).toHaveLength(3);
 
       // Change filter — new fetch replaces events
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(1, 1));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(1, 1));
       filters = { ...filters, category: 'Climate' };
       rerender({});
 
@@ -383,17 +521,17 @@ describe('useExplorePagination', () => {
 
   describe('handleRefresh', () => {
     it('sets refreshing=true during refresh', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       // Set up a promise we can control
       let resolveRefresh!: (value: any) => void;
-      mockGetEventsBackend.mockReturnValue(
+      mockGetEventsForLocations.mockReturnValue(
         new Promise((resolve) => {
           resolveRefresh = resolve;
         })
@@ -413,15 +551,15 @@ describe('useExplorePagination', () => {
     });
 
     it('re-fetches events from offset 0 on refresh', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
       await act(async () => {
         result.current.handleRefresh();
       });
@@ -430,59 +568,59 @@ describe('useExplorePagination', () => {
 
       // The refresh call should have offset: 0
       const lastCall =
-        mockGetEventsBackend.mock.calls[mockGetEventsBackend.mock.calls.length - 1][0];
+        mockGetEventsForLocations.mock.calls[mockGetEventsForLocations.mock.calls.length - 1][0];
       expect(lastCall.offset).toBe(0);
     });
   });
 
   describe('handleEndReached (load more)', () => {
     it('does nothing when hasMore is false', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(5, 5));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(5, 5));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(result.current.hasMore).toBe(false);
 
-      const callCountBefore = mockGetEventsBackend.mock.calls.length;
+      const callCountBefore = mockGetEventsForLocations.mock.calls.length;
 
       act(() => {
         result.current.handleEndReached();
       });
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(callCountBefore);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(callCountBefore);
     });
 
     it('does nothing when loading is true', async () => {
       // Never resolves so loading stays true
-      mockGetEventsBackend.mockReturnValue(new Promise(() => {}));
+      mockGetEventsForLocations.mockReturnValue(new Promise(() => {}));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       expect(result.current.loading).toBe(true);
 
-      const callCountBefore = mockGetEventsBackend.mock.calls.length;
+      const callCountBefore = mockGetEventsForLocations.mock.calls.length;
 
       act(() => {
         result.current.handleEndReached();
       });
 
       // No additional call beyond the initial one
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(callCountBefore);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(callCountBefore);
     });
 
     it('loads more events and appends them when hasMore is true', async () => {
       // First call: 20 events, total 40 → hasMore=true
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
       // Second call: 20 more events
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 21));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 21));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -499,17 +637,17 @@ describe('useExplorePagination', () => {
     });
 
     it('does not duplicate load more calls (deduplication via loadingRef)', async () => {
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
 
       let resolveLoadMore!: (v: any) => void;
-      mockGetEventsBackend.mockReturnValue(
+      mockGetEventsForLocations.mockReturnValue(
         new Promise((resolve) => {
           resolveLoadMore = resolve;
         })
       );
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -526,15 +664,15 @@ describe('useExplorePagination', () => {
       });
 
       // Only 2 calls total: 1 initial + 1 load more (no duplicates)
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(2);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2);
     });
 
     it('handles load more error gracefully without setting error state', async () => {
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
-      mockGetEventsBackend.mockRejectedValueOnce(new Error('Load more failed'));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
+      mockGetEventsForLocations.mockRejectedValueOnce(new Error('Load more failed'));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -554,21 +692,29 @@ describe('useExplorePagination', () => {
 
   describe('default pageSize', () => {
     it('uses pageSize 20 by default when not provided', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(5, 5));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(5, 5));
 
-      const { result } = renderHook(() => useExplorePagination({ filters: defaultFilters }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(expect.objectContaining({ limit: 20 }));
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 20 }),
+        expect.any(Array),
+        expect.any(Function)
+      );
     });
   });
 
   describe('returned interface', () => {
     it('exposes all required fields', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(0, 0));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(0, 0));
 
-      const { result } = renderHook(() => useExplorePagination({ filters: defaultFilters }));
+      const { result } = renderHook(() =>
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters })
+      );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -589,14 +735,14 @@ describe('useExplorePagination', () => {
       // The isMountedRef guards prevent setState calls on unmounted components.
       // We verify no errors are thrown when unmounting mid-fetch.
       let resolveInitial!: (v: any) => void;
-      mockGetEventsBackend.mockReturnValueOnce(
+      mockGetEventsForLocations.mockReturnValueOnce(
         new Promise((resolve) => {
           resolveInitial = resolve;
         })
       );
 
       const { unmount } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       // Unmount while fetch is still in flight
@@ -612,14 +758,14 @@ describe('useExplorePagination', () => {
 
     it('does not update state after unmount during fetch error', async () => {
       let rejectInitial!: (reason: any) => void;
-      mockGetEventsBackend.mockReturnValueOnce(
+      mockGetEventsForLocations.mockReturnValueOnce(
         new Promise((_, reject) => {
           rejectInitial = reject;
         })
       );
 
       const { unmount } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       unmount();
@@ -632,17 +778,17 @@ describe('useExplorePagination', () => {
     });
 
     it('does not update state after unmount during load more', async () => {
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
 
       let resolveLoadMore!: (v: any) => void;
-      mockGetEventsBackend.mockReturnValueOnce(
+      mockGetEventsForLocations.mockReturnValueOnce(
         new Promise((resolve) => {
           resolveLoadMore = resolve;
         })
       );
 
       const { result, unmount } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -663,17 +809,17 @@ describe('useExplorePagination', () => {
     });
 
     it('does not update state after unmount during load more error', async () => {
-      mockGetEventsBackend.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
+      mockGetEventsForLocations.mockResolvedValueOnce(makeApiResponse(20, 40, 1));
 
       let rejectLoadMore!: (reason: any) => void;
-      mockGetEventsBackend.mockReturnValueOnce(
+      mockGetEventsForLocations.mockReturnValueOnce(
         new Promise((_, reject) => {
           rejectLoadMore = reject;
         })
       );
 
       const { result, unmount } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -699,15 +845,15 @@ describe('useExplorePagination', () => {
       // A second fetchEvents call (via handleRefresh) during the first fetch
       // causes the first response to be discarded when it arrives.
       let resolveFirst!: (v: any) => void;
-      mockGetEventsBackend.mockReturnValueOnce(
+      mockGetEventsForLocations.mockReturnValueOnce(
         new Promise((resolve) => {
           resolveFirst = resolve;
         })
       );
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(2, 2));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(2, 2));
 
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20 })
+        useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
       // First call is in flight; loading is true
@@ -719,7 +865,7 @@ describe('useExplorePagination', () => {
       });
 
       // Two API calls were made: the initial and the refresh
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(2);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(2);
 
       // Resolve the stale first call — its result should be discarded
       await act(async () => {
@@ -736,19 +882,29 @@ describe('useExplorePagination', () => {
   describe('offline behavior (isOffline)', () => {
     it('does not call getEventsBackend on mount when offline, and sets an error', async () => {
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline: true })
+        useExplorePagination({
+          expandLocations: mockExpand,
+          filters: defaultFilters,
+          pageSize: 20,
+          isOffline: true,
+        })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
       expect(result.current.error).toBeTruthy();
       expect(result.current.events).toEqual([]);
     });
 
     it('handleEndReached does not fetch when offline', async () => {
       const { result } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline: true })
+        useExplorePagination({
+          expandLocations: mockExpand,
+          filters: defaultFilters,
+          pageSize: 20,
+          isOffline: true,
+        })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -757,15 +913,20 @@ describe('useExplorePagination', () => {
         result.current.handleEndReached();
       });
 
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
     });
 
     it('keeps already-loaded events when going offline and refreshing', async () => {
-      mockGetEventsBackend.mockResolvedValue(makeApiResponse(3, 3));
+      mockGetEventsForLocations.mockResolvedValue(makeApiResponse(3, 3));
 
       let isOffline = false;
       const { result, rerender } = renderHook(() =>
-        useExplorePagination({ filters: defaultFilters, pageSize: 20, isOffline })
+        useExplorePagination({
+          expandLocations: mockExpand,
+          filters: defaultFilters,
+          pageSize: 20,
+          isOffline,
+        })
       );
 
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -774,13 +935,13 @@ describe('useExplorePagination', () => {
       // Connectivity drops; a pull-to-refresh must not wipe the loaded pages.
       isOffline = true;
       rerender({});
-      const callCountBefore = mockGetEventsBackend.mock.calls.length;
+      const callCountBefore = mockGetEventsForLocations.mock.calls.length;
 
       await act(async () => {
         result.current.handleRefresh();
       });
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(callCountBefore);
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(callCountBefore);
       expect(result.current.events).toHaveLength(3);
     });
   });

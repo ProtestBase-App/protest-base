@@ -181,6 +181,70 @@ describe('DraftEdit', () => {
     alertSpy.mockRestore();
   });
 
+  describe('location on save', () => {
+    const draftInBelgium = () =>
+      createMockEvent({
+        $id: 'draft-1',
+        country: 'belgium',
+        city: 'Brussels',
+        region: 'Brussels-Capital',
+        street_address: 'Rue de la Loi 16',
+        postal_code: '1000',
+      });
+
+    const renderDraft = async () => {
+      getDraftEventPreview.mockResolvedValue(draftInBelgium());
+      patchEvent.mockResolvedValue(draftInBelgium());
+      const utils = renderWithProviders(<DraftEdit />, {
+        providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+      });
+      await utils.findByTestId('btn-draft-save');
+      return utils;
+    };
+
+    it('keeps the string postcode the API sends and re-sends it unchanged', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { getByTestId } = await renderDraft();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('btn-draft-save'));
+      });
+
+      const [, patch] = patchEvent.mock.calls[0];
+      expect(patch).toMatchObject({
+        postal_code: '1000',
+        country: 'belgium',
+        city: 'Brussels',
+        street_address: 'Rue de la Loi 16',
+      });
+      alertSpy.mockRestore();
+    });
+
+    it("sends '' for the address it emptied on a country switch, and no stale pin", async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { getByTestId } = await renderDraft();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('country-chip-netherlands'));
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('btn-draft-save'));
+      });
+
+      const [, patch] = patchEvent.mock.calls[0];
+      expect(patch).toMatchObject({
+        country: 'netherlands',
+        street_address: '',
+        city: '',
+        region: '',
+        postal_code: '',
+      });
+      expect(patch).not.toHaveProperty('geocod_lat');
+      expect(patch).not.toHaveProperty('geocod_lng');
+      alertSpy.mockRestore();
+    });
+  });
+
   describe('Unsaved changes guard', () => {
     it('prompts before closing when the draft has unsaved edits', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});

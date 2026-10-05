@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { StyleSheet, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,6 +32,9 @@ import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { FormattedEventListItem } from '@/utils/eventFormatters';
 import { getThemeColors } from '@/utils/themeColors';
+import { resolveEventCityLabel } from '@/utils/eventLocation';
+import { countryOfLocationToken } from '@/utils/locationFilterOptions';
+import { getCountryLabel } from '@/utils/countryOptions';
 
 function LoadingFooter() {
   return (
@@ -66,11 +69,12 @@ export default function ExploreTab() {
 
   const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
 
-  // Filter-button badge: categories/date count 1 each, locations and
+  // Filter-button badge: category/date/country count 1 each, locations and
   // organizations count one per selection (same rule as the calendar tab).
   const activeFilterCount =
     (appliedFilters.category ? 1 : 0) +
     (appliedFilters.dateFilter ? 1 : 0) +
+    (appliedFilters.country ? 1 : 0) +
     appliedFilters.locations.length +
     appliedFilters.organizations.length;
 
@@ -81,14 +85,6 @@ export default function ExploreTab() {
   // Recomputed on every render, like the calendar tab — the value only
   // changes when the Belgium-TZ day flips.
   const todayKey = getTodayDateKeyInBelgium();
-
-  // Hierarchy tokens (e.g. r:be:brussels) are expanded to their member postal
-  // codes here; the backend receives the comma-joined code list. Raw codes pass
-  // through unchanged.
-  const expandedPostalCodes = useMemo(
-    () => expandLocationTokens(appliedFilters.locations).codes,
-    [expandLocationTokens, appliedFilters.locations]
-  );
 
   const {
     events: displayedEvents,
@@ -102,9 +98,13 @@ export default function ExploreTab() {
   } = useExplorePagination({
     pageSize: 20,
     isOffline,
+    // Hierarchy tokens (e.g. r:be:brussels) go to the backend as `areas`; the
+    // expander only serves the legacy postal-code fallback.
+    expandLocations: expandLocationTokens,
     filters: {
       dateFilter: appliedFilters.dateFilter,
-      postalCodes: expandedPostalCodes,
+      country: appliedFilters.country,
+      locations: appliedFilters.locations,
       organizers: appliedFilters.organizations,
       category: appliedFilters.category,
       search: searchQuery,
@@ -146,6 +146,11 @@ export default function ExploreTab() {
     [organizationItems]
   );
 
+  const resolveCountryLabel = useCallback(
+    (country: string) => getCountryLabel(country, userLanguage),
+    [userLanguage]
+  );
+
   // Every applied-filter mutation (sheet apply or chip removal) refetches page
   // 1 server-side, so the list must also reset to the top.
   const mutateAppliedFilters = useCallback(
@@ -167,7 +172,13 @@ export default function ExploreTab() {
   // "My area" quick-scope: append the home token to the existing location
   // filter (reusing the server-side postcode expansion). Once applied it shows
   // as a normal removable location chip, so no separate clear is needed.
-  const showMyAreaChip = !!homeAreaToken && !appliedFilters.locations.includes(homeAreaToken);
+  // Hidden while another country is selected: the backend ANDs the two, so the
+  // home area could never match.
+  const homeAreaCountry = homeAreaToken ? countryOfLocationToken(homeAreaToken) : null;
+  const showMyAreaChip =
+    !!homeAreaToken &&
+    !appliedFilters.locations.includes(homeAreaToken) &&
+    (!appliedFilters.country || !homeAreaCountry || homeAreaCountry === appliedFilters.country);
 
   const applyMyArea = useCallback(() => {
     if (!homeAreaToken) return;
@@ -185,6 +196,10 @@ export default function ExploreTab() {
   );
   const removeDateFilter = useCallback(
     () => mutateAppliedFilters((prev) => ({ ...prev, dateFilter: null })),
+    [mutateAppliedFilters]
+  );
+  const removeCountryFilter = useCallback(
+    () => mutateAppliedFilters((prev) => ({ ...prev, country: null })),
     [mutateAppliedFilters]
   );
   const removeLocationFilter = useCallback(
@@ -225,10 +240,7 @@ export default function ExploreTab() {
         event = await getEventByIdBackend(eventId);
       }
 
-      const cityLabel =
-        event.postal_code && event.country
-          ? getSubMunicipalityNameRef.current(String(event.postal_code), event.country, event.city)
-          : undefined;
+      const cityLabel = resolveEventCityLabel(event, getSubMunicipalityNameRef.current);
 
       await shareEventWithAlert(event, userLanguageRef.current, cityLabel);
     } catch (err) {
@@ -238,7 +250,7 @@ export default function ExploreTab() {
   }, []);
 
   const renderEventCard = useCallback(
-    ({ item }: { item: FormattedEventListItem }) => {
+    ({ item, index }: { item: FormattedEventListItem; index: number }) => {
       const eventForCard: Event = {
         $id: item.$id,
         id: item.$id,
@@ -262,10 +274,7 @@ export default function ExploreTab() {
         help_needed: item.help_needed,
       };
 
-      const cityLabel =
-        item.postal_code && item.country
-          ? getSubMunicipalityNameRef.current(String(item.postal_code), item.country, item.city)
-          : '';
+      const cityLabel = resolveEventCityLabel(item, getSubMunicipalityNameRef.current);
 
       return (
         <ExploreEventCard
@@ -276,6 +285,7 @@ export default function ExploreTab() {
           onShare={handleShareEvent}
           userLanguage={userLanguageRef.current}
           cityLabel={cityLabel}
+          testID={`explore-card-${index}`}
         />
       );
     },
@@ -304,9 +314,14 @@ export default function ExploreTab() {
         </ThemedView>
 
         <ThemedView style={styles.searchContainer}>
-          <SearchInput onSearch={handleTextInputSearch} styleProps={styles.searchInput} />
+          <SearchInput
+            testID="explore-search-input"
+            onSearch={handleTextInputSearch}
+            styleProps={styles.searchInput}
+          />
 
           <TouchableOpacity
+            testID="explore-filters-button"
             onPress={() => setFiltersSheetOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={
@@ -345,6 +360,7 @@ export default function ExploreTab() {
           <ThemedView style={styles.myAreaRow}>
             <FilterChip
               small
+              testID="explore-my-area-chip"
               label={t('homeArea.scopeChip')}
               accessibilityLabel={t('homeArea.scopeChip')}
               onPress={applyMyArea}
@@ -355,10 +371,12 @@ export default function ExploreTab() {
 
         <ExploreActiveFilterChips
           filters={appliedFilters}
+          resolveCountryLabel={resolveCountryLabel}
           resolveLocationLabel={resolveLocationLabel}
           resolveOrganizationLabel={resolveOrganizationLabel}
           onRemoveCategory={removeCategoryFilter}
           onRemoveDate={removeDateFilter}
+          onRemoveCountry={removeCountryFilter}
           onRemoveLocation={removeLocationFilter}
           onRemoveOrganization={removeOrganizationFilter}
         />
@@ -374,6 +392,7 @@ export default function ExploreTab() {
                 {t('explore.refreshFailedMessage')}
               </ThemedText>
               <TouchableOpacity
+                testID="explore-retry"
                 style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
                 onPress={handleRefresh}
               >

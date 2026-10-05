@@ -26,6 +26,7 @@ import { Spacing, Typography } from '@/constants/DesignTokens';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { toPostalCodeString } from '@/utils/eventLocation';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -193,7 +194,7 @@ export default function CreateTemplateScreen() {
         city: eventData.city || '',
         region: eventData.region || '',
         country: eventData.country || '',
-        postal_code: eventData.postal_code ?? null,
+        postal_code: toPostalCodeString(eventData.postal_code),
         website_url: eventData.website_url || '',
         categories: Array.isArray(eventData.categories)
           ? eventData.categories.join(',')
@@ -282,7 +283,7 @@ export default function CreateTemplateScreen() {
           city: eventData.city || '',
           region: eventData.region || '',
           country: eventData.country || '',
-          postal_code: eventData.postal_code ?? null,
+          postal_code: toPostalCodeString(eventData.postal_code),
           website_url: eventData.website_url || '',
           categories: Array.isArray(eventData.categories)
             ? eventData.categories.join(',')

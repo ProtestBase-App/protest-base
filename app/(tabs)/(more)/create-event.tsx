@@ -32,6 +32,7 @@ import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvent
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { toPostalCodeString } from '@/utils/eventLocation';
 
 /**
  * Validate URL format using URL constructor.
@@ -387,7 +388,7 @@ export default function CreateEventModal() {
           city: eventData.city !== undefined ? eventData.city : prevForm.city,
           region: eventData.region !== undefined ? eventData.region : prevForm.region,
           country: eventData.country !== undefined ? eventData.country : prevForm.country,
-          postal_code: eventData.postal_code ?? prevForm.postal_code,
+          postal_code: toPostalCodeString(eventData.postal_code) ?? prevForm.postal_code,
           website_url:
             eventData.website_url !== undefined ? eventData.website_url : prevForm.website_url,
           categories: Array.isArray(eventData.categories)

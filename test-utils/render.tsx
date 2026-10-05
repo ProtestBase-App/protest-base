@@ -20,6 +20,7 @@ import React from 'react';
 import { render, RenderOptions } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { LocationFilterOption } from '@/utils/locationFilterOptions';
+import type { ExploreAppliedFilters } from '@/context/ExploreTabProvider';
 
 // Re-export everything from testing library
 export * from '@testing-library/react-native';
@@ -92,6 +93,7 @@ export interface MockPostalCodeContext {
   expandLocationTokens?: jest.Mock;
   resolveLocationLabel?: jest.Mock;
   isLocationSelectionTooBroad?: jest.Mock;
+  buildLocationMatch?: jest.Mock;
 }
 
 export interface MockHomeAreaContext {
@@ -111,12 +113,7 @@ export interface MockConnectivityContext {
 export interface MockExploreTabContext {
   searchQuery?: string;
   setSearchQuery?: jest.Mock;
-  appliedFilters?: {
-    category: string | null;
-    dateFilter: string | null;
-    locations: string[];
-    organizations: string[];
-  };
+  appliedFilters?: ExploreAppliedFilters;
   setAppliedFilters?: jest.Mock;
   shouldScrollToTop?: boolean;
   setShouldScrollToTop?: jest.Mock;
@@ -256,6 +253,11 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
   expandLocationTokens: jest.fn().mockReturnValue({ codes: [], truncated: false }),
   resolveLocationLabel: jest.fn((value: string) => value),
   isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+  buildLocationMatch: jest.fn().mockReturnValue({
+    codesByCountry: new Map(),
+    wholeCountries: new Set(),
+    rawCodes: new Set(),
+  }),
 };
 
 const defaultHomeAreaContext: Required<MockHomeAreaContext> = {
@@ -275,7 +277,13 @@ const defaultConnectivityContext: Required<MockConnectivityContext> = {
 const defaultExploreTabContext: Required<MockExploreTabContext> = {
   searchQuery: '',
   setSearchQuery: jest.fn(),
-  appliedFilters: { category: null, dateFilter: null, locations: [], organizations: [] },
+  appliedFilters: {
+    category: null,
+    dateFilter: null,
+    country: null,
+    locations: [],
+    organizations: [],
+  },
   setAppliedFilters: jest.fn(),
   shouldScrollToTop: false,
   setShouldScrollToTop: jest.fn(),

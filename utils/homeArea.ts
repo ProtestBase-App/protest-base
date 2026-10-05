@@ -22,11 +22,13 @@ import { Event } from '@/types/event.types';
 import { parseAsUTC } from '@/utils/eventFormatters';
 import { hasMapCoordinates } from '@/utils/mapTabUtils';
 import { LocationFilterOption } from '@/utils/locationFilterOptions';
+import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
 
-/** Backend country value for each token country segment. Only two exist. */
+/** Backend country value for each token country segment. */
 const TOKEN_COUNTRY: Record<string, string> = {
   be: 'belgium',
   nl: 'netherlands',
+  lu: 'luxembourg',
 };
 
 export interface HomeAreaMatch {
@@ -141,25 +143,13 @@ export function buildHomeAreaMatch(
 }
 
 /**
- * Normalize an event postcode to the 4-digit numeric key the datasets use.
- * NL event postcodes carry a 2-letter suffix ("5611 EC") while the bundled
- * postal datasets (and therefore the match Sets) key on the bare 4-digit code
- * ("5611"); BE postcodes are already 4-digit. Returns null when no 4-digit
- * code is present (online/ungeocoded events).
- */
-function normalizeEventPostcode(postalCode: number | string): string | null {
-  const match = String(postalCode).match(/\d{4}/);
-  return match ? match[0] : null;
-}
-
-/**
  * Rank an event by proximity to the home area: 0 same municipality, 1 same
  * province, 2 same region, 3 elsewhere. Checked narrow → broad (the sets are
  * nested supersets). The country gate runs first: BE and NL postcodes collide
  * numerically, so a bare postcode match is unsafe across countries.
  */
 export function rankEventByHomeArea(event: Event, match: HomeAreaMatch): 0 | 1 | 2 | 3 {
-  if (match.country && event.country?.toLowerCase() !== match.country) return 3;
+  if (match.country && canonicalCountry(event.country) !== match.country) return 3;
   if (event.postal_code === null || event.postal_code === undefined) return 3;
   const code = normalizeEventPostcode(event.postal_code);
   if (!code) return 3;
@@ -194,7 +184,7 @@ function meanCenter(
   let sumLat = 0;
   let n = 0;
   for (const event of events) {
-    if (match.country && event.country?.toLowerCase() !== match.country) continue;
+    if (match.country && canonicalCountry(event.country) !== match.country) continue;
     if (event.postal_code === null || event.postal_code === undefined) continue;
     const code = normalizeEventPostcode(event.postal_code);
     if (!code || !codes.has(code)) continue;

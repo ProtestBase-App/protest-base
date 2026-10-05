@@ -177,7 +177,7 @@ describe('eventFormatters', () => {
     website_url: 'https://example.com',
     categories: ['climate', 'social-justice'],
     disclaimer: 'Please be peaceful',
-    postal_code: 1000,
+    postal_code: '1000',
     geocod_status: 'success',
     geocod_lat: 50.8503,
     geocod_lng: 4.3517,
@@ -198,7 +198,7 @@ describe('eventFormatters', () => {
       expect(result.categories).toEqual(['climate', 'social-justice']);
       expect(result.startDateNoFormat).toBe('2025-07-14');
       expect(result.endDateNoFormat).toBe('2025-07-14');
-      expect(result.postal_code).toBe(1000);
+      expect(result.postal_code).toBe('1000');
     });
 
     it('should format start date correctly in English', () => {
@@ -300,7 +300,7 @@ describe('eventFormatters', () => {
       expect(result.street_address).toBe('123 Main St');
       expect(result.city).toBe('Brussels');
       expect(result.region).toBe('Brussels-Capital');
-      expect(result.postal_code).toBe(1000);
+      expect(result.postal_code).toBe('1000');
       expect(result.geocod_lat).toBe(50.8503);
       expect(result.geocod_lng).toBe(4.3517);
     });
@@ -421,15 +421,15 @@ describe('eventFormatters', () => {
       expect(result.geocod_lng).toBeNull();
     });
 
-    it('should handle event with postal_code as 0', () => {
-      const eventZeroPostal: Event = {
+    it('should handle an empty postal_code', () => {
+      const eventEmptyPostal: Event = {
         ...mockEvent,
-        postal_code: 0,
+        postal_code: '',
       };
 
-      const result = formatEventForDisplay(eventZeroPostal);
+      const result = formatEventForDisplay(eventEmptyPostal);
 
-      // 0 is falsy, so the code converts it to null (postal_code || null)
+      // '' is falsy, so the code converts it to null (postal_code || null)
       expect(result.postal_code).toBeNull();
     });
   });
@@ -485,7 +485,7 @@ describe('eventFormatters', () => {
       expect(result.country).toBe('Belgium');
       expect(result.organizer_name).toBe('Test Organizer');
       expect(result.co_organizers).toEqual(['co-org1', 'co-org2']);
-      expect(result.postal_code).toBe(1000);
+      expect(result.postal_code).toBe('1000');
     });
 
     it('should format time with leading zeros', () => {
@@ -589,15 +589,15 @@ describe('eventFormatters', () => {
       expect(result.start_time).toMatch(/\d{2}:\d{2}/);
     });
 
-    it('should handle event with postal_code as 0', () => {
-      const eventZeroPostal = {
+    it('should pass an empty postal_code through', () => {
+      const eventEmptyPostal = {
         ...mockEvent,
-        postal_code: 0,
+        postal_code: '',
       };
-      const result = formatEventForList(eventZeroPostal);
+      const result = formatEventForList(eventEmptyPostal);
 
       // postal_code is passed through directly in formatEventForList
-      expect(result.postal_code).toBe(0);
+      expect(result.postal_code).toBe('');
     });
 
     it('should handle event with all optional fields undefined', () => {

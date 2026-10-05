@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
+import { useFiltersSheetKeyboard } from '@/components/FiltersSheetShell';
 import { ThemedText } from '@/components/ThemedText';
 import { FilterChip } from '@/components/ui/FilterChip';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -121,6 +122,7 @@ export function SheetSearchMultiSelect({
   // and forwards its ref to a focus/blur-capable input); the cast reconciles
   // gorhom's RNGH-based ref type with the shared RN TextInput ref below.
   const SearchInput = (inBottomSheet ? BottomSheetTextInput : TextInput) as typeof TextInput;
+  const { revealFocusedInput } = useFiltersSheetKeyboard();
 
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
@@ -141,6 +143,9 @@ export function SheetSearchMultiSelect({
     }
     setFocused(true);
     onFocusChange?.(true);
+    // Moving focus between sheet inputs keeps the keyboard up, so the sheet
+    // gets no keyboard event to reveal the new one by.
+    revealFocusedInput();
   };
 
   const handleBlur = () => {
@@ -269,6 +274,7 @@ export function SheetSearchMultiSelect({
           underlineColorAndroid="transparent"
           accessibilityLabel={placeholder}
           accessibilityState={{ disabled }}
+          testID={testID ? `${testID}-input` : undefined}
         />
         {!disabled &&
           (query.length > 0 ? (
@@ -300,6 +306,7 @@ export function SheetSearchMultiSelect({
             visibleOptions.map((option, index) => (
               <Pressable
                 key={option.value}
+                testID={testID ? `${testID}-option-${index}` : undefined}
                 style={[
                   styles.optionRow,
                   index > 0 && { borderTopWidth: 0.5, borderTopColor: themeColors.separator },

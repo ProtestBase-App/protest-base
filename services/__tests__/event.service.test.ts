@@ -31,6 +31,8 @@ import api from '@/services/api';
 import { isEventOngoing } from '@/utils/eventStatus';
 import {
   getEventsBackend,
+  getEventsForLocations,
+  LocationSelectionTooBroadError,
   getOrganizationUpcomingEvents,
   getOrganizationPastEvents,
   getEventByIdBackend,
@@ -50,6 +52,7 @@ import {
   EventNetworkError,
 } from '@/services/event.service';
 import type { DuplicateWarningReport, Event } from '@/types/event.types';
+import { buildLocationUpdate } from '@/utils/eventLocation';
 
 const mockApi = api as jest.Mocked<typeof api>;
 const mockIsEventOngoing = isEventOngoing as jest.Mock;
@@ -71,7 +74,7 @@ const makeEvent = (overrides: Partial<Event> = {}): Event => ({
   website_url: null,
   categories: ['Protest'],
   disclaimer: null,
-  postal_code: 1000,
+  postal_code: '1000',
   geocod_status: null,
   geocod_lat: null,
   geocod_lng: null,
@@ -175,6 +178,28 @@ describe('event.service', () => {
       expect(mockApi.get).toHaveBeenCalledWith('/events', {
         params: expect.objectContaining({ category: 'Protest' }),
       });
+    });
+
+    it('passes country param', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+      });
+
+      await getEventsBackend({ country: 'netherlands', areas: ['m:nl:1011'] });
+
+      expect(mockApi.get).toHaveBeenCalledWith('/events', {
+        params: expect.objectContaining({ country: 'netherlands', areas: 'm:nl:1011' }),
+      });
+    });
+
+    it('omits country param when not set', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { events: [], total: 0, limit: 100, offset: 0 } },
+      });
+
+      await getEventsBackend({ category: 'Protest' });
+
+      expect((mockApi.get.mock.calls[0][1] as any).params).not.toHaveProperty('country');
     });
 
     it('trims and passes search param', async () => {
@@ -702,7 +727,7 @@ describe('event.service', () => {
         data: { success: true, data: { $id: 'new-evt-6' } },
       });
 
-      await createEventBackend({ ...baseEventData, postal_code: 1000 });
+      await createEventBackend({ ...baseEventData, postal_code: '1000' });
 
       const [, payload]: any[] = mockApi.post.mock.calls[0];
       expect(payload.postal_code).toBe('1000');
@@ -843,7 +868,7 @@ describe('event.service', () => {
       const dataWithPostal = {
         ...baseEventData,
         image: { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' },
-        postal_code: 1000,
+        postal_code: '1000',
       };
 
       await createEventBackend(dataWithPostal);
@@ -1046,7 +1071,7 @@ describe('event.service', () => {
 
       await updateEvent('evt-1', {
         image: { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' },
-        postal_code: 1050,
+        postal_code: '1050',
       });
 
       const [, payload] = mockApi.put.mock.calls[0];
@@ -1289,6 +1314,162 @@ describe('event.service', () => {
   // ============================================================
   // deleteEvent
   // ============================================================
+  describe('getEventsForLocations', () => {
+    const page = (filtersApplied?: Record<string, unknown>) => ({
+      data: {
+        success: true,
+        data: {
+          events: [],
+          total: 0,
+          limit: 20,
+          offset: 0,
+          ...(filtersApplied ? { filters_applied: filtersApplied } : {}),
+        },
+      },
+    });
+    const expand = jest.fn((values: string[]) => ({
+      codes: values.flatMap((v) => (v === 'r:be:brussels' ? ['1000', '1060'] : [v])),
+      truncated: false,
+    }));
+    const paramsOfCall = (n: number) => (mockApi.get.mock.calls[n][1] as any).params;
+
+    beforeEach(() => expand.mockClear());
+
+    it('sends tokens once, as one comma-joined `areas` string, when the backend echoes them', async () => {
+      mockApi.get.mockResolvedValueOnce(page({ areas: ['r:be:brussels', 'm:be:9000'] }));
+
+      await getEventsForLocations({ limit: 20 }, ['r:be:brussels', 'm:be:9000'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+      expect(paramsOfCall(0).areas).toBe('r:be:brussels,m:be:9000');
+      expect(paramsOfCall(0)).not.toHaveProperty('postalCodes');
+      expect(expand).not.toHaveBeenCalled();
+    });
+
+    it('retries with postal codes when the backend ignores `areas`', async () => {
+      mockApi.get
+        .mockResolvedValueOnce(page({ dateFilter: null }))
+        .mockResolvedValueOnce(page({ dateFilter: null }));
+
+      await getEventsForLocations({ limit: 20 }, ['r:be:brussels'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+      expect(paramsOfCall(1).postalCodes).toBe('1000,1060');
+      expect(paramsOfCall(1)).not.toHaveProperty('areas');
+    });
+
+    it('keeps the country on both the areas request and the postal-code retry', async () => {
+      mockApi.get
+        .mockResolvedValueOnce(page({ country: 'belgium' }))
+        .mockResolvedValueOnce(page({ country: 'belgium' }));
+
+      await getEventsForLocations({ limit: 20, country: 'belgium' }, ['r:be:brussels'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+      expect(paramsOfCall(0)).toEqual(
+        expect.objectContaining({ country: 'belgium', areas: 'r:be:brussels' })
+      );
+      expect(paramsOfCall(1)).toEqual(
+        expect.objectContaining({ country: 'belgium', postalCodes: '1000,1060' })
+      );
+    });
+
+    it('treats a response without filters_applied as an old backend', async () => {
+      mockApi.get.mockResolvedValueOnce(page()).mockResolvedValueOnce(page());
+
+      await getEventsForLocations({ limit: 20 }, ['r:be:brussels'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+      expect(paramsOfCall(1).postalCodes).toBe('1000,1060');
+    });
+
+    it('sends raw postal codes the legacy way only', async () => {
+      mockApi.get.mockResolvedValueOnce(page());
+
+      await getEventsForLocations({ limit: 20 }, ['r:be:brussels', '9000'], expand);
+
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+      expect(paramsOfCall(0).postalCodes).toBe('1000,1060,9000');
+      expect(paramsOfCall(0)).not.toHaveProperty('areas');
+    });
+
+    it('throws without a request when the postal-code list would be too broad', async () => {
+      const tooBroad = jest.fn(() => ({ codes: ['1000'], truncated: true }));
+
+      await expect(getEventsForLocations({ limit: 20 }, ['1000'], tooBroad)).rejects.toBeInstanceOf(
+        LocationSelectionTooBroadError
+      );
+      expect(mockApi.get).not.toHaveBeenCalled();
+    });
+
+    it('sends neither filter for an empty selection', async () => {
+      mockApi.get.mockResolvedValueOnce(page());
+
+      await getEventsForLocations({ limit: 20 }, [], expand);
+
+      expect(paramsOfCall(0)).not.toHaveProperty('areas');
+      expect(paramsOfCall(0)).not.toHaveProperty('postalCodes');
+    });
+  });
+
+  describe('location clears on update', () => {
+    // A BE event switched to LU with its address emptied, as the edit screens build it.
+    const loaded = {
+      street_address: 'Rue de la Loi 16',
+      city: 'Brussels',
+      region: 'Brussels-Capital',
+      country: 'belgium',
+      postal_code: '1000',
+    };
+    const cleared = buildLocationUpdate(
+      { street_address: '', city: '', region: '', country: 'luxembourg', postal_code: null },
+      loaded
+    );
+    const expected = {
+      street_address: '',
+      city: '',
+      region: '',
+      country: 'luxembourg',
+      postal_code: '',
+    };
+
+    it("sends cleared fields as '' on the JSON PUT, never null", async () => {
+      mockApi.put.mockResolvedValueOnce({ data: { success: true, data: { $id: 'evt-1' } } });
+
+      await updateEvent('evt-1', { title: 'T', ...cleared });
+
+      const [, body]: any[] = mockApi.put.mock.calls[0];
+      expect(body).toMatchObject(expected);
+      expect(Object.values(body)).not.toContain(null);
+    });
+
+    it("sends cleared fields as '' parts on the multipart PUT", async () => {
+      mockApi.put.mockResolvedValueOnce({ data: { success: true, data: { $id: 'evt-1' } } });
+
+      await updateEvent('evt-1', {
+        title: 'T',
+        ...cleared,
+        images: [{ uri: 'file:///new.jpg', mimeType: 'image/jpeg', fileName: 'new.jpg' }],
+      });
+
+      const [, payload]: any[] = mockApi.put.mock.calls[0];
+      expect(payload).toBeInstanceOf(FormData);
+      for (const [field, value] of Object.entries(expected)) {
+        expect((payload as FormData).getAll(field)).toEqual([value]);
+      }
+    });
+
+    it("sends cleared fields as '' on the draft PATCH", async () => {
+      mockApi.patch.mockResolvedValueOnce({ data: { success: true, data: { $id: 'evt-1' } } });
+
+      await patchEvent('evt-1', cleared);
+
+      const [, body]: any[] = mockApi.patch.mock.calls[0];
+      expect(body).toMatchObject(expected);
+      expect(Object.values(body)).not.toContain(null);
+    });
+  });
+
   describe('deleteEvent', () => {
     it('resolves without error on successful deletion', async () => {
       mockApi.delete.mockResolvedValueOnce({ data: {} });

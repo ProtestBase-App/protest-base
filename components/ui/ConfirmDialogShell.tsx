@@ -31,6 +31,8 @@ export interface ConfirmDialogShellProps {
   destructive?: boolean;
   /** Spinner on confirm; also blocks dismissal while the work is in flight. */
   submitting?: boolean;
+  /** Prefix for E2E ids: `${testID}-dismiss` and `${testID}-confirm`. */
+  testID?: string;
 }
 
 /**
@@ -55,6 +57,7 @@ export default function ConfirmDialogShell({
   onConfirm,
   destructive,
   submitting,
+  testID,
 }: ConfirmDialogShellProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -80,6 +83,7 @@ export default function ConfirmDialogShell({
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
+                testID={testID ? `${testID}-dismiss` : undefined}
                 onPress={handleDismiss}
                 disabled={submitting}
                 style={[
@@ -97,6 +101,7 @@ export default function ConfirmDialogShell({
 
               {!!confirmLabel && !!onConfirm && (
                 <TouchableOpacity
+                  testID={testID ? `${testID}-confirm` : undefined}
                   onPress={onConfirm}
                   disabled={submitting}
                   style={[

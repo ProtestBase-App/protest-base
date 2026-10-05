@@ -164,6 +164,7 @@ import EventForm from '@/components/EventForm';
 import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
 import { searchAddress } from '@/services/address.service';
+import * as featureFlags from '@/utils/featureFlags';
 
 const mockSearchAddress = searchAddress as jest.Mock;
 
@@ -497,7 +498,7 @@ describe('EventForm — country and postal code loading', () => {
   });
 
   it('renders with existing postal code value', async () => {
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithPostalCode}
@@ -514,7 +515,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('clears postal code when country changes', async () => {
     const setForm = jest.fn();
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
 
     const { rerender } = render(
       <EventForm
@@ -547,7 +548,7 @@ describe('EventForm — country and postal code loading', () => {
   });
 
   it('renders postal code placeholder when value not found in loaded data', async () => {
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 9999 };
+    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '9999' };
     render(
       <EventForm
         form={formWithPostalCode}
@@ -620,7 +621,7 @@ describe('EventForm — street address autocomplete', () => {
       ...mockForm,
       country: 'belgium',
       street_address: '',
-      postal_code: 1000,
+      postal_code: '1000',
     };
     mockSearchAddress.mockResolvedValue([]);
     render(
@@ -654,7 +655,7 @@ describe('EventForm — street address autocomplete', () => {
       ...mockForm,
       country: 'belgium',
       street_address: '',
-      postal_code: 1000,
+      postal_code: '1000',
     };
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
     render(
@@ -685,7 +686,7 @@ describe('EventForm — street address autocomplete', () => {
         street_address: 'Rue de la Loi 16',
         city: 'Brussels',
         region: 'Brussels-Capital',
-        postal_code: 1000,
+        postal_code: '1000',
       })
     );
   });
@@ -695,7 +696,7 @@ describe('EventForm — street address autocomplete', () => {
     const formWithLocation = {
       ...mockForm,
       country: 'belgium',
-      postal_code: 1000,
+      postal_code: '1000',
       city: 'Brussels',
       region: 'Brussels-Capital',
       street_address: '',
@@ -735,7 +736,7 @@ describe('EventForm — street address autocomplete', () => {
     expect(next).toEqual(
       expect.objectContaining({
         street_address: 'Grote Markt',
-        postal_code: 1000,
+        postal_code: '1000',
         city: 'Brussels',
         region: 'Brussels-Capital',
       })
@@ -747,7 +748,7 @@ describe('EventForm — street address autocomplete', () => {
     const formWithPostal = {
       ...mockForm,
       country: 'belgium',
-      postal_code: 1000,
+      postal_code: '1000',
       street_address: '',
     };
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
@@ -868,7 +869,7 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
   const baseForm = {
     ...mockForm,
     country: 'belgium',
-    postal_code: 1000,
+    postal_code: '1000',
     street_address: '',
   };
 
@@ -1034,7 +1035,7 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
     fireEvent.press(within(picker).getByLabelText('Antwerp (2000)'));
 
     const next = latestNext(setForm, baseForm);
-    expect(next).toEqual(expect.objectContaining({ postal_code: 2000 }));
+    expect(next).toEqual(expect.objectContaining({ postal_code: '2000' }));
     // The (controlled) value is still present → the confirmation card returns.
     expect(screen.getByTestId('postal-code-filled')).toBeTruthy();
     expect(screen.queryByTestId('dropdown-event-postal-code')).toBeNull();
@@ -1074,7 +1075,7 @@ describe('EventForm — country-change location clearing', () => {
       country: 'belgium',
       street_address: 'Loaded Street 5',
       city: 'Brussels',
-      postal_code: 1000,
+      postal_code: '1000',
     };
     await act(async () => {
       rerender(
@@ -1099,7 +1100,7 @@ describe('EventForm — country-change location clearing', () => {
       street_address: 'Rue X 1',
       city: 'Brussels',
       region: 'BC',
-      postal_code: 1000,
+      postal_code: '1000',
     };
     const { rerender } = render(
       <EventForm form={beForm} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
@@ -1678,7 +1679,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('renders postal code section for Netherlands with postal code selected', async () => {
-    const formWithCountry = { ...mockForm, country: 'netherlands', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'netherlands', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -1695,7 +1696,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
   });
 
   it('renders postal code section for Belgium in EN', async () => {
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -1711,7 +1712,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
   });
 
   it('renders postal code section for Belgium in NL', async () => {
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -1727,7 +1728,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
   });
 
   it('renders postal code section for Belgium in FR', async () => {
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -1743,7 +1744,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
   });
 
   it('renders postal code section for Belgium with unknown language', async () => {
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -1763,7 +1764,7 @@ describe('EventForm — filteredPostalCodes branches', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('shows selected postal code item when it exists in loaded data', async () => {
-    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithPostalCode}
@@ -1786,7 +1787,7 @@ describe('EventForm — filteredPostalCodes branches', () => {
     const formWithUncoveredCode = {
       ...mockForm,
       country: 'belgium',
-      postal_code: 9999,
+      postal_code: '9999',
       city: 'Mystery Town',
     };
     render(
@@ -1804,7 +1805,12 @@ describe('EventForm — filteredPostalCodes branches', () => {
   });
 
   it('synthesizes a code-only dropdown item when no city is stored', async () => {
-    const formWithUncoveredCode = { ...mockForm, country: 'belgium', postal_code: 9999, city: '' };
+    const formWithUncoveredCode = {
+      ...mockForm,
+      country: 'belgium',
+      postal_code: '9999',
+      city: '',
+    };
     render(
       <EventForm
         form={formWithUncoveredCode}
@@ -1850,7 +1856,7 @@ describe('EventForm — postal code clearing', () => {
     const formWithPostalCode = {
       ...mockForm,
       country: 'belgium',
-      postal_code: 1000,
+      postal_code: '1000',
       street_address: 'Rue de la Loi 16',
       city: 'Brussels',
       region: 'Brussels-Capital',
@@ -2266,7 +2272,7 @@ describe('EventForm — postal code selection', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('renders the selected postal code as a chip after loading', async () => {
-    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: 1000 };
+    const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
     render(
       <EventForm
         form={formWithCountry}
@@ -2285,7 +2291,7 @@ describe('EventForm — postal code selection', () => {
   it('renders postal code placeholder when data has not loaded yet', async () => {
     // postal_code=9999 doesn't exist in mock data, AND data hasn't loaded
     // This tests the branch where listPostalCodes.length === 0
-    const formWithPostalCode = { ...mockForm, country: '', postal_code: 9999 };
+    const formWithPostalCode = { ...mockForm, country: '', postal_code: '9999' };
     render(
       <EventForm
         form={formWithPostalCode}
@@ -2296,5 +2302,108 @@ describe('EventForm — postal code selection', () => {
     );
     // Without a country, postal code section won't show, but the form should render
     expect(screen.toJSON()).toBeTruthy();
+  });
+});
+
+describe('EventForm — Luxembourg', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const luxembourgForm: FormState = {
+    ...mockForm,
+    country: 'luxembourg',
+    postal_code: null,
+    city: '',
+    region: '',
+    street_address: '',
+  };
+
+  // Apply the latest functional setForm updater to read the resulting state.
+  const latestNext = (setForm: jest.Mock, base: FormState) => {
+    const updater = setForm.mock.calls
+      .map((c) => c[0])
+      .reverse()
+      .find((arg) => typeof arg === 'function');
+    return updater ? updater(base) : undefined;
+  };
+
+  const renderForm = async (form: FormState, setForm = jest.fn()) => {
+    render(
+      <EventForm form={form} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
+    );
+    await act(async () => {
+      await flushPromises();
+    });
+    return setForm;
+  };
+
+  it('offers Luxembourg while it is enabled', async () => {
+    await renderForm(mockForm);
+    expect(screen.getByTestId('country-chip-luxembourg')).toBeTruthy();
+  });
+
+  it('hides Luxembourg in production builds unless the event is already there', async () => {
+    jest.spyOn(featureFlags, 'isLuxembourgEnabled').mockReturnValue(false);
+
+    await renderForm(mockForm);
+    expect(screen.queryByTestId('country-chip-luxembourg')).toBeNull();
+
+    screen.unmount();
+    await renderForm(luxembourgForm);
+    expect(screen.getByTestId('country-chip-luxembourg')).toBeTruthy();
+  });
+
+  it('picks a town or village: the locality, a representative code and the canton', async () => {
+    const setForm = await renderForm(luxembourgForm);
+
+    const picker = screen.getByTestId('dropdown-event-postal-code');
+    const input = within(picker).getByDisplayValue('');
+    fireEvent(input, 'focus');
+    fireEvent.changeText(input, 'wilwer');
+    fireEvent.press(within(picker).getByLabelText('Wilwerwiltz (Kiischpelt)'));
+
+    expect(latestNext(setForm, luxembourgForm)).toEqual(
+      expect.objectContaining({
+        city: 'Wilwerwiltz',
+        postal_code: '9776',
+        // Stored as address search stores it, whatever the app language.
+        region: 'Canton Wiltz',
+      })
+    );
+  });
+
+  it('tells apart villages that share a name, by commune', async () => {
+    await renderForm(luxembourgForm);
+
+    const picker = screen.getByTestId('dropdown-event-postal-code');
+    const input = within(picker).getByDisplayValue('');
+    fireEvent(input, 'focus');
+    fireEvent.changeText(input, 'fischbach');
+
+    expect(within(picker).getByLabelText('Fischbach (Clervaux)')).toBeTruthy();
+    expect(within(picker).getByLabelText('Fischbach')).toBeTruthy();
+  });
+
+  it('shows a picked locality by name, never its representative code', async () => {
+    await renderForm({ ...luxembourgForm, city: 'Wilwerwiltz', postal_code: '9776' });
+
+    const card = screen.getByTestId('postal-code-filled');
+    expect(within(card).getByText('Wilwerwiltz (Kiischpelt)')).toBeTruthy();
+    expect(within(card).queryByText(/9776/)).toBeNull();
+  });
+
+  it('searches addresses in Luxembourg without a representative code as hint', async () => {
+    mockSearchAddress.mockResolvedValue([]);
+    await renderForm({ ...luxembourgForm, city: 'Wilwerwiltz', postal_code: '9776' });
+
+    fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'grand-rue');
+    await waitFor(() => expect(mockSearchAddress).toHaveBeenCalled());
+
+    expect(mockSearchAddress).toHaveBeenCalledWith(
+      'grand-rue',
+      'lu',
+      'en',
+      undefined,
+      expect.anything()
+    );
   });
 });

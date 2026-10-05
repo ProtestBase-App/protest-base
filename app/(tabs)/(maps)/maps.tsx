@@ -379,8 +379,9 @@ export default function MapsScreen() {
   }, []);
 
   const renderCard = useCallback(
-    ({ item }: { item: Event }) => (
+    ({ item, index }: { item: Event; index: number }) => (
       <MapEventCard
+        testID={`map-card-${index}`}
         event={item}
         active={item.$id === selectedId}
         saved={isSaved(item.$id)}
@@ -620,6 +621,7 @@ export default function MapsScreen() {
             <ThemedText style={styles.emptyTitle}>{t('maps.emptyTitle')}</ThemedText>
             {anyResetTarget && (
               <Pressable
+                testID="map-reset-filters"
                 onPress={handleResetAll}
                 accessibilityRole="button"
                 style={[

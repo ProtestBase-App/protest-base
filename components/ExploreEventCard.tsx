@@ -39,6 +39,8 @@ export interface ExploreEventCardProps {
   onShare: (eventId: string) => void;
   userLanguage: string;
   cityLabel: string;
+  /** Prefix for the card's E2E ids: `${testID}`, `${testID}-save`, `${testID}-share`. */
+  testID?: string;
 }
 
 function ExploreEventCard({
@@ -49,6 +51,7 @@ function ExploreEventCard({
   onShare,
   userLanguage,
   cityLabel,
+  testID,
 }: ExploreEventCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -84,6 +87,7 @@ function ExploreEventCard({
 
   return (
     <TouchableOpacity
+      testID={testID}
       onPress={handleCardPress}
       accessibilityRole="button"
       accessibilityLabel={`Event: ${event.title}, ${formatEventDateTimeLabel(event, userLanguage)}`}
@@ -154,7 +158,7 @@ function ExploreEventCard({
             <ThemedView style={styles.metadataRow}>
               <IconSymbol name="map" size={16} color={colors.icon} />
               <ThemedText type="cardMetadata" style={{ color: colors.text }}>
-                {cityLabel}, {event.postal_code}
+                {[cityLabel, event.postal_code].filter(Boolean).join(', ')}
               </ThemedText>
             </ThemedView>
           )}
@@ -178,6 +182,7 @@ function ExploreEventCard({
                   ? { backgroundColor: colors.tint }
                   : { borderColor: themeColors.cardBorder, borderWidth: 1 },
               ]}
+              testID={testID ? `${testID}-save` : undefined}
               onPress={(e) => {
                 e.stopPropagation();
                 onSave(event.$id, getEffectiveEndTime(event).getTime());
@@ -202,6 +207,7 @@ function ExploreEventCard({
 
           <Pressable
             style={[styles.shareButton, { borderColor: themeColors.cardBorder, borderWidth: 1 }]}
+            testID={testID ? `${testID}-share` : undefined}
             onPress={(e) => {
               e.stopPropagation();
               onShare(event.$id);
@@ -309,6 +315,7 @@ export default memo(ExploreEventCard, (prevProps, nextProps) => {
     prevProps.todayKey === nextProps.todayKey &&
     prevProps.isSaved === nextProps.isSaved &&
     prevProps.userLanguage === nextProps.userLanguage &&
-    prevProps.cityLabel === nextProps.cityLabel
+    prevProps.cityLabel === nextProps.cityLabel &&
+    prevProps.testID === nextProps.testID
   );
 });

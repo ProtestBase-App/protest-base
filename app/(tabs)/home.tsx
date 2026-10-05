@@ -106,7 +106,7 @@ export default function HomeTab() {
   const {
     loading: postalCodesLoading,
     getSubMunicipalityName,
-    expandLocationTokens,
+    buildLocationMatch,
     resolveLocationLabel,
   } = usePostalCodes();
   const { dropdownItems: organizationItems } = useOrganizations();
@@ -149,13 +149,12 @@ export default function HomeTab() {
     [allEvents, now]
   );
 
-  const postalCodeSet = useMemo(
-    () =>
-      filters.locations.length > 0 ? new Set(expandLocationTokens(filters.locations).codes) : null,
-    [filters.locations, expandLocationTokens]
+  const locationMatch = useMemo(
+    () => (filters.locations.length > 0 ? buildLocationMatch(filters.locations) : null),
+    [filters.locations, buildLocationMatch]
   );
 
-  const filterContext = useMemo(() => ({ isSaved, postalCodeSet }), [isSaved, postalCodeSet]);
+  const filterContext = useMemo(() => ({ isSaved, locationMatch }), [isSaved, locationMatch]);
 
   const filteredEvents = useMemo(
     () => upcomingEvents.filter((event) => matchesCalendarFilters(event, filters, filterContext)),
@@ -347,18 +346,18 @@ export default function HomeTab() {
 
   const countMatchesForDraft = useCallback(
     (draft: CalendarFilters) => {
-      const draftPostalCodes =
-        draft.locations.length > 0 ? new Set(expandLocationTokens(draft.locations).codes) : null;
+      const draftLocationMatch =
+        draft.locations.length > 0 ? buildLocationMatch(draft.locations) : null;
       // upcomingEvents (not allEvents) so the "See N protests" label matches
       // the time-granular cutoff applied to the rendered list.
       return countUpcomingCalendarMatches(
         upcomingEvents,
         draft,
-        { isSaved, postalCodeSet: draftPostalCodes },
+        { isSaved, locationMatch: draftLocationMatch },
         getTodayDateKeyInBelgium()
       );
     },
-    [upcomingEvents, isSaved, expandLocationTokens]
+    [upcomingEvents, isSaved, buildLocationMatch]
   );
 
   const removeCategoriesFilter = useCallback(
@@ -403,9 +402,10 @@ export default function HomeTab() {
 
   const renderDayEntries = (entries: CalendarDayEntry[]) => (
     <View style={styles.rowsContainer}>
-      {entries.map((entry) => (
+      {entries.map((entry, index) => (
         <CalendarEventRow
           key={`${entry.event.$id}-${entry.dayIndex}`}
+          testID={`calendar-row-${index}`}
           entry={entry}
           todayKey={todayKey}
           isSaved={isSaved(entry.event.$id)}

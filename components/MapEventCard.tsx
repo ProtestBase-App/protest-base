@@ -36,6 +36,8 @@ export interface MapEventCardProps {
   onPress: () => void;
   /** Toggle the bookmark; must not trigger navigation. */
   onToggleSave: () => void;
+  /** Prefix for the card's E2E ids: `${testID}` and `${testID}-save`. */
+  testID?: string;
 }
 
 function MapEventCard({
@@ -47,6 +49,7 @@ function MapEventCard({
   displayCategory,
   onPress,
   onToggleSave,
+  testID,
 }: MapEventCardProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -64,6 +67,7 @@ function MapEventCard({
 
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={event.title}
@@ -122,6 +126,7 @@ function MapEventCard({
       </View>
 
       <Pressable
+        testID={testID ? `${testID}-save` : undefined}
         onPress={onToggleSave}
         hitSlop={12}
         accessibilityRole="button"
@@ -219,6 +224,7 @@ export default memo(MapEventCard, (prev, next) => {
     prev.saved === next.saved &&
     prev.userLanguage === next.userLanguage &&
     prev.todayKey === next.todayKey &&
-    prev.displayCategory === next.displayCategory
+    prev.displayCategory === next.displayCategory &&
+    prev.testID === next.testID
   );
 });

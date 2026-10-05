@@ -298,8 +298,10 @@ describe('SignIn Screen', () => {
       await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
       expect(queryByText('auth.troubleSigningInBody')).toBeNull();
 
-      // The button enters a short cooldown (text flips to tryAgainIn); wait until
-      // it re-enables before the second press.
+      // The button enters a short cooldown (text flips to tryAgainIn); wait for it
+      // to start — the label reads signInButton for a render before the cooldown
+      // ticks — then until it re-enables before the second press.
+      await waitFor(() => expect(getByText('auth.tryAgainIn')).toBeTruthy());
       await waitFor(() => expect(getByText('auth.signInButton')).toBeTruthy(), {
         timeout: 5000,
         interval: 200,

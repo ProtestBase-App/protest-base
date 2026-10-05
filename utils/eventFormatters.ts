@@ -172,7 +172,7 @@ export interface FormattedEvent {
   website_url: string | null;
   categories: string[];
   disclaimer: string | null;
-  postal_code: number | null;
+  postal_code: string | null;
   geocod_status: string | null;
   geocod_lat: number | null;
   geocod_lng: number | null;
@@ -326,7 +326,7 @@ export interface FormattedEventListItem {
   organization_id?: string;
   organizer_name?: string;
   co_organizers?: string[];
-  postal_code?: number | null;
+  postal_code?: string | null;
   view_count: number;
   help_needed: boolean;
 }

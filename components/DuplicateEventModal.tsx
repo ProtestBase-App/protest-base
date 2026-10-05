@@ -74,6 +74,7 @@ export default function DuplicateEventModal({
       onDismiss={onDismiss}
       confirmLabel={canOverride ? t(confirmKey) : undefined}
       onConfirm={canOverride ? onConfirm : undefined}
+      testID="duplicate-dialog"
     >
       <ScrollView
         style={styles.list}

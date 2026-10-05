@@ -41,7 +41,7 @@ describe('shareHelpers', () => {
     website_url: null,
     categories: ['climate'],
     disclaimer: null,
-    postal_code: 1000,
+    postal_code: '1000',
     geocod_status: null,
     geocod_lat: null,
     geocod_lng: null,
@@ -167,6 +167,17 @@ describe('shareHelpers', () => {
         const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
         expect(shareCall.message).toContain('📍 1000');
         expect(shareCall.message).not.toContain('Brussels');
+      });
+
+      it('should include the city when the event has no postal_code', async () => {
+        (Share.share as jest.Mock).mockResolvedValue({});
+        const eventWithoutPostal = { ...mockEvent, postal_code: null };
+
+        await shareEvent({ event: eventWithoutPostal, userLanguage: 'en', cityLabel: 'Arlon' });
+
+        const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
+        expect(shareCall.message).toContain('📍 Arlon\n');
+        expect(shareCall.message).not.toContain('📍 Arlon,');
       });
 
       it('should not include location line when postal_code is missing', async () => {

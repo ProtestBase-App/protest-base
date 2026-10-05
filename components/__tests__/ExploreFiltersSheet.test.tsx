@@ -7,27 +7,40 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
 });
 
 jest.mock('@/services/event.service', () => ({
-  getEventsBackend: jest.fn(),
+  getEventsForLocations: jest.fn(),
+}));
+
+jest.mock('@/utils/featureFlags', () => ({
+  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
 }));
 
 import React from 'react';
 import { renderWithProviders, fireEvent, act } from '@/test-utils/render';
 import { ExploreFiltersSheet } from '@/components/ExploreFiltersSheet';
 import { DEFAULT_EXPLORE_FILTERS } from '@/context/ExploreTabProvider';
-import { getEventsBackend } from '@/services/event.service';
+import { getEventsForLocations } from '@/services/event.service';
+import { isLuxembourgEnabled } from '@/utils/featureFlags';
+import type { LocationFilterOption } from '@/utils/locationFilterOptions';
 
-const mockGetEventsBackend = getEventsBackend as jest.MockedFunction<typeof getEventsBackend>;
+const mockGetEventsForLocations = getEventsForLocations as jest.MockedFunction<
+  typeof getEventsForLocations
+>;
 
 const countResponse = (total: number) => ({ events: [], total, limit: 1, offset: 0 });
+
+const mockIsLuxembourgEnabled = isLuxembourgEnabled as jest.MockedFunction<
+  typeof isLuxembourgEnabled
+>;
 
 const SECTION_LABEL_KEYS = [
   'filters.category',
   'filters.date',
+  'filters.country',
   'filters.location',
   'filters.organization',
 ];
 
-/** Flush the 400ms count debounce and settle the getEventsBackend promise. */
+/** Flush the 400ms count debounce and settle the count request promise. */
 async function settleCount() {
   act(() => {
     jest.advanceTimersByTime(400);
@@ -48,7 +61,8 @@ describe('ExploreFiltersSheet', () => {
     jest.clearAllMocks();
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
-    mockGetEventsBackend.mockResolvedValue(countResponse(7));
+    mockGetEventsForLocations.mockResolvedValue(countResponse(7));
+    mockIsLuxembourgEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -67,7 +81,7 @@ describe('ExploreFiltersSheet', () => {
       });
     });
 
-    it('renders the title and the four section labels when visible', () => {
+    it('renders the title and every section label when visible', () => {
       const { getByText } = renderWithProviders(<ExploreFiltersSheet {...defaultProps} />);
 
       expect(getByText('filters.title')).toBeTruthy();
@@ -169,6 +183,191 @@ describe('ExploreFiltersSheet', () => {
     });
   });
 
+  describe('Country chips (single-select)', () => {
+    const BRUSSELS: LocationFilterOption = {
+      value: 'r:be:brussels',
+      label: 'Brussels-Capital',
+      tier: 'region',
+      count: 37,
+      provinceLabel: '',
+      searchText: 'brussels-capital',
+    };
+    const AMSTERDAM: LocationFilterOption = {
+      value: 'm:nl:1011',
+      label: 'Amsterdam',
+      tier: 'municipality',
+      count: 80,
+      provinceLabel: 'Noord-Holland',
+      searchText: 'amsterdam noord-holland 1011',
+    };
+    const locationOverrides = {
+      providerOverrides: {
+        postalCodeContext: {
+          locationFilterOptions: [BRUSSELS, AMSTERDAM],
+          resolveLocationLabel: jest.fn((v: string) => v),
+          isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+        },
+      },
+    };
+
+    it('renders All plus Belgium and the Netherlands, with All active by default', () => {
+      const { getByLabelText, queryByLabelText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} />
+      );
+
+      expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
+      expect(getByLabelText('Belgium').props.accessibilityState.selected).toBe(false);
+      expect(getByLabelText('Netherlands').props.accessibilityState.selected).toBe(false);
+      expect(queryByLabelText('Luxembourg')).toBeNull();
+    });
+
+    it('offers Luxembourg only while it is enabled', () => {
+      mockIsLuxembourgEnabled.mockReturnValue(true);
+      const { getByLabelText } = renderWithProviders(<ExploreFiltersSheet {...defaultProps} />);
+
+      expect(getByLabelText('Luxembourg')).toBeTruthy();
+    });
+
+    it('labels countries in the user language', () => {
+      const { getByLabelText } = renderWithProviders(<ExploreFiltersSheet {...defaultProps} />, {
+        providerOverrides: { globalContext: { userLanguage: 'fr' } },
+      });
+
+      expect(getByLabelText('Belgique')).toBeTruthy();
+      expect(getByLabelText('Pays-Bas')).toBeTruthy();
+    });
+
+    it('applies the selected country', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} onApply={onApply} />
+      );
+
+      fireEvent.press(getByLabelText('Netherlands'));
+
+      expect(getByLabelText('Netherlands').props.accessibilityState.selected).toBe(true);
+      expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(false);
+
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ country: 'netherlands' }));
+    });
+
+    it('clears the country when the active chip or All is tapped', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <ExploreFiltersSheet
+          {...defaultProps}
+          initialFilters={{ ...DEFAULT_EXPLORE_FILTERS, country: 'belgium' }}
+          onApply={onApply}
+        />
+      );
+
+      fireEvent.press(getByLabelText('Belgium'));
+      expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
+
+      fireEvent.press(getByLabelText('Netherlands'));
+      fireEvent.press(getByLabelText('filters.countryAll'));
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ country: null }));
+    });
+
+    it('drops location areas outside the selected country but keeps raw postal codes', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <ExploreFiltersSheet
+          {...defaultProps}
+          initialFilters={{
+            ...DEFAULT_EXPLORE_FILTERS,
+            locations: ['r:be:brussels', 'm:nl:1011', '1000'],
+          }}
+          onApply={onApply}
+        />,
+        locationOverrides
+      );
+
+      fireEvent.press(getByLabelText('Netherlands'));
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(onApply).toHaveBeenCalledWith(
+        expect.objectContaining({ country: 'netherlands', locations: ['m:nl:1011', '1000'] })
+      );
+    });
+
+    it('keeps the location selection when the country is cleared', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <ExploreFiltersSheet
+          {...defaultProps}
+          initialFilters={{
+            ...DEFAULT_EXPLORE_FILTERS,
+            country: 'belgium',
+            locations: ['r:be:brussels'],
+          }}
+          onApply={onApply}
+        />,
+        locationOverrides
+      );
+
+      fireEvent.press(getByLabelText('filters.countryAll'));
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(onApply).toHaveBeenCalledWith(
+        expect.objectContaining({ country: null, locations: ['r:be:brussels'] })
+      );
+    });
+
+    it('scopes the location options to the selected country', () => {
+      const { getByLabelText, getByPlaceholderText, queryByLabelText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} />,
+        locationOverrides
+      );
+
+      const locationInput = getByPlaceholderText('filters.searchPlaceholder');
+      fireEvent(locationInput, 'focus');
+      fireEvent.changeText(locationInput, 'am');
+      expect(getByLabelText('Amsterdam')).toBeTruthy();
+
+      fireEvent.press(getByLabelText('Belgium'));
+      fireEvent(locationInput, 'focus');
+      fireEvent.changeText(locationInput, 'am');
+      expect(queryByLabelText('Amsterdam')).toBeNull();
+
+      fireEvent.changeText(locationInput, 'brus');
+      expect(getByLabelText('Brussels-Capital')).toBeTruthy();
+    });
+
+    it('sends the country with the count request', async () => {
+      const { getByLabelText } = renderWithProviders(<ExploreFiltersSheet {...defaultProps} />);
+
+      fireEvent.press(getByLabelText('Belgium'));
+      await settleCount();
+
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        { limit: 1, offset: 0, includeEnded: false, country: 'belgium' },
+        [],
+        expect.any(Function)
+      );
+    });
+
+    it('enables Reset for a country-only draft and clears it', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <ExploreFiltersSheet {...defaultProps} onApply={onApply} />
+      );
+
+      fireEvent.press(getByLabelText('Belgium'));
+      const resetButton = getByLabelText('common.reset');
+      expect(resetButton.props.accessibilityState.disabled).toBe(false);
+
+      fireEvent.press(resetButton);
+      fireEvent.press(getByText('filters.confirmFilters'));
+
+      expect(onApply).toHaveBeenCalledWith(DEFAULT_EXPLORE_FILTERS);
+    });
+  });
+
   describe('Apply button label', () => {
     it('shows the confirm label before the debounce resolves, then the count label', async () => {
       const { getByText, queryByText } = renderWithProviders(
@@ -184,7 +383,7 @@ describe('ExploreFiltersSheet', () => {
     });
 
     it('shows the no-matches label when the count resolves to 0', async () => {
-      mockGetEventsBackend.mockResolvedValue(countResponse(0));
+      mockGetEventsForLocations.mockResolvedValue(countResponse(0));
       const { getByText, queryByText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />
       );
@@ -219,14 +418,12 @@ describe('ExploreFiltersSheet', () => {
       fireEvent.press(getByText('categories.protest'));
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
-      expect(mockGetEventsBackend).toHaveBeenCalledWith({
-        limit: 1,
-        offset: 0,
-        includeEnded: false,
-        category: 'Protest',
-        search: 'rally',
-      });
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        { limit: 1, offset: 0, includeEnded: false, category: 'Protest', search: 'rally' },
+        [],
+        expect.any(Function)
+      );
     });
 
     it('coalesces rapid draft changes into a single debounced request', async () => {
@@ -235,13 +432,15 @@ describe('ExploreFiltersSheet', () => {
       fireEvent.press(getByText('categories.protest'));
       fireEvent.press(getByText('categories.strike'));
 
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledTimes(1);
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'Strike' })
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'Strike' }),
+        [],
+        expect.any(Function)
       );
     });
   });
@@ -323,7 +522,7 @@ describe('ExploreFiltersSheet', () => {
       // Advance past the debounce — the effect must have early-returned without
       // calling the backend.
       await settleCount();
-      expect(mockGetEventsBackend).not.toHaveBeenCalled();
+      expect(mockGetEventsForLocations).not.toHaveBeenCalled();
 
       // Apply Pressable is disabled when tooBroad — pressing it is a silent
       // no-op so onApply is never called.
@@ -333,7 +532,7 @@ describe('ExploreFiltersSheet', () => {
   });
 
   describe('Location selection → count request', () => {
-    it('includes expanded postalCodes in the count request', async () => {
+    it('passes the selected locations to the count request', async () => {
       const { getByPlaceholderText, getByLabelText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />,
         {
@@ -366,8 +565,11 @@ describe('ExploreFiltersSheet', () => {
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ postalCodes: ['1000'] })
+      // The selection itself goes to the service, which sends it as `areas`.
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.not.objectContaining({ postalCodes: expect.anything() }),
+        ['be-1000'],
+        expect.any(Function)
       );
     });
   });
@@ -392,15 +594,17 @@ describe('ExploreFiltersSheet', () => {
 
       await settleCount();
 
-      expect(mockGetEventsBackend).toHaveBeenCalledWith(
-        expect.objectContaining({ organizers: ['org-1'] })
+      expect(mockGetEventsForLocations).toHaveBeenCalledWith(
+        expect.objectContaining({ organizers: ['org-1'] }),
+        [],
+        expect.any(Function)
       );
     });
   });
 
   describe('Count fetch error path', () => {
     it('handles a rejected count fetch gracefully and keeps the fallback label', async () => {
-      mockGetEventsBackend.mockRejectedValue(new Error('boom'));
+      mockGetEventsForLocations.mockRejectedValue(new Error('boom'));
 
       const { getByText, queryByText } = renderWithProviders(
         <ExploreFiltersSheet {...defaultProps} />

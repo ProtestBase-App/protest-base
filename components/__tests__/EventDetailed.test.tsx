@@ -101,7 +101,7 @@ const mockEvent: FormattedEvent = {
   city: 'Brussels',
   street_address: '123 Main St',
   country: 'belgium',
-  postal_code: 1000,
+  postal_code: '1000',
   categories: ['Climate'],
   image: 'https://example.com/image.jpg',
   images: ['https://example.com/image.jpg'],

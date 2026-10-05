@@ -8,6 +8,9 @@ export interface CoOrganizerAvatar {
   avatar: string | null;
 }
 
+/** Canonical country value the events API filters on (`GET /events?country=`). */
+export type EventCountry = 'belgium' | 'netherlands' | 'luxembourg';
+
 /** Event data as returned by the API. */
 export interface Event {
   $id: string;
@@ -25,7 +28,8 @@ export interface Event {
   city?: string | null;
   region?: string | null;
   country: string;
-  postal_code?: number | null;
+  // Stored and returned as a string (VARCHAR); bare digits for LU and NL.
+  postal_code?: string | null;
 
   geocod_status?: string | null;
   geocod_lat?: number | null;
@@ -131,7 +135,8 @@ export interface CreateEventRequest {
   city?: string;
   region?: string;
   country?: string;
-  postal_code?: number;
+  // '' clears the stored postcode on an update (an omitted field is left unchanged).
+  postal_code?: string;
 
   // Either a picked image or omitted (backend supplies a default).
   image?: PickedImage;

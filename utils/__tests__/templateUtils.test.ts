@@ -18,7 +18,7 @@ describe('templateUtils', () => {
           city: 'Brussels',
           region: 'Brussels-Capital',
           country: 'Belgium',
-          postal_code: 1000,
+          postal_code: '1000',
           geocod_status: 'success',
           geocod_lat: 50.8503,
           geocod_lng: 4.3517,
@@ -44,7 +44,7 @@ describe('templateUtils', () => {
         expect(result.city).toBe('Brussels');
         expect(result.region).toBe('Brussels-Capital');
         expect(result.country).toBe('Belgium');
-        expect(result.postal_code).toBe(1000);
+        expect(result.postal_code).toBe('1000');
         expect(result.website_url).toBe('https://example.com');
         expect(result.categories).toEqual(['climate', 'environment']);
         expect(result.disclaimer).toBe('Please be respectful');
@@ -360,7 +360,7 @@ describe('templateUtils', () => {
         expect(result.title?.length).toBe(10000);
       });
 
-      it('should handle postal_code with value 0', () => {
+      it('should skip an empty postal_code', () => {
         // Edge case: postal code 0 is falsy but might be valid
         const eventWithZeroPostal: Event = {
           $id: 'event123',
@@ -370,12 +370,11 @@ describe('templateUtils', () => {
           start_time: '2025-07-14T14:00:00Z',
           country: 'Belgium',
           organizer_name: 'Organizer',
-          postal_code: 0,
+          postal_code: '',
         };
 
         const result = extractTemplateData(eventWithZeroPostal);
 
-        // 0 is falsy, so it won't be included per current implementation
         expect(result).not.toHaveProperty('postal_code');
       });
 
@@ -388,12 +387,12 @@ describe('templateUtils', () => {
           start_time: '2025-07-14T14:00:00Z',
           country: 'Belgium',
           organizer_name: 'Organizer',
-          postal_code: 1000,
+          postal_code: '1000',
         };
 
         const result = extractTemplateData(eventWithPostalCode);
 
-        expect(result.postal_code).toBe(1000);
+        expect(result.postal_code).toBe('1000');
       });
 
       it('should handle arrays with single item', () => {

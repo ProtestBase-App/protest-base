@@ -39,7 +39,7 @@ const makeEvent = (overrides: Partial<FormattedEventListItem> = {}): FormattedEv
   all_day: false,
   city: 'Brussels',
   country: 'belgium',
-  postal_code: 1000,
+  postal_code: '1000',
   categories: ['Climate'],
   image: '',
   help_needed: false,

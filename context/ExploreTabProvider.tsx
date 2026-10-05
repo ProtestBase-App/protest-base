@@ -8,6 +8,8 @@ import React, {
   SetStateAction,
 } from 'react';
 
+import type { EventCountry } from '@/types/event.types';
+
 /**
  * Applied filters for the Explore tab. The filter bottom sheet keeps its own
  * draft state, so the provider only stores what has been applied.
@@ -17,6 +19,8 @@ export interface ExploreAppliedFilters {
   category: string | null;
   /** Date preset: 'today' | 'tomorrow' | 'thisWeek' | 'thisWeekend', or null for all dates. */
   dateFilter: string | null;
+  /** Canonical country value (e.g. 'belgium') or null for all countries. */
+  country: EventCountry | null;
   /** Administrative-hierarchy location tokens (expanded to postal codes by consumers). */
   locations: string[];
   /** Organization IDs. */
@@ -26,6 +30,7 @@ export interface ExploreAppliedFilters {
 export const DEFAULT_EXPLORE_FILTERS: ExploreAppliedFilters = Object.freeze({
   category: null,
   dateFilter: null,
+  country: null,
   locations: [],
   organizations: [],
 });

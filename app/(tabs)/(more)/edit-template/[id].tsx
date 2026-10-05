@@ -22,6 +22,7 @@ import type { FormState } from '@/types/eventForm.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { toPostalCodeString } from '@/utils/eventLocation';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -211,7 +212,7 @@ export default function EditTemplateScreen() {
             ? eventData.categories[0] || ''
             : eventData.categories || '',
           disclaimer: eventData.disclaimer || '',
-          postal_code: eventData.postal_code || null,
+          postal_code: toPostalCodeString(eventData.postal_code),
           co_organizers: eventData.co_organizers || [],
           help_needed: eventData.help_needed || false,
           help_description: eventData.help_description || '',
@@ -368,6 +369,7 @@ export default function EditTemplateScreen() {
                 isLoading={false}
               />
               <CustomButton
+                testID="btn-edit-template-save"
                 title={t('common.save')}
                 handlePress={handleSave}
                 containerStyles={styles.buttonSave}
@@ -394,6 +396,7 @@ export default function EditTemplateScreen() {
 
           <ThemedView style={styles.templateMetaSection}>
             <FormField
+              testID="input-edit-template-name"
               title={t('template.nameLabel')}
               value={templateName}
               placeholder={t('template.namePlaceholder')}
@@ -430,7 +433,12 @@ export default function EditTemplateScreen() {
             mode="edit-template"
           />
 
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} activeOpacity={0.7}>
+          <TouchableOpacity
+            testID="btn-edit-template-delete"
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
             <IconSymbol name="trash" size={18} color="#EF4444" />
             <ThemedText style={styles.deleteButtonText}>{t('template.deleteButton')}</ThemedText>
           </TouchableOpacity>

@@ -1,17 +1,34 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+  type ScrollView,
+} from 'react-native';
 import {
   BottomSheetBackdrop,
   BottomSheetBackdropProps,
   BottomSheetModal,
   BottomSheetScrollView,
+  type BottomSheetScrollViewMethods,
 } from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { t } from '@/utils/i18n';
+import {
+  DROPDOWN_HEADROOM,
+  DROPDOWN_LABEL_ROOM,
+  getRevealScrollOffset,
+} from '@/utils/keyboardReveal';
 import { getThemeColors } from '@/utils/themeColors';
 
 export interface FiltersSheetShellProps {
@@ -24,6 +41,24 @@ export interface FiltersSheetShellProps {
   testID?: string;
 }
 
+// gorhom resizes the sheet over several frames once the keyboard is up; the
+// settled reveal waits until the sheet layout has been still this long.
+const REVEAL_SETTLE_MS = 120;
+
+interface FiltersSheetKeyboardContextValue {
+  /** Scroll the focused input, plus room for its dropdown, into the visible area. */
+  revealFocusedInput: () => void;
+}
+
+// No-op default so inputs rendered outside a sheet need no guard.
+const FiltersSheetKeyboardContext = createContext<FiltersSheetKeyboardContextValue>({
+  revealFocusedInput: () => {},
+});
+
+export function useFiltersSheetKeyboard(): FiltersSheetKeyboardContextValue {
+  return useContext(FiltersSheetKeyboardContext);
+}
+
 /**
  * Shared bottom-sheet scaffold for filter editors (calendar + explore + maps).
  * Wraps @gorhom/bottom-sheet's BottomSheetModal: owns the modal host, scrim,
@@ -32,7 +67,10 @@ export interface FiltersSheetShellProps {
  *
  * The public API stays declarative (`visible` / `onClose`); internally a ref
  * bridges it onto gorhom's imperative present()/dismiss(), and `onDismiss`
- * funnels swipe-down / backdrop-tap / hardware-back back through `onClose`.
+ * funnels swipe-down / backdrop-tap dismissals back through `onClose`.
+ *
+ * Keyboard: the sheet rides up above the soft keyboard and the body keeps the
+ * focused input, plus room for its dropdown, inside the visible area.
  */
 export function FiltersSheetShell({
   visible,
@@ -44,6 +82,7 @@ export function FiltersSheetShell({
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const sheetRef = useRef<BottomSheetModal>(null);
   // Only dismiss a sheet that was actually presented, so the first mount with
@@ -60,6 +99,14 @@ export function FiltersSheetShell({
     }
   }, [visible]);
 
+  // Swipe-down and backdrop taps dismiss the sheet inside gorhom. The effect
+  // must then skip its own dismiss(): on an already-dismissed modal it leaves
+  // gorhom stuck mid-dismiss and the next present() never shows.
+  const handleDismiss = useCallback(() => {
+    presentedRef.current = false;
+    onClose();
+  }, [onClose]);
+
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
@@ -75,7 +122,7 @@ export function FiltersSheetShell({
   return (
     <BottomSheetModal
       ref={sheetRef}
-      onDismiss={onClose}
+      onDismiss={handleDismiss}
       enableDynamicSizing
       // Preserve the old 78% max-height clamp; the sheet shrinks to its content
       // below that and the inner ScrollView scrolls once it hits the cap.
@@ -88,37 +135,145 @@ export function FiltersSheetShell({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
       }}
-      keyboardBehavior="extend"
+      // Android is edge-to-edge, so the OS never resizes the window for the
+      // keyboard: "adjustPan" makes the sheet offset itself by the keyboard
+      // height ("adjustResize" zeroes it, leaving the inputs under the keyboard).
+      // "interactive" lifts the sheet above the keyboard; when it no longer fits
+      // it stops below the status bar and its content shrinks to the space left.
+      keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
+      android_keyboardInputMode="adjustPan"
+      topInset={insets.top}
     >
+      <FiltersSheetBody title={title} onClose={onClose} testID={testID}>
+        {children}
+      </FiltersSheetBody>
+    </BottomSheetModal>
+  );
+}
+
+interface FiltersSheetBodyProps {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  testID?: string;
+}
+
+/** Scrollable sheet content; gorhom mounts it per presentation. */
+function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBodyProps) {
+  const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
+
+  const scrollRef = useRef<BottomSheetScrollViewMethods & Pick<ScrollView, 'getNativeScrollRef'>>(
+    null
+  );
+  const contentRef = useRef<View>(null);
+  const viewportHeightRef = useRef(0);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reveal = useCallback(() => {
+    const input = TextInput.State.currentlyFocusedInput();
+    const content = contentRef.current;
+    const viewport = scrollRef.current?.getNativeScrollRef?.();
+    const viewportHeight = viewportHeightRef.current;
+    if (!input || !content || !viewport || viewportHeight <= 0) return;
+
+    input.measureLayout(
+      content,
+      (_x, y, _width, height) => {
+        // Read the current offset off the screen rather than from scroll events:
+        // gorhom resets the scroll while it re-settles the sheet and still
+        // reports the stale offset. Both measures share the sheet's transform.
+        viewport.measureInWindow((_viewportX, viewportTop) => {
+          input.measureInWindow((_inputX, inputTop) => {
+            const current = y - (inputTop - viewportTop);
+            // The input with its label above and its dropdown's room below.
+            const next = getRevealScrollOffset(
+              current,
+              viewportHeight,
+              y - DROPDOWN_LABEL_ROOM,
+              y + height + Spacing.md + DROPDOWN_HEADROOM
+            );
+            if (Math.abs(next - current) >= 1) {
+              scrollRef.current?.scrollTo({ y: next, animated: true });
+            }
+          });
+        });
+      },
+      // The focused input lives outside this sheet: nothing to reveal.
+      () => {}
+    );
+  }, []);
+
+  const scheduleReveal = useCallback(() => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
+      revealTimerRef.current = null;
+      reveal();
+    }, REVEAL_SETTLE_MS);
+  }, [reveal]);
+
+  useEffect(() => {
+    // iOS announces the keyboard before animating it, Android once it is up.
+    const subscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      scheduleReveal
+    );
+    return () => {
+      subscription.remove();
+      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    };
+  }, [scheduleReveal]);
+
+  // The viewport shrinks while the sheet settles onto the keyboard and the
+  // content grows when a dropdown opens; both can push the input out of view.
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeightRef.current = event.nativeEvent.layout.height;
+      scheduleReveal();
+    },
+    [scheduleReveal]
+  );
+
+  // Immediate: on focus the input is revealed before the keyboard animates in;
+  // the settled pass after the sheet resizes then fine-tunes it.
+  const keyboardContext = useMemo<FiltersSheetKeyboardContextValue>(
+    () => ({ revealFocusedInput: reveal }),
+    [reveal]
+  );
+
+  return (
+    <FiltersSheetKeyboardContext.Provider value={keyboardContext}>
       {/* keyboardShouldPersistTaps keeps SheetSearchMultiSelect dropdown row
           taps landing while the keyboard is up. */}
       <BottomSheetScrollView
+        ref={scrollRef}
         testID={testID}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: Spacing.sm,
-          paddingBottom: Spacing['2xl'],
-        }}
+        onLayout={handleLayout}
+        onContentSizeChange={scheduleReveal}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <ThemedText style={styles.title}>{title}</ThemedText>
-          <Pressable
-            style={[styles.closeButton, { backgroundColor: themeColors.badgeBg }]}
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.close')}
-          >
-            <IconSymbol name="xmark" size={14} color={themeColors.secondaryText} />
-          </Pressable>
-        </View>
+        {/* Inputs are measured against this view: plain layout, unaffected by
+            the sheet's animated position or the scroll offset. */}
+        <View ref={contentRef} collapsable={false} style={styles.content}>
+          <View style={styles.headerRow}>
+            <ThemedText style={styles.title}>{title}</ThemedText>
+            <Pressable
+              testID="filters-close"
+              style={[styles.closeButton, { backgroundColor: themeColors.badgeBg }]}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
+              <IconSymbol name="xmark" size={14} color={themeColors.secondaryText} />
+            </Pressable>
+          </View>
 
-        {children}
+          {children}
+        </View>
       </BottomSheetScrollView>
-    </BottomSheetModal>
+    </FiltersSheetKeyboardContext.Provider>
   );
 }
 
@@ -179,6 +334,7 @@ export function FiltersSheetFooter({
   return (
     <View style={styles.footer}>
       <Pressable
+        testID="filters-reset"
         style={[
           styles.resetButton,
           {
@@ -203,6 +359,7 @@ export function FiltersSheetFooter({
       </Pressable>
 
       <Pressable
+        testID="filters-apply"
         style={[
           styles.applyButton,
           {
@@ -223,6 +380,11 @@ export function FiltersSheetFooter({
 }
 
 const styles = StyleSheet.create({
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing['2xl'],
+  },
   flex: {
     flex: 1,
   },

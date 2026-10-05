@@ -252,6 +252,7 @@ export default function OrganizerProfile() {
         <ThemedView style={styles.container}>
           <View style={[styles.navBar, { borderBottomColor: themeColors.separator }]}>
             <TouchableOpacity
+              testID="organizer-back"
               onPress={handleBack}
               style={styles.navBack}
               accessibilityRole="button"
@@ -262,6 +263,7 @@ export default function OrganizerProfile() {
             <View style={styles.navRight}>
               {!notFound && (
                 <TouchableOpacity
+                  testID="organizer-share"
                   onPress={handleShare}
                   style={styles.navIconButton}
                   accessibilityRole="button"
@@ -308,7 +310,9 @@ export default function OrganizerProfile() {
               <View style={styles.identity}>
                 <OrganizerAvatar avatarUrl={organizerAvatar} name={name} size={88} />
                 <View style={styles.orgNameRow}>
-                  <ThemedText style={styles.orgName}>{name}</ThemedText>
+                  <ThemedText testID="organizer-name" style={styles.orgName}>
+                    {name}
+                  </ThemedText>
                   {isVerified && (
                     <IconSymbol
                       name="checkmark.shield"
@@ -365,6 +369,7 @@ export default function OrganizerProfile() {
                     borderWidth: isFollowing ? 1 : 0,
                   },
                 ]}
+                testID="organizer-follow"
                 onPress={handleFollow}
                 activeOpacity={0.8}
                 accessibilityRole="button"
@@ -386,6 +391,7 @@ export default function OrganizerProfile() {
                   </ThemedText>
                   {!eventsLoading && eventCount !== null && eventCount > 0 && (
                     <TouchableOpacity
+                      testID="organizer-see-all"
                       onPress={handleSeeAllEvents}
                       accessibilityRole="button"
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -414,6 +420,7 @@ export default function OrganizerProfile() {
                     return (
                       <TouchableOpacity
                         key={ev.$id}
+                        testID={`organizer-event-${index}`}
                         style={[
                           styles.eventCard,
                           {
