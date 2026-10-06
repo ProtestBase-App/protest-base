@@ -1,6 +1,5 @@
 import { countries } from '@/constants/Countries';
 import type { EventCountry } from '@/types/event.types';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
 
 export interface CountryFilterOption {
   /** Canonical country value, e.g. 'belgium'. */
@@ -16,15 +15,10 @@ export function getCountryLabel(value: string, locale: string): string {
   return entry.label[locale as keyof typeof entry.label] ?? entry.label.en;
 }
 
-/**
- * The countries a filter can be narrowed to, in `constants/Countries.ts` order.
- * Luxembourg is listed only while it is enabled.
- */
+/** The countries a filter can be narrowed to, in `constants/Countries.ts` order. */
 export function getCountryFilterOptions(locale: string): CountryFilterOption[] {
-  return countries
-    .filter(({ value }) => value !== 'luxembourg' || isLuxembourgEnabled())
-    .map(({ value }) => ({
-      value: value as EventCountry,
-      label: getCountryLabel(value, locale),
-    }));
+  return countries.map(({ value }) => ({
+    value: value as EventCountry,
+    label: getCountryLabel(value, locale),
+  }));
 }

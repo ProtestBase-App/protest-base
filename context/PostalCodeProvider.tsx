@@ -10,7 +10,6 @@ import React, {
 } from 'react';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
 import { logger } from '@/utils/logger';
 import {
   buildLocationFilterOptions,
@@ -103,8 +102,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
   const loadPostalCodesForCountry = useCallback(
     async (country: string) => {
       if (country === 'luxembourg') {
-        // Never touch the shared loading flag while Luxembourg is off.
-        if (!isLuxembourgEnabled() || luxembourgRequestedRef.current) return;
+        if (luxembourgRequestedRef.current) return;
         luxembourgRequestedRef.current = true;
         setLoading(true);
         try {

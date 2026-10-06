@@ -164,7 +164,6 @@ import EventForm from '@/components/EventForm';
 import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
 import { searchAddress } from '@/services/address.service';
-import * as featureFlags from '@/utils/featureFlags';
 
 const mockSearchAddress = searchAddress as jest.Mock;
 
@@ -2336,19 +2335,8 @@ describe('EventForm — Luxembourg', () => {
     return setForm;
   };
 
-  it('offers Luxembourg while it is enabled', async () => {
+  it('offers Luxembourg', async () => {
     await renderForm(mockForm);
-    expect(screen.getByTestId('country-chip-luxembourg')).toBeTruthy();
-  });
-
-  it('hides Luxembourg in production builds unless the event is already there', async () => {
-    jest.spyOn(featureFlags, 'isLuxembourgEnabled').mockReturnValue(false);
-
-    await renderForm(mockForm);
-    expect(screen.queryByTestId('country-chip-luxembourg')).toBeNull();
-
-    screen.unmount();
-    await renderForm(luxembourgForm);
     expect(screen.getByTestId('country-chip-luxembourg')).toBeTruthy();
   });
 

@@ -24,7 +24,6 @@
  */
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import * as featureFlags from '@/utils/featureFlags';
 
 // ============================================
 // Mocks BEFORE imports
@@ -317,7 +316,7 @@ describe('PostalCodeProvider', () => {
 
     const isLuxembourgToken = (value: string) => /^[cpm]:lu(:|$)/.test(value);
 
-    it('offers the Luxembourg areas while it is enabled', async () => {
+    it('offers the Luxembourg areas', async () => {
       const { result } = renderHook(() => usePostalCodes(), { wrapper });
       await waitFor(() =>
         expect(result.current.locationFilterOptions.some((o) => o.value === 'c:lu')).toBe(true)
@@ -326,21 +325,6 @@ describe('PostalCodeProvider', () => {
         o.value.startsWith('m:lu:')
       );
       expect(communes).toHaveLength(100);
-    });
-
-    it('loads nothing for Luxembourg while it is off', async () => {
-      jest.spyOn(featureFlags, 'isLuxembourgEnabled').mockReturnValue(false);
-      const { result } = renderHook(() => usePostalCodes(), { wrapper });
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      await act(async () => {
-        await result.current.loadPostalCodesForCountry('luxembourg');
-      });
-
-      expect(result.current.loading).toBe(false);
-      expect(result.current.locationFilterOptions.some((o) => isLuxembourgToken(o.value))).toBe(
-        false
-      );
     });
   });
 });

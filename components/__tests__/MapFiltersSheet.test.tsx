@@ -6,20 +6,11 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
   return (props: any) => React.createElement('MaterialIcons', props);
 });
 
-jest.mock('@/utils/featureFlags', () => ({
-  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
-}));
-
 import React from 'react';
 import { Switch } from 'react-native';
 import { renderWithProviders, fireEvent, createMockEvent } from '@/test-utils/render';
 import { MapFiltersSheet } from '@/components/MapFiltersSheet';
 import { DEFAULT_MAP_FILTERS } from '@/utils/mapTabUtils';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
-
-const mockIsLuxembourgEnabled = isLuxembourgEnabled as jest.MockedFunction<
-  typeof isLuxembourgEnabled
->;
 
 const CATEGORY_KEYS = [
   'categories.protest',
@@ -44,7 +35,6 @@ describe('MapFiltersSheet', () => {
     jest.clearAllMocks();
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
-    mockIsLuxembourgEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -199,13 +189,6 @@ describe('MapFiltersSheet', () => {
       expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
       expect(getByLabelText('Belgium')).toBeTruthy();
       expect(getByLabelText('Netherlands')).toBeTruthy();
-      expect(queryByLabelText('Luxembourg')).toBeNull();
-    });
-
-    it('offers Luxembourg only while it is enabled', () => {
-      mockIsLuxembourgEnabled.mockReturnValue(true);
-      const { getByLabelText } = renderWithProviders(<MapFiltersSheet {...defaultProps} />);
-
       expect(getByLabelText('Luxembourg')).toBeTruthy();
     });
 
