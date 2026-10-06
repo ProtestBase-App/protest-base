@@ -1,9 +1,5 @@
 jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockReturnValue('light') }));
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
-jest.mock('@/utils/featureFlags', () => ({
-  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
-}));
-
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { CountryFilterSection } from '@/components/CountryFilterSection';

@@ -10,16 +10,11 @@ jest.mock('@/services/event.service', () => ({
   getEventsForLocations: jest.fn(),
 }));
 
-jest.mock('@/utils/featureFlags', () => ({
-  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
-}));
-
 import React from 'react';
 import { renderWithProviders, fireEvent, act } from '@/test-utils/render';
 import { ExploreFiltersSheet } from '@/components/ExploreFiltersSheet';
 import { DEFAULT_EXPLORE_FILTERS } from '@/context/ExploreTabProvider';
 import { getEventsForLocations } from '@/services/event.service';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
 import type { LocationFilterOption } from '@/utils/locationFilterOptions';
 
 const mockGetEventsForLocations = getEventsForLocations as jest.MockedFunction<
@@ -27,10 +22,6 @@ const mockGetEventsForLocations = getEventsForLocations as jest.MockedFunction<
 >;
 
 const countResponse = (total: number) => ({ events: [], total, limit: 1, offset: 0 });
-
-const mockIsLuxembourgEnabled = isLuxembourgEnabled as jest.MockedFunction<
-  typeof isLuxembourgEnabled
->;
 
 const SECTION_LABEL_KEYS = [
   'filters.category',
@@ -62,7 +53,6 @@ describe('ExploreFiltersSheet', () => {
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
     mockGetEventsForLocations.mockResolvedValue(countResponse(7));
-    mockIsLuxembourgEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -218,13 +208,6 @@ describe('ExploreFiltersSheet', () => {
       expect(getByLabelText('filters.countryAll').props.accessibilityState.selected).toBe(true);
       expect(getByLabelText('Belgium').props.accessibilityState.selected).toBe(false);
       expect(getByLabelText('Netherlands').props.accessibilityState.selected).toBe(false);
-      expect(queryByLabelText('Luxembourg')).toBeNull();
-    });
-
-    it('offers Luxembourg only while it is enabled', () => {
-      mockIsLuxembourgEnabled.mockReturnValue(true);
-      const { getByLabelText } = renderWithProviders(<ExploreFiltersSheet {...defaultProps} />);
-
       expect(getByLabelText('Luxembourg')).toBeTruthy();
     });
 

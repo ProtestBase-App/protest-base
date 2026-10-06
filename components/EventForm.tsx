@@ -47,7 +47,6 @@ import { logger } from '@/utils/logger';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { optimizeImageForUpload } from '@/utils/imageOptimization';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
 
 // LayoutAnimation is opt-in on Android.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -285,11 +284,6 @@ const EventForm: React.FC<EventFormProps> = ({
   }, [luxembourgData]);
 
   const isLuxembourg = form.country === 'luxembourg';
-  // Luxembourg is offered only while enabled, but an event already set to it
-  // keeps its chip so the form shows what is stored.
-  const selectableCountries = countries.filter(
-    (c) => c.value !== 'luxembourg' || isLuxembourgEnabled() || isLuxembourg
-  );
 
   const postalCodeOptions = useMemo<SheetSearchMultiSelectOption[]>(
     () =>
@@ -834,7 +828,7 @@ const EventForm: React.FC<EventFormProps> = ({
         {t('createEvent.country')} ({t('common.optional')})
       </ThemedText>
       <ThemedView style={styles.chipRow}>
-        {selectableCountries.map((c) => {
+        {countries.map((c) => {
           const active = form.country === c.value;
           return (
             <FilterChip

@@ -1,18 +1,7 @@
-jest.mock('@/utils/featureFlags', () => ({
-  isLuxembourgEnabled: jest.fn().mockReturnValue(false),
-}));
-
 import { getCountryFilterOptions, getCountryLabel } from '@/utils/countryOptions';
-import { isLuxembourgEnabled } from '@/utils/featureFlags';
-
-const mockIsLuxembourgEnabled = isLuxembourgEnabled as jest.MockedFunction<
-  typeof isLuxembourgEnabled
->;
 
 describe('countryOptions', () => {
-  beforeEach(() => {
-    mockIsLuxembourgEnabled.mockReturnValue(false);
-  });
+  beforeEach(() => {});
 
   describe('getCountryLabel', () => {
     it('localizes known countries, case-insensitively', () => {
@@ -27,16 +16,7 @@ describe('countryOptions', () => {
   });
 
   describe('getCountryFilterOptions', () => {
-    it('lists Belgium and the Netherlands in order while Luxembourg is off', () => {
-      expect(getCountryFilterOptions('fr')).toEqual([
-        { value: 'belgium', label: 'Belgique' },
-        { value: 'netherlands', label: 'Pays-Bas' },
-      ]);
-    });
-
-    it('adds Luxembourg once it is enabled', () => {
-      mockIsLuxembourgEnabled.mockReturnValue(true);
-
+    it('lists every country in order, localized', () => {
       expect(getCountryFilterOptions('nl')).toEqual([
         { value: 'belgium', label: 'België' },
         { value: 'netherlands', label: 'Nederland' },
