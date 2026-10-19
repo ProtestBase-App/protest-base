@@ -29,6 +29,15 @@ export interface SheetSearchMultiSelectProps {
   minSearchLength?: number;
   maxVisibleOptions?: number;
   /**
+   * Replaces the default match (the trimmed, lowercased query as a substring of
+   * `searchText`) for a non-empty query: returns the matching options, best
+   * first. Opt-in, for option lists too large or too particular for the default.
+   */
+  filterOptions?: (
+    options: SheetSearchMultiSelectOption[],
+    query: string
+  ) => SheetSearchMultiSelectOption[];
+  /**
    * Message shown inside the open panel when a query at/above minSearchLength
    * matches nothing. Opt-in: when omitted the panel simply closes on no match
    * (legacy behaviour), so existing callers are unaffected.
@@ -103,6 +112,7 @@ export function SheetSearchMultiSelect({
   leadingIconName,
   minSearchLength = 0,
   maxVisibleOptions = 5,
+  filterOptions,
   noResultsText,
   minLengthHintText,
   loading = false,
@@ -168,9 +178,11 @@ export function SheetSearchMultiSelect({
     const matched =
       normalizedQuery.length === 0
         ? unselected
-        : unselected.filter((option) =>
-            (option.searchText ?? option.label.toLowerCase()).includes(normalizedQuery)
-          );
+        : filterOptions
+          ? filterOptions(unselected, normalizedQuery)
+          : unselected.filter((option) =>
+              (option.searchText ?? option.label.toLowerCase()).includes(normalizedQuery)
+            );
     return matched.slice(0, maxVisibleOptions);
   }, [
     disabled,
@@ -181,6 +193,7 @@ export function SheetSearchMultiSelect({
     selected,
     minSearchLength,
     maxVisibleOptions,
+    filterOptions,
   ]);
 
   // Panel visibility: matched options, a "keep typing" hint (query below the

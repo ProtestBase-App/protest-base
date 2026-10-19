@@ -5,7 +5,7 @@
 [![React Native](https://img.shields.io/badge/React%20Native-0.86-61dafb)](https://reactnative.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)](https://www.typescriptlang.org)
 
-A mobile app that helps people discover and organize protest events in Belgium, the Netherlands and Luxembourg. Available on iOS and Android.
+A mobile app that helps people discover and organize protest events in Belgium, the Netherlands and Luxembourg, and in France once the backend serves it (the app checks at runtime). Available on iOS and Android.
 
 Website: **[protestbase.be](https://protestbase.be)**
 

@@ -190,6 +190,20 @@ describe('MapFiltersSheet', () => {
       expect(getByLabelText('Belgium')).toBeTruthy();
       expect(getByLabelText('Netherlands')).toBeTruthy();
       expect(getByLabelText('Luxembourg')).toBeTruthy();
+      expect(queryByLabelText('France')).toBeNull();
+    });
+
+    it('offers France once the backend serves it, and applies it', () => {
+      const onApply = jest.fn();
+      const { getByLabelText, getByText } = renderWithProviders(
+        <MapFiltersSheet {...defaultProps} events={[]} onApply={onApply} />,
+        { providerOverrides: { postalCodeContext: { franceEnabled: true } } }
+      );
+
+      fireEvent.press(getByLabelText('France'));
+      fireEvent.press(getByText('maps.filterApplyCount'));
+
+      expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ country: 'france' }));
     });
 
     it('never lists an unknown country from the events', () => {

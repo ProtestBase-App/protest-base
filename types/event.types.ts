@@ -9,7 +9,7 @@ export interface CoOrganizerAvatar {
 }
 
 /** Canonical country value the events API filters on (`GET /events?country=`). */
-export type EventCountry = 'belgium' | 'netherlands' | 'luxembourg';
+export type EventCountry = 'belgium' | 'netherlands' | 'luxembourg' | 'france';
 
 /** Event data as returned by the API. */
 export interface Event {
@@ -158,10 +158,12 @@ export interface CreateEventRequest {
   is_draft?: boolean;
 
   // Coordinates of an accepted address suggestion. When the client sends both
-  // (and they fall inside the BE/NL bbox) the backend ADOPTS them as the event
-  // pin and skips geocoding; otherwise it silently falls back to Nominatim. Send
-  // them only for a suggestion picked in the current session. `geocod_status` is
-  // minted server-side and must NEVER be sent — a client value is ignored.
+  // (and they fall inside the service-area box of the event's country: Benelux,
+  // or metropolitan France + Corsica) the backend ADOPTS them as the event pin
+  // and skips geocoding; otherwise it silently falls back to Nominatim. Send
+  // them only for a suggestion picked in the current session, together with the
+  // country. `geocod_status` is minted server-side and must NEVER be sent — a
+  // client value is ignored.
   geocod_status?: string;
   geocod_lat?: number;
   geocod_lng?: number;

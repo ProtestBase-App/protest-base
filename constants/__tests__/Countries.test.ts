@@ -19,8 +19,8 @@ describe('Countries', () => {
       expect(Array.isArray(countries)).toBe(true);
     });
 
-    it('should contain 3 countries', () => {
-      expect(countries).toHaveLength(3);
+    it('should contain 4 countries', () => {
+      expect(countries).toHaveLength(4);
     });
   });
 
@@ -81,6 +81,19 @@ describe('Countries', () => {
 
     it('should have English, French and Dutch labels', () => {
       expect(luxembourg?.label).toEqual({ en: 'Luxembourg', fr: 'Luxembourg', nl: 'Luxemburg' });
+    });
+  });
+
+  describe('France entry', () => {
+    const france = countries.find((c) => c.value === 'france');
+
+    it('should exist with the backend value "france", last', () => {
+      expect(france?.value).toBe('france');
+      expect(countries[countries.length - 1]).toBe(france);
+    });
+
+    it('should have English, French and Dutch labels', () => {
+      expect(france?.label).toEqual({ en: 'France', fr: 'France', nl: 'Frankrijk' });
     });
   });
 

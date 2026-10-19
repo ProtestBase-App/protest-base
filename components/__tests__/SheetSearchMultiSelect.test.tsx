@@ -304,6 +304,43 @@ describe('SheetSearchMultiSelect', () => {
     });
   });
 
+  describe('filterOptions', () => {
+    it('replaces the default match and keeps its order, still capped and without selected values', () => {
+      // A matcher the default could never be: by postcode, last first.
+      const filterOptions = jest.fn((options: SheetSearchMultiSelectOption[], query: string) =>
+        options.filter((option) => option.searchText?.endsWith(query)).reverse()
+      );
+      render(
+        <SheetSearchMultiSelect
+          {...defaultProps}
+          selected={['opt-antwerp']}
+          filterOptions={filterOptions}
+          maxVisibleOptions={1}
+        />
+      );
+
+      fireEvent(getInput(), 'focus');
+      fireEvent.changeText(getInput(), ' 000 ');
+
+      expect(filterOptions).toHaveBeenLastCalledWith(
+        OPTIONS.filter((option) => option.value !== 'opt-antwerp'),
+        '000'
+      );
+      expect(screen.getByLabelText('Bruges')).toBeTruthy();
+      expect(screen.queryByLabelText('Brussels')).toBeNull();
+    });
+
+    it('is not asked for an empty query', () => {
+      const filterOptions = jest.fn(() => []);
+      render(<SheetSearchMultiSelect {...defaultProps} filterOptions={filterOptions} />);
+
+      fireEvent(getInput(), 'focus');
+
+      expect(filterOptions).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Brussels')).toBeTruthy();
+    });
+  });
+
   describe('maxVisibleOptions slicing', () => {
     it('shows only maxVisibleOptions rows when more options match', () => {
       const manyOptions: SheetSearchMultiSelectOption[] = [

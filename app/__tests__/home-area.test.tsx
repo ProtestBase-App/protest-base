@@ -40,4 +40,23 @@ describe('HomeAreaScreen', () => {
     const { options } = mockPicker.mock.calls[mockPicker.mock.calls.length - 1][0];
     expect(options.map((o) => o.value)).toEqual(['p:lu:wiltz', 'm:lu:kiischpelt']);
   });
+
+  it('offers French régions and départements, but not France itself', () => {
+    renderWithProviders(<HomeAreaScreen />, {
+      providerOverrides: {
+        postalCodeContext: {
+          loading: false,
+          franceEnabled: true,
+          locationFilterOptions: [
+            option('c:fr', 'country'),
+            option('r:fr:ile-de-france', 'region'),
+            option('p:fr:75', 'province'),
+          ],
+        },
+      },
+    });
+
+    const { options } = mockPicker.mock.calls[mockPicker.mock.calls.length - 1][0];
+    expect(options.map((o) => o.value)).toEqual(['r:fr:ile-de-france', 'p:fr:75']);
+  });
 });

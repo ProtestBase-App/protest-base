@@ -21,23 +21,16 @@ import { HOME_AREA_CENTROIDS } from '@/constants/HomeAreaCentroids';
 import { Event } from '@/types/event.types';
 import { parseAsUTC } from '@/utils/eventFormatters';
 import { hasMapCoordinates } from '@/utils/mapTabUtils';
-import { LocationFilterOption } from '@/utils/locationFilterOptions';
+import { countryOfLocationToken, LocationFilterOption } from '@/utils/locationFilterOptions';
 import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
-
-/** Backend country value for each token country segment. */
-const TOKEN_COUNTRY: Record<string, string> = {
-  be: 'belgium',
-  nl: 'netherlands',
-  lu: 'luxembourg',
-};
 
 export interface HomeAreaMatch {
   /** The original home-area token this match was built from (for centroid lookup). */
   token: string;
   /**
-   * Backend country value the home token belongs to ('belgium' | 'netherlands'),
-   * or null for a raw/unknown token. Gates event matching against the BE/NL
-   * postcode-range collision.
+   * Backend country value the home token belongs to (e.g. 'belgium'), or null for
+   * a raw/unknown token. Gates event matching against the BE/NL postcode-range
+   * collision.
    */
   country: string | null;
   /** Postcodes in the home municipality (empty unless the token is municipality-tier). */
@@ -76,10 +69,11 @@ function findContainingTier(
 
 /**
  * Resolve a home token to the three graduated postcode sets (municipality →
- * province → region) plus the country gate. The datasets carry no parent
- * pointers, so parents are resolved by postcode-containment against the
- * same-country options of each broader tier. Returns null for an empty/
- * unresolvable token (e.g. postal data not loaded yet, or a stale token).
+ * province → region) plus the country gate. The BE/NL/LU datasets carry no
+ * parent pointers, so parents are resolved by postcode-containment against the
+ * same-country options of each broader tier; a French département names its
+ * région instead, since a few French codes span two régions. Returns null for
+ * an empty/unresolvable token (e.g. postal data not loaded yet, or a stale token).
  */
 export function buildHomeAreaMatch(
   token: string | null,
@@ -95,7 +89,7 @@ export function buildHomeAreaMatch(
   const parts = token.split(':');
   const tierPrefix = parts.length >= 3 ? parts[0] : ''; // 'm' | 'p' | 'r' | '' (raw code)
   const countrySegment = parts.length >= 3 ? parts[1] : '';
-  const country = TOKEN_COUNTRY[countrySegment] ?? null;
+  const country = countryOfLocationToken(token);
 
   let municipalityCodes = new Set<string>();
   let provinceCodes = new Set<string>();
@@ -124,7 +118,10 @@ export function buildHomeAreaMatch(
         provinceToken = province.token;
       }
     }
-    const region = findContainingTier(options, `r:${countrySegment}:`, rep, expandTokens);
+    const parentToken = options.find((option) => option.value === token)?.parentToken;
+    const region = parentToken
+      ? { token: parentToken, codes: new Set(expandTokens([parentToken]).codes) }
+      : findContainingTier(options, `r:${countrySegment}:`, rep, expandTokens);
     if (region) {
       regionCodes = region.codes;
       regionToken = region.token;
@@ -151,7 +148,7 @@ export function buildHomeAreaMatch(
 export function rankEventByHomeArea(event: Event, match: HomeAreaMatch): 0 | 1 | 2 | 3 {
   if (match.country && canonicalCountry(event.country) !== match.country) return 3;
   if (event.postal_code === null || event.postal_code === undefined) return 3;
-  const code = normalizeEventPostcode(event.postal_code);
+  const code = normalizeEventPostcode(event.postal_code, event.country);
   if (!code) return 3;
   if (match.municipalityCodes.has(code)) return 0;
   if (match.provinceCodes.has(code)) return 1;
@@ -186,7 +183,7 @@ function meanCenter(
   for (const event of events) {
     if (match.country && canonicalCountry(event.country) !== match.country) continue;
     if (event.postal_code === null || event.postal_code === undefined) continue;
-    const code = normalizeEventPostcode(event.postal_code);
+    const code = normalizeEventPostcode(event.postal_code, event.country);
     if (!code || !codes.has(code)) continue;
     if (!hasMapCoordinates(event)) continue;
     sumLng += event.geocod_lng!;

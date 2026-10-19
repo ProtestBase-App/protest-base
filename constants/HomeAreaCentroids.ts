@@ -13,13 +13,15 @@
  * every area. A picked municipality that isn't listed falls back to its province
  * center, then its region center (see `resolveHomeAreaCenter` in
  * `utils/homeArea.ts`) — "roughly right" instead of "somewhere else entirely".
- * Province centers use the province capital's coordinates.
+ * Province centers use the province capital's coordinates. France is complete
+ * (every région and département), from the backend's dataset.
  *
  * Token scheme mirrors `utils/locationFilterOptions.ts`:
  *   r:be:<slug>     region        m:be:<minCode>  municipality (min member code)
  *   p:be:<slug>     BE province   m:nl:<minCode>  NL sub-municipality
  *   p:nl:<slug>     NL province   p:lu:<slug>     LU canton
  *   m:lu:<slug>     LU commune (slug: some LU codes belong to two communes)
+ *   r:fr:<slug>     FR région     p:fr:<code>     FR département (e.g. p:fr:2a)
  *
  * Municipality min-code tokens were verified against the bundled BE_EN / NL
  * datasets (they are language-independent). Coordinates are [lng, lat] to match
@@ -138,6 +140,121 @@ export const HOME_AREA_CENTROIDS: Record<string, [number, number]> = {
   'm:lu:grevenmacher': [6.4372, 49.6803], // Grevenmacher
   'm:lu:kaerjeng': [5.8944, 49.5825], // Käerjeng
   'm:lu:ettelbruck': [6.1056, 49.8498], // Ettelbruck
+
+  // --- France: régions ---
+  // The backend dataset's `center` (the population-weighted mean of the communes),
+  // via local/tools/generate-fr-postal-data.mjs; the same for the départements.
+  'r:fr:auvergne-rhone-alpes': [4.8782, 45.6298], // Auvergne-Rhône-Alpes
+  'r:fr:bourgogne-franche-comte': [5.1428, 47.2177], // Bourgogne-Franche-Comté
+  'r:fr:bretagne': [-2.8426, 48.1667], // Bretagne
+  'r:fr:centre-val-de-loire': [1.5694, 47.6386], // Centre-Val de Loire
+  'r:fr:corse': [9.1071, 42.2112], // Corse
+  'r:fr:grand-est': [6.259, 48.6973], // Grand Est
+  'r:fr:hauts-de-france': [2.8166, 50.2408], // Hauts-de-France
+  'r:fr:ile-de-france': [2.3558, 48.836], // Île-de-France
+  'r:fr:normandie': [0.235, 49.258], // Normandie
+  'r:fr:nouvelle-aquitaine': [-0.1619, 45.0851], // Nouvelle-Aquitaine
+  'r:fr:occitanie': [2.4619, 43.5938], // Occitanie
+  'r:fr:pays-de-la-loire': [-1.0579, 47.3579], // Pays de la Loire
+  'r:fr:provence-alpes-cote-d-azur': [5.9047, 43.5564], // Provence-Alpes-Côte d'Azur
+
+  // --- France: départements ---
+  'p:fr:01': [5.3593, 46.1084], // Ain
+  'p:fr:02': [3.4584, 49.5719], // Aisne
+  'p:fr:03': [3.1554, 46.3355], // Allier
+  'p:fr:04': [6.0169, 44.0044], // Alpes-de-Haute-Provence
+  'p:fr:05': [6.2094, 44.6173], // Hautes-Alpes
+  'p:fr:06': [7.1596, 43.6816], // Alpes-Maritimes
+  'p:fr:07': [4.5726, 44.8092], // Ardèche
+  'p:fr:08': [4.7104, 49.7225], // Ardennes
+  'p:fr:09': [1.5577, 43.0207], // Ariège
+  'p:fr:10': [4.0648, 48.3139], // Aube
+  'p:fr:11': [2.574, 43.1748], // Aude
+  'p:fr:12': [2.5857, 44.3192], // Aveyron
+  'p:fr:13': [5.2961, 43.4075], // Bouches-du-Rhône
+  'p:fr:14': [-0.3272, 49.1595], // Calvados
+  'p:fr:15': [2.57, 45.0073], // Cantal
+  'p:fr:16': [0.1172, 45.6914], // Charente
+  'p:fr:17': [-0.8914, 45.9038], // Charente-Maritime
+  'p:fr:18': [2.4258, 47.084], // Cher
+  'p:fr:19': [1.7052, 45.2657], // Corrèze
+  'p:fr:21': [4.973, 47.311], // Côte-d'Or
+  'p:fr:22': [-2.8064, 48.5156], // Côtes-d'Armor
+  'p:fr:23': [1.951, 46.1341], // Creuse
+  'p:fr:24': [0.6991, 45.0755], // Dordogne
+  'p:fr:25': [6.3565, 47.2548], // Doubs
+  'p:fr:26': [4.9478, 44.8231], // Drôme
+  'p:fr:27': [1.085, 49.1346], // Eure
+  'p:fr:28': [1.4046, 48.4742], // Eure-et-Loir
+  'p:fr:29': [-4.2001, 48.2664], // Finistère
+  'p:fr:2a': [8.8567, 41.8595], // Corse-du-Sud
+  'p:fr:2b': [9.3323, 42.5275], // Haute-Corse
+  'p:fr:30': [4.3231, 43.9321], // Gard
+  'p:fr:31': [1.375, 43.5532], // Haute-Garonne
+  'p:fr:32': [0.5173, 43.693], // Gers
+  'p:fr:33': [-0.5788, 44.8404], // Gironde
+  'p:fr:34': [3.6688, 43.5456], // Hérault
+  'p:fr:35': [-1.6796, 48.1752], // Ille-et-Vilaine
+  'p:fr:36': [1.6366, 46.7881], // Indre
+  'p:fr:37': [0.6843, 47.3404], // Indre-et-Loire
+  'p:fr:38': [5.4924, 45.3478], // Isère
+  'p:fr:39': [5.6541, 46.7744], // Jura
+  'p:fr:40': [-0.9434, 43.825], // Landes
+  'p:fr:41': [1.3792, 47.5805], // Loir-et-Cher
+  'p:fr:42': [4.2902, 45.6028], // Loire
+  'p:fr:43': [3.9233, 45.1618], // Haute-Loire
+  'p:fr:44': [-1.6963, 47.2717], // Loire-Atlantique
+  'p:fr:45': [2.165, 47.9154], // Loiret
+  'p:fr:46': [1.5971, 44.6262], // Lot
+  'p:fr:47': [0.52, 44.3449], // Lot-et-Garonne
+  'p:fr:48': [3.4662, 44.5566], // Lozère
+  'p:fr:49': [-0.6013, 47.376], // Maine-et-Loire
+  'p:fr:50': [-1.4095, 49.1701], // Manche
+  'p:fr:51': [4.1268, 49.101], // Marne
+  'p:fr:52': [5.1681, 48.2175], // Haute-Marne
+  'p:fr:53': [-0.7114, 48.1072], // Mayenne
+  'p:fr:54': [6.1119, 48.8403], // Meurthe-et-Moselle
+  'p:fr:55': [5.3634, 48.9736], // Meuse
+  'p:fr:56': [-2.9168, 47.7634], // Morbihan
+  'p:fr:57': [6.4479, 49.1553], // Moselle
+  'p:fr:58': [3.3049, 47.0889], // Nièvre
+  'p:fr:59': [3.1398, 50.555], // Nord
+  'p:fr:60': [2.4622, 49.3593], // Oise
+  'p:fr:61': [0.0276, 48.6163], // Orne
+  'p:fr:62': [2.4227, 50.5351], // Pas-de-Calais
+  'p:fr:63': [3.174, 45.7722], // Puy-de-Dôme
+  'p:fr:64': [-0.9105, 43.3608], // Pyrénées-Atlantiques
+  'p:fr:65': [0.1117, 43.1776], // Hautes-Pyrénées
+  'p:fr:66': [2.8413, 42.6567], // Pyrénées-Orientales
+  'p:fr:67': [7.6659, 48.6178], // Bas-Rhin
+  'p:fr:68': [7.3205, 47.8387], // Haut-Rhin
+  'p:fr:69': [4.8125, 45.7736], // Rhône
+  'p:fr:70': [6.2046, 47.6326], // Haute-Saône
+  'p:fr:71': [4.6455, 46.6291], // Saône-et-Loire
+  'p:fr:72': [0.2006, 47.9844], // Sarthe
+  'p:fr:73': [6.1218, 45.5781], // Savoie
+  'p:fr:74': [6.2972, 46.0647], // Haute-Savoie
+  'p:fr:75': [2.347, 48.8589], // Paris
+  'p:fr:76': [0.8393, 49.5472], // Seine-Maritime
+  'p:fr:77': [2.766, 48.7217], // Seine-et-Marne
+  'p:fr:78': [1.9921, 48.8711], // Yvelines
+  'p:fr:79': [-0.3741, 46.5282], // Deux-Sèvres
+  'p:fr:80': [2.2635, 49.9413], // Somme
+  'p:fr:81': [2.1141, 43.7759], // Tarn
+  'p:fr:82': [1.2856, 44.0382], // Tarn-et-Garonne
+  'p:fr:83': [6.1746, 43.281], // Var
+  'p:fr:84': [5.013, 43.9941], // Vaucluse
+  'p:fr:85': [-1.4085, 46.6982], // Vendée
+  'p:fr:86': [0.4026, 46.6152], // Vienne
+  'p:fr:87': [1.2204, 45.8556], // Haute-Vienne
+  'p:fr:88': [6.518, 48.188], // Vosges
+  'p:fr:89': [3.4808, 47.9382], // Yonne
+  'p:fr:90': [6.8842, 47.6268], // Territoire de Belfort
+  'p:fr:91': [2.3293, 48.6383], // Essonne
+  'p:fr:92': [2.2574, 48.8564], // Hauts-de-Seine
+  'p:fr:93': [2.4543, 48.9101], // Seine-Saint-Denis
+  'p:fr:94': [2.4424, 48.7947], // Val-de-Marne
+  'p:fr:95': [2.2488, 49.0164], // Val-d'Oise
 };
 
 /**
@@ -151,7 +268,18 @@ export function homeAreaZoomForToken(token: string | null): number | null {
   if (token.startsWith('m:')) return 11.5;
   // Luxembourg cantons are a fraction of a Belgian or Dutch province.
   if (token.startsWith('p:lu:')) return 10;
+  // French départements and régions are several times their Belgian counterparts;
+  // Paris and its inner ring are city-sized départements.
+  if (token.startsWith('p:fr:')) return FRENCH_CITY_DEPARTEMENT_ZOOM[token] ?? 8.5;
+  if (token.startsWith('r:fr:')) return token === 'r:fr:ile-de-france' ? 8 : 6.5;
   if (token.startsWith('p:')) return 9;
   if (token.startsWith('r:')) return token === 'r:be:brussels' ? 10.5 : 8;
   return null;
 }
+
+const FRENCH_CITY_DEPARTEMENT_ZOOM: Record<string, number> = {
+  'p:fr:75': 11, // Paris
+  'p:fr:92': 10, // Hauts-de-Seine
+  'p:fr:93': 10, // Seine-Saint-Denis
+  'p:fr:94': 10, // Val-de-Marne
+};

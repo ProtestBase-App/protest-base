@@ -10,7 +10,7 @@
  */
 
 /** Lowercase ISO country code accepted by the autocomplete endpoint. */
-export type AddressCountryCode = 'be' | 'nl' | 'lu';
+export type AddressCountryCode = 'be' | 'nl' | 'lu' | 'fr';
 
 /** Language hint accepted by the autocomplete endpoint. */
 export type AddressLang = 'en' | 'nl' | 'fr' | 'de';
@@ -29,7 +29,7 @@ export interface AddressSuggestion {
   postal_code: string | null;
   city: string | null;
   region: string | null;
-  /** Full name, "belgium" | "netherlands" | "luxembourg". */
+  /** Full name, "belgium" | "netherlands" | "luxembourg" | "france". */
   country: string;
   /**
    * Latitude. When the suggestion is accepted via a live pick this session, it

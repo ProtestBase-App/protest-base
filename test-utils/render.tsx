@@ -94,6 +94,8 @@ export interface MockPostalCodeContext {
   resolveLocationLabel?: jest.Mock;
   isLocationSelectionTooBroad?: jest.Mock;
   buildLocationMatch?: jest.Mock;
+  franceEnabled?: boolean;
+  franceLoading?: boolean;
 }
 
 export interface MockHomeAreaContext {
@@ -258,6 +260,9 @@ const defaultPostalCodeContext: Required<MockPostalCodeContext> = {
     wholeCountries: new Set(),
     rawCodes: new Set(),
   }),
+  // France stays hidden unless a test opens the gate.
+  franceEnabled: false,
+  franceLoading: false,
 };
 
 const defaultHomeAreaContext: Required<MockHomeAreaContext> = {

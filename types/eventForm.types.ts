@@ -26,7 +26,8 @@ export interface FormState {
    * never seeded from a loaded event/draft — so a non-null value reliably means
    * "picked this session". Forwarded on save as `geocod_lat`/`geocod_lng`; the
    * backend adopts the confirmed pin (skipping a re-geocode) when both are set
-   * and inside the BE/NL bbox, otherwise it silently falls back to geocoding.
+   * and inside the box of the event's country (Benelux, or metropolitan France +
+   * Corsica), otherwise it silently falls back to geocoding.
    */
   geocod_lat: number | null;
   geocod_lng: number | null;

@@ -151,6 +151,10 @@ describe('canonicalCountry', () => {
     expect(canonicalCountry('the netherlands')).toBe('netherlands');
     expect(canonicalCountry('Luxemburg')).toBe('luxembourg');
     expect(canonicalCountry('lu')).toBe('luxembourg');
+    expect(canonicalCountry('france')).toBe('france');
+    expect(canonicalCountry('Frankrijk')).toBe('france');
+    expect(canonicalCountry('FRANKREICH')).toBe('france');
+    expect(canonicalCountry(' fr ')).toBe('france');
   });
 
   it('compares after NFC, so a decomposed accent still matches', () => {
@@ -168,14 +172,59 @@ describe('canonicalCountry', () => {
 
 describe('normalizeEventPostcode', () => {
   it('keeps the 4 digits the datasets key on', () => {
-    expect(normalizeEventPostcode('1000')).toBe('1000');
-    expect(normalizeEventPostcode('5611 EC')).toBe('5611');
-    expect(normalizeEventPostcode('L-1611')).toBe('1611');
-    expect(normalizeEventPostcode(9000)).toBe('9000');
+    expect(normalizeEventPostcode('1000', 'belgium')).toBe('1000');
+    expect(normalizeEventPostcode('5611 EC', 'netherlands')).toBe('5611');
+    expect(normalizeEventPostcode('L-1611', 'luxembourg')).toBe('1611');
+    expect(normalizeEventPostcode(9000, 'Belgique')).toBe('9000');
   });
 
   it('returns null without a 4-digit code', () => {
-    expect(normalizeEventPostcode('')).toBeNull();
-    expect(normalizeEventPostcode('9')).toBeNull();
+    expect(normalizeEventPostcode('', 'belgium')).toBeNull();
+    expect(normalizeEventPostcode('9', 'belgium')).toBeNull();
+  });
+
+  it('keeps the 4-digit rule when the country is unknown or missing', () => {
+    expect(normalizeEventPostcode('1000', null)).toBe('1000');
+    expect(normalizeEventPostcode('75011', 'germany')).toBe('7501');
+  });
+
+  describe('France', () => {
+    it('keeps all 5 digits, leading zero included', () => {
+      expect(normalizeEventPostcode('75011', 'france')).toBe('75011');
+      expect(normalizeEventPostcode('01000', 'france')).toBe('01000');
+      expect(normalizeEventPostcode('20090', 'france')).toBe('20090');
+    });
+
+    it('folds the spellings the backend canonicalises', () => {
+      expect(normalizeEventPostcode('F-75011', 'france')).toBe('75011');
+      expect(normalizeEventPostcode('FR-75011', 'france')).toBe('75011');
+      expect(normalizeEventPostcode('fr 75011', 'france')).toBe('75011');
+      expect(normalizeEventPostcode('75 011', 'france')).toBe('75011');
+      expect(normalizeEventPostcode(' 01000 ', 'france')).toBe('01000');
+    });
+
+    it('pads a code whose leading zero was lost to a numeric parse, as the backend does', () => {
+      expect(normalizeEventPostcode('1000', 'france')).toBe('01000');
+      expect(normalizeEventPostcode(1000, 'france')).toBe('01000');
+      expect(normalizeEventPostcode(75011, 'france')).toBe('75011');
+    });
+
+    it('applies to every spelling of France', () => {
+      expect(normalizeEventPostcode('01000', 'Frankrijk')).toBe('01000');
+      expect(normalizeEventPostcode('F-01000', 'FR')).toBe('01000');
+    });
+
+    it('returns null for anything that is no French code', () => {
+      expect(normalizeEventPostcode('', 'france')).toBeNull();
+      expect(normalizeEventPostcode('750', 'france')).toBeNull();
+      expect(normalizeEventPostcode('750111', 'france')).toBeNull();
+      expect(normalizeEventPostcode('2A004', 'france')).toBeNull();
+      expect(normalizeEventPostcode('Paris', 'france')).toBeNull();
+    });
+
+    it('never truncates a French code to the 4-digit form', () => {
+      expect(normalizeEventPostcode('75011', 'france')).not.toBe('7501');
+      expect(normalizeEventPostcode('01000', 'france')).not.toBe('0100');
+    });
   });
 });
