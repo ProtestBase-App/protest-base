@@ -75,7 +75,7 @@ export default function EditTemplateScreen() {
   const { removeTemplate, editTemplate } = useTemplates();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
   const templateId = Array.isArray(id) ? id[0] : id;
 
   const [loading, setLoading] = useState(true);

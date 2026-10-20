@@ -8,6 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  type TextInputInstance,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -75,7 +76,7 @@ export default function SignIn() {
   );
   const [resetPasswordMessage, setResetPasswordMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const emailInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInputInstance>(null);
   const onboardingFormUrl = ExternalLinks.ONBOARDING_FORM;
 
   const [failedAttempts, setFailedAttempts] = useState(0);

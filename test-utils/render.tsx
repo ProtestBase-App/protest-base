@@ -18,6 +18,7 @@
  */
 import React from 'react';
 import { render, RenderOptions } from '@testing-library/react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { LocationFilterOption } from '@/utils/locationFilterOptions';
 import type { ExploreAppliedFilters } from '@/context/ExploreTabProvider';
@@ -421,16 +422,20 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
 // Wrapper component
 // ============================================================================
 
+// Mirrors the app root: gesture-handler 3 throws when a GestureDetector has no
+// GestureHandlerRootView ancestor.
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <SafeAreaProvider
-      initialMetrics={{
-        frame: { x: 0, y: 0, width: 375, height: 812 },
-        insets: { top: 44, left: 0, right: 0, bottom: 34 },
-      }}
-    >
-      {children}
-    </SafeAreaProvider>
+    <GestureHandlerRootView>
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 375, height: 812 },
+          insets: { top: 44, left: 0, right: 0, bottom: 34 },
+        }}
+      >
+        {children}
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

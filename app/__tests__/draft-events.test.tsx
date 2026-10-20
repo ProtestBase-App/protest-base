@@ -94,6 +94,7 @@ import React from 'react';
 import { Alert, RefreshControl } from 'react-native';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders, createMockEvent, createMockUser } from '@/test-utils/render';
+import { SEARCH_DEBOUNCE_MS } from '@/components/SearchInput';
 import DraftEventsScreen from '../(tabs)/(more)/draft-events';
 
 const {
@@ -592,9 +593,18 @@ describe('DraftEventsScreen', () => {
       expect(getByTestId('triage-publish-ready')).toBeTruthy();
 
       // A search narrows the fetched set, so the card's counts would no longer
-      // describe the account.
-      fireEvent.changeText(getByTestId('draft-search-input'), 'vrede');
-      await waitFor(() => expect(queryByTestId('triage-entry-card')).toBeNull());
+      // describe the account. Fake timers step past the search debounce: on real
+      // time this re-render can outlast waitFor's 1 s budget under a parallel run.
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      try {
+        fireEvent.changeText(getByTestId('draft-search-input'), 'vrede');
+        await act(async () => {
+          jest.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+        });
+        expect(queryByTestId('triage-entry-card')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
   // The backend's duplicate guard in block mode: publish is refused with 409

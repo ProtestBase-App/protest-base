@@ -8,7 +8,8 @@ import {
   useWindowDimensions,
   View,
   type LayoutChangeEvent,
-  type ScrollView,
+  type ScrollViewInstance,
+  type ViewInstance,
 } from 'react-native';
 import {
   BottomSheetBackdrop,
@@ -164,10 +165,10 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  const scrollRef = useRef<BottomSheetScrollViewMethods & Pick<ScrollView, 'getNativeScrollRef'>>(
-    null
-  );
-  const contentRef = useRef<View>(null);
+  const scrollRef = useRef<
+    BottomSheetScrollViewMethods & Pick<ScrollViewInstance, 'getNativeScrollRef'>
+  >(null);
+  const contentRef = useRef<ViewInstance>(null);
   const viewportHeightRef = useRef(0);
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

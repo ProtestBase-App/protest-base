@@ -101,8 +101,8 @@ const MyEventsList: React.FC<EventListProps> = ({
       contentContainerStyle={styles.listContainer}
       refreshing={refreshing}
       onRefresh={onRefresh}
-      ListEmptyComponent={!loading ? EmptyEventMyEvents : null}
-      ListHeaderComponent={headerTitle ? renderListHeader : null}
+      ListEmptyComponent={!loading ? EmptyEventMyEvents : undefined}
+      ListHeaderComponent={headerTitle ? renderListHeader : undefined}
       extraData={cacheVersion} // Force re-render when postal codes load
     />
   );

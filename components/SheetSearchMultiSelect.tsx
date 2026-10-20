@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type TextInputInstance,
+} from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import { useFiltersSheetKeyboard } from '@/components/FiltersSheetShell';
@@ -136,7 +143,7 @@ export function SheetSearchMultiSelect({
 
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   // Delay blur so taps on dropdown rows land before the list unmounts.
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

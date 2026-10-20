@@ -6,9 +6,10 @@ import { t } from '@/utils/i18n';
 export default function MoreLayout() {
   const colorScheme = useColorScheme();
 
+  // Opaque headers: SDK 58's iOS 26+ default would put content under them.
   return (
     <>
-      <Stack>
+      <Stack screenOptions={{ headerTransparent: false }}>
         <Stack.Screen name="more" options={{ headerShown: false }} />
         <Stack.Screen
           name="create-event-options"

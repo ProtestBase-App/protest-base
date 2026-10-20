@@ -1,5 +1,13 @@
 import React from 'react';
-import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type ViewInstance,
+} from 'react-native';
 import { act, fireEvent, renderWithProviders } from '@/test-utils/render';
 import { FormScreenScaffold, useFormKeyboard } from '@/components/FormScreenScaffold';
 import { Spacing } from '@/constants/DesignTokens';
@@ -7,6 +15,8 @@ import { DROPDOWN_HEADROOM, DROPDOWN_LABEL_ROOM } from '@/utils/keyboardReveal';
 
 type MeasureInWindowCallback = (x: number, y: number, width: number, height: number) => void;
 type FocusedInput = ReturnType<typeof TextInput.State.currentlyFocusedInput>;
+// The jest preset mocks View as a class, so its instances measure through the prototype.
+const viewPrototype = View.prototype as unknown as ViewInstance;
 
 const VIEWPORT_TOP = 100;
 const INPUT_HEIGHT = 40;
@@ -53,7 +63,7 @@ describe('FormScreenScaffold dropdown room', () => {
       return { remove: jest.fn() };
     }) as unknown as typeof Keyboard.addListener);
     jest
-      .spyOn(View.prototype, 'measureInWindow')
+      .spyOn(viewPrototype, 'measureInWindow')
       .mockImplementation((callback: MeasureInWindowCallback) =>
         callback(0, VIEWPORT_TOP, 375, 600)
       );
@@ -123,7 +133,7 @@ describe('FormScreenScaffold dropdown room', () => {
     mockKeyboard({ visible: true, top: 900 });
     let finishMeasuring: (() => void) | undefined;
     jest
-      .spyOn(View.prototype, 'measureInWindow')
+      .spyOn(viewPrototype, 'measureInWindow')
       .mockImplementation((callback: MeasureInWindowCallback) => {
         finishMeasuring = () => callback(0, VIEWPORT_TOP, 375, 600);
       });

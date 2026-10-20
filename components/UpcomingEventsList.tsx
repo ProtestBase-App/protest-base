@@ -151,8 +151,8 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
       contentContainerStyle={styles.listContainer}
       refreshing={refreshing}
       onRefresh={onRefresh}
-      ListEmptyComponent={!loading ? (ListEmptyComponent ?? EmptyEventMyEvents) : null}
-      ListHeaderComponent={headerTitle ? renderListHeader : null}
+      ListEmptyComponent={!loading ? (ListEmptyComponent ?? EmptyEventMyEvents) : undefined}
+      ListHeaderComponent={headerTitle ? renderListHeader : undefined}
       extraData={cacheVersion}
       showsVerticalScrollIndicator={false}
     />

@@ -16,6 +16,7 @@ import {
   View,
   type LayoutChangeEvent,
   type StyleProp,
+  type ViewInstance,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
@@ -69,7 +70,7 @@ export function FormScreenScaffold({
 }: FormScreenScaffoldProps) {
   const internalRef = useRef<KeyboardAwareScrollViewRef>(null);
   const scrollRef = scrollViewRef ?? internalRef;
-  const viewportRef = useRef<View>(null);
+  const viewportRef = useRef<ViewInstance>(null);
 
   const [footerHeight, setFooterHeight] = useState(0);
   const [dropdownFocused, setDropdownFocused] = useState(false);

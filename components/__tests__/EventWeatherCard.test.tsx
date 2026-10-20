@@ -222,7 +222,7 @@ describe('EventWeatherCard', () => {
   });
 
   it('credits Open-Meteo with a link that opens their site', () => {
-    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     render(<EventWeatherCard weather={forecast()} userLanguage="en" />);
 
     expect(screen.getByText('weather.attribution')).toBeTruthy();
