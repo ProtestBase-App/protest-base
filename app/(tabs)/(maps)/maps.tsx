@@ -642,6 +642,7 @@ export default function MapsScreen() {
         {carouselVisible && (
           <FlatList
             ref={listRef}
+            testID="map-carousel"
             data={mapEvents}
             horizontal
             keyExtractor={(item) => item.$id}

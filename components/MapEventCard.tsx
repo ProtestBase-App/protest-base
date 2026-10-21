@@ -71,6 +71,7 @@ function MapEventCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={event.title}
+      accessibilityState={{ selected: active }}
       style={[
         styles.card,
         {
