@@ -1,6 +1,7 @@
 import { logger } from '@/utils/logger';
 import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
 import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
+import type { FranceAreas } from '@/constants/PostalCodes_FR';
 
 /**
  * Administrative-hierarchy location options for the /explore filter.
@@ -10,7 +11,8 @@ import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCode
  *
  *   - Belgium: region (3) -> province (10) -> municipality (578)
  *   - Netherlands: province (12) -> sub-municipality (351)
- *   - Luxembourg, while selectable: country (1) -> canton (12) -> commune (100)
+ *   - Luxembourg: country (1) -> canton (12) -> commune (100)
+ *   - France, once the backend serves it: country (1) -> région (13) -> département (96)
  *
  * Selecting an area filters by ALL of its member postal codes. Explore sends the
  * tokens themselves as `areas` and the backend expands them per country;
@@ -27,12 +29,16 @@ import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCode
  *   c:lu            LU country    (matches on the country alone)
  *   p:lu:<slug>     LU canton     e.g. p:lu:esch-sur-alzette
  *   m:lu:<slug>     LU commune    e.g. m:lu:kaerjeng
+ *   c:fr            FR country    (matches on the country alone)
+ *   r:fr:<slug>     FR région     e.g. r:fr:ile-de-france
+ *   p:fr:<code>     FR département, INSEE code in lower case, e.g. p:fr:75, p:fr:2a
  *
  * BE/NL municipalities/sub-municipalities are keyed by the minimum member postal
  * code; LU communes by slug, because some LU codes belong to two communes. The postal-code -> municipality partition is byte-identical across the
  * three Belgian language files, so the min-code token is language-independent
  * and these options can be built from whichever single BE file is loaded at
- * runtime.
+ * runtime. French tokens are the backend's own (copied with its dataset, never
+ * derived here), and French codes stay 5-digit strings throughout.
  *
  * This module is pure (no React, no i18n). Display-only formatting that needs
  * translation (tier headers, "{n} postal codes") is done by the screen.
@@ -58,6 +64,11 @@ export interface LocationFilterOption {
    * name-only (a bare postcode resolves to its municipality, not its province).
    */
   searchText: string;
+  /**
+   * The enclosing area's token where the data names it (a French département's
+   * région), so it never has to be guessed from shared postal codes.
+   */
+  parentToken?: string;
 }
 
 export interface LocationFilterData {
@@ -83,7 +94,7 @@ export const BACKEND_SAFE_LIMIT = 3800;
  * state, turns the whole `areas` request into a 400.
  */
 export const AREA_TOKEN_PATTERN =
-  /^(c:(be|nl|lu)|r:be:[a-z0-9-]+|p:(be|nl|lu):[a-z0-9-]+|m:(be|nl):\d{1,4}|m:lu:[a-z0-9-]+)$/;
+  /^(c:(be|nl|lu|fr)|r:(be|fr):[a-z0-9-]+|p:(be|nl|lu|fr):[a-z0-9-]+|m:(be|nl):\d{1,4}|m:lu:[a-z0-9-]+)$/;
 export const MAX_AREA_TOKENS = 50;
 export const MAX_AREA_TOKEN_LENGTH = 64;
 
@@ -91,6 +102,7 @@ const TOKEN_COUNTRY: Record<string, string> = {
   be: 'belgium',
   nl: 'netherlands',
   lu: 'luxembourg',
+  fr: 'france',
 };
 
 // ---------------------------------------------------------------------------
@@ -189,6 +201,8 @@ const LU_COUNTRY_LABEL: Record<Lang, string> = {
 };
 const LU_CANTON_PREFIX: Record<Lang, string> = { en: 'Canton', fr: 'Canton', nl: 'Kanton' };
 const LU_CANTON_NAME_NL: Record<string, string> = { luxembourg: 'Luxemburg' };
+// French régions and départements keep their official names in every language.
+const FR_COUNTRY_LABEL: Record<Lang, string> = { en: 'France', fr: 'France', nl: 'Frankrijk' };
 
 const TIER_RANK: Record<LocationTier, number> = {
   country: 0,
@@ -202,11 +216,33 @@ function findKey(row: Record<string, unknown>, prefix: string): string | undefin
   return Object.keys(row).find((k) => k.startsWith(prefix));
 }
 
+/**
+ * Lower case without accents ("Hérault" → "herault"), and the same with spaces
+ * for hyphens and apostrophes ("saint etienne"), so a query matches however the
+ * name is typed.
+ */
+export function foldForSearch(text: string): { folded: string; spaced: string } {
+  const lower = text.toLowerCase();
+  // Most names are plain ASCII, with no accent to strip: skip the decomposition.
+  const folded = /[^ -~]/.test(lower)
+    ? lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    : lower;
+  return {
+    folded,
+    spaced: folded
+      .replace(/[-'’]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  };
+}
+
 interface BuildParams {
   belgiumRows?: Record<string, unknown>[];
   netherlandsRows?: Record<string, unknown>[];
-  /** Luxembourg areas; only passed while Luxembourg is selectable. */
+  /** Luxembourg areas. */
   luxembourg?: { cantons: LuxembourgCanton[]; communes: LuxembourgCommune[] };
+  /** French areas; only passed once the backend serves France. */
+  france?: FranceAreas;
   lang: Lang;
 }
 
@@ -218,12 +254,14 @@ export function buildLocationFilterOptions({
   belgiumRows,
   netherlandsRows,
   luxembourg,
+  france,
   lang,
 }: BuildParams): LocationFilterData {
   const tokenToCodes = new Map<string, string[]>();
   const tokenToLabel = new Map<string, string>();
   const options: LocationFilterOption[] = [];
 
+  // BE/NL/LU only: their datasets hold numbers. France registers its own strings below.
   const register = (
     value: string,
     label: string,
@@ -389,6 +427,66 @@ export function buildLocationFilterOptions({
     }
   }
 
+  if (france) {
+    // Membership follows the communes, as on the server: a postcode shared by
+    // communes of two départements belongs to both (05110 is in 04 and 05).
+    const departementByCode = new Map(france.departements.map((d) => [d.code, d]));
+    const areaCodes = new Map<string, Set<string>>();
+    const addCode = (token: string, code: string) => {
+      if (!areaCodes.has(token)) areaCodes.set(token, new Set());
+      areaCodes.get(token)!.add(code);
+    };
+    for (const [code, communes] of Object.entries(france.postcodes)) {
+      addCode('c:fr', code);
+      for (const [, , departementCode] of communes) {
+        const departement = departementByCode.get(departementCode);
+        if (!departement) continue;
+        addCode(departement.token, code);
+        addCode(departement.region, code);
+      }
+    }
+
+    // French codes stay strings: never a number, which would drop "01000"'s
+    // leading zero. All are 5 digits, so the text order is the numeric one.
+    const registerFrench = (
+      value: string,
+      label: string,
+      tier: LocationTier,
+      provinceLabel = '',
+      parentToken?: string
+    ) => {
+      const codeList = [...(areaCodes.get(value) ?? [])].sort();
+      tokenToCodes.set(value, codeList);
+      tokenToLabel.set(value, label);
+      const { folded, spaced } = foldForSearch(label);
+      const searchText = [...new Set([label.toLowerCase(), folded, spaced])].join(' ');
+      options.push({
+        value,
+        label,
+        tier,
+        count: codeList.length,
+        provinceLabel,
+        searchText,
+        ...(parentToken ? { parentToken } : {}),
+      });
+    };
+
+    // c:fr matches on the country alone; like c:lu, its codes only feed the count.
+    registerFrench('c:fr', FR_COUNTRY_LABEL[lang], 'country');
+    const regionName = new Map(france.regions.map((r) => [r.token, r.name]));
+    for (const region of france.regions) registerFrench(region.token, region.name, 'region');
+    for (const departement of france.departements) {
+      registerFrench(
+        departement.token,
+        // French users know their département by its number.
+        `${departement.name} (${departement.code})`,
+        'province',
+        regionName.get(departement.region) ?? '',
+        departement.region
+      );
+    }
+  }
+
   options.sort((a, b) => {
     if (TIER_RANK[a.tier] !== TIER_RANK[b.tier]) return TIER_RANK[a.tier] - TIER_RANK[b.tier];
     return a.label.localeCompare(b.label);
@@ -442,6 +540,15 @@ export function countryOfLocationToken(value: string): string | null {
 }
 
 /**
+ * The part of a selection the legacy `postalCodes` request may carry. French
+ * areas never go out as postal codes: that parameter matches a code in any
+ * country, so only `areas` can scope them to France.
+ */
+export function withoutFrenchAreas(values: string[]): string[] {
+  return values.filter((value) => countryOfLocationToken(value) !== 'france');
+}
+
+/**
  * True when the selection can only go out as a postal-code list and that list
  * would pass the safe limit. Used by the filter screens to block over-broad
  * selections before any request is fired.
@@ -451,7 +558,7 @@ export function isLocationSelectionTooBroad(
   tokenToCodes: Map<string, string[]>
 ): boolean {
   if (isAreaTokenSelection(values)) return false;
-  return expandLocationTokens(values, tokenToCodes).truncated;
+  return expandLocationTokens(withoutFrenchAreas(values), tokenToCodes).truncated;
 }
 
 /** A location selection prepared for matching events on the device. */
@@ -510,7 +617,7 @@ export function matchesLocationFilter(
   const code =
     event.postal_code === null || event.postal_code === undefined
       ? null
-      : normalizeEventPostcode(event.postal_code);
+      : normalizeEventPostcode(event.postal_code, event.country);
   if (code && match.rawCodes.has(code)) return true;
   const country = canonicalCountry(event.country);
   if (!country) return false;

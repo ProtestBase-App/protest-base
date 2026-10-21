@@ -80,6 +80,7 @@ export function ExploreFiltersSheet({
     expandLocationTokens,
     isLocationSelectionTooBroad,
     loading,
+    franceEnabled,
   } = usePostalCodes();
   const { dropdownItems, loading: organizationsLoading, ensureOrganizations } = useOrganizations();
   const { userLanguage } = useGlobalContext();
@@ -277,6 +278,7 @@ export function ExploreFiltersSheet({
         selected={draft.country}
         onSelect={selectCountry}
         userLanguage={userLanguage}
+        franceEnabled={franceEnabled}
       />
 
       <View style={styles.section}>

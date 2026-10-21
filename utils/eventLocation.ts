@@ -66,9 +66,10 @@ const COUNTRY_VARIANTS: Record<string, readonly string[]> = {
   belgium: ['belgium', 'belgique', 'belgie', 'belgië', 'be'],
   netherlands: ['netherlands', 'pays-bas', 'nederland', 'nl', 'the netherlands'],
   luxembourg: ['luxembourg', 'luxemburg', 'lëtzebuerg', 'letzebuerg', 'lu'],
+  france: ['france', 'frankrijk', 'frankreich', 'fr'],
 };
 
-/** Canonical country ('belgium' | 'netherlands' | 'luxembourg') for a stored spelling, else null. */
+/** Canonical country ('belgium' | 'netherlands' | 'luxembourg' | 'france') for a stored spelling, else null. */
 export function canonicalCountry(value: string | null | undefined): string | null {
   if (!value) return null;
   const normalized = value.normalize('NFC').trim().toLowerCase();
@@ -78,11 +79,24 @@ export function canonicalCountry(value: string | null | undefined): string | nul
   return null;
 }
 
+// The backend's French rule (utils/postalCode): the bare 5 digits, after an optional
+// "F-"/"FR-" prefix and a "75 001" space. A 4-digit value can only be a code whose
+// leading zero was lost to a numeric parse, so it is padded back: "1000" → "01000".
+const FR_POSTAL_CODE = /^(?:[Ff][Rr]?(?:\s*-)?\s*)?(\d{1,2}) ?(\d{3})$/;
+
 /**
- * The 4-digit part of an event postcode, which the bundled datasets key on:
- * "1000" → "1000", a legacy NL "5611 EC" → "5611", "L-1611" → "1611".
+ * The part of an event postcode the area data keys on, by the event's country.
+ * France keeps all 5 digits, as a string: "75011", "01000", "F-75011" → "75011".
+ * Elsewhere the 4-digit part: "1000", a legacy NL "5611 EC" → "5611", "L-1611" → "1611".
  */
-export function normalizeEventPostcode(postalCode: string | number): string | null {
+export function normalizeEventPostcode(
+  postalCode: string | number,
+  country: string | null | undefined
+): string | null {
+  if (canonicalCountry(country) === 'france') {
+    const match = String(postalCode).trim().match(FR_POSTAL_CODE);
+    return match ? `${match[1]}${match[2]}`.padStart(5, '0') : null;
+  }
   const match = String(postalCode).match(/\d{4}/);
   return match ? match[0] : null;
 }

@@ -15,9 +15,20 @@ export function getCountryLabel(value: string, locale: string): string {
   return entry.label[locale as keyof typeof entry.label] ?? entry.label.en;
 }
 
+/**
+ * The countries that can be picked, in `constants/Countries.ts` order. France is
+ * listed only while the backend serves it (PostalCodeProvider's `franceEnabled`).
+ */
+export function getSelectableCountries({ franceEnabled }: { franceEnabled: boolean }) {
+  return countries.filter(({ value }) => value !== 'france' || franceEnabled);
+}
+
 /** The countries a filter can be narrowed to, in `constants/Countries.ts` order. */
-export function getCountryFilterOptions(locale: string): CountryFilterOption[] {
-  return countries.map(({ value }) => ({
+export function getCountryFilterOptions(
+  locale: string,
+  { franceEnabled }: { franceEnabled: boolean }
+): CountryFilterOption[] {
+  return getSelectableCountries({ franceEnabled }).map(({ value }) => ({
     value: value as EventCountry,
     label: getCountryLabel(value, locale),
   }));

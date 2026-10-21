@@ -17,6 +17,30 @@ describe('CountryFilterSection', () => {
     expect(getByLabelText('Pays-Bas')).toBeTruthy();
   });
 
+  it('hides France unless the backend serves it', () => {
+    const { queryByLabelText, rerender, getByLabelText } = render(
+      <CountryFilterSection selected={null} onSelect={jest.fn()} userLanguage="nl" />
+    );
+    expect(getByLabelText('Luxemburg')).toBeTruthy();
+    expect(queryByLabelText('Frankrijk')).toBeNull();
+
+    rerender(
+      <CountryFilterSection selected={null} onSelect={jest.fn()} userLanguage="nl" franceEnabled />
+    );
+    expect(getByLabelText('Frankrijk')).toBeTruthy();
+  });
+
+  it('reports France when it is offered and tapped', () => {
+    const onSelect = jest.fn();
+    const { getByLabelText } = render(
+      <CountryFilterSection selected={null} onSelect={onSelect} userLanguage="fr" franceEnabled />
+    );
+
+    fireEvent.press(getByLabelText('France'));
+
+    expect(onSelect).toHaveBeenCalledWith('france');
+  });
+
   it('reports the tapped country, and null for All', () => {
     const onSelect = jest.fn();
     const { getByLabelText } = render(

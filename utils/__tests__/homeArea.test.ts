@@ -239,12 +239,15 @@ describe('home area — real LU dataset integration', () => {
 // ============================================================================
 
 describe('HOME_AREA_CENTROIDS coordinate integrity', () => {
-  it('places every centroid inside the BE/NL bounding box (catches lat/lng swaps)', () => {
-    // Belgium + Netherlands span roughly lng 2.5–7.3, lat 49.4–53.7. A swapped
-    // pair puts a ~51 latitude into the longitude slot → out of range. Collect
-    // offenders so a failure names the token.
-    const outOfBounds = Object.entries(HOME_AREA_CENTROIDS).filter(
-      ([, [lng, lat]]) => lng < 2.5 || lng > 7.3 || lat < 49.4 || lat > 53.7
+  it('places every centroid inside its country’s box (catches lat/lng swaps)', () => {
+    // Belgium + Netherlands + Luxembourg span roughly lng 2.5–7.3, lat 49.4–53.7;
+    // metropolitan France + Corsica, the backend's box: lng −5.3–9.7, lat 41.2–51.2.
+    // A swapped pair puts a ~45–51 latitude into the longitude slot → out of range.
+    // Collect offenders so a failure names the token.
+    const outOfBounds = Object.entries(HOME_AREA_CENTROIDS).filter(([token, [lng, lat]]) =>
+      token.split(':')[1] === 'fr'
+        ? lng < -5.3 || lng > 9.7 || lat < 41.2 || lat > 51.2
+        : lng < 2.5 || lng > 7.3 || lat < 49.4 || lat > 53.7
     );
     expect(outOfBounds).toEqual([]);
   });
@@ -334,6 +337,26 @@ describe('rankEventByHomeArea', () => {
       postal_code: '7500 AB',
     });
     expect(rankEventByHomeArea(nlEvent, nlMatch)).toBe(1); // same NL province
+  });
+
+  it('compares all 5 digits of a French postcode, leading zero kept', () => {
+    // 01000 must not be read as 0100 (truncated) or as Brussels' 1000 (numeric).
+    const ain: HomeAreaMatch = {
+      token: 'p:fr:01',
+      country: 'france',
+      municipalityCodes: new Set(),
+      provinceCodes: new Set(['01000', '01090']),
+      regionCodes: new Set(['01000', '01090', '69001']),
+      provinceToken: 'p:fr:01',
+      regionToken: 'r:fr:auvergne-rhone-alpes',
+    };
+    const french = (postalCode: string) =>
+      createMockEvent({ country: 'france', postal_code: postalCode });
+    expect(rankEventByHomeArea(french('01000'), ain)).toBe(1);
+    expect(rankEventByHomeArea(french('F-01090'), ain)).toBe(1);
+    expect(rankEventByHomeArea(french('69001'), ain)).toBe(2);
+    expect(rankEventByHomeArea(french('01001'), ain)).toBe(3);
+    expect(rankEventByHomeArea(beEvent('1000'), ain)).toBe(3);
   });
 });
 

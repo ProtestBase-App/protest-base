@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewInstance } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -43,7 +43,7 @@ export function TemplateLaunchTile({
 }: TemplateLaunchTileProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const menuButtonRef = useRef<View>(null);
+  const menuButtonRef = useRef<ViewInstance>(null);
 
   const category = Array.isArray(template.event_data.categories)
     ? template.event_data.categories[0]

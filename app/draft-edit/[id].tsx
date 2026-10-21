@@ -50,7 +50,7 @@ export default function DraftEdit() {
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
   const eventId = Array.isArray(id) ? id[0] : id;
 
   const [loading, setLoading] = useState(true);

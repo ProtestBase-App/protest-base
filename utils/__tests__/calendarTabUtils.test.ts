@@ -13,7 +13,8 @@ import {
   isEventInProgress,
   matchesCalendarFilters,
 } from '../calendarTabUtils';
-import { buildLocationMatch } from '@/utils/locationFilterOptions';
+import { FR_AREAS } from '@/constants/PostalCodes_FR';
+import { buildLocationFilterOptions, buildLocationMatch } from '@/utils/locationFilterOptions';
 
 // ============================================================================
 // Helpers
@@ -212,6 +213,44 @@ describe('calendarTabUtils', () => {
       it('skips the location check entirely when no location filter is active', () => {
         const event = createMockEvent({ postal_code: undefined });
         expect(matchesCalendarFilters(event, filtersWith(), contextWith())).toBe(true);
+      });
+
+      describe('France, on the real data: by département and région membership', () => {
+        const { tokenToCodes } = buildLocationFilterOptions({ france: FR_AREAS, lang: 'fr' });
+        const france = (values: string[]) =>
+          contextWith({ locationMatch: buildLocationMatch(values, tokenToCodes) });
+        const event = (postalCode: string) =>
+          createMockEvent({ country: 'france', postal_code: postalCode });
+
+        it('matches a département and its région, whole 5-digit codes', () => {
+          expect(matchesCalendarFilters(event('01000'), filtersWith(), france(['p:fr:01']))).toBe(
+            true
+          );
+          expect(
+            matchesCalendarFilters(
+              event('01000'),
+              filtersWith(),
+              france(['r:fr:auvergne-rhone-alpes'])
+            )
+          ).toBe(true);
+          expect(matchesCalendarFilters(event('75011'), filtersWith(), france(['p:fr:01']))).toBe(
+            false
+          );
+        });
+
+        it('puts a code shared by two départements in both, as the server does', () => {
+          expect(matchesCalendarFilters(event('05110'), filtersWith(), france(['p:fr:04']))).toBe(
+            true
+          );
+          expect(matchesCalendarFilters(event('05110'), filtersWith(), france(['p:fr:05']))).toBe(
+            true
+          );
+        });
+
+        it('keeps a Belgian 1000 out of the Ain, whose 01000 it would read as', () => {
+          const brussels = createMockEvent({ country: 'belgium', postal_code: '1000' });
+          expect(matchesCalendarFilters(brussels, filtersWith(), france(['p:fr:01']))).toBe(false);
+        });
       });
     });
 

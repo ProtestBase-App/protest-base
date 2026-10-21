@@ -412,7 +412,7 @@ export default function ExploreTab() {
               onEndReachedThreshold={0.3}
               keyboardDismissMode="on-drag"
               ListEmptyComponent={<EmptyEventMyEvents />}
-              ListFooterComponent={loadingMore && hasMore ? <LoadingFooter /> : null}
+              ListFooterComponent={loadingMore && hasMore ? <LoadingFooter /> : undefined}
               contentContainerStyle={styles.listContentContainer}
               maxToRenderPerBatch={10}
               windowSize={7}

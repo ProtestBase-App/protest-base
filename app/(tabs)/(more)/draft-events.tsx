@@ -730,11 +730,11 @@ export default function DraftEventsScreen() {
                     // active chip hides the very drafts it would publish.
                     onPublishReady={showPublishRow ? handlePublishAll : undefined}
                   />
-                ) : null
+                ) : undefined
               }
               ListFooterComponent={renderFooter}
               ListEmptyComponent={
-                !isEmpty ? null : hasActiveFilters ? (
+                !isEmpty ? undefined : hasActiveFilters ? (
                   // "No drafts" would be a lie here — the account has drafts,
                   // they just don't match. Offer the way out instead of Create.
                   <DashedEmptyState

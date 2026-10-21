@@ -594,6 +594,8 @@ const fr: LocaleData = {
     searchPostalCode: 'Rechercher par code postal ou commune...',
     localityLabel: 'Localité',
     searchLocality: 'Rechercher une localité...',
+    communeLabel: 'Commune',
+    searchCommune: 'Rechercher une commune ou un code postal...',
     searchNoResults: 'Aucun résultat',
     searchMinLength: 'Saisissez au moins {{count}} caractères',
     streetAddressPlaceholder: 'Nom et numéro de rue',
@@ -625,6 +627,7 @@ const fr: LocaleData = {
     locationHelper:
       "Commencez par l'adresse — le code postal se remplit automatiquement. Vous pouvez aussi le définir manuellement.",
     locationHelperLu: "Recherchez l'adresse, ou choisissez la localité ci-dessous.",
+    locationHelperFr: "Choisissez la commune, ou recherchez l'adresse.",
     imageHelper:
       "Ajoutez jusqu'à 5 images — la première est la photo de couverture de votre événement",
     eventLinkHelper:

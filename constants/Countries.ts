@@ -23,4 +23,14 @@ export const countries = [
     },
     value: 'luxembourg',
   },
+  // Offered only once the backend serves France (see PostalCodeProvider's
+  // `franceEnabled`); listed here so stored French events always get their name.
+  {
+    label: {
+      en: 'France',
+      fr: 'France',
+      nl: 'Frankrijk',
+    },
+    value: 'france',
+  },
 ];

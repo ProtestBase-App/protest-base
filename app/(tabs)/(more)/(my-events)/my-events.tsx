@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { StyleSheet, ScrollView, RefreshControl, View } from 'react-native';
+import {
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
@@ -36,7 +42,7 @@ export default function MyEventsScreen() {
     refreshPastEvents,
   } = usePastEvents();
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
   const pastSectionY = useRef<number>(0);
   const hasMountedRef = useRef(false);
 

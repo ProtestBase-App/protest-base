@@ -2,9 +2,14 @@ import { Stack } from 'expo-router';
 import { HeaderBackButton } from '@/components/ui/HeaderBackButton';
 import { t } from '@/utils/i18n';
 
+export const unstable_settings = {
+  anchor: 'my-events',
+};
+
 export default function MyEventsLayout() {
+  // Opaque headers: SDK 58's iOS 26+ default would put content under them.
   return (
-    <Stack initialRouteName="my-events">
+    <Stack screenOptions={{ headerTransparent: false }}>
       <Stack.Screen
         name="my-events"
         options={{

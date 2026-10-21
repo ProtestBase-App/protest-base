@@ -15,21 +15,27 @@ export interface CountryFilterSectionProps {
   onSelect: (country: EventCountry | null) => void;
   /** Language for the country labels. */
   userLanguage: string;
+  /** Whether France is offered (the backend serves it). Hidden by default. */
+  franceEnabled?: boolean;
 }
 
 /**
  * Single-select country row shared by the Explore and Map filter sheets:
  * "All" plus every selectable country, labeled in the user's language.
  *
- * The language is a prop because sheet content renders in the
- * BottomSheetModalProvider portal, which sits above the app's context providers.
+ * The language and the France gate are props because sheet content renders in
+ * the BottomSheetModalProvider portal, which sits above the app's context providers.
  */
 export function CountryFilterSection({
   selected,
   onSelect,
   userLanguage,
+  franceEnabled = false,
 }: CountryFilterSectionProps) {
-  const options = useMemo(() => getCountryFilterOptions(userLanguage), [userLanguage]);
+  const options = useMemo(
+    () => getCountryFilterOptions(userLanguage, { franceEnabled }),
+    [userLanguage, franceEnabled]
+  );
 
   return (
     <View style={styles.section}>

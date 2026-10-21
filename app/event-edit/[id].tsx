@@ -37,7 +37,7 @@ export default function EditEvent() {
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const { id, isCreated } = useLocalSearchParams();
+  const { id, isCreated } = useLocalSearchParams<{ id: string | string[]; isCreated?: string }>();
   const eventId = Array.isArray(id) ? id[0] : id;
 
   const [eventDetail, setEventDetail] = useState<FormattedEvent[]>([]);

@@ -231,6 +231,9 @@ export default (): ExpoConfig => {
         {
           android: {
             ...(appEnv !== 'production' && { usesCleartextTraffic: true }),
+            // SDK 58's template turns R8 on for release builds. Kept off (the SDK 57
+            // behavior) until a release build has been exercised with it enabled.
+            enableMinifyInReleaseBuilds: false,
           },
         },
       ],

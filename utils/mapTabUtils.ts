@@ -11,7 +11,7 @@
 import { Event, EventCountry } from '@/types/event.types';
 import { getEventDateKeyInBelgium } from '@/utils/calendarUtils';
 import { EVENT_TIMEZONE, parseAsUTC } from '@/utils/eventFormatters';
-import { canonicalCountry } from '@/utils/eventLocation';
+import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
 import { isEventOngoing } from '@/utils/eventStatus';
 
 export type MapTimeFilter = 'all' | 'today' | 'week';
@@ -104,13 +104,18 @@ export function matchesTimeWindow(
  * Postal-code filter token. Prefixed with the canonical country (spelling
  * variants like 'Belgique' fold into 'belgium') so identical numeric codes in
  * Belgium and the Netherlands don't collide; an unknown country keeps its
- * lowercased value.
+ * lowercased value. A French code takes its canonical 5-digit form ("F-75011"
+ * → "75011"); the others stay as stored.
  */
 export function postalTokenForEvent(event: Event): string | null {
   if (event.postal_code === null || event.postal_code === undefined) return null;
   if (!event.country) return null;
   const country = canonicalCountry(event.country) ?? event.country.toLowerCase();
-  return `${country}:${event.postal_code}`;
+  const code =
+    country === 'france'
+      ? (normalizeEventPostcode(event.postal_code, country) ?? event.postal_code)
+      : event.postal_code;
+  return `${country}:${code}`;
 }
 
 /** Country value a postal token belongs to ('belgium:1000' → 'belgium'). */
@@ -210,7 +215,7 @@ export function buildPostalCodeOptions(
     if (!token || byToken.has(token)) continue;
 
     const country = countryOfPostalToken(token);
-    const code = String(event.postal_code);
+    const code = token.slice(country.length + 1);
     const commune = resolveCommune(code, country, event.city);
     const label = commune ? `${code} · ${commune}` : code;
 

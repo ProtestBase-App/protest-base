@@ -75,7 +75,7 @@ export function MapFiltersSheet({
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  const { getSubMunicipalityName } = usePostalCodes();
+  const { getSubMunicipalityName, franceEnabled } = usePostalCodes();
   const { dropdownItems, loading: organizationsLoading, ensureOrganizations } = useOrganizations();
 
   const [draft, setDraft] = useState<MapFilters>(initialFilters);
@@ -193,6 +193,7 @@ export function MapFiltersSheet({
         selected={draft.country}
         onSelect={selectCountry}
         userLanguage={userLanguage}
+        franceEnabled={franceEnabled}
       />
 
       <View style={styles.section}>

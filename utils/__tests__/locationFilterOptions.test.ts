@@ -15,6 +15,7 @@ import {
   isLocationSelectionTooBroad,
   matchesLocationFilter,
   resolveLocationLabel,
+  withoutFrenchAreas,
   type LocationFilterData,
   type LocationFilterOption,
 } from '../locationFilterOptions';
@@ -23,6 +24,7 @@ import { POSTAL_CODES_FR } from '@/constants/PostalCodes_BE_FR';
 import { POSTAL_CODES_NL } from '@/constants/PostalCodes_BE_NL';
 import { POSTAL_CODES_NL_NL } from '@/constants/PostalCodes_NL';
 import { LU_CANTONS, LU_COMMUNES } from '@/constants/PostalCodes_LU';
+import { FR_AREAS } from '@/constants/PostalCodes_FR';
 
 // The dataset interfaces have no index signature; the builder takes a generic
 // record, so widen once here.
@@ -192,6 +194,18 @@ describe('area tokens on the wire', () => {
     expect(isAreaTokenSelection([])).toBe(false);
     expect(isAreaTokenSelection(Array(MAX_AREA_TOKENS + 1).fill('c:be'))).toBe(false);
   });
+
+  it('accepts the French country, région and département tokens', () => {
+    expect(
+      isAreaTokenSelection(['c:fr', 'r:fr:ile-de-france', 'p:fr:75', 'p:fr:01', 'p:fr:2a'])
+    ).toBe(true);
+  });
+
+  it('rejects what the backend rejects for France: a commune tier, upper case', () => {
+    expect(isAreaTokenSelection(['m:fr:75056'])).toBe(false);
+    expect(isAreaTokenSelection(['p:fr:2A'])).toBe(false);
+    expect(isAreaTokenSelection(['r:nl:holland', 'c:fr'])).toBe(false);
+  });
 });
 
 describe('countryOfLocationToken', () => {
@@ -204,6 +218,9 @@ describe('countryOfLocationToken', () => {
     expect(countryOfLocationToken('c:lu')).toBe('luxembourg');
     expect(countryOfLocationToken('p:lu:esch-sur-alzette')).toBe('luxembourg');
     expect(countryOfLocationToken('m:lu:kaerjeng')).toBe('luxembourg');
+    expect(countryOfLocationToken('c:fr')).toBe('france');
+    expect(countryOfLocationToken('r:fr:corse')).toBe('france');
+    expect(countryOfLocationToken('p:fr:2b')).toBe('france');
   });
 
   it('returns null for raw postal codes and malformed tokens', () => {
@@ -229,6 +246,63 @@ describe('isLocationSelectionTooBroad', () => {
       .get('r:be:wallonia')!
       .concat(data.tokenToCodes.get('r:be:flanders')!);
     expect(isLocationSelectionTooBroad(rawCodes, data.tokenToCodes)).toBe(true);
+  });
+
+  it('leaves French areas out of the postal-code list, which never carries them', () => {
+    const tokenToCodes = new Map([
+      ['r:fr:grand-est', Array.from({ length: 900 }, (_, i) => String(51000 + i * 10))],
+    ]);
+    expect(isLocationSelectionTooBroad(['1000', 'r:fr:grand-est'], tokenToCodes)).toBe(false);
+  });
+});
+
+describe('withoutFrenchAreas', () => {
+  it('drops French tokens and keeps every other value, raw codes included', () => {
+    expect(
+      withoutFrenchAreas(['c:fr', 'r:fr:corse', 'p:fr:75', 'p:be:liege', 'c:lu', '1000'])
+    ).toEqual(['p:be:liege', 'c:lu', '1000']);
+  });
+});
+
+describe('French postcodes on the device (5 digits)', () => {
+  const tokenToCodes = new Map([
+    ['p:fr:01', ['01000', '01090']],
+    ['p:fr:75', ['75001', '75011']],
+  ]);
+
+  it('matches the full 5-digit code, leading zero included', () => {
+    const ain = buildLocationMatch(['p:fr:01'], tokenToCodes);
+    expect(matchesLocationFilter({ country: 'france', postal_code: '01000' }, ain)).toBe(true);
+    expect(matchesLocationFilter({ country: 'Frankrijk', postal_code: '01090' }, ain)).toBe(true);
+    expect(matchesLocationFilter({ country: 'france', postal_code: '01100' }, ain)).toBe(false);
+  });
+
+  it('folds the spellings the backend canonicalises', () => {
+    const paris = buildLocationMatch(['p:fr:75'], tokenToCodes);
+    expect(matchesLocationFilter({ country: 'france', postal_code: 'F-75011' }, paris)).toBe(true);
+    expect(matchesLocationFilter({ country: 'FR', postal_code: '75 011' }, paris)).toBe(true);
+  });
+
+  it('never truncates a French code onto a 4-digit one', () => {
+    const rawCodes = buildLocationMatch(['7501', '0100'], tokenToCodes);
+    expect(matchesLocationFilter({ country: 'france', postal_code: '75011' }, rawCodes)).toBe(
+      false
+    );
+    expect(matchesLocationFilter({ country: 'france', postal_code: '01000' }, rawCodes)).toBe(
+      false
+    );
+  });
+
+  it('keeps French areas to French events', () => {
+    const ain = buildLocationMatch(['p:fr:01'], tokenToCodes);
+    expect(matchesLocationFilter({ country: 'belgium', postal_code: '01000' }, ain)).toBe(false);
+    expect(matchesLocationFilter({ country: null, postal_code: '01000' }, ain)).toBe(false);
+  });
+
+  it('matches the whole country without a postcode', () => {
+    const france = buildLocationMatch(['c:fr'], tokenToCodes);
+    expect(matchesLocationFilter({ country: 'France', postal_code: null }, france)).toBe(true);
+    expect(matchesLocationFilter({ country: 'belgium', postal_code: '1000' }, france)).toBe(false);
   });
 });
 
@@ -264,6 +338,33 @@ describe('resolveLocationLabel', () => {
 
   it('returns the value unchanged when nothing matches', () => {
     expect(resolveLocationLabel('mystery', data.tokenToLabel)).toBe('mystery');
+  });
+});
+
+describe('France next to Belgium, the Netherlands and Luxembourg', () => {
+  beforeEach(() => mockWarn.mockClear());
+
+  it('adds its 110 areas without an unmapped name or a token clash', () => {
+    const { options } = buildLocationFilterOptions({
+      belgiumRows: BE_EN,
+      netherlandsRows: NL,
+      luxembourg: { cantons: LU_CANTONS, communes: LU_COMMUNES },
+      france: FR_AREAS,
+      lang: 'en',
+    });
+    const values = options.map((o) => o.value);
+    expect(new Set(values).size).toBe(values.length);
+    expect(values.filter((value) => countryOfLocationToken(value) === 'france')).toHaveLength(110);
+    expect(mockWarn).not.toHaveBeenCalled();
+  });
+
+  it('lists the countries first, France among them', () => {
+    const { options } = buildLocationFilterOptions({
+      luxembourg: { cantons: LU_CANTONS, communes: LU_COMMUNES },
+      france: FR_AREAS,
+      lang: 'nl',
+    });
+    expect(options.slice(0, 2).map((o) => o.label)).toEqual(['Frankrijk', 'Luxemburg (land)']);
   });
 });
 

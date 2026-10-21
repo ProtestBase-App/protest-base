@@ -50,6 +50,7 @@ import {
   EventIncompleteError,
   EventNotFoundError,
   EventNetworkError,
+  probeFranceSupport,
 } from '@/services/event.service';
 import type { DuplicateWarningReport, Event } from '@/types/event.types';
 import { buildLocationUpdate } from '@/utils/eventLocation';
@@ -1409,6 +1410,102 @@ describe('event.service', () => {
 
       expect(paramsOfCall(0)).not.toHaveProperty('areas');
       expect(paramsOfCall(0)).not.toHaveProperty('postalCodes');
+    });
+
+    describe('French areas', () => {
+      it('go out as `areas` like every other token', async () => {
+        mockApi.get.mockResolvedValueOnce(page({ areas: ['p:fr:75', 'r:fr:corse'] }));
+
+        await getEventsForLocations({ limit: 20 }, ['p:fr:75', 'r:fr:corse'], expand);
+
+        expect(mockApi.get).toHaveBeenCalledTimes(1);
+        expect(paramsOfCall(0).areas).toBe('p:fr:75,r:fr:corse');
+      });
+
+      it('are dropped from the postal-code retry, never expanded', async () => {
+        mockApi.get.mockResolvedValueOnce(page()).mockResolvedValueOnce(page());
+
+        await getEventsForLocations({ limit: 20 }, ['p:fr:75', 'r:be:brussels'], expand);
+
+        expect(mockApi.get).toHaveBeenCalledTimes(2);
+        expect(expand).toHaveBeenCalledWith(['r:be:brussels']);
+        expect(paramsOfCall(1).postalCodes).toBe('1000,1060');
+      });
+
+      it('match nothing on a backend without `areas` when they are all that is selected', async () => {
+        mockApi.get.mockResolvedValueOnce(page());
+
+        const result = await getEventsForLocations(
+          { limit: 20, offset: 40 },
+          ['p:fr:75', 'c:fr'],
+          expand
+        );
+
+        expect(mockApi.get).toHaveBeenCalledTimes(1);
+        expect(expand).not.toHaveBeenCalled();
+        expect(result).toEqual({ events: [], total: 0, limit: 20, offset: 40 });
+      });
+
+      it('are dropped next to raw postal codes, which only go out the legacy way', async () => {
+        mockApi.get.mockResolvedValueOnce(page());
+
+        await getEventsForLocations({ limit: 20 }, ['9000', 'p:fr:01'], expand);
+
+        expect(mockApi.get).toHaveBeenCalledTimes(1);
+        expect(paramsOfCall(0).postalCodes).toBe('9000');
+        expect(paramsOfCall(0)).not.toHaveProperty('areas');
+      });
+    });
+  });
+
+  describe('probeFranceSupport', () => {
+    const answer = (status: number, success: boolean) => ({ status, data: { success } });
+
+    it('asks GET /events for one French event, anonymously', async () => {
+      mockApi.get.mockResolvedValueOnce(answer(200, true));
+
+      await probeFranceSupport();
+
+      expect(mockApi.get).toHaveBeenCalledWith(
+        '/events',
+        expect.objectContaining({ params: { country: 'france', limit: 1 }, skipAuth: true })
+      );
+    });
+
+    it('is available on a 200', async () => {
+      mockApi.get.mockResolvedValueOnce(answer(200, true));
+      await expect(probeFranceSupport()).resolves.toBe('available');
+    });
+
+    it('is unavailable on the 400 of a backend without France, taken as an answer', async () => {
+      mockApi.get.mockResolvedValueOnce(answer(400, false));
+      await expect(probeFranceSupport()).resolves.toBe('unavailable');
+
+      const { validateStatus } = mockApi.get.mock.calls[0][1] as {
+        validateStatus: (status: number) => boolean;
+      };
+      expect([200, 400, 404, 500, 503].map(validateStatus)).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+      ]);
+    });
+
+    it('is unknown when the request fails, a network error included', async () => {
+      mockApi.get.mockRejectedValueOnce(
+        Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' })
+      );
+      await expect(probeFranceSupport()).resolves.toBe('unknown');
+
+      mockApi.get.mockRejectedValueOnce({ response: { status: 503 } });
+      await expect(probeFranceSupport()).resolves.toBe('unknown');
+    });
+
+    it('is unknown for a 200 that does not report success', async () => {
+      mockApi.get.mockResolvedValueOnce(answer(200, false));
+      await expect(probeFranceSupport()).resolves.toBe('unknown');
     });
   });
 

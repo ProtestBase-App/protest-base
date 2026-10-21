@@ -591,6 +591,8 @@ const en: LocaleData = {
     searchPostalCode: 'Search by postal code or municipality...',
     localityLabel: 'Town or village',
     searchLocality: 'Search a town or village...',
+    communeLabel: 'Town or village',
+    searchCommune: 'Search a town or postal code...',
     searchNoResults: 'No matches found',
     searchMinLength: 'Type at least {{count}} characters',
     streetAddressPlaceholder: 'Street name and number',
@@ -620,6 +622,7 @@ const en: LocaleData = {
     locationHelper:
       'Search for the address — the postal code fills in automatically. You can also set it manually.',
     locationHelperLu: 'Search for the address, or pick the town or village below.',
+    locationHelperFr: 'Pick the town or village, or search for the address.',
     imageHelper: "Add up to 5 images — the first one is your event's cover photo",
     eventLinkHelper: 'Share a link to your event page, registration form, or more information',
     coOrganizersHelper: 'Organizations collaborating on this event',

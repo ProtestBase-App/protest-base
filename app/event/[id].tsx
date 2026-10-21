@@ -58,7 +58,7 @@ export default function EventDetails() {
   const { likeEvent, unlikeEvent, isLiked } = useLikedEvents();
   const { loading: postalCodesLoading, getSubMunicipalityName } = usePostalCodes();
   const { userOrganizations } = useUserOrganizations();
-  const { id, isCreated } = useLocalSearchParams();
+  const { id, isCreated } = useLocalSearchParams<{ id: string | string[]; isCreated?: string }>();
   const insets = useSafeAreaInsets();
 
   const eventId = Array.isArray(id) ? id[0] : id;

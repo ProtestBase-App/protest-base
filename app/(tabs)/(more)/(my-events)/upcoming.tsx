@@ -249,7 +249,7 @@ export default function UpcomingEventsScreen() {
               ListHeaderComponent={
                 timeline.nextUp.length > 0 ? (
                   <UpcomingNextUp events={timeline.nextUp} now={now} userLanguage={userLanguage} />
-                ) : null
+                ) : undefined
               }
               ListEmptyComponent={
                 isEmpty ? (
@@ -262,7 +262,7 @@ export default function UpcomingEventsScreen() {
                     linkLabel={t('myEvents.viewPastEvents')}
                     onLinkPress={() => router.push(Routes.MY_EVENTS_PAST)}
                   />
-                ) : null
+                ) : undefined
               }
               ListFooterComponent={renderFooter}
               refreshControl={

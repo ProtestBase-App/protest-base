@@ -209,6 +209,69 @@ describe('ExploreFiltersSheet', () => {
       expect(getByLabelText('Belgium').props.accessibilityState.selected).toBe(false);
       expect(getByLabelText('Netherlands').props.accessibilityState.selected).toBe(false);
       expect(getByLabelText('Luxembourg')).toBeTruthy();
+      expect(queryByLabelText('France')).toBeNull();
+    });
+
+    describe('France, once the backend serves it', () => {
+      const PARIS: LocationFilterOption = {
+        value: 'p:fr:75',
+        label: 'Paris (75)',
+        tier: 'province',
+        count: 21,
+        provinceLabel: 'Île-de-France',
+        searchText: 'paris (75)',
+        parentToken: 'r:fr:ile-de-france',
+      };
+      const franceOverrides = {
+        providerOverrides: {
+          postalCodeContext: {
+            franceEnabled: true,
+            locationFilterOptions: [BRUSSELS, PARIS],
+            resolveLocationLabel: jest.fn((v: string) => v),
+            isLocationSelectionTooBroad: jest.fn().mockReturnValue(false),
+          },
+        },
+      };
+
+      it('offers France and applies it', () => {
+        const onApply = jest.fn();
+        const { getByLabelText, getByText } = renderWithProviders(
+          <ExploreFiltersSheet {...defaultProps} onApply={onApply} />,
+          franceOverrides
+        );
+
+        fireEvent.press(getByLabelText('France'));
+        fireEvent.press(getByText('filters.confirmFilters'));
+
+        expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ country: 'france' }));
+      });
+
+      it('keeps French areas only, and offers them only, once France is picked', () => {
+        const onApply = jest.fn();
+        const { getByLabelText, getByPlaceholderText, getByText, queryByLabelText } =
+          renderWithProviders(
+            <ExploreFiltersSheet
+              {...defaultProps}
+              initialFilters={{
+                ...DEFAULT_EXPLORE_FILTERS,
+                locations: ['r:be:brussels', 'p:fr:75'],
+              }}
+              onApply={onApply}
+            />,
+            franceOverrides
+          );
+
+        fireEvent.press(getByLabelText('France'));
+        const locationInput = getByPlaceholderText('filters.searchPlaceholder');
+        fireEvent(locationInput, 'focus');
+        fireEvent.changeText(locationInput, 'brus');
+        expect(queryByLabelText('Brussels-Capital')).toBeNull();
+        fireEvent.press(getByText('filters.confirmFilters'));
+
+        expect(onApply).toHaveBeenCalledWith(
+          expect.objectContaining({ country: 'france', locations: ['p:fr:75'] })
+        );
+      });
     });
 
     it('labels countries in the user language', () => {

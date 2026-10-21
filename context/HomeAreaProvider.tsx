@@ -14,6 +14,7 @@ import {
   clearHomeArea as removeHomeArea,
 } from '@/services/localStorageService';
 import { buildHomeAreaMatch, HomeAreaMatch } from '@/utils/homeArea';
+import { countryOfLocationToken } from '@/utils/locationFilterOptions';
 import { logger } from '@/utils/logger';
 
 interface HomeAreaContextType {
@@ -32,17 +33,29 @@ interface HomeAreaContextType {
 const HomeAreaContext = createContext<HomeAreaContextType | undefined>(undefined);
 
 export function HomeAreaProvider({ children }: { children: ReactNode }) {
-  const { locationFilterOptions, expandLocationTokens, resolveLocationLabel } = usePostalCodes();
-  const [homeAreaToken, setHomeAreaToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    locationFilterOptions,
+    expandLocationTokens,
+    resolveLocationLabel,
+    franceEnabled,
+    franceLoading,
+  } = usePostalCodes();
+  const [storedToken, setStoredToken] = useState<string | null>(null);
+  const [storageLoading, setStorageLoading] = useState(true);
+
+  // A French home area exists only while France is offered: the stored token is
+  // kept but hidden otherwise, and counts as loading until the gate answers.
+  const isFrenchToken = !!storedToken && countryOfLocationToken(storedToken) === 'france';
+  const homeAreaToken = isFrenchToken && !franceEnabled ? null : storedToken;
+  const loading = storageLoading || (isFrenchToken && franceLoading);
 
   useEffect(() => {
     let active = true;
     (async () => {
       const stored = await readHomeArea();
       if (active) {
-        setHomeAreaToken(stored);
-        setLoading(false);
+        setStoredToken(stored);
+        setStorageLoading(false);
       }
     })();
     return () => {
@@ -52,7 +65,7 @@ export function HomeAreaProvider({ children }: { children: ReactNode }) {
 
   const setHomeArea = useCallback(async (token: string | null) => {
     // Optimistic: update state immediately, persist in the background.
-    setHomeAreaToken(token);
+    setStoredToken(token);
     try {
       if (token === null) {
         await removeHomeArea();

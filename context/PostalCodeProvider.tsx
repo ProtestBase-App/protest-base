@@ -8,8 +8,12 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+import { AppState } from 'react-native';
+import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
+import type { FranceAreas } from '@/constants/PostalCodes_FR';
 import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
+import { probeFranceSupport } from '@/services/event.service';
 import { logger } from '@/utils/logger';
 import {
   buildLocationFilterOptions,
@@ -58,6 +62,14 @@ interface PostalCodeContextType {
   isLocationSelectionTooBroad: (values: string[]) => boolean;
   /** Prepare a selection for matching events on the device (country-scoped, like the server). */
   buildLocationMatch: (values: string[]) => LocationMatch;
+  /**
+   * France is offered: the backend answered 200 to `probeFranceSupport` and the
+   * French area data has loaded. Every France feature waits on this, and it
+   * stays false whenever the backend has not answered 200.
+   */
+  franceEnabled: boolean;
+  /** True until the backend's first answer about France (and its data, after a yes). */
+  franceLoading: boolean;
 }
 
 const PostalCodeContext = createContext<PostalCodeContextType>({
@@ -75,6 +87,8 @@ const PostalCodeContext = createContext<PostalCodeContextType>({
     wholeCountries: new Set(),
     rawCodes: new Set(),
   }),
+  franceEnabled: false,
+  franceLoading: false,
 });
 
 interface PostalCodeProviderProps {
@@ -98,6 +112,48 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
     communes: LuxembourgCommune[];
   } | null>(null);
   const luxembourgRequestedRef = useRef(false);
+
+  // The France gate. Separate from `loading`, which holds the splash and the
+  // screens' loaders: a slow answer must never block or re-show them.
+  const { isOffline } = useConnectivity();
+  const [franceStatus, setFranceStatus] = useState<'pending' | 'on' | 'off'>('pending');
+  const [franceAreas, setFranceAreas] = useState<FranceAreas | null>(null);
+  // Settled once the backend answered either way; a failed request is asked again.
+  const franceProbeRef = useRef({ inFlight: false, settled: false });
+
+  const probeFrance = useCallback(async () => {
+    const probe = franceProbeRef.current;
+    if (probe.inFlight || probe.settled) return;
+    probe.inFlight = true;
+    const support = await probeFranceSupport();
+    probe.inFlight = false;
+    probe.settled = support !== 'unknown';
+    if (support !== 'available') {
+      setFranceStatus('off');
+      return;
+    }
+    try {
+      const module = await import('@/constants/PostalCodes_FR');
+      setFranceAreas(module.FR_AREAS);
+      setFranceStatus('on');
+    } catch (error) {
+      logger.error('Failed to load postal codes for country:', { country: 'france', error });
+      setFranceStatus('off');
+    }
+  }, []);
+
+  // Asked at start, and again after a failed request once back online or back
+  // in the foreground, so a backend that starts serving France is picked up.
+  useEffect(() => {
+    if (!isOffline) void probeFrance();
+  }, [isOffline, probeFrance]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void probeFrance();
+    });
+    return () => subscription.remove();
+  }, [probeFrance]);
 
   const loadPostalCodesForCountry = useCallback(
     async (country: string) => {
@@ -229,12 +285,17 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       belgiumRows: postalCodesCache.belgium,
       netherlandsRows: postalCodesCache.netherlands,
       luxembourg: luxembourgAreas ?? undefined,
+      // Loaded only after the backend answered that it serves France.
+      france: franceAreas ?? undefined,
       lang,
     });
-  }, [postalCodesCache, luxembourgAreas, userLanguage]);
+  }, [postalCodesCache, luxembourgAreas, franceAreas, userLanguage]);
 
   const resolveRawCode = useCallback(
     (code: string): string => {
+      // The BE/NL lookup parses the code as a number, which would read a French
+      // "01000" as Brussels' 1000.
+      if (code.length > 4) return code;
       const city =
         getSubMunicipalityName(code, 'belgium') || getSubMunicipalityName(code, 'netherlands');
       return city ? `${city} (${code})` : code;
@@ -274,6 +335,8 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       resolveLocationLabel: resolveLocationLabelCb,
       isLocationSelectionTooBroad: isLocationSelectionTooBroadCb,
       buildLocationMatch: buildLocationMatchCb,
+      franceEnabled: franceStatus === 'on',
+      franceLoading: franceStatus === 'pending',
     }),
     [
       getSubMunicipalityName,
@@ -286,6 +349,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       resolveLocationLabelCb,
       isLocationSelectionTooBroadCb,
       buildLocationMatchCb,
+      franceStatus,
     ]
   );
 

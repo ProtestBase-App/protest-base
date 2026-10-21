@@ -154,8 +154,10 @@ const styles = StyleSheet.create({
 function RootNavigator() {
   const { isLogged } = useGlobalContext();
 
+  // SDK 58 makes iOS 26+ native headers transparent with content scrolling under
+  // them; keep them opaque so screens lay out below the header as before.
   return (
-    <Stack>
+    <Stack screenOptions={{ headerTransparent: false }}>
       {/* Auth screens: only accessible when NOT logged in */}
       <Stack.Protected guard={!isLogged}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />

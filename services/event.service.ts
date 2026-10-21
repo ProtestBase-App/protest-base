@@ -20,7 +20,7 @@ import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { isEventOngoing } from '@/utils/eventStatus';
 import { isNetworkError } from '@/utils/networkError';
 import { logger } from '@/utils/logger';
-import { isAreaTokenSelection } from '@/utils/locationFilterOptions';
+import { isAreaTokenSelection, withoutFrenchAreas } from '@/utils/locationFilterOptions';
 
 export type {
   Event,
@@ -275,6 +275,33 @@ export async function getEventsBackend(
   }
 }
 
+/** What the backend answered about serving France; 'unknown' is worth asking again. */
+export type FranceSupport = 'available' | 'unavailable' | 'unknown';
+
+/**
+ * Whether the backend serves France, the runtime gate for every France feature:
+ * `GET /events?country=france&limit=1` answers 200 once it does, and a 400
+ * (validation: unknown country) before. Anything else, a network failure
+ * included, is 'unknown'.
+ */
+export async function probeFranceSupport(): Promise<FranceSupport> {
+  try {
+    const response = await api.get<{ success: boolean }>('/events', {
+      params: { country: 'france', limit: 1 },
+      skipAuth: true,
+      // An older backend's 400 is an answer, not an error for the interceptor to log.
+      validateStatus: (status) => status === 200 || status === 400,
+    });
+    if (response.status === 400) return 'unavailable';
+    return response.data?.success === true ? 'available' : 'unknown';
+  } catch (error) {
+    logger.warn('[EventService] France support probe failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return 'unknown';
+  }
+}
+
 /** A selection that can only go out as postal codes, and too many of them for the backend. */
 export class LocationSelectionTooBroadError extends Error {
   constructor() {
@@ -289,6 +316,10 @@ export class LocationSelectionTooBroadError extends Error {
  * list is used instead when the selection holds raw postal codes, or when the
  * backend predates `areas`: such a backend drops the param and returns the
  * unfiltered feed, which shows as a `filters_applied` without `areas`.
+ *
+ * French areas are never sent as postal codes (that list is country-blind); they
+ * are dropped from the legacy request, and a selection of French areas alone then
+ * matches nothing.
  *
  * @throws {LocationSelectionTooBroadError} when the postal-code list would pass the backend cap.
  */
@@ -305,7 +336,16 @@ export async function getEventsForLocations(
     logger.info('[EventService] Backend ignored areas; retrying with postal codes');
   }
 
-  const { codes, truncated } = expandToPostalCodes(locations);
+  const legacyLocations = withoutFrenchAreas(locations);
+  if (legacyLocations.length === 0) {
+    return {
+      events: [],
+      total: 0,
+      limit: filters.limit ?? API_LIMITS.EVENTS_DEFAULT,
+      offset: filters.offset ?? 0,
+    };
+  }
+  const { codes, truncated } = expandToPostalCodes(legacyLocations);
   if (truncated) throw new LocationSelectionTooBroadError();
   return getEventsBackend({ ...filters, postalCodes: codes });
 }

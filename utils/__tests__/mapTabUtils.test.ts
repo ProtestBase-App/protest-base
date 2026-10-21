@@ -205,6 +205,21 @@ describe('mapTabUtils', () => {
       expect(postalTokenForEvent(geocodedEvent({ country: 'Germany' }))).toBe('germany:1000');
     });
 
+    it('keeps a French code whole, as a string, and folds its spellings', () => {
+      expect(postalTokenForEvent(geocodedEvent({ country: 'france', postal_code: '01000' }))).toBe(
+        'france:01000'
+      );
+      expect(
+        postalTokenForEvent(geocodedEvent({ country: 'Frankrijk', postal_code: 'F-75011' }))
+      ).toBe('france:75011');
+    });
+
+    it('leaves non-French codes exactly as stored', () => {
+      expect(
+        postalTokenForEvent(geocodedEvent({ country: 'netherlands', postal_code: '5611 EC' }))
+      ).toBe('netherlands:5611 EC');
+    });
+
     it('returns null without a postal code or country', () => {
       expect(postalTokenForEvent(geocodedEvent({ postal_code: null }))).toBeNull();
       expect(postalTokenForEvent(geocodedEvent({ country: '' }))).toBeNull();
@@ -450,6 +465,21 @@ describe('mapTabUtils', () => {
     it('skips events without a postal code or country', () => {
       const events = [geocodedEvent({ postal_code: null }), geocodedEvent({ country: '' })];
       expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([]);
+    });
+
+    it('labels a French code with its 5 digits and groups its spellings', () => {
+      const events = [
+        geocodedEvent({ country: 'france', postal_code: '01000', city: 'Bourg-en-Bresse' }),
+        geocodedEvent({ country: 'France', postal_code: 'F-01000', city: 'Bourg-en-Bresse' }),
+      ];
+      expect(buildPostalCodeOptions(events, resolveCommune)).toEqual([
+        {
+          value: 'france:01000',
+          label: '01000 · Bourg-en-Bresse',
+          searchText: '01000 · bourg-en-bresse',
+          country: 'france',
+        },
+      ]);
     });
   });
 
