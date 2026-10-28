@@ -3,6 +3,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { t } from '@/utils/i18n';
 
+// Without an anchor, a rebuilt tab state (e.g. after login) opens the (my-events)
+// group instead of the More hub: expo-router sorts route groups first.
+export const unstable_settings = {
+  anchor: 'more',
+};
+
 export default function MoreLayout() {
   const colorScheme = useColorScheme();
 
