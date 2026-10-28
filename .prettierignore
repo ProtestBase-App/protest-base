@@ -12,5 +12,12 @@ expo-env.d.ts
 node_modules/
 
 # Config & tooling
-.claude/
+.*/
+!.github/
+!.eas/
+!.vscode/
 .maestro/
+
+# Untracked notes at the repo root; README is the only tracked markdown
+/*.md
+!/README.md
