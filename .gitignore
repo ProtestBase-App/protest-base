@@ -49,8 +49,5 @@ coverage-*/
 
 *.bak*
 
-CLAUDE.md
-.claude
-
 local/
 .maestro
