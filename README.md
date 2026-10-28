@@ -98,4 +98,4 @@ Our source code is publicly available so anyone can audit how we handle data. Tr
 | Maps          | [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) + [OpenFreeMap](https://openfreemap.org) |
 | Storage       | AsyncStorage + SecureStore (with chunked encryption for list payloads)                                              |
 | Notifications | [Expo Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/) (local reminders only)               |
-| Testing       | Jest 30 + React Native Testing Library                                                                              |
+| Testing       | Jest 30 + React Native Testing Library, [Maestro](https://maestro.dev) for end-to-end tests                         |
