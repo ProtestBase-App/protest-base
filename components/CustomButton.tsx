@@ -34,6 +34,7 @@ export default function CustomButton({
   return (
     <>
       <TouchableOpacity
+        accessibilityRole="button"
         testID={testID}
         onPress={handlePress}
         activeOpacity={0.7}

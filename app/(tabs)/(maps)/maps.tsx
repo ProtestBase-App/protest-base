@@ -469,6 +469,7 @@ export default function MapsScreen() {
                 selected={event.$id === selectedId}
                 onPress={handleSelect}
                 accessibilityLabel={event.title}
+                accessibilityHint={t('a11y.hints.selectOnMap')}
               />
             </Marker>
           );
@@ -507,6 +508,7 @@ export default function MapsScreen() {
             onPress={() => setSheetOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={t('home.openFilters')}
+            accessibilityHint={t('a11y.hints.openFilters')}
             style={[
               styles.filterButton,
               anyFilterActive
@@ -579,6 +581,7 @@ export default function MapsScreen() {
               onPress={() => void handleZoom(1)}
               accessibilityRole="button"
               accessibilityLabel={t('maps.zoomIn')}
+              accessibilityHint={t('a11y.hints.zoomInMap')}
               style={[
                 styles.mapButton,
                 {
@@ -593,6 +596,7 @@ export default function MapsScreen() {
               onPress={() => void handleZoom(-1)}
               accessibilityRole="button"
               accessibilityLabel={t('maps.zoomOut')}
+              accessibilityHint={t('a11y.hints.zoomOutMap')}
               style={[
                 styles.mapButton,
                 {

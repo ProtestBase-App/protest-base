@@ -1,4 +1,5 @@
 import { PickedImage } from '@/types/event.types';
+import type { RepeatFormState } from '@/types/eventSeries.types';
 
 export interface FormState {
   organization_id: string;
@@ -31,6 +32,11 @@ export interface FormState {
    */
   geocod_lat: number | null;
   geocod_lng: number | null;
+  /**
+   * The Repeat control, on the create screen only. Absent or `once` is a single event.
+   * Survives in a local autosave, so it only counts while the feature is on.
+   */
+  repeat?: RepeatFormState;
 }
 
 export interface EmptyFieldsState {
@@ -65,4 +71,9 @@ export interface EventFormProps {
    * midnight; picking a real time is what converts the event back to timed.
    */
   isAllDay?: boolean;
+  /**
+   * Show the Repeat control. Only the create screen sets this, and only while the
+   * feature is on: the schedule of a series cannot be edited, so no edit form has it.
+   */
+  showRepeat?: boolean;
 }

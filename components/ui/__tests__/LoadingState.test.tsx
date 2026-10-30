@@ -16,7 +16,7 @@ describe('LoadingState', () => {
   });
 
   it('uses custom accessibility label', () => {
-    render(<LoadingState accessibilityLabel="Fetching events" />);
+    render(<LoadingState label="Fetching events" />);
     expect(screen.getByLabelText('Fetching events')).toBeTruthy();
   });
 

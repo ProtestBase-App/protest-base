@@ -48,6 +48,16 @@ export function useVersionCheck(): VersionCheckContextType {
   return context;
 }
 
+/**
+ * Whether recurring events are on for this launch.
+ *
+ * Fails closed, and unlike useVersionCheck it does not throw outside the provider,
+ * so anything that renders a badge can ask without a provider around it.
+ */
+export function useRecurringEventsEnabled(): boolean {
+  return useContext(VersionCheckContext)?.features.recurringEvents === true;
+}
+
 interface VersionCheckProviderProps {
   children: ReactNode;
 }
@@ -68,6 +78,7 @@ export function VersionCheckProvider({ children }: VersionCheckProviderProps): R
     maintenanceMessage: null,
     updateMessage: null,
     updateUrl: '',
+    features: { recurringEvents: false },
   });
 
   /**

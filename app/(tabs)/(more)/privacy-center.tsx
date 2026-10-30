@@ -228,6 +228,7 @@ export default function PrivacyCenterScreen() {
                 onPress={openAppSettings}
                 accessibilityRole="button"
                 accessibilityLabel={t('privacyCenter.manageAllPermissions')}
+                accessibilityHint={t('a11y.hints.openSettings')}
               >
                 <IconSymbol name="gear" size={IconSizes.md} color={themeColors.text} />
                 <ThemedText style={styles.manageButtonText}>

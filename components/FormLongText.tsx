@@ -1,4 +1,4 @@
-import { StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, type TextInputProps } from 'react-native';
 import { useState } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -8,7 +8,7 @@ import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
 
-interface FormFieldProps {
+interface FormFieldProps extends TextInputProps {
   title: string;
   value: string;
   placeholder: string;
@@ -42,7 +42,6 @@ interface FormFieldProps {
   defaultExpanded?: boolean;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
-  [key: string]: any;
 }
 
 export default function FormLongText({
@@ -105,7 +104,11 @@ export default function FormLongText({
         />
 
         {isLongText && (
-          <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} style={styles.icon}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => setIsExpanded(!isExpanded)}
+            style={styles.icon}
+          >
             <IconSymbol
               size={16}
               name={

@@ -61,6 +61,7 @@ export default function CalendarHeader({
           style={({ pressed }) => [styles.monthButton, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
           accessibilityLabel={`${monthName} ${year}, open month picker`}
+          accessibilityHint={t('a11y.hints.openMonthPicker')}
         >
           <ThemedText style={[styles.monthText, { color: themeColors.text }]} numberOfLines={1}>
             {monthName}
@@ -80,6 +81,7 @@ export default function CalendarHeader({
             ]}
             accessibilityRole="button"
             accessibilityLabel="Go to today"
+            accessibilityHint={t('a11y.hints.goToToday')}
           >
             <ThemedText style={[styles.todayText, { color: themeColors.secondaryText }]}>
               {t('filters.today')}
@@ -104,6 +106,7 @@ export default function CalendarHeader({
           ]}
           accessibilityRole="button"
           accessibilityLabel={t('home.openFilters')}
+          accessibilityHint={t('a11y.hints.openFilters')}
         >
           <IconSymbol
             name="slider.horizontal.3"
@@ -141,6 +144,7 @@ export default function CalendarHeader({
             ]}
             accessibilityRole="button"
             accessibilityLabel={t('home.previousMonth')}
+            accessibilityHint={t('a11y.hints.previousMonth')}
           >
             <IconSymbol name="chevron.left" size={15} color={themeColors.secondaryText} />
           </Pressable>
@@ -156,6 +160,7 @@ export default function CalendarHeader({
             ]}
             accessibilityRole="button"
             accessibilityLabel={t('home.nextMonth')}
+            accessibilityHint={t('a11y.hints.nextMonth')}
           >
             <IconSymbol name="chevron.right" size={15} color={themeColors.secondaryText} />
           </Pressable>

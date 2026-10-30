@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/ThemedView';
 import FormField from '@/components/FormField';
 import FormDateField from '@/components/FormDateField';
 import FormLongText from '@/components/FormLongText';
+import RepeatFields from '@/components/RepeatFields';
 import {
   SheetSearchMultiSelect,
   SheetSearchMultiSelectOption,
@@ -54,6 +55,7 @@ import { logger } from '@/utils/logger';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { optimizeImageForUpload } from '@/utils/imageOptimization';
+import { isRepeating } from '@/utils/recurrence';
 
 // LayoutAnimation is opt-in on Android.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -85,6 +87,7 @@ const EventForm: React.FC<EventFormProps> = ({
   mode = 'create-event',
   scrollViewRef,
   isAllDay = false,
+  showRepeat = false,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -98,6 +101,9 @@ const EventForm: React.FC<EventFormProps> = ({
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
+
+  // A series has a rule instead of the two date fields.
+  const repeat = showRepeat && isRepeating(form.repeat) ? form.repeat : null;
 
   // A loaded all-day event stops being one the moment the organizer moves the
   // start off Brussels midnight — that is the only way to give a scraped
@@ -381,11 +387,11 @@ const EventForm: React.FC<EventFormProps> = ({
     // Templates don't require start_time; only title is "recommended" for templates.
     const requiredFields = isTemplateMode
       ? [form.title]
-      : [form.title, form.description, form.start_time];
+      : [form.title, form.description, repeat ? repeat.startLocal : form.start_time];
     const completed = requiredFields.filter((field) => field !== '').length;
     const total = requiredFields.length;
     return { completed, total, percentage: Math.round((completed / total) * 100) };
-  }, [form.title, form.description, form.start_time, isTemplateMode]);
+  }, [form.title, form.description, form.start_time, repeat, isTemplateMode]);
 
   // O(1) lookup when resolving co-organizer chip labels.
   const orgLookup = useMemo(
@@ -689,7 +695,7 @@ const EventForm: React.FC<EventFormProps> = ({
           return (
             // Plain Views: ThemedView would paint the theme background over the image.
             <View key={`${uri}-${index}`} style={styles.imageThumbWrapper}>
-              <Image source={{ uri }} style={styles.imageThumb} />
+              <Image accessibilityIgnoresInvertColors source={{ uri }} style={styles.imageThumb} />
               {index === 0 && (
                 <View style={[styles.mainImageBadge, { backgroundColor: themeColors.tint }]}>
                   <ThemedText style={styles.mainImageBadgeText}>
@@ -702,6 +708,7 @@ const EventForm: React.FC<EventFormProps> = ({
                 style={styles.imageThumbRemove}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityLabel={t('createEvent.removeImageAccessibilityLabel')}
+                accessibilityHint={t('a11y.hints.removeImage')}
                 accessibilityRole="button"
               >
                 <IconSymbol name="xmark" size={12} color="white" />
@@ -713,6 +720,7 @@ const EventForm: React.FC<EventFormProps> = ({
                     disabled={index === 0}
                     style={[styles.imageMoveButton, index === 0 && styles.imageMoveButtonDisabled]}
                     accessibilityLabel={t('createEvent.moveImageLeftAccessibilityLabel')}
+                    accessibilityHint={t('a11y.hints.moveImage')}
                     accessibilityRole="button"
                   >
                     <IconSymbol name="chevron.left" size={16} color={themeColors.icon} />
@@ -725,6 +733,7 @@ const EventForm: React.FC<EventFormProps> = ({
                       index === form.images.length - 1 && styles.imageMoveButtonDisabled,
                     ]}
                     accessibilityLabel={t('createEvent.moveImageRightAccessibilityLabel')}
+                    accessibilityHint={t('a11y.hints.moveImage')}
                     accessibilityRole="button"
                   >
                     <IconSymbol name="chevron.right" size={16} color={themeColors.icon} />
@@ -760,7 +769,7 @@ const EventForm: React.FC<EventFormProps> = ({
           style={styles.progressContainer}
           accessible={true}
           accessibilityRole="progressbar"
-          accessibilityLabel={t('createEvent.progressAccessibilityLabel', {
+          aria-label={t('createEvent.progressAccessibilityLabel', {
             percentage: getFormProgress.percentage,
           })}
           accessibilityValue={{
@@ -853,32 +862,47 @@ const EventForm: React.FC<EventFormProps> = ({
         <>
           <SectionHeader title={t('createEvent.dateAndTime')} isDark={isDark} />
 
-          <FormDateField
-            testID="input-event-start-time"
-            title={`${t('createEvent.startTime')} *`}
-            value={form.start_time}
-            placeholder={t('createEvent.pickStartDateTime')}
-            handleChangeText={handleStartTimeChange}
-            otherStyles={styles.fieldSpacing}
-            hasError={emptyFields.start_time}
-            minDate={new Date()}
-            allDayLabel={stillAllDay ? t('events.allDay') : undefined}
-            allDayHint={stillAllDay ? t('eventEdit.allDayHint') : undefined}
-          />
+          {showRepeat && (
+            <RepeatFields
+              repeat={form.repeat}
+              onChange={(next) => setForm((prev) => ({ ...prev, repeat: next }))}
+              startTime={form.start_time}
+              endTime={form.end_time}
+              userLanguage={userLang}
+              hasError={emptyFields.start_time}
+            />
+          )}
 
-          <FormDateField
-            testID="input-event-end-time"
-            title={`${t('createEvent.endTime')} (${t('common.optional')})`}
-            value={form.end_time}
-            placeholder={t('createEvent.pickEndDateTime')}
-            handleChangeText={(isoString: string) => setForm({ ...form, end_time: isoString })}
-            otherStyles={styles.fieldSpacing}
-            minDate={safeParseDate(form.start_time)}
-            // No hint here: the end of an all-day event is a storage artifact
-            // (23:59:59.999), not something the organizer is asked to set.
-            allDayLabel={stillAllDay ? t('events.allDay') : undefined}
-          />
-          <HelperText text={t('createEvent.endTimeHelper')} isDark={isDark} />
+          {!repeat && (
+            <>
+              <FormDateField
+                testID="input-event-start-time"
+                title={`${t('createEvent.startTime')} *`}
+                value={form.start_time}
+                placeholder={t('createEvent.pickStartDateTime')}
+                handleChangeText={handleStartTimeChange}
+                otherStyles={styles.fieldSpacing}
+                hasError={emptyFields.start_time}
+                minDate={new Date()}
+                allDayLabel={stillAllDay ? t('events.allDay') : undefined}
+                allDayHint={stillAllDay ? t('eventEdit.allDayHint') : undefined}
+              />
+
+              <FormDateField
+                testID="input-event-end-time"
+                title={`${t('createEvent.endTime')} (${t('common.optional')})`}
+                value={form.end_time}
+                placeholder={t('createEvent.pickEndDateTime')}
+                handleChangeText={(isoString: string) => setForm({ ...form, end_time: isoString })}
+                otherStyles={styles.fieldSpacing}
+                minDate={safeParseDate(form.start_time)}
+                // No hint here: the end of an all-day event is a storage artifact
+                // (23:59:59.999), not something the organizer is asked to set.
+                allDayLabel={stillAllDay ? t('events.allDay') : undefined}
+              />
+              <HelperText text={t('createEvent.endTimeHelper')} isDark={isDark} />
+            </>
+          )}
         </>
       )}
 
@@ -980,6 +1004,7 @@ const EventForm: React.FC<EventFormProps> = ({
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   accessibilityLabel={t('createEvent.changePostalAccessibilityLabel')}
+                  accessibilityHint={t('a11y.hints.changePostal')}
                 >
                   <ThemedText style={[styles.postalChangeText, { color: themeColors.tint }]}>
                     {t('createEvent.postalChange')}
@@ -1112,6 +1137,8 @@ const EventForm: React.FC<EventFormProps> = ({
         {t('createEvent.volunteering')}
       </ThemedText>
       <TouchableOpacity
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: form.help_needed }}
         testID="checkbox-event-help-needed"
         style={styles.checkboxContainer}
         onPress={() => setForm({ ...form, help_needed: !form.help_needed })}

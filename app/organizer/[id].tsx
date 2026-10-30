@@ -290,7 +290,7 @@ export default function OrganizerProfile() {
               accessible
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
-              accessibilityLabel={`${t('organizer.notFoundTitle')}. ${t('organizer.notFoundBody')}`}
+              aria-label={`${t('organizer.notFoundTitle')}. ${t('organizer.notFoundBody')}`}
             >
               <IconSymbol
                 name="exclamationmark.triangle"
@@ -419,6 +419,7 @@ export default function OrganizerProfile() {
                     const location = formatEventLocation(ev);
                     return (
                       <TouchableOpacity
+                        accessibilityRole="button"
                         key={ev.$id}
                         testID={`organizer-event-${index}`}
                         style={[

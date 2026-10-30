@@ -9,8 +9,11 @@ import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/Design
 import { useColorScheme } from '@/hooks/useColorScheme';
 import type { DuplicateSummary } from '@/types/event.types';
 import {
+  countDistinctDuplicates,
+  duplicateKey,
   duplicateTitle,
   formatDuplicateMeta,
+  formatDuplicateYourDate,
   relationshipMessageKey,
   relationshipOpenLabelKey,
 } from '@/utils/duplicateEvents';
@@ -69,7 +72,7 @@ export default function DuplicateEventModal({
     <ConfirmDialogShell
       visible={visible}
       title={t(titleKey)}
-      message={t(introKey, { count: duplicates.length })}
+      message={t(introKey, { count: countDistinctDuplicates(duplicates) })}
       dismissLabel={t('common.goBack')}
       onDismiss={onDismiss}
       confirmLabel={canOverride ? t(confirmKey) : undefined}
@@ -83,9 +86,10 @@ export default function DuplicateEventModal({
       >
         {duplicates.map((duplicate) => {
           const meta = formatDuplicateMeta(duplicate, locale);
+          const yourDate = formatDuplicateYourDate(duplicate, locale);
           return (
             <ThemedView
-              key={duplicate.id}
+              key={duplicateKey(duplicate)}
               style={[
                 styles.match,
                 {
@@ -102,6 +106,11 @@ export default function DuplicateEventModal({
                   {meta}
                 </ThemedText>
               )}
+              {!!yourDate && (
+                <ThemedText style={[styles.matchYourDate, { color: themeColors.text }]}>
+                  {yourDate}
+                </ThemedText>
+              )}
               <ThemedText style={[styles.matchWhy, { color: themeColors.subtleText }]}>
                 {t(relationshipMessageKey(duplicate.relationship))}
               </ThemedText>
@@ -114,6 +123,7 @@ export default function DuplicateEventModal({
                 accessibilityLabel={t('duplicates.accessibilityOpen', {
                   title: duplicateTitle(duplicate),
                 })}
+                accessibilityHint={t('a11y.hints.openEvent')}
               >
                 <ThemedText style={[styles.openButtonText, { color: themeColors.link }]}>
                   {t(relationshipOpenLabelKey(duplicate.relationship))}
@@ -155,6 +165,11 @@ const styles = StyleSheet.create({
   },
   matchMeta: {
     fontFamily: Typography.families.regular,
+    fontSize: Typography.sizes.xs,
+    marginTop: 2,
+  },
+  matchYourDate: {
+    fontFamily: Typography.families.medium,
     fontSize: Typography.sizes.xs,
     marginTop: 2,
   },

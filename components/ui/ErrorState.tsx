@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type ViewProps } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -16,7 +16,7 @@ import { Spacing, Typography } from '@/constants/DesignTokens';
  * <ErrorState message="Network error" containerStyles={{ paddingHorizontal: 32 }} />
  */
 
-interface ErrorStateProps {
+interface ErrorStateProps extends ViewProps {
   /** The error message to display */
   message: string;
   /** Color of the error text. Defaults to the theme tint color. */
@@ -27,8 +27,6 @@ interface ErrorStateProps {
   textStyles?: object;
   /** Accessibility label for screen readers. Defaults to the message. */
   accessibilityLabel?: string;
-  /** Additional props to pass through */
-  [key: string]: any;
 }
 
 function ErrorStateComponent({
@@ -46,7 +44,7 @@ function ErrorStateComponent({
     <ThemedView
       style={[styles.container, containerStyles]}
       accessibilityRole="alert"
-      accessibilityLabel={accessibilityLabel ?? message}
+      aria-label={accessibilityLabel ?? message}
       accessibilityLiveRegion="polite"
       {...props}
     >

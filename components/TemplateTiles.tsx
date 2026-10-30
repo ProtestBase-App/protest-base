@@ -105,6 +105,7 @@ export function TemplateLaunchTile({
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={t('templates.tileMenu')}
+        accessibilityHint={t('a11y.hints.openTemplateMenu')}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={styles.menuButton}
         testID={`template-menu-${template.$id}`}
@@ -129,6 +130,7 @@ export function TemplateNewTile({ onPress }: TemplateNewTileProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={t('templates.newTemplateTile')}
+      accessibilityHint={t('a11y.hints.createTemplate')}
       testID="template-new-tile"
       style={({ pressed }) => [
         styles.tile,

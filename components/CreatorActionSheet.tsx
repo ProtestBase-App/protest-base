@@ -38,8 +38,20 @@ export default function CreatorActionSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose}>
-        <Pressable style={styles.sheetWrapper} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        // No close control here: VoiceOver leaves with the escape gesture.
+        accessible={false}
+        accessibilityRole="none"
+        onAccessibilityEscape={onClose}
+        style={styles.scrim}
+        onPress={onClose}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={styles.sheetWrapper}
+          onPress={(e) => e.stopPropagation()}
+        >
           <ThemedView style={[styles.sheet, { backgroundColor: themeColors.surfaceBackground }]}>
             <View style={[styles.handle, { backgroundColor: themeColors.separator }]} />
 
@@ -136,6 +148,7 @@ function ActionRow({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={description}
     >
       <View style={[styles.iconContainer, { backgroundColor: themeColors.badgeBg }]}>
         <IconSymbol name={icon} size={IconSizes.md} color={iconColor} />

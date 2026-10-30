@@ -182,6 +182,23 @@ describe('Routes', () => {
       const result = DynamicRoutes.eventEdit('xyz789', { isCreated: true });
       expect(result.params.isCreated).toBe('true');
     });
+
+    it('should not include allUpcoming when no query params provided or when it is false', () => {
+      expect(DynamicRoutes.eventEdit('xyz789').params).not.toHaveProperty('allUpcoming');
+      expect(DynamicRoutes.eventEdit('xyz789', { allUpcoming: false }).params).not.toHaveProperty(
+        'allUpcoming'
+      );
+    });
+
+    it('should include allUpcoming as string "true" when allUpcoming is true', () => {
+      const result = DynamicRoutes.eventEdit('xyz789', { allUpcoming: true });
+      expect(result.params).toEqual({ id: 'xyz789', allUpcoming: 'true' });
+    });
+
+    it('should carry isCreated and allUpcoming together', () => {
+      const result = DynamicRoutes.eventEdit('xyz789', { isCreated: true, allUpcoming: true });
+      expect(result.params).toEqual({ id: 'xyz789', isCreated: 'true', allUpcoming: 'true' });
+    });
   });
 
   describe('DynamicRoutes.draftEdit', () => {
@@ -198,6 +215,27 @@ describe('Routes', () => {
     it('should only have id in params', () => {
       const result = DynamicRoutes.draftEdit('draft001');
       expect(Object.keys(result.params)).toEqual(['id']);
+    });
+
+    it('should only have id in params when allUpcoming is false', () => {
+      const result = DynamicRoutes.draftEdit('draft001', { allUpcoming: false });
+      expect(Object.keys(result.params)).toEqual(['id']);
+    });
+
+    it('should include allUpcoming as string "true" when allUpcoming is true', () => {
+      const result = DynamicRoutes.draftEdit('draft001', { allUpcoming: true });
+      expect(result.params).toEqual({ id: 'draft001', allUpcoming: 'true' });
+    });
+  });
+
+  describe('DynamicRoutes.series', () => {
+    it('should return the series screen pathname', () => {
+      expect(DynamicRoutes.series('series001').pathname).toBe('/series/[id]');
+    });
+
+    it('should only have id in params', () => {
+      const result = DynamicRoutes.series('series001');
+      expect(result.params).toEqual({ id: 'series001' });
     });
   });
 

@@ -110,6 +110,8 @@ export interface EventDetailedProps {
   onLike?: () => void;
   /** "Protest forecast" for this event; null or undefined hides the card. */
   weather?: EventWeather | null;
+  /** The badge of a date of a recurring series. Absent on a single event. */
+  seriesBadge?: React.ReactNode;
 }
 
 const EventDetailed: React.FC<EventDetailedProps> = ({
@@ -129,6 +131,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   isEventLiked = false,
   onLike,
   weather,
+  seriesBadge,
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -356,6 +359,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                   onPress={() => openViewerAt(index)}
                   accessibilityRole="imagebutton"
                   accessibilityLabel={t('events.viewImage')}
+                  accessibilityHint={t('a11y.hints.viewImage')}
                 >
                   <Image
                     source={item}
@@ -378,6 +382,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               disabled={heroImages.length === 0}
               accessibilityRole="imagebutton"
               accessibilityLabel={t('events.viewImage')}
+              accessibilityHint={t('a11y.hints.viewImage')}
             >
               <Image
                 source={heroImages[0] || require('@/assets/images/event-image-default.png')}
@@ -411,6 +416,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               onPress={onBack}
               accessibilityRole="button"
               accessibilityLabel={t('common.back')}
+              accessibilityHint={t('a11y.hints.goBack')}
             >
               <BlurView intensity={20} tint="dark" style={styles.navPill}>
                 <IconSymbol name="arrow.backward" size={IconSizes.md} color="white" />
@@ -425,6 +431,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 onPress={onShare}
                 accessibilityRole="button"
                 accessibilityLabel={t('events.share')}
+                accessibilityHint={t('a11y.hints.shareEvent')}
               >
                 <BlurView intensity={20} tint="dark" style={styles.navPill}>
                   <IconSymbol name="square.and.arrow.up" size={IconSizes.md} color="white" />
@@ -438,6 +445,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                   onPress={onOpenCreatorMenu}
                   accessibilityRole="button"
                   accessibilityLabel={t('events.modifyPill')}
+                  accessibilityHint={t('a11y.hints.manageEvent')}
                 >
                   <IconSymbol name="pencil" size={14} color="white" />
                   <ThemedText style={styles.creatorPillText}>{t('events.modifyPill')}</ThemedText>
@@ -452,6 +460,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       accessibilityLabel={
                         isEventLiked ? t('events.likedEvent') : t('events.likeEvent')
                       }
+                      accessibilityHint={t('a11y.hints.toggleLike')}
                     >
                       <BlurView
                         intensity={20}
@@ -476,6 +485,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                     accessibilityLabel={
                       isEventSaved ? t('events.savedEvent') : t('events.saveEvent')
                     }
+                    accessibilityHint={t('a11y.hints.toggleSave')}
                   >
                     <BlurView
                       intensity={20}
@@ -596,6 +606,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 onPress={() => Linking.openSettings()}
                 accessibilityRole="button"
                 accessibilityLabel={t('notifications.permissionNotice')}
+                accessibilityHint={t('a11y.hints.openSettings')}
               >
                 <IconSymbol name="bell.badge" size={IconSizes.md} color={themeColors.warning} />
                 <ThemedText style={[styles.notificationNoticeText, { color: themeColors.text }]}>
@@ -645,7 +656,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       type="categoryBadge"
                       style={{ color: categoryColors.color }}
                       accessibilityRole="text"
-                      accessibilityLabel={`Category: ${formatCategoryLabel(category)}`}
+                      aria-label={`Category: ${formatCategoryLabel(category)}`}
                     >
                       {formatCategoryLabel(category)}
                     </ThemedText>
@@ -655,7 +666,10 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             </View>
           )}
 
+          {!!seriesBadge && <View style={styles.seriesBadgeRow}>{seriesBadge}</View>}
+
           <TouchableOpacity
+            accessibilityRole="button"
             testID="event-calendar-card"
             onPress={createEventCalendar}
             style={[
@@ -696,6 +710,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           {(hasAddress || hasMap) && (
             <TouchableOpacity
+              accessibilityRole="button"
               testID="event-location-card"
               onPress={
                 hasMap
@@ -835,6 +850,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           {event.website_url && isValidUrl(event.website_url) && (
             <TouchableOpacity
+              accessibilityRole="button"
               onPress={() => safeOpenUrl(event.website_url!)}
               style={[
                 styles.websiteRow,
@@ -902,6 +918,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 )}
 
                 <TouchableOpacity
+                  accessibilityRole="button"
                   style={[styles.floatingDirections, { backgroundColor: themeColors.tint }]}
                   onPress={() => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)}
                   activeOpacity={0.85}
@@ -958,6 +975,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               style={styles.viewerCloseButton}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              accessibilityHint={t('a11y.hints.closeScreen')}
               hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
             >
               <IconSymbol name="xmark" size={IconSizes.lg} color="white" />
@@ -1036,6 +1054,7 @@ function OrganizerRow({
         activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={`${t('events.viewProfile')} ${name}`}
+        accessibilityHint={t('a11y.hints.openOrganizer')}
       >
         {rowContent}
       </TouchableOpacity>
@@ -1266,6 +1285,9 @@ const styles = StyleSheet.create({
     height: 24,
   },
 
+  seriesBadgeRow: {
+    marginBottom: Spacing.md,
+  },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

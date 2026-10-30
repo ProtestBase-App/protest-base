@@ -4,6 +4,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
 import { Spacing, BorderRadius, Typography } from '@/constants/DesignTokens';
+import { t } from '@/utils/i18n';
 
 interface OrganizerChipProps {
   /** Name of the organizer */
@@ -56,6 +57,7 @@ export const OrganizerChip: React.FC<OrganizerChipProps> = ({ name, avatarUrl, o
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`View ${name}'s profile`}
+        accessibilityHint={t('a11y.hints.openOrganizer')}
       >
         {content}
       </TouchableOpacity>

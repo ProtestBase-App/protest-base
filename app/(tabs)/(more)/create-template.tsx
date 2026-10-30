@@ -408,6 +408,7 @@ export default function CreateTemplateScreen() {
             style={styles.closeButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Close create template screen"
+            accessibilityHint={t('a11y.hints.closeScreen')}
             accessibilityRole="button"
           >
             <IconSymbol name="xmark" size={24} color="#687076" />
@@ -484,6 +485,7 @@ export default function CreateTemplateScreen() {
             />
 
             <TouchableOpacity
+              accessibilityRole="button"
               style={[styles.cancelButton, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
               onPress={handleBackPress}
               activeOpacity={0.7}

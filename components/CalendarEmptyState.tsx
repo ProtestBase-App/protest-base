@@ -70,6 +70,7 @@ export function CalendarEmptyState({
           onPress={() => onJumpToDate(nextDateKey)}
           accessibilityRole="button"
           accessibilityLabel={pillLabel}
+          accessibilityHint={t('a11y.hints.goToNextEvent')}
           style={({ pressed }) => [
             styles.pill,
             { backgroundColor: themeColors.categoryBadgeBg, opacity: pressed ? 0.7 : 1 },

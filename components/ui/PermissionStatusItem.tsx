@@ -15,6 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Typography, IconSizes } from '@/constants/DesignTokens';
 import { PermissionStatus } from '@/utils/permissionHelpers';
 import { getThemeColors } from '@/utils/themeColors';
+import { t } from '@/utils/i18n';
 
 interface PermissionStatusItemProps {
   /** Display name of the permission */
@@ -112,6 +113,7 @@ export function PermissionStatusItem({
           onPress={onOpenSettings}
           accessibilityRole="button"
           accessibilityLabel={openSettingsLabel}
+          accessibilityHint={t('a11y.hints.openSettings')}
         >
           <ThemedText style={styles.settingsButtonText}>{openSettingsLabel}</ThemedText>
           <IconSymbol name="arrow.up.forward" size={IconSizes.sm} color={themeColors.tint} />

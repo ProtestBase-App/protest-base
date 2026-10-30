@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { SeriesBadge, useShowsSeriesBadge } from '@/components/SeriesBadge';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
@@ -93,8 +94,13 @@ function CalendarEventRow({
     ? t('home.dayProgress', { index: dayIndex, total: totalDays })
     : formatEventStartLabel(event, userLanguage);
 
+  const inSeries = useShowsSeriesBadge(event);
   const hasBadges =
-    inProgress || event.help_needed === true || Boolean(displayedCategory) || isMultiDay;
+    inProgress ||
+    event.help_needed === true ||
+    Boolean(displayedCategory) ||
+    isMultiDay ||
+    inSeries;
 
   return (
     <Pressable
@@ -102,6 +108,7 @@ function CalendarEventRow({
       onPress={() => onPress(event.$id)}
       accessibilityRole="button"
       accessibilityLabel={event.title}
+      accessibilityHint={t('a11y.hints.openEvent')}
       style={({ pressed }) => [
         styles.row,
         {
@@ -182,6 +189,7 @@ function CalendarEventRow({
                 </ThemedText>
               </View>
             )}
+            <SeriesBadge event={event} testID={testID ? `${testID}-series` : undefined} />
           </View>
         )}
       </View>
@@ -196,6 +204,7 @@ function CalendarEventRow({
         style={styles.bookmarkButton}
         accessibilityRole="button"
         accessibilityLabel={isSaved ? 'Remove from saved' : 'Save event'}
+        accessibilityHint={t('a11y.hints.toggleSave')}
         accessibilityState={{ selected: isSaved }}
       >
         {/* Keyed remount fades the fill/color swap in per the handoff's 0.15s spec. */}

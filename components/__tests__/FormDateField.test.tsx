@@ -367,4 +367,350 @@ describe('FormDateField', () => {
       expect(screen.getByTestId('custom-date-input')).toBeTruthy();
     });
   });
+
+  // A date-only or time-only field, running in a named zone: the repeat form picks
+  // times and days of Brussels, wherever the device is.
+  describe('picker modes', () => {
+    const BRUSSELS = 'Europe/Brussels';
+    const originalOS = Platform.OS;
+
+    const androidOpen = () => {
+      const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
+      return DateTimePickerAndroid.open as jest.Mock;
+    };
+
+    /** Make the next picker the user opens answer with `answer`. */
+    const answerWith = (event: { type: string }, picked?: Date) => {
+      androidOpen().mockImplementation(({ onChange }: any) => onChange(event, picked));
+    };
+
+    afterEach(() => {
+      (Platform as any).OS = originalOS;
+    });
+
+    describe('on Android', () => {
+      beforeEach(() => {
+        (Platform as any).OS = 'android';
+        androidOpen().mockReset();
+      });
+
+      describe('time only', () => {
+        it('opens one picker, in time mode, in the given zone', () => {
+          render(<FormDateField {...defaultProps} pickerMode="time" timeZoneName={BRUSSELS} />);
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+          expect(androidOpen()).toHaveBeenCalledWith(
+            expect.objectContaining({ mode: 'time', timeZoneName: BRUSSELS })
+          );
+        });
+
+        it('shows 24 hours, like every other time of a rule', () => {
+          render(<FormDateField {...defaultProps} pickerMode="time" timeZoneName={BRUSSELS} />);
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledWith(expect.objectContaining({ is24Hour: true }));
+        });
+
+        it('opens on a value that arrived after the field mounted', () => {
+          const { rerender } = render(
+            <FormDateField {...defaultProps} value="" pickerMode="time" timeZoneName={BRUSSELS} />
+          );
+
+          rerender(
+            <FormDateField
+              {...defaultProps}
+              value="2026-11-10T18:00:00.000Z"
+              pickerMode="time"
+              timeZoneName={BRUSSELS}
+            />
+          );
+          fireEvent.press(screen.getByDisplayValue(/./));
+
+          const options = androidOpen().mock.calls[0][0];
+          expect(options.value.toISOString()).toBe('2026-11-10T18:00:00.000Z');
+        });
+
+        it('opens on the value the field has', () => {
+          render(
+            <FormDateField
+              {...defaultProps}
+              value="2026-11-03T18:00:00.000Z"
+              pickerMode="time"
+              timeZoneName={BRUSSELS}
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen().mock.calls[0][0].value.toISOString()).toBe(
+            '2026-11-03T18:00:00.000Z'
+          );
+        });
+
+        it('hands back the picked instant as it is, and does not recompose it from local getters', () => {
+          const handleChangeText = jest.fn();
+          // 18:07:42 UTC: the picker answered in Brussels, so only the instant is the answer.
+          answerWith({ type: 'set' }, new Date('2026-11-03T18:07:42.000Z'));
+          render(
+            <FormDateField
+              {...defaultProps}
+              value="2026-01-15T09:00:00.000Z"
+              pickerMode="time"
+              timeZoneName={BRUSSELS}
+              handleChangeText={handleChangeText}
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+          expect(handleChangeText).toHaveBeenCalledTimes(1);
+          // Neither the seconds nor the day of the current value are touched.
+          expect(handleChangeText).toHaveBeenCalledWith('2026-11-03T18:07:42.000Z');
+        });
+
+        it('says nothing when the picker is dismissed', () => {
+          const handleChangeText = jest.fn();
+          answerWith({ type: 'dismissed' }, undefined);
+          render(
+            <FormDateField
+              {...defaultProps}
+              pickerMode="time"
+              timeZoneName={BRUSSELS}
+              handleChangeText={handleChangeText}
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(handleChangeText).not.toHaveBeenCalled();
+        });
+
+        it('needs no minimum date', () => {
+          render(
+            <FormDateField
+              title="Start time"
+              value=""
+              placeholder="Select date"
+              handleChangeText={jest.fn()}
+              pickerMode="time"
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+        });
+      });
+
+      describe('date only', () => {
+        it('opens one picker, in date mode, in the given zone, with the minimum date', () => {
+          render(<FormDateField {...defaultProps} pickerMode="date" timeZoneName={BRUSSELS} />);
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+          expect(androidOpen()).toHaveBeenCalledWith(
+            expect.objectContaining({ mode: 'date', timeZoneName: BRUSSELS, minimumDate: minDate })
+          );
+        });
+
+        it('hands back the picked day at once, with no time picker after it', () => {
+          const handleChangeText = jest.fn();
+          answerWith({ type: 'set' }, new Date('2026-12-01T11:00:00.000Z'));
+          render(
+            <FormDateField
+              {...defaultProps}
+              pickerMode="date"
+              timeZoneName={BRUSSELS}
+              handleChangeText={handleChangeText}
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+          expect(handleChangeText).toHaveBeenCalledTimes(1);
+          expect(handleChangeText).toHaveBeenCalledWith('2026-12-01T11:00:00.000Z');
+        });
+
+        it('says nothing when the picker is dismissed', () => {
+          const handleChangeText = jest.fn();
+          answerWith({ type: 'dismissed' }, undefined);
+          render(
+            <FormDateField
+              {...defaultProps}
+              pickerMode="date"
+              handleChangeText={handleChangeText}
+            />
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(1);
+          expect(handleChangeText).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('date and time, the default', () => {
+        it('is unchanged: a date picker, then a time picker, in the device zone', () => {
+          const handleChangeText = jest.fn();
+          androidOpen()
+            .mockImplementationOnce(({ onChange }: any) =>
+              onChange({ type: 'set' }, new Date(2026, 10, 3, 0, 0))
+            )
+            .mockImplementationOnce(({ onChange }: any) =>
+              onChange({ type: 'set' }, new Date(2026, 10, 3, 19, 30, 45))
+            );
+          render(<FormDateField {...defaultProps} handleChangeText={handleChangeText} />);
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(2);
+          expect(androidOpen().mock.calls[0][0]).toMatchObject({
+            mode: 'date',
+            minimumDate: minDate,
+          });
+          expect(androidOpen().mock.calls[1][0]).toMatchObject({ mode: 'time' });
+          expect(androidOpen().mock.calls[0][0].timeZoneName).toBeUndefined();
+          expect(androidOpen().mock.calls[1][0].timeZoneName).toBeUndefined();
+          // The day from the first picker, the clock from the second, seconds dropped.
+          expect(handleChangeText).toHaveBeenCalledTimes(1);
+          expect(handleChangeText).toHaveBeenCalledWith(
+            new Date(2026, 10, 3, 19, 30).toISOString()
+          );
+        });
+
+        it('is what an explicit datetime mode does as well', () => {
+          render(<FormDateField {...defaultProps} pickerMode="datetime" />);
+          androidOpen().mockImplementationOnce(({ onChange }: any) =>
+            onChange({ type: 'set' }, new Date(2026, 10, 3, 0, 0))
+          );
+
+          fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+          expect(androidOpen()).toHaveBeenCalledTimes(2);
+        });
+      });
+    });
+
+    describe('on iOS', () => {
+      beforeEach(() => {
+        (Platform as any).OS = 'ios';
+        capturedOnChange = null;
+      });
+
+      const openPicker = () => {
+        fireEvent.press(screen.getByPlaceholderText('Select date'));
+        return screen.getByTestId('date-time-picker');
+      };
+
+      it('shows the date and time picker inline in the device zone by default', () => {
+        render(<FormDateField {...defaultProps} />);
+
+        const picker = openPicker();
+
+        expect(picker.props.mode).toBe('datetime');
+        expect(picker.props.display).toBe('inline');
+        expect(picker.props.timeZoneName).toBeUndefined();
+        expect(picker.props.minimumDate).toBe(minDate);
+      });
+
+      it('shows a spinner for a time-only picker, in the given zone', () => {
+        render(<FormDateField {...defaultProps} pickerMode="time" timeZoneName={BRUSSELS} />);
+
+        const picker = openPicker();
+
+        expect(picker.props.mode).toBe('time');
+        expect(picker.props.display).toBe('spinner');
+        expect(picker.props.timeZoneName).toBe(BRUSSELS);
+      });
+
+      it('shows a date-only picker inline, in the given zone', () => {
+        render(<FormDateField {...defaultProps} pickerMode="date" timeZoneName={BRUSSELS} />);
+
+        const picker = openPicker();
+
+        expect(picker.props.mode).toBe('date');
+        expect(picker.props.display).toBe('inline');
+        expect(picker.props.timeZoneName).toBe(BRUSSELS);
+      });
+
+      it('hands back what a time-only picker answers, seconds dropped', () => {
+        const handleChangeText = jest.fn();
+        render(
+          <FormDateField
+            {...defaultProps}
+            pickerMode="time"
+            timeZoneName={BRUSSELS}
+            handleChangeText={handleChangeText}
+          />
+        );
+        openPicker();
+
+        act(() => {
+          capturedOnChange({ type: 'set' }, new Date('2026-11-03T18:07:42.500Z'));
+        });
+
+        expect(handleChangeText).toHaveBeenCalledWith('2026-11-03T18:07:00.000Z');
+      });
+    });
+
+    describe('formatValue', () => {
+      it('writes the text of the field instead of the device-local date and time', () => {
+        const formatValue = jest.fn((value: string) => `at ${value}`);
+        render(
+          <FormDateField
+            {...defaultProps}
+            value="2026-11-03T18:00:00.000Z"
+            pickerMode="time"
+            formatValue={formatValue}
+          />
+        );
+
+        expect(screen.getByPlaceholderText('Select date').props.value).toBe(
+          'at 2026-11-03T18:00:00.000Z'
+        );
+        expect(formatValue).toHaveBeenCalledWith('2026-11-03T18:00:00.000Z');
+      });
+
+      it('is not asked about an empty or unreadable value, which show the placeholder', () => {
+        const formatValue = jest.fn(() => 'never');
+
+        const empty = render(
+          <FormDateField {...defaultProps} value="" formatValue={formatValue} />
+        );
+        expect(empty.getByPlaceholderText('Select date').props.value).toBe('');
+        empty.unmount();
+
+        render(<FormDateField {...defaultProps} value="not-a-date" formatValue={formatValue} />);
+        expect(screen.getByPlaceholderText('Select date').props.value).toBe('');
+        expect(formatValue).not.toHaveBeenCalled();
+      });
+
+      it('wins over the all-day wording', () => {
+        render(
+          <FormDateField
+            {...defaultProps}
+            value="2026-11-03T23:00:00.000Z"
+            allDayLabel="All day"
+            formatValue={() => 'Nov 4'}
+          />
+        );
+
+        expect(screen.getByPlaceholderText('Select date').props.value).toBe('Nov 4');
+      });
+
+      it('leaves the default text alone when there is none', () => {
+        render(<FormDateField {...defaultProps} value="2025-07-14T14:30:00.000Z" />);
+
+        expect(screen.getByPlaceholderText('Select date').props.value).toMatch(
+          /^\d{2}\/\d{2}\/\d{4} - \d{2}:\d{2}$/
+        );
+      });
+    });
+  });
 });

@@ -78,10 +78,11 @@ export function MaintenanceScreen({ message }: MaintenanceScreenProps): React.Re
         <View style={styles.container}>
           {/* Logo */}
           <Image
+            accessibilityIgnoresInvertColors
             source={logoSource}
             style={styles.logo}
             resizeMode="contain"
-            accessibilityLabel="ProtestBase"
+            aria-label="ProtestBase"
           />
 
           {/* Wrench icon with wobble animation */}
@@ -114,6 +115,7 @@ export function MaintenanceScreen({ message }: MaintenanceScreenProps): React.Re
                 key={link.name}
                 onPress={() => handleSocialPress(link.url)}
                 accessibilityLabel={link.name}
+                accessibilityHint={t('a11y.hints.openExternalLink')}
                 accessibilityRole="link"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >

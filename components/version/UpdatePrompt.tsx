@@ -61,7 +61,11 @@ export function UpdatePrompt({
               containerStyles={styles.updateButton}
               isLoading={false}
             />
-            <TouchableOpacity onPress={onDismiss} style={styles.laterButton}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={onDismiss}
+              style={styles.laterButton}
+            >
               <ThemedText style={styles.laterText}>
                 {t('version.updatePrompt.laterButton')}
               </ThemedText>

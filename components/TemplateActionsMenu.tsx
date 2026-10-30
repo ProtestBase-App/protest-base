@@ -38,6 +38,7 @@ function MenuRow({ icon, label, color, separatorColor, onPress }: MenuRowProps) 
       onPress={onPress}
       accessibilityRole="menuitem"
       accessibilityLabel={label}
+      accessibilityHint={t('a11y.hints.applyTemplateAction')}
       style={({ pressed }) => [
         styles.row,
         separatorColor
@@ -88,6 +89,7 @@ export default function TemplateActionsMenu({
         onPress={onClose}
         accessibilityRole="button"
         accessibilityLabel={t('common.cancel')}
+        accessibilityHint={t('a11y.hints.closeMenu')}
       />
       <View
         style={[

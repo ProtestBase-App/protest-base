@@ -34,7 +34,8 @@ export function FeatureCard({ title, description, icon, onPress }: FeatureCardPr
       ]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={description ? `${title}: ${description}` : title}
+      accessibilityLabel={title}
+      accessibilityHint={description}
     >
       <View style={[styles.featureCardIconContainer, { backgroundColor: iconContainerBg }]}>
         <IconSymbol name={icon} size={24} color={iconColor} />

@@ -1,4 +1,4 @@
-import { StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, type TextInputProps } from 'react-native';
 import { useState } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -7,8 +7,9 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
+import { t } from '@/utils/i18n';
 
-interface FormFieldProps {
+interface FormFieldProps extends TextInputProps {
   title: string | null;
   value: string;
   placeholder: string;
@@ -38,7 +39,6 @@ interface FormFieldProps {
   blurOnSubmit?: boolean;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
-  [key: string]: any;
 }
 
 export default function FormField({
@@ -103,6 +103,7 @@ export default function FormField({
             onPress={() => setShowPassword(!showPassword)}
             accessibilityRole="button"
             accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityHint={t('a11y.hints.togglePassword')}
           >
             <IconSymbol
               size={28}

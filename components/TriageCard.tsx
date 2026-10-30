@@ -218,6 +218,7 @@ export default function TriageCard({
                 onPress={() => onPickDate(option.isoDate)}
                 accessibilityRole="button"
                 accessibilityLabel={option.label}
+                accessibilityHint={t('a11y.hints.setDate')}
                 testID={`triage-reschedule-${option.isoDate}`}
                 style={({ pressed }) => [
                   styles.shortcutChip,
@@ -236,6 +237,7 @@ export default function TriageCard({
               onPress={onOpenDatePicker}
               accessibilityRole="button"
               accessibilityLabel={t('drafts.triagePickDate')}
+              accessibilityHint={t('a11y.hints.pickDate')}
               testID="triage-pick-date"
               style={({ pressed }) => [
                 styles.shortcutChip,
@@ -342,6 +344,7 @@ export default function TriageCard({
         onPress={onOpenEditor}
         accessibilityRole="button"
         accessibilityLabel={t('drafts.triageOpenEditor')}
+        accessibilityHint={t('a11y.hints.openEditor')}
         testID="triage-open-editor"
         style={[styles.footer, { borderTopColor: themeColors.cardBorder }]}
       >
@@ -371,7 +374,7 @@ function CheckChip({
       style={[styles.checkChip, { backgroundColor: background }]}
       // A ratio is a word-overlap measure, not a correctness percentage — it
       // belongs in assistive text only, matching the website.
-      accessibilityLabel={
+      aria-label={
         check.ratio !== undefined
           ? `${fieldLabel}: ${stateLabel} (${Math.round(check.ratio * 100)}%)`
           : `${fieldLabel}: ${stateLabel}`

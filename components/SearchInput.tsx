@@ -21,6 +21,8 @@ interface SearchInputProps {
   placeholder?: string;
   /** Accessibility label for the text field (defaults to the placeholder). */
   accessibilityLabel?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 const SearchInput = ({
@@ -30,6 +32,7 @@ const SearchInput = ({
   testID,
   placeholder,
   accessibilityLabel,
+  accessibilityHint,
 }: SearchInputProps) => {
   const [query, setQuery] = useState(
     typeof initialQuery === 'string' ? initialQuery : initialQuery?.join(' ') || ''
@@ -91,6 +94,7 @@ const SearchInput = ({
         value={query}
         placeholder={placeholder ?? t('explore.searchPlaceholder')}
         accessibilityLabel={accessibilityLabel ?? placeholder ?? t('explore.searchPlaceholder')}
+        accessibilityHint={accessibilityHint ?? t('a11y.hints.searchAsYouType')}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholderTextColor={themeColors.placeholder}
@@ -100,7 +104,7 @@ const SearchInput = ({
         returnKeyType="search"
       />
 
-      <TouchableOpacity onPress={handleSearch}>
+      <TouchableOpacity accessibilityRole="button" onPress={handleSearch}>
         <IconSymbol name="magnifyingglass" color={themeColors.secondaryText} />
       </TouchableOpacity>
     </ThemedView>

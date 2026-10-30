@@ -63,6 +63,7 @@ export default function CalendarActiveFilterChips({
             removable
             label={categoriesLabel}
             accessibilityLabel={`Remove ${categoriesLabel}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveCategories}
           />
         )}
@@ -74,6 +75,7 @@ export default function CalendarActiveFilterChips({
             removable
             label={resolveLocationLabel(token)}
             accessibilityLabel={`Remove ${resolveLocationLabel(token)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={() => onRemoveLocation(token)}
             leading={<IconSymbol name="mappin.and.ellipse" size={11} color={themeColors.tint} />}
           />
@@ -86,6 +88,7 @@ export default function CalendarActiveFilterChips({
             removable
             label={resolveOrganizationLabel(id)}
             accessibilityLabel={`Remove ${resolveOrganizationLabel(id)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={() => onRemoveOrganization(id)}
             leading={<IconSymbol name="person" size={11} color={themeColors.tint} />}
           />
@@ -97,6 +100,7 @@ export default function CalendarActiveFilterChips({
             removable
             label={t('home.savedChip')}
             accessibilityLabel={`Remove ${t('home.savedChip')}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveSavedOnly}
             leading={<IconSymbol name="bookmark.fill" size={11} color={themeColors.tint} />}
           />
@@ -108,6 +112,7 @@ export default function CalendarActiveFilterChips({
             removable
             label={t('createEvent.helpNeeded')}
             accessibilityLabel={`Remove ${t('createEvent.helpNeeded')}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveHelpNeeded}
             activeColor={themeColors.warning}
             activeBackground={themeColors.warningBg}

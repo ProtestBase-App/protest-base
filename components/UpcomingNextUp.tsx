@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 
+import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedText } from '@/components/ThemedText';
 import { ActionPill } from '@/components/ui/ActionPill';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -71,6 +72,7 @@ function NextUpCard({ event, width, userLanguage, themeColors }: NextUpCardProps
         onPress={() => router.push(DynamicRoutes.event(event.$id))}
         accessibilityRole="button"
         accessibilityLabel={event.title}
+        accessibilityHint={t('a11y.hints.openEvent')}
         style={({ pressed }) => [styles.cardContent, pressed && styles.pressed]}
       >
         <View
@@ -99,6 +101,7 @@ function NextUpCard({ event, width, userLanguage, themeColors }: NextUpCardProps
                 onPress={() => router.push(DynamicRoutes.eventEdit(event.$id))}
                 accessibilityRole="button"
                 accessibilityLabel={t('myEvents.addLocation')}
+                accessibilityHint={t('a11y.hints.addLocation')}
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
               >
                 <ThemedText style={[styles.addLocation, { color: themeColors.tint }]}>
@@ -107,6 +110,7 @@ function NextUpCard({ event, width, userLanguage, themeColors }: NextUpCardProps
               </Pressable>
             )}
           </View>
+          <SeriesBadge event={event} testID={`next-up-series-${event.$id}`} />
         </View>
       </Pressable>
 

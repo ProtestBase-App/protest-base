@@ -51,6 +51,16 @@ export const useUserOrganizations = (): UserOrganizationsContextType => {
   return context;
 };
 
+/**
+ * Whether the signed-in user belongs to this organization. False for a guest (the
+ * provider empties its list on logout) and, unlike useUserOrganizations, outside the
+ * provider, so anything that renders a card can ask without one around it.
+ */
+export const useIsOrganizationMember = (organizationId: string | null | undefined): boolean => {
+  const context = useContext(UserOrganizationsContext);
+  return !!organizationId && !!context?.userOrganizations.some((org) => org.$id === organizationId);
+};
+
 export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps> = ({
   children,
 }) => {

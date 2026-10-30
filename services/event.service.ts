@@ -15,6 +15,22 @@ import {
   PublishDraftResponse,
   PickedImage,
 } from '@/types/event.types';
+import type {
+  CreateEventReport,
+  CreateSeriesDraftRequest,
+  CreateSeriesRequest,
+  EventSeries,
+  EventSeriesSummary,
+  RecurrenceInput,
+  RecurrencePreview,
+  SeriesAddDatesRequest,
+  SeriesAddDatesResult,
+  SeriesCancelResult,
+  SeriesDeleteResult,
+  SeriesEditRequest,
+  SeriesEditResult,
+  SeriesPublishResult,
+} from '@/types/eventSeries.types';
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { MAX_EVENT_LOOKBACK_MS } from '@/constants/EventConfig';
 import { isEventOngoing } from '@/utils/eventStatus';
@@ -556,7 +572,7 @@ function normalizeArrayField(value: unknown): string[] | undefined {
  * Returns a fresh object — never mutates the caller's data.
  */
 function normalizeEventPayload<T extends Record<string, unknown>>(eventData: T): T {
-  return {
+  const normalized: Record<string, unknown> = {
     ...eventData,
     categories: normalizeArrayField(eventData.categories),
     co_organizers: normalizeArrayField(eventData.co_organizers),
@@ -564,7 +580,15 @@ function normalizeEventPayload<T extends Record<string, unknown>>(eventData: T):
       eventData.postal_code !== null && eventData.postal_code !== undefined
         ? String(eventData.postal_code)
         : undefined,
-  } as T;
+  };
+  // The server computes every date of a series and refuses a time sent next to a
+  // rule, so anything left over from the single-event fields goes here.
+  if (normalized.recurrence) {
+    delete normalized.start_time;
+    delete normalized.end_time;
+    delete normalized.all_day;
+  }
+  return normalized as T;
 }
 
 /** Narrow a mixed images-list entry to a picked file (vs a kept URL string). */
@@ -615,6 +639,10 @@ function buildEventFormData(
       if (Array.isArray(value)) {
         formData.append(key, JSON.stringify(value));
       }
+    } else if (key === 'recurrence') {
+      // One text field holding the rule as JSON. Dropped by the string branch below,
+      // the request would reach the server with neither a rule nor a start_time.
+      formData.append(key, JSON.stringify(value));
     } else if (key === 'postal_code') {
       formData.append(key, String(value));
     } else if (key === 'geocod_lat' || key === 'geocod_lng') {
@@ -715,6 +743,9 @@ function parseDuplicateSummary(raw: unknown): DuplicateSummary | null {
     reason,
     strength,
     ...(typeof entry.similarity === 'number' ? { similarity: entry.similarity } : {}),
+    ...(stringOrNull(entry.occurrence_start_time)
+      ? { occurrence_start_time: stringOrNull(entry.occurrence_start_time) }
+      : {}),
   };
 }
 
@@ -795,8 +826,107 @@ function duplicateEventErrorFrom(
 export interface CreateEventOptions {
   /** Acknowledge a previous 409 DUPLICATE_EVENT and create the event anyway. */
   duplicateOverride?: boolean;
-  /** Filled with the backend's non-blocking duplicate warnings, when any. */
-  report?: DuplicateWarningReport;
+  /** Filled with the backend's duplicate warnings, and with the series when one was made. */
+  report?: CreateEventReport;
+}
+
+// ---------------------------------------------------------------------------
+// Recurring series errors
+//
+// The backend's messages are English-only, so callers show localized copy keyed on
+// `code` (utils/recurrence.ts). `code` is read off the body, never inferred from the
+// status: a stale API prefix 404s every call, and that must not read as "this series
+// is gone". Nothing here is ever retried: a 4xx on a rule or a series action is the
+// organizer's to fix.
+// ---------------------------------------------------------------------------
+
+/** The backend's codes for a refused rule or series action. */
+const SERIES_ERROR_CODES = new Set([
+  'RECURRENCE_DISABLED',
+  'RECURRENCE_INVALID',
+  'RECURRENCE_UNTIL_BEFORE_START',
+  'RECURRENCE_TOO_FEW_OCCURRENCES',
+  'RECURRENCE_TOO_MANY_OCCURRENCES',
+  'VALIDATION_ERROR',
+  // Only reachable on a series when `recurrence` was lost on the way.
+  'MISSING_START_TIME',
+  'SERIES_NOT_FOUND',
+  'SERIES_NOTHING_UPCOMING',
+  'SERIES_SCHEDULE_IMMUTABLE',
+  'SERIES_ENDED',
+  'INVALID_FROM_EVENT',
+  'CANCELLATION_REASON_TOO_LONG',
+  'NOT_ORGANIZATION_MEMBER',
+  'CONFLICT',
+]);
+
+/**
+ * A rule or a series action the backend refused, or (`SERIES_NOT_CONFIRMED`, the one
+ * code that is ours) a recurring create it answered without a series.
+ */
+export class EventSeriesError extends Error {
+  code: string;
+  /** The cap for this rule, on RECURRENCE_TOO_MANY_OCCURRENCES. */
+  max?: number;
+  /** `YYYY-MM-DD`, the last possible date, on RECURRENCE_TOO_MANY_OCCURRENCES. */
+  windowEnd?: string;
+  constructor(code: string, message: string, cap?: { max?: number; windowEnd?: string }) {
+    super(message);
+    this.name = 'EventSeriesError';
+    this.code = code;
+    this.max = cap?.max;
+    this.windowEnd = cap?.windowEnd;
+  }
+}
+
+/** The typed error for an error body, or null when the code is not a series one. */
+function seriesErrorFrom(data: unknown): EventSeriesError | null {
+  const body = data as
+    { code?: unknown; error?: unknown; max?: unknown; window_end?: unknown } | undefined;
+  if (typeof body?.code !== 'string' || !SERIES_ERROR_CODES.has(body.code)) return null;
+  return new EventSeriesError(body.code, typeof body.error === 'string' ? body.error : body.code, {
+    max: typeof body.max === 'number' ? body.max : undefined,
+    windowEnd: typeof body.window_end === 'string' ? body.window_end : undefined,
+  });
+}
+
+/** Field names out of an EVENT_INCOMPLETE body, whose `fields` entries are objects. */
+function incompleteFieldsFrom(data: { fields?: unknown } | undefined): string[] {
+  if (!Array.isArray(data?.fields)) return [];
+  return data.fields
+    .map((entry) => (typeof entry === 'string' ? entry : (entry as { field?: unknown })?.field))
+    .filter((field): field is string => typeof field === 'string');
+}
+
+/**
+ * The shared catch of every series call. The api.ts interceptor rewrites a 429 into
+ * an error with NO `.response`, so that check MUST come first; a 409 means different
+ * things by code, so nothing below keys on the status alone until the codes are done.
+ */
+function rethrowSeriesError(error: any, fallbackMessage: string): never {
+  if (error?.isRateLimited || error?.code === 'RATE_LIMIT_EXCEEDED') {
+    throw error;
+  }
+  if (error instanceof EventSeriesError) {
+    throw error;
+  }
+  if (isDuplicateEventResponse(error)) {
+    throw duplicateEventErrorFrom(error.response.data, 'This event already exists');
+  }
+  if (error.response?.status === 422 && error.response?.data?.code === 'EVENT_INCOMPLETE') {
+    throw new EventIncompleteError(incompleteFieldsFrom(error.response.data));
+  }
+  const seriesError = seriesErrorFrom(error.response?.data);
+  if (seriesError) {
+    throw seriesError;
+  }
+  if (error.response?.status === 401) {
+    throw new Error('Please log in to perform this action');
+  }
+  if (error.response?.status === 403) {
+    throw new Error('You do not have permission to perform this action');
+  }
+  throw new Error(error.response?.data?.error || error.message || fallbackMessage);
 }
 
 /**
@@ -810,15 +940,20 @@ export interface CreateEventOptions {
  * ordered multipart parts; all-URL lists go as plain JSON. Falls back to the
  * legacy single image field when `images` is absent.
  *
+ * With `recurrence` this creates a whole series: `data` is then the first date, and
+ * the series lands in `options.report`.
+ *
  * @param eventData - Event data object
  * @param options - Duplicate-guard override and warnings out-parameter
  * @returns The created event object from the backend
  * @throws DuplicateEventError on 409 DUPLICATE_EVENT (backend in block mode)
+ * @throws EventSeriesError on a refused rule, or a recurring create with no series back
  */
 export async function createEventBackend(
-  eventData: CreateEventRequest,
+  eventData: CreateEventRequest | CreateSeriesRequest,
   options?: CreateEventOptions
 ): Promise<Event> {
+  const isRecurring = 'recurrence' in eventData && !!eventData.recurrence;
   try {
     logger.debug('[EventService] createEventBackend called', {
       title: eventData.title,
@@ -863,6 +998,7 @@ export async function createEventBackend(
     const response = await api.post<{
       success: boolean;
       data: Event;
+      series?: EventSeriesSummary;
       message: string;
     }>('/events', payload, {
       headers,
@@ -875,8 +1011,19 @@ export async function createEventBackend(
 
     collectDuplicateWarnings(response.data, options?.report, options?.duplicateOverride);
 
+    if (isRecurring) {
+      // A recurring submit must never pass for a single event.
+      if (!response.data.series) {
+        throw new EventSeriesError('SERIES_NOT_CONFIRMED', 'The server did not confirm the series');
+      }
+      if (options?.report) options.report.series = response.data.series;
+    }
+
     return response.data.data;
   } catch (error: any) {
+    if (isRecurring) {
+      rethrowSeriesError(error, 'Failed to create the series');
+    }
     // The api.ts interceptor rewrites a 429 into a RateLimitError carrying NO
     // `.response`, so this MUST come before any error.response read or the flags
     // are flattened away (see the auth error-swallow contract, and publishDraft).
@@ -1144,7 +1291,7 @@ async function getDraftsTotalForOrganizations(organizationIds: string[]): Promis
  * @returns The created draft event
  */
 export async function createDraftEvent(
-  eventData: CreateDraftRequest,
+  eventData: CreateDraftRequest | CreateSeriesDraftRequest,
   options?: CreateEventOptions
 ): Promise<Event> {
   // The runtime body-builder tolerates the missing required fields; only the
@@ -1426,7 +1573,7 @@ export async function publishDraft(
       throw error;
     }
     if (error.response?.status === 422 && error.response?.data?.code === 'EVENT_INCOMPLETE') {
-      throw new EventIncompleteError(error.response.data.fields ?? []);
+      throw new EventIncompleteError(incompleteFieldsFrom(error.response.data));
     }
     // Two very different 409s share this status. DUPLICATE_EVENT means nothing
     // was published; every other 409 (EVENT_NOT_DRAFT, or a 409 with no code at
@@ -1448,5 +1595,240 @@ export async function publishDraft(
       throw new Error('Event not found');
     }
     throw new Error(error.response?.data?.error || error.message || 'Failed to publish draft');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recurring series
+//
+// A series is N ordinary events plus one rule: "only this event" stays on the
+// /events/:id endpoints above, and the calls below act on a whole scope. A scope is
+// every upcoming date, or with `fromEventId` that date and every later one. Past dates
+// are never touched. Only current members of the series' organization can act.
+// ---------------------------------------------------------------------------
+
+/**
+ * Expand a rule into its dates. This is the only place the app gets series dates
+ * from: DST, month lengths and the 3-month cap live on the server. With neither
+ * `until` nor `count` it returns every date up to the cap.
+ *
+ * @throws EventSeriesError on a rule the backend refuses
+ */
+export async function previewRecurrence(recurrence: RecurrenceInput): Promise<RecurrencePreview> {
+  try {
+    const response = await api.post<{ success: boolean; data: RecurrencePreview }>(
+      '/events/recurrence/preview',
+      { recurrence },
+      // A refused rule is an answer the form shows inline, not an error to log.
+      { validateStatus: (status) => status === 200 || status === 400 }
+    );
+
+    if (response.status === 400) {
+      throw seriesErrorFrom(response.data) ?? new Error('Failed to preview the series');
+    }
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to preview the series');
+    }
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to preview the series');
+  }
+}
+
+/**
+ * Read a series. Public: what comes back depends on who asks, members also get the
+ * drafts, and anyone else gets SERIES_NOT_FOUND for a series with nothing published.
+ *
+ * @throws EventSeriesError with SERIES_NOT_FOUND when there is nothing to show
+ */
+export async function getSeries(seriesId: string): Promise<EventSeries> {
+  try {
+    const response = await api.get<{ success: boolean; data: EventSeries }>(
+      `/events/series/${seriesId}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to load the series');
+    }
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to load the series');
+  }
+}
+
+/** The `?from_event_id` of a "this and all following" call; none means every upcoming date. */
+function seriesScopeParams(fromEventId?: string): { from_event_id: string } | undefined {
+  return fromEventId ? { from_event_id: fromEventId } : undefined;
+}
+
+/**
+ * Edit a scope of a series. Every field sent overwrites every active or draft date in
+ * scope, individually edited ones included; fields not sent stay as they are. Times
+ * are recomputed per date from its own day. The schedule itself cannot be edited.
+ *
+ * `images` works as on updateEvent: new files go as multipart, the rest as JSON.
+ *
+ * @throws EventSeriesError on a refused edit
+ */
+export async function editSeries(
+  seriesId: string,
+  eventData: SeriesEditRequest,
+  options?: { fromEventId?: string }
+): Promise<SeriesEditResult> {
+  try {
+    logger.debug('[EventService] editSeries called', {
+      seriesId,
+      fromEventId: options?.fromEventId,
+    });
+    const normalized = normalizeEventPayload(eventData as unknown as Record<string, unknown>);
+    const imagesHasNewFile =
+      Array.isArray(eventData.images) && eventData.images.some(isPickedImage);
+    const imageIsFile = isPickedImage(eventData.image);
+
+    let payload: FormData | Record<string, unknown>;
+    let headers: Record<string, string> = {};
+
+    if (imagesHasNewFile || (eventData.images === undefined && imageIsFile)) {
+      // The builder skips nulls, and on multipart the clear is the empty string.
+      const fields = { ...normalized, ...(normalized.end_local === null && { end_local: '' }) };
+      ({ payload, headers } = imagesHasNewFile
+        ? buildEventFormData(fields, null, eventData.images!)
+        : buildEventFormData(fields, eventData.image as PickedImage));
+    } else {
+      payload = normalized;
+      if (eventData.images !== undefined) {
+        delete (payload as Record<string, unknown>).image;
+      }
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await api.put<{ success: boolean; data: SeriesEditResult }>(
+      `/events/series/${seriesId}`,
+      payload,
+      { headers, params: seriesScopeParams(options?.fromEventId), timeout: 60000 }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to update the series');
+    }
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to update the series');
+  }
+}
+
+/**
+ * Cancel a scope of a series: active dates are cancelled, drafts in scope are deleted
+ * (a draft cannot be cancelled). `result.series` is null when nothing was left.
+ *
+ * @throws EventSeriesError on a refused cancel
+ */
+export async function cancelSeries(
+  seriesId: string,
+  options?: { fromEventId?: string }
+): Promise<SeriesCancelResult> {
+  try {
+    const response = await api.post<{ success: boolean; data: SeriesCancelResult }>(
+      `/events/series/${seriesId}/cancel`,
+      {},
+      { params: seriesScopeParams(options?.fromEventId) }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to cancel the series');
+    }
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to cancel the series');
+  }
+}
+
+/**
+ * Delete a scope of a series, WHATEVER the status of each date: published ones too.
+ * The app only deletes drafts, so callers check the scope first (`isDraftsOnlyScope`).
+ * `result.series` is null when nothing was left.
+ *
+ * @throws EventSeriesError on a refused delete
+ */
+export async function deleteSeriesOccurrences(
+  seriesId: string,
+  options?: { fromEventId?: string }
+): Promise<SeriesDeleteResult> {
+  try {
+    const response = await api.delete<{ success: boolean; data: SeriesDeleteResult }>(
+      `/events/series/${seriesId}`,
+      { params: seriesScopeParams(options?.fromEventId) }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to delete the dates');
+    }
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to delete the dates');
+  }
+}
+
+/**
+ * Publish every upcoming draft of a series. Past drafts stay drafts, and one draft on
+ * its own goes through publishDraft.
+ *
+ * @throws EventIncompleteError on 422, with the fields missing across all the drafts
+ * @throws DuplicateEventError on 409 DUPLICATE_EVENT, listing the clashing dates
+ * @throws EventSeriesError on a refused publish
+ */
+export async function publishSeries(
+  seriesId: string,
+  options?: { duplicateOverride?: boolean; report?: DuplicateWarningReport }
+): Promise<SeriesPublishResult> {
+  try {
+    // `{}` and never an empty body, as in publishDraft.
+    const body = options?.duplicateOverride ? { duplicate_override: true } : {};
+    const response = await api.post<{ success: boolean; data: SeriesPublishResult }>(
+      `/events/series/${seriesId}/publish`,
+      body,
+      { timeout: 60000 }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to publish the series');
+    }
+
+    collectDuplicateWarnings(response.data, options?.report, options?.duplicateOverride);
+
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to publish the series');
+  }
+}
+
+/**
+ * Add the next rule dates, inside the series' 3-month window. Content and status are
+ * copied from the latest active or draft date.
+ *
+ * @throws DuplicateEventError on 409 DUPLICATE_EVENT, listing the clashing dates
+ * @throws EventSeriesError on a refused add, RECURRENCE_TOO_MANY_OCCURRENCES past the window
+ */
+export async function addSeriesDates(
+  seriesId: string,
+  dates: SeriesAddDatesRequest,
+  options?: { duplicateOverride?: boolean; report?: DuplicateWarningReport }
+): Promise<SeriesAddDatesResult> {
+  try {
+    const body = options?.duplicateOverride ? { ...dates, duplicate_override: true } : dates;
+    const response = await api.post<{ success: boolean; data: SeriesAddDatesResult }>(
+      `/events/series/${seriesId}/dates`,
+      body
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error('Failed to add dates');
+    }
+
+    collectDuplicateWarnings(response.data, options?.report, options?.duplicateOverride);
+
+    return response.data.data;
+  } catch (error: any) {
+    rethrowSeriesError(error, 'Failed to add dates');
   }
 }

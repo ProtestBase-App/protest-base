@@ -34,6 +34,7 @@ export function BrandHeader({ title, subtitle, onCreatePress, onBackPress }: Bra
         onPress={onBackPress ?? (() => router.back())}
         accessibilityRole="button"
         accessibilityLabel={t('common.goBack')}
+        accessibilityHint={t('a11y.hints.goBack')}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={({ pressed }) => [
           styles.backButton,
@@ -66,6 +67,7 @@ export function BrandHeader({ title, subtitle, onCreatePress, onBackPress }: Bra
           onPress={onCreatePress}
           accessibilityRole="button"
           accessibilityLabel={t('more.createNewEvent')}
+          accessibilityHint={t('a11y.hints.createEvent')}
           style={({ pressed }) => [
             styles.createButton,
             { backgroundColor: themeColors.tint, shadowColor: themeColors.tint },

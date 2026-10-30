@@ -15,6 +15,8 @@ import {
   patchEvent,
   publishDraft,
   deleteEvent,
+  deleteSeriesOccurrences,
+  editSeries,
   EventIncompleteError,
   EventNotDraftError,
 } from '@/services/event.service';
@@ -22,12 +24,16 @@ import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
+import { useEventSeries } from '@/hooks/useEventSeries';
 import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
+import SeriesScopeDialog from '@/components/SeriesScopeDialog';
 import type { FormState } from '@/types/eventForm.types';
 import type { DuplicateWarningReport, UpdateEventRequest } from '@/types/event.types';
+import type { SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
@@ -38,6 +44,8 @@ import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
+import { HelperText } from '@/utils/formHelpers';
+import { isDraftsOnlyScope, seriesErrorMessage, seriesTimesFromForm } from '@/utils/recurrence';
 
 // Matches common URL patterns, with or without protocol/www.
 const URL_REGEX =
@@ -50,11 +58,18 @@ export default function DraftEdit() {
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const { id, allUpcoming } = useLocalSearchParams<{
+    id: string | string[];
+    allUpcoming?: string;
+  }>();
   const eventId = Array.isArray(id) ? id[0] : id;
+  const recurringEnabled = useRecurringEventsEnabled();
 
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState(false);
+  const [draftSeriesId, setDraftSeriesId] = useState<string | null>(null);
+  const [saveScopeOpen, setSaveScopeOpen] = useState(false);
+  const [deleteScopeOpen, setDeleteScopeOpen] = useState(false);
   // 409 DUPLICATE_EVENT. The edits are already saved by the time publish runs,
   // so the retry re-sends only the publish — never the patch again.
   const duplicatePrompt = useDuplicatePrompt({ isOffline });
@@ -108,6 +123,7 @@ export default function DraftEdit() {
         setLoading(true);
         const event = await getDraftEventPreview(eventId);
         wasAllDayRef.current = event.all_day === true;
+        setDraftSeriesId(event.series_id ?? null);
         setForm((prev) => {
           const next: FormState = {
             ...prev,
@@ -151,6 +167,12 @@ export default function DraftEdit() {
 
     loadDraft();
   }, [eventId]);
+
+  // One date of a series, while the feature is on. "Edit all upcoming" opens the form
+  // on the first date in scope, and then there is no choice left to offer.
+  const seriesId = recurringEnabled ? draftSeriesId : null;
+  const editsAllUpcoming = !!seriesId && allUpcoming === 'true';
+  const { series } = useEventSeries(seriesId);
 
   const isDirty = useCallback(
     () =>
@@ -234,6 +256,16 @@ export default function DraftEdit() {
   const handleSave = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
     if (!validateLight()) return;
+    if (editsAllUpcoming) {
+      await saveSeries();
+    } else if (seriesId) {
+      setSaveScopeOpen(true);
+    } else {
+      await saveDraft();
+    }
+  };
+
+  const saveDraft = async () => {
     setActionBusy(true);
     try {
       await patchEvent(eventId, buildDraftPatch());
@@ -243,6 +275,51 @@ export default function DraftEdit() {
       Alert.alert(t('common.error'), (error as Error).message);
     } finally {
       setActionBusy(false);
+    }
+  };
+
+  // Null when the form asks for a schedule change, which a series cannot take.
+  const seriesTimes =
+    seriesId && initialFormRef.current
+      ? seriesTimesFromForm(form, initialFormRef.current.start_time)
+      : null;
+
+  /** Save this draft and every later date, or with `allUpcoming` every upcoming date. */
+  const saveSeries = async () => {
+    if (!seriesId) return;
+    if (!seriesTimes) {
+      Alert.alert(t('common.error'), t('series.edit.dateLocked'));
+      return;
+    }
+    setActionBusy(true);
+    try {
+      // The schedule fields of the patch cannot be sent to a series.
+      const {
+        start_time: _start,
+        end_time: _end,
+        all_day: _allDay,
+        ...content
+      } = buildDraftPatch();
+      const result = await editSeries(
+        seriesId,
+        { ...content, ...(wasAllDayRef.current ? {} : seriesTimes) },
+        editsAllUpcoming ? undefined : { fromEventId: eventId }
+      );
+      Alert.alert(t('common.success'), t('series.messages.updated', { count: result.updated }));
+      router.back();
+    } catch (error) {
+      Alert.alert(t('common.error'), seriesErrorMessage(error, userLanguage));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleSaveScopeConfirm = (scope: SeriesScope) => {
+    setSaveScopeOpen(false);
+    if (scope === 'following') {
+      saveSeries();
+    } else {
+      saveDraft();
     }
   };
 
@@ -351,32 +428,48 @@ export default function DraftEdit() {
 
   const handleDelete = () => {
     if (!assertOnlineOrAlert(isOffline)) return;
+    if (seriesId) {
+      setDeleteScopeOpen(true);
+      return;
+    }
     Alert.alert(t('drafts.deleteConfirmTitle'), t('drafts.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('drafts.delete'),
         style: 'destructive',
-        onPress: async () => {
-          setActionBusy(true);
-          try {
-            await deleteEvent(eventId);
-            // Keep the draft badge count in sync after removing a draft.
-            const orgIds = userOrganizations.map((org) => org.$id);
-            refreshUserEventCounts(orgIds).catch((refreshErr) =>
-              logger.warn('Event counts refresh failed after draft delete', {
-                error: refreshErr instanceof Error ? refreshErr.message : String(refreshErr),
-              })
-            );
-            router.replace(Routes.DRAFT_EVENTS);
-            Alert.alert(t('common.success'), t('drafts.deleted'));
-          } catch (error) {
-            Alert.alert(t('common.error'), (error as Error).message);
-          } finally {
-            setActionBusy(false);
-          }
-        },
+        onPress: () => runDelete('only'),
       },
     ]);
+  };
+
+  const runDelete = async (scope: SeriesScope) => {
+    setDeleteScopeOpen(false);
+    setActionBusy(true);
+    try {
+      let message = t('drafts.deleted');
+      if (scope === 'following' && seriesId) {
+        const result = await deleteSeriesOccurrences(seriesId, { fromEventId: eventId });
+        message = t('series.messages.deleted', { count: result.deleted });
+      } else {
+        await deleteEvent(eventId);
+      }
+      // Keep the draft badge count in sync after removing a draft.
+      const orgIds = userOrganizations.map((org) => org.$id);
+      refreshUserEventCounts(orgIds).catch((refreshErr) =>
+        logger.warn('Event counts refresh failed after draft delete', {
+          error: refreshErr instanceof Error ? refreshErr.message : String(refreshErr),
+        })
+      );
+      router.replace(Routes.DRAFT_EVENTS);
+      Alert.alert(t('common.success'), message);
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        scope === 'following' ? seriesErrorMessage(error, userLanguage) : (error as Error).message
+      );
+    } finally {
+      setActionBusy(false);
+    }
   };
 
   if (!user && !isLogged) {
@@ -412,13 +505,16 @@ export default function DraftEdit() {
               isLoading={actionBusy}
             />
 
-            <CustomButton
-              testID="btn-draft-publish"
-              title={t('drafts.publish')}
-              handlePress={handlePublish}
-              containerStyles={styles.buttonPrimary}
-              isLoading={actionBusy}
-            />
+            {/* Publish acts on this one draft; "Publish all" is on the series screen. */}
+            {!editsAllUpcoming && (
+              <CustomButton
+                testID="btn-draft-publish"
+                title={t('drafts.publish')}
+                handlePress={handlePublish}
+                containerStyles={styles.buttonPrimary}
+                isLoading={actionBusy}
+              />
+            )}
           </ThemedView>
         }
       >
@@ -428,21 +524,25 @@ export default function DraftEdit() {
               {t('drafts.editTitle')}
             </ThemedText>
             <View style={styles.headerActions}>
-              <TouchableOpacity
-                onPress={handleDelete}
-                style={styles.headerButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel={t('drafts.delete')}
-                accessibilityRole="button"
-                testID="btn-draft-delete"
-              >
-                <IconSymbol name="trash" size={24} color={themeColors.destructive} />
-              </TouchableOpacity>
+              {!editsAllUpcoming && (
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  style={styles.headerButton}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityLabel={t('drafts.delete')}
+                  accessibilityHint={t('a11y.hints.deleteDraft')}
+                  accessibilityRole="button"
+                  testID="btn-draft-delete"
+                >
+                  <IconSymbol name="trash" size={24} color={themeColors.destructive} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={handleClosePress}
                 style={styles.headerButton}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel={t('common.close')}
+                accessibilityHint={t('a11y.hints.closeScreen')}
                 accessibilityRole="button"
                 testID="btn-draft-close"
               >
@@ -450,6 +550,17 @@ export default function DraftEdit() {
               </TouchableOpacity>
             </View>
           </ThemedView>
+
+          {!!seriesId && (
+            <HelperText
+              text={
+                editsAllUpcoming
+                  ? t('series.edit.allNote')
+                  : `${t('series.edit.partOfSeries')} ${t('series.edit.onlyNote')}`
+              }
+              isDark={colorScheme === 'dark'}
+            />
+          )}
 
           <EventForm
             form={form}
@@ -461,6 +572,34 @@ export default function DraftEdit() {
           />
         </ThemedView>
       </FormScreenScaffold>
+      <SeriesScopeDialog
+        visible={saveScopeOpen}
+        title={t('series.edit.scopeTitle')}
+        onlyHint={t('series.edit.onlyNote')}
+        followingHint={t('series.edit.followingNote')}
+        followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
+        dismissLabel={t('common.cancel')}
+        onDismiss={() => setSaveScopeOpen(false)}
+        confirmLabel={t('drafts.save')}
+        onConfirm={handleSaveScopeConfirm}
+        testID="series-edit-scope"
+      />
+      <SeriesScopeDialog
+        visible={deleteScopeOpen}
+        title={t('series.dialogs.deleteScopeTitle')}
+        message={t('series.dialogs.deleteScopeBody')}
+        followingDisabledReason={
+          series && isDraftsOnlyScope(series, eventId)
+            ? undefined
+            : t('series.dialogs.deleteFollowingLocked')
+        }
+        dismissLabel={t('common.cancel')}
+        onDismiss={() => setDeleteScopeOpen(false)}
+        confirmLabel={t('drafts.delete')}
+        onConfirm={runDelete}
+        destructive
+        testID="series-delete-scope"
+      />
       <DuplicateEventModal
         mode="publish"
         locale={userLanguage}

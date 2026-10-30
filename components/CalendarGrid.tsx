@@ -174,6 +174,7 @@ export default function CalendarGrid({
                   accessibilityLabel={`${day.date.toDateString()}${
                     hasEvents ? ', has events' : ''
                   }`}
+                  accessibilityHint={t('a11y.hints.selectDay')}
                 >
                   <View
                     style={[

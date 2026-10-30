@@ -4,6 +4,7 @@
 // Run: npx eslint "app/**/*.{ts,tsx}" "components/**/*.{ts,tsx}" --config eslint.a11y.config.js
 const { defineConfig } = require('eslint/config');
 const reactNativeA11y = require('eslint-plugin-react-native-a11y');
+const reactHooks = require('eslint-plugin-react-hooks');
 const tsParser = require('@typescript-eslint/parser');
 
 module.exports = defineConfig([
@@ -16,8 +17,11 @@ module.exports = defineConfig([
         ecmaFeatures: { jsx: true },
       },
     },
-    plugins: { 'react-native-a11y': reactNativeA11y },
-    // "all" = basic + iOS + Android rule sets (14 rules).
-    rules: reactNativeA11y.configs.all.rules,
+    // A single-plugin sweep sees every other rule's disable comment as unused.
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
+    plugins: { 'react-native-a11y': reactNativeA11y, 'react-hooks': reactHooks },
+    // "all" = basic + iOS + Android rule sets (14 rules). react-hooks is registered only
+    // so that eslint-disable comments naming its rules resolve; this sweep does not run it.
+    rules: { ...reactNativeA11y.configs.all.rules, 'react-hooks/exhaustive-deps': 'off' },
   },
 ]);

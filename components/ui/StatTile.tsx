@@ -17,6 +17,8 @@ export interface StatTileProps {
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 export function StatTile({
@@ -28,6 +30,7 @@ export function StatTile({
   onPress,
   style,
   testID,
+  accessibilityHint,
 }: StatTileProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -38,6 +41,7 @@ export function StatTile({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${count}`}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.tile,
         {

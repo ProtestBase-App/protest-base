@@ -18,6 +18,8 @@ export interface DashedEmptyStateProps {
   /** Optional underlined accent link below the CTA. */
   linkLabel?: string;
   onLinkPress?: () => void;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function DashedEmptyState({
   onCtaPress,
   linkLabel,
   onLinkPress,
+  accessibilityHint,
 }: DashedEmptyStateProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -57,6 +60,7 @@ export function DashedEmptyState({
             onPress={onLinkPress}
             accessibilityRole="link"
             accessibilityLabel={linkLabel}
+            accessibilityHint={accessibilityHint}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <ThemedText style={[styles.link, { color: themeColors.tint }]}>{linkLabel}</ThemedText>

@@ -68,6 +68,7 @@ function OverlayChip({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
+      accessibilityHint={t('a11y.hints.applyMapFilter')}
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor, borderColor, opacity: pressed ? 0.7 : 1 },

@@ -16,6 +16,8 @@ interface SettingsButtonProps {
   style?: StyleProp<ViewStyle>;
   badge?: number | string;
   badgeColor?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 const SettingsButton: React.FC<SettingsButtonProps> = ({
@@ -26,6 +28,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
   style,
   badge,
   badgeColor,
+  accessibilityHint,
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -71,6 +74,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({
       disabled={!navigationTarget && !onPressCallback}
       style={style}
       accessibilityLabel={badge !== undefined ? `${text}, ${badge} items` : text}
+      accessibilityHint={accessibilityHint}
     >
       <ThemedView
         style={[styles.container, { backgroundColor: themeColors.buttonSecondaryBackground }]}

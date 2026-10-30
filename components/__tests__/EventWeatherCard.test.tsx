@@ -236,11 +236,11 @@ describe('EventWeatherCard', () => {
     render(<EventWeatherCard weather={forecast()} userLanguage="en" />);
 
     const summary = screen.getByRole('summary');
-    expect(summary.props.accessibilityLabel).toMatch(
+    expect(summary.props['aria-label']).toMatch(
       /^weather\.title\. weather\.mayChange\. weather\.conditions\.rain, /
     );
     expect(screen.getByRole('link').props.accessibilityLabel).toBe('weather.attributionLinkA11y');
-    expect(screen.getByTestId('weather-tip-wind_rain').props.accessibilityLabel).toBe(
+    expect(screen.getByTestId('weather-tip-wind_rain').props['aria-label']).toBe(
       'weather.tips.wind_rain'
     );
   });

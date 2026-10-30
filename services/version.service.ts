@@ -17,7 +17,7 @@ import { openStoreUrlSafely } from '@/utils/urlSafety';
 import semverValid from 'semver/functions/valid';
 import semverLt from 'semver/functions/lt';
 import api, { setApiPrefix } from './api';
-import { AppConfigResponse, VersionCheckResult } from '@/types/appConfig.types';
+import { AppConfigResponse, AppFeatures, VersionCheckResult } from '@/types/appConfig.types';
 import { getInstalledAppVersion } from '@/utils/appVersion';
 
 /** Default fail-open result — lets the user proceed when the API fails. */
@@ -30,6 +30,7 @@ const FAIL_OPEN_RESULT: VersionCheckResult = {
   maintenanceMessage: null,
   updateMessage: null,
   updateUrl: '',
+  features: { recurringEvents: false },
 };
 
 /**
@@ -52,6 +53,9 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     // Capture the dynamic API prefix so subsequent requests route correctly.
     // Empty-string default keeps an old-backend / new-app combo working.
     await setApiPrefix(data.apiPrefix ?? '');
+
+    // Strictly true: a backend without `features`, or with anything else there, is off.
+    const features: AppFeatures = { recurringEvents: data.features?.recurringEvents === true };
 
     const installedVersion = getInstalledAppVersion() ?? '0.0.0';
     const platform = Platform.OS;
@@ -87,6 +91,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
         maintenanceMessage: data.maintenanceMessage,
         updateMessage: null,
         updateUrl: '',
+        features,
       };
     }
 
@@ -106,6 +111,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
           maintenanceMessage: null,
           updateMessage: data.updateMessage,
           updateUrl: updateUrl,
+          features,
         };
       } else {
         logger.info(
@@ -120,6 +126,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
           maintenanceMessage: null,
           updateMessage: data.updateMessage,
           updateUrl: updateUrl,
+          features,
         };
       }
     }
@@ -142,6 +149,7 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
       maintenanceMessage: null,
       updateMessage: hasAvailableUpdate ? data.updateMessage : null,
       updateUrl: updateUrl,
+      features,
     };
   } catch (error) {
     // Fail-open: log and allow the user to proceed.

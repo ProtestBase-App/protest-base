@@ -88,6 +88,8 @@ const MAPPING = {
   'questionmark.circle': 'help-outline',
   'minus.circle': 'remove-circle-outline',
   'arrow.triangle.turn.up.right.diamond': 'directions',
+  repeat: 'repeat',
+  circle: 'radio-button-unchecked',
   star: 'star',
   'star.fill': 'star',
   ellipsis: 'more-horiz',

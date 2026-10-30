@@ -40,6 +40,7 @@ export default function EmptyMyUpcomingEvents() {
 
       {/* CTA Button */}
       <TouchableOpacity
+        accessibilityRole="button"
         style={[styles.ctaButton, { backgroundColor: themeColors.tint }]}
         onPress={handleCreateEvent}
         activeOpacity={0.8}

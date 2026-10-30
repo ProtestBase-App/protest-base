@@ -99,9 +99,7 @@ describe('OrganizerProfile — deleted organizations (REQ-FE-002)', () => {
       const { findByRole } = renderScreen();
 
       const alert = await findByRole('alert');
-      expect(alert.props.accessibilityLabel).toBe(
-        'organizer.notFoundTitle. organizer.notFoundBody'
-      );
+      expect(alert.props['aria-label']).toBe('organizer.notFoundTitle. organizer.notFoundBody');
     });
 
     it('withholds the follow button so a dead org cannot be followed', async () => {

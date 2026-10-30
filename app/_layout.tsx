@@ -190,6 +190,7 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="series/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="organizer/[id]" options={{ headerShown: false }} />
       <Stack.Screen
         name="report-event"

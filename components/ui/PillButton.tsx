@@ -21,6 +21,8 @@ export interface PillButtonProps {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 export function PillButton({
@@ -32,6 +34,7 @@ export function PillButton({
   disabled = false,
   style,
   testID,
+  accessibilityHint,
 }: PillButtonProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -45,6 +48,7 @@ export function PillButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.button,
         { height },

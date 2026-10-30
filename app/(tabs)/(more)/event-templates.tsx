@@ -320,7 +320,7 @@ export default function EventTemplatesScreen() {
           <BrandHeader title={t('more.templates')} subtitle={t('templates.subtitle')} />
 
           {showLoading ? (
-            <LoadingState accessibilityLabel={t('templates.loadingTemplates')} />
+            <LoadingState label={t('templates.loadingTemplates')} />
           ) : showError ? (
             <View style={styles.errorContainer}>
               <ErrorState message={templatesError || t('templates.loadError')} />

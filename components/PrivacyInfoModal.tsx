@@ -19,8 +19,18 @@ export default function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalP
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        accessible={false}
+        accessibilityRole="none"
+        style={styles.overlay}
+        onPress={onClose}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={styles.modalContainer}
+          onPress={(e) => e.stopPropagation()}
+        >
           <ThemedView style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Shield Icon */}
@@ -90,6 +100,7 @@ export default function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalP
                 onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel={t('privacyInfo.closeAccessibility')}
+                accessibilityHint={t('a11y.hints.closeDialog')}
               >
                 <ThemedText style={styles.buttonText}>{t('privacyInfo.gotIt')}</ThemedText>
               </Pressable>

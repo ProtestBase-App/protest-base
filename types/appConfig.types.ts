@@ -45,6 +45,17 @@ export interface AppConfigData {
   configVersion: number;
   /** Path prefix the mobile app must prepend to all API requests (e.g. "/api/v1"). Empty string when none. */
   apiPrefix?: string;
+  /** Server-side feature switches. Absent on a backend that predates them. */
+  features?: Partial<AppFeatures>;
+}
+
+/**
+ * Features the backend can switch on or off with no app release. Every one fails
+ * closed, and none is ever persisted: the value can differ between launches.
+ */
+export interface AppFeatures {
+  /** Repeat control, series badge, series screen, "this and following" choices. */
+  recurringEvents: boolean;
 }
 
 /**
@@ -68,4 +79,6 @@ export interface VersionCheckResult {
   updateMessage: string | null;
   /** Store URL for the current platform */
   updateUrl: string;
+  /** Feature switches for this launch; all off unless the backend said otherwise. */
+  features: AppFeatures;
 }

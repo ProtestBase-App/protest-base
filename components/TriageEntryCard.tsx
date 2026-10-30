@@ -70,6 +70,7 @@ export default function TriageEntryCard({
           onPress={onStartTriage}
           accessibilityRole="button"
           accessibilityLabel={t('drafts.triageStart')}
+          accessibilityHint={t('a11y.hints.startTriage')}
           testID="triage-start"
           style={({ pressed }) => [
             styles.primaryButton,
@@ -84,6 +85,7 @@ export default function TriageEntryCard({
             onPress={onPublishReady}
             accessibilityRole="button"
             accessibilityLabel={t('drafts.triagePublishReady', { count: readyCount })}
+            accessibilityHint={t('a11y.hints.publishReady')}
             testID="triage-publish-ready"
             style={({ pressed }) => [
               styles.secondaryButton,

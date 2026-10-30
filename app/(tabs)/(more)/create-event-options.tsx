@@ -35,7 +35,8 @@ function OptionRow({ title, subtitle, icon, onPress, testID }: OptionRowProps) {
       ]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${subtitle}`}
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
       testID={testID}
     >
       <View style={[styles.iconCircle, { backgroundColor: themeColors.categoryBadgeBg }]}>

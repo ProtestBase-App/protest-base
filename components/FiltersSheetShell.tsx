@@ -266,6 +266,7 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              accessibilityHint={t('a11y.hints.closeDialog')}
             >
               <IconSymbol name="xmark" size={14} color={themeColors.secondaryText} />
             </Pressable>
@@ -347,6 +348,7 @@ export function FiltersSheetFooter({
         disabled={resetDisabled}
         accessibilityRole="button"
         accessibilityLabel={t('common.reset')}
+        accessibilityHint={t('a11y.hints.resetFilters')}
         accessibilityState={{ disabled: resetDisabled }}
       >
         <ThemedText

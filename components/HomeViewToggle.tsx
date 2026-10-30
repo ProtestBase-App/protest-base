@@ -48,6 +48,7 @@ export default function HomeViewToggle({ value, onChange }: HomeViewToggleProps)
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={option.label}
+            accessibilityHint={t('a11y.hints.switchView')}
             activeOpacity={0.7}
             onPress={() => onChange(option.mode)}
             style={[

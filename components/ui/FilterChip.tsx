@@ -26,6 +26,8 @@ export interface FilterChipProps {
   accessibilityLabel?: string;
   testID?: string;
   containerStyle?: StyleProp<ViewStyle>;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 /**
@@ -45,6 +47,7 @@ export function FilterChip({
   accessibilityLabel,
   testID,
   containerStyle,
+  accessibilityHint,
 }: FilterChipProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -63,6 +66,7 @@ export function FilterChip({
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled }}
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
       testID={testID}
       style={({ pressed }) => [
         styles.chip,

@@ -295,11 +295,12 @@ export default function SignIn() {
                 onPress={handleBackPress}
                 style={styles.iconContainer}
                 accessibilityLabel="Go back"
+                accessibilityHint={t('a11y.hints.goBack')}
                 accessibilityRole="button"
               >
                 <IconSymbol name="arrow.backward" size={24} color={themeColors.text} />
               </TouchableOpacity>
-              <Image source={logoSource} style={styles.logo} />
+              <Image accessibilityIgnoresInvertColors source={logoSource} style={styles.logo} />
             </ThemedView>
             <ThemedText type="title" style={styles.text1}>
               {t('auth.signIn')}
@@ -359,6 +360,7 @@ export default function SignIn() {
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
+                accessibilityHint={t('a11y.hints.resetPassword')}
                 testID="nudge-reset-password"
               >
                 <ThemedView
@@ -386,6 +388,7 @@ export default function SignIn() {
             )}
 
             <TouchableOpacity
+              accessibilityRole="button"
               style={styles.forgetPasswordButton}
               onPress={() => handleOpenModal('forgot')}
             >
@@ -395,6 +398,7 @@ export default function SignIn() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              accessibilityRole="button"
               style={styles.firstTimeButton}
               onPress={() => handleOpenModal('firstTime')}
             >
@@ -426,11 +430,15 @@ export default function SignIn() {
             style={styles.flex1}
           >
             <TouchableOpacity
+              accessible={false}
+              accessibilityRole="none"
               style={styles.modalContainer}
               activeOpacity={1}
               onPress={handleCloseModal}
             >
               <TouchableOpacity
+                accessible={false}
+                accessibilityRole="none"
                 activeOpacity={1}
                 onPress={(e) => e.stopPropagation()}
                 style={styles.modalTouchableWrapper}
@@ -509,6 +517,7 @@ export default function SignIn() {
                       </ThemedView>
                       <ThemedView style={styles.modalButtons}>
                         <TouchableOpacity
+                          accessibilityRole="button"
                           style={[
                             styles.modalButtonCancelContainer,
                             { borderTopColor: themeColors.border },

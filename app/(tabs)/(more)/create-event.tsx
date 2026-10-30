@@ -17,6 +17,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { getThemeColors } from '@/utils/themeColors';
@@ -24,7 +25,8 @@ import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
-import type { DuplicateWarningReport, PickedImage } from '@/types/event.types';
+import type { PickedImage } from '@/types/event.types';
+import type { CreateEventReport, RepeatFormState } from '@/types/eventSeries.types';
 import { Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
@@ -33,6 +35,12 @@ import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
+import {
+  buildRecurrenceRule,
+  isRepeating,
+  repeatFieldMessage,
+  seriesErrorMessage,
+} from '@/utils/recurrence';
 
 /**
  * Validate URL format using URL constructor.
@@ -109,13 +117,21 @@ const hasFormChanges = (current: FormState, initial: FormState): boolean => {
     current.postal_code !== initial.postal_code ||
     !areArraysEqual(current.co_organizers, initial.co_organizers) ||
     current.help_needed !== initial.help_needed ||
-    current.help_description !== initial.help_description
+    current.help_description !== initial.help_description ||
+    isRepeating(current.repeat)
   );
 };
 
 export default function CreateEventModal() {
-  const { user, loading, isLogged, userLanguage, refreshUserEventCounts, upsertEventInCache } =
-    useGlobalContext();
+  const {
+    user,
+    loading,
+    isLogged,
+    userLanguage,
+    refreshUserEventCounts,
+    refetchEvents,
+    upsertEventInCache,
+  } = useGlobalContext();
   const {
     selectedOrganizationId,
     hasOrganizations,
@@ -123,6 +139,7 @@ export default function CreateEventModal() {
     loading: userOrgsLoading,
   } = useUserOrganizations();
   const { isOffline } = useConnectivity();
+  const recurringEnabled = useRecurringEventsEnabled();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const isPresented = router.canGoBack();
@@ -429,6 +446,22 @@ export default function CreateEventModal() {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
+  /**
+   * The rule this form is asking for, or null for a single event. Read at every
+   * submit: a resumed autosave can hold a rule from when the feature was on, and the
+   * form then shows the single-event fields, so that is what gets sent.
+   */
+  const activeRepeat = (): RepeatFormState | null =>
+    recurringEnabled && isRepeating(form.repeat) ? form.repeat : null;
+
+  /** Alert what is wrong with the rule, if anything. A rule that fails stops the submit. */
+  const alertRepeatErrors = (repeat: RepeatFormState): boolean => {
+    const { errors } = buildRecurrenceRule(repeat);
+    if (errors.length === 0) return false;
+    Alert.alert(t('common.error'), errors.map(repeatFieldMessage).join('\n'));
+    return true;
+  };
+
   /** Whitespace-trimmed copy of the form, shared by both submit paths. */
   const trimForm = () => ({
     ...form,
@@ -448,11 +481,12 @@ export default function CreateEventModal() {
 
     // Form value takes precedence, fall back to context (single-org users)
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+    const repeat = activeRepeat();
 
     const newEmptyFields = {
       organization_id: !effectiveOrgId,
       title: trimmedForm.title === '',
-      start_time: trimmedForm.start_time === '',
+      start_time: repeat ? repeat.startLocal === '' : trimmedForm.start_time === '',
       description: trimmedForm.description === '',
       help_description: trimmedForm.help_needed && !trimmedForm.help_description,
     };
@@ -482,7 +516,9 @@ export default function CreateEventModal() {
       return;
     }
 
-    if (trimmedForm.end_time && trimmedForm.end_time < trimmedForm.start_time) {
+    if (repeat) {
+      if (alertRepeatErrors(repeat)) return;
+    } else if (trimmedForm.end_time && trimmedForm.end_time < trimmedForm.start_time) {
       Alert.alert(t('common.error'), t('createEvent.endTimeBeforeStart'));
       return;
     }
@@ -505,6 +541,9 @@ export default function CreateEventModal() {
   const runCreateEvent = async (duplicateOverride: boolean) => {
     const trimmedForm = trimForm();
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+    const repeat = activeRepeat();
+    const rule = repeat ? buildRecurrenceRule(repeat).rule : null;
+    if (repeat && !rule) return;
 
     setSubmitting(true);
     try {
@@ -515,7 +554,7 @@ export default function CreateEventModal() {
 
       // Non-blocking duplicate verdicts, when the backend has something to say
       // about an event it accepted anyway (warn mode, or a weak match).
-      const report: DuplicateWarningReport = {};
+      const report: CreateEventReport = {};
 
       // Backend handles image upload, geocoding, URL validation, category
       // formatting; it also fills in organizer_id and organizer_name from the JWT.
@@ -526,8 +565,12 @@ export default function CreateEventModal() {
           organization_id: effectiveOrgId,
           title: trimmedForm.title,
           description: trimmedForm.description,
-          start_time: trimmedForm.start_time,
-          end_time: trimmedForm.end_time || undefined,
+          ...(rule
+            ? { recurrence: rule }
+            : {
+                start_time: trimmedForm.start_time,
+                end_time: trimmedForm.end_time || undefined,
+              }),
           street_address: trimmedForm.street_address || undefined,
           city: trimmedForm.city || undefined,
           region: trimmedForm.region || undefined,
@@ -556,20 +599,34 @@ export default function CreateEventModal() {
       // Seed the global events cache so Home (calendar/list) and other screens
       // see the new event immediately, without waiting for the next refetch.
       upsertEventInCache(resultCreateEvent);
+      // A series is N new rows and this seeded one: the rest come with a refresh.
+      if (report.series) {
+        refetchEvents().catch((refreshErr) => {
+          logger.warn('Global events cache refresh failed', { error: refreshErr });
+        });
+      }
 
       router.replace(DynamicRoutes.event(resultCreateEvent.$id, { isCreated: true }));
 
       alertWithDuplicateWarning(
         t('common.success'),
-        t('alerts.eventCreated'),
+        report.series
+          ? t('series.messages.created', { count: report.series.occurrence_count })
+          : t('alerts.eventCreated'),
         report,
-        (duplicate) => router.push(duplicateHref(duplicate))
+        (duplicate) => router.push(duplicateHref(duplicate)),
+        undefined,
+        userLanguage
       );
     } catch (error) {
       // Block mode refused it: the prompt shows the matches and waits. Never
       // retried automatically — the override is the organizer's call.
       if (duplicatePrompt.capture(error, 'event')) return;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = rule
+        ? seriesErrorMessage(error, userLanguage)
+        : error instanceof Error
+          ? error.message
+          : String(error);
       Alert.alert(t('common.error'), errorMessage);
     } finally {
       setSubmitting(false);
@@ -612,6 +669,11 @@ export default function CreateEventModal() {
       return;
     }
 
+    // A draft may be incomplete, but a draft series is still a series: without a rule
+    // that can be sent it must not fall back to one draft.
+    const repeat = activeRepeat();
+    if (repeat && alertRepeatErrors(repeat)) return;
+
     await runCreateDraft(false);
   };
 
@@ -619,6 +681,9 @@ export default function CreateEventModal() {
   const runCreateDraft = async (duplicateOverride: boolean) => {
     const trimmedForm = trimForm();
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+    const repeat = activeRepeat();
+    const rule = repeat ? buildRecurrenceRule(repeat).rule : null;
+    if (repeat && !rule) return;
 
     setSavingDraft(true);
     try {
@@ -626,15 +691,19 @@ export default function CreateEventModal() {
         ? trimmedForm.co_organizers
         : undefined;
 
-      const report: DuplicateWarningReport = {};
+      const report: CreateEventReport = {};
 
       await createDraftEvent(
         {
           organization_id: effectiveOrgId,
           title: trimmedForm.title,
           description: trimmedForm.description || undefined,
-          start_time: trimmedForm.start_time || undefined,
-          end_time: trimmedForm.end_time || undefined,
+          ...(rule
+            ? { recurrence: rule }
+            : {
+                start_time: trimmedForm.start_time || undefined,
+                end_time: trimmedForm.end_time || undefined,
+              }),
           street_address: trimmedForm.street_address || undefined,
           city: trimmedForm.city || undefined,
           region: trimmedForm.region || undefined,
@@ -666,14 +735,22 @@ export default function CreateEventModal() {
       router.replace(Routes.DRAFT_EVENTS);
       alertWithDuplicateWarning(
         t('common.success'),
-        t('drafts.savedConfirmation'),
+        report.series
+          ? t('series.messages.draftsCreated', { count: report.series.occurrence_count })
+          : t('drafts.savedConfirmation'),
         report,
-        (duplicate) => router.push(duplicateHref(duplicate))
+        (duplicate) => router.push(duplicateHref(duplicate)),
+        undefined,
+        userLanguage
       );
     } catch (error) {
       // The duplicate guard runs on drafts too — same prompt, same override.
       if (duplicatePrompt.capture(error, 'draft')) return;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = rule
+        ? seriesErrorMessage(error, userLanguage)
+        : error instanceof Error
+          ? error.message
+          : String(error);
       Alert.alert(t('common.error'), errorMessage);
     } finally {
       setSavingDraft(false);
@@ -722,6 +799,7 @@ export default function CreateEventModal() {
               style={styles.closeButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityLabel={t('createEvent.closeAccessibilityLabel')}
+              accessibilityHint={t('a11y.hints.closeScreen')}
               accessibilityRole="button"
             >
               <IconSymbol name="xmark" size={24} color={themeColors.icon} />
@@ -741,6 +819,7 @@ export default function CreateEventModal() {
             emptyFields={emptyFields}
             userLanguage={userLanguage}
             scrollViewRef={scrollViewRef}
+            showRepeat={recurringEnabled}
           />
 
           <CustomButton

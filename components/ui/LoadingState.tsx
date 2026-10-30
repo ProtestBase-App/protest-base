@@ -17,8 +17,8 @@ interface LoadingStateProps {
   size?: ActivityIndicatorProps['size'];
   /** Style overrides for the container */
   containerStyles?: ViewStyle | ViewStyle[];
-  /** Accessibility label for screen readers */
-  accessibilityLabel?: string;
+  /** What is loading, for screen readers. */
+  label?: string;
   /** Scale multiplier for the BrandLoader/PlacardLoader variants */
   scale?: number;
   /** Test ID forwarded to the root element */
@@ -30,7 +30,7 @@ function LoadingStateComponent({
   color,
   size = 'large',
   containerStyles,
-  accessibilityLabel = 'Loading content',
+  label = 'Loading content',
   scale,
   testID,
 }: LoadingStateProps) {
@@ -51,7 +51,7 @@ function LoadingStateComponent({
     <ThemedView
       style={[styles.container, containerStyles]}
       accessibilityRole="progressbar"
-      accessibilityLabel={accessibilityLabel}
+      aria-label={label}
       accessibilityState={{ busy: true }}
       testID={variant === 'spinner' ? testID : undefined}
     >

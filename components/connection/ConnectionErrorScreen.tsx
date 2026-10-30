@@ -73,10 +73,11 @@ export function ConnectionErrorScreen({ onRetry }: ConnectionErrorScreenProps): 
         <ThemedView style={styles.container}>
           {/* Logo */}
           <Image
+            accessibilityIgnoresInvertColors
             source={logoSource}
             style={styles.logo}
             resizeMode="contain"
-            accessibilityLabel="ProtestBase"
+            aria-label="ProtestBase"
           />
 
           {/* Cloud-offline icon with pulse animation */}

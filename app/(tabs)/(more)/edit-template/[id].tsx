@@ -385,6 +385,7 @@ export default function EditTemplateScreen() {
             style={styles.closeButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Close edit template screen"
+            accessibilityHint={t('a11y.hints.closeScreen')}
             accessibilityRole="button"
           >
             <IconSymbol name="xmark" size={24} color="#687076" />
@@ -434,6 +435,7 @@ export default function EditTemplateScreen() {
           />
 
           <TouchableOpacity
+            accessibilityRole="button"
             testID="btn-edit-template-delete"
             style={styles.deleteButton}
             onPress={handleDelete}

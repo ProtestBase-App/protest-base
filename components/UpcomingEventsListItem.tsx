@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -26,7 +27,11 @@ export default function UpcomingEventsListItem({ event }: UpcomingEventsListItem
   const cityLabel = resolveEventCityLabel(event, getSubMunicipalityName);
 
   return (
-    <TouchableOpacity onPress={() => router.push(`/event/${event.id}` as any)} activeOpacity={0.7}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      onPress={() => router.push(`/event/${event.id}` as any)}
+      activeOpacity={0.7}
+    >
       <ThemedView style={[styles.cardContainer, { borderColor: themeColors.cardBorder }]}>
         {/* Top Row: Image + Info */}
         <View style={styles.topRow}>
@@ -93,6 +98,8 @@ export default function UpcomingEventsListItem({ event }: UpcomingEventsListItem
               </ThemedText>
             </View>
           )}
+
+          <SeriesBadge event={event} />
         </View>
       </ThemedView>
     </TouchableOpacity>

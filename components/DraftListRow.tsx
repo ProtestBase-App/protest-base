@@ -3,6 +3,7 @@ import { AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-nat
 import Swipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import * as Haptics from 'expo-haptics';
 
+import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { PUBLISH_PILL_TEXT } from '@/components/ui/ActionPill';
@@ -266,6 +267,8 @@ function DraftListRowComponent({
           <ThemedText style={styles.title} numberOfLines={1}>
             {event.title || t('drafts.untitled')}
           </ThemedText>
+
+          <SeriesBadge event={event} testID={`draft-series-${event.$id}`} />
 
           {status.kind === 'pastDate' ? (
             <ThemedText

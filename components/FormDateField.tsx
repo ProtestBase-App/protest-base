@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -18,10 +18,17 @@ interface FormDateFieldProps {
   placeholder: string;
   handleChangeText: (text: string) => void;
   hasError?: boolean;
-  minDate: Date;
+  /** Earliest pickable date. A time-only field has no use for it. */
+  minDate?: Date;
   otherStyles?: object;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
+  /** Pick a date and a time (the default), or only one of them. */
+  pickerMode?: 'datetime' | 'date' | 'time';
+  /** IANA zone the picker works in, instead of the device's. */
+  timeZoneName?: string;
+  /** The text for the value, when the device-local date and time would be wrong for it. */
+  formatValue?: (value: string) => string;
   /**
    * Localised "All day". When passed it replaces the clock time in the field —
    * a date-only event has no time to show. The caller decides when that is
@@ -31,7 +38,6 @@ interface FormDateFieldProps {
   allDayLabel?: string;
   /** Localised explanation shown under the field while `allDayLabel` is active. */
   allDayHint?: string;
-  [key: string]: any;
 }
 
 /**
@@ -71,13 +77,21 @@ export default function FormDateField({
   testID,
   allDayLabel,
   allDayHint,
-  ...props
+  pickerMode = 'datetime',
+  timeZoneName,
+  formatValue,
 }: FormDateFieldProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = getThemeColors(colorScheme);
   const initialDate = safeParseDate(value);
   const [date, setDate] = useState<Date>(initialDate);
+
+  // An edit screen fills the form in after this field mounts: the picker has to open
+  // on that value, not on the moment the field appeared.
+  useEffect(() => {
+    if (value) setDate(safeParseDate(value));
+  }, [value]);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
 
@@ -108,12 +122,17 @@ export default function FormDateField({
           const currentDate = new Date(selectedDate);
           setDate(currentDate);
 
-          showAndroidTimePicker(currentDate);
+          if (pickerMode === 'date') {
+            handleChangeText(currentDate.toISOString());
+          } else {
+            showAndroidTimePicker(currentDate);
+          }
         }
       },
       mode: 'date',
       display: 'default',
       minimumDate: minDate,
+      timeZoneName,
     });
   };
 
@@ -122,6 +141,14 @@ export default function FormDateField({
       value: currentDate,
       onChange: (event: DateTimePickerEvent, selectedTime?: Date) => {
         if (event.type === 'set' && selectedTime) {
+          // A time-only field runs in a named zone: the instant is the answer, and
+          // the local getters below would read the device's clock instead.
+          if (pickerMode === 'time') {
+            setDate(selectedTime);
+            handleChangeText(selectedTime.toISOString());
+            return;
+          }
+
           const newDate = new Date(currentDate);
           newDate.setHours(selectedTime.getHours());
           newDate.setMinutes(selectedTime.getMinutes());
@@ -133,12 +160,19 @@ export default function FormDateField({
       },
       mode: 'time',
       display: 'default',
+      timeZoneName,
+      // A time-only field holds a rule's HH:MM, shown in 24 hours everywhere else.
+      is24Hour: pickerMode === 'time',
     });
   };
 
   const handleInputPress = () => {
     if (Platform.OS === 'android') {
-      showAndroidDatePicker();
+      if (pickerMode === 'time') {
+        showAndroidTimePicker(date);
+      } else {
+        showAndroidDatePicker();
+      }
     } else {
       // iOS: toggle the picker. If it's already open, treat tap as "Done".
       if (showDatePicker) {
@@ -158,9 +192,13 @@ export default function FormDateField({
   if (value) {
     const parsed = new Date(value);
     if (!isNaN(parsed.getTime())) {
-      displayValue = showingAllDay
-        ? `${formatDateForDisplay(parsed).split(' - ')[0]} - ${allDayLabel}`
-        : formatDateForDisplay(parsed);
+      if (formatValue) {
+        displayValue = formatValue(value);
+      } else {
+        displayValue = showingAllDay
+          ? `${formatDateForDisplay(parsed).split(' - ')[0]} - ${allDayLabel}`
+          : formatDateForDisplay(parsed);
+      }
     }
   }
 
@@ -168,7 +206,12 @@ export default function FormDateField({
     <ThemedView style={[styles.container, otherStyles]}>
       <ThemedText style={styles.label}>{title}</ThemedText>
 
-      <TouchableOpacity testID={testID} onPress={handleInputPress} activeOpacity={0.8}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        testID={testID}
+        onPress={handleInputPress}
+        activeOpacity={0.8}
+      >
         <ThemedView
           style={[
             styles.inputWrapper,
@@ -181,6 +224,7 @@ export default function FormDateField({
           ]}
         >
           <TextInput
+            accessibilityRole="none"
             style={[
               styles.textInput,
               isDark ? styles.textInputDark : styles.textInputLight,
@@ -195,7 +239,6 @@ export default function FormDateField({
             placeholderTextColor={themeColors.placeholder}
             editable={false}
             pointerEvents="none"
-            {...props}
           />
           <IconSymbol size={24} name="calendar" color={themeColors.text} />
         </ThemedView>
@@ -210,10 +253,11 @@ export default function FormDateField({
       {Platform.OS === 'ios' && showDatePicker && (
         <DateTimePicker
           value={date}
-          mode="datetime"
-          display="inline"
+          mode={pickerMode}
+          display={pickerMode === 'time' ? 'spinner' : 'inline'}
           onChange={handleIOSChange}
           minimumDate={minDate}
+          timeZoneName={timeZoneName}
         />
       )}
     </ThemedView>

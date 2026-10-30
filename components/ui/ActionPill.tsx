@@ -26,6 +26,8 @@ export interface ActionPillProps {
   onPress?: () => void;
   disabled?: boolean;
   testID?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export function ActionPill({
   onPress,
   disabled = false,
   testID,
+  accessibilityHint,
 }: ActionPillProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -97,6 +100,7 @@ export function ActionPill({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.pill,
         palette.container,

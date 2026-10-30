@@ -38,9 +38,18 @@ export interface MapEventPinProps {
   onPress: () => void;
   accessibilityLabel: string;
   testID?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
-function MapEventPin({ color, selected, onPress, accessibilityLabel, testID }: MapEventPinProps) {
+function MapEventPin({
+  color,
+  selected,
+  onPress,
+  accessibilityLabel,
+  testID,
+  accessibilityHint,
+}: MapEventPinProps) {
   const progress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {
@@ -62,6 +71,7 @@ function MapEventPin({ color, selected, onPress, accessibilityLabel, testID }: M
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ selected }}
       testID={testID}
       hitSlop={4}

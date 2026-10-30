@@ -37,9 +37,11 @@ describe('FeatureCard', () => {
     expect(screen.getByRole('button')).toBeTruthy();
   });
 
-  it('sets composite accessibility label with title and description', () => {
+  it('labels the card with its title and hints the description', () => {
     render(<FeatureCard {...defaultProps} />);
-    expect(screen.getByLabelText('Create Event: Create a new protest event')).toBeTruthy();
+    expect(screen.getByLabelText('Create Event').props.accessibilityHint).toBe(
+      'Create a new protest event'
+    );
   });
 
   it('sets accessibility label with only title when description is empty', () => {

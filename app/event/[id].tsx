@@ -9,11 +9,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   getEventByIdBackend,
   cancelEvent,
+  cancelSeries,
   EventAlreadyCancelledError,
   EventNotFoundError,
   EventNetworkError,
 } from '@/services/event.service';
 import type { Event } from '@/services/event.service';
+import type { SeriesScope } from '@/types/eventSeries.types';
 import { trackEventView } from '@/services/eventView.service';
 import { canUserEditEvent } from '@/utils/eventPermissions';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
@@ -23,6 +25,7 @@ import { shareEventWithAlert } from '@/utils/shareHelpers';
 import EventDetailed from '@/components/EventDetailed';
 import CreatorActionSheet from '@/components/CreatorActionSheet';
 import CancelEventModal from '@/components/CancelEventModal';
+import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -32,6 +35,9 @@ import { useLikedEvents } from '@/context/LikedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useIsOrganizationMember } from '@/context/UserOrganizationsProvider';
+import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
+import { useEventSeries } from '@/hooks/useEventSeries';
 import { useEventWeather } from '@/hooks/useEventWeather';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
@@ -42,6 +48,7 @@ import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { logger } from '@/utils/logger';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
 import { getCountryLabel } from '@/utils/countryOptions';
+import { seriesBadgeText, seriesErrorMessage } from '@/utils/recurrence';
 
 export default function EventDetails() {
   const {
@@ -83,6 +90,13 @@ export default function EventDetails() {
   // Fetched here, not in EventDetailed: the pre-check needs the raw event and
   // the connectivity flag, and the presentational component stays that way.
   const { weather, refresh: refreshWeather } = useEventWeather(rawEvent, { isOffline });
+
+  // The series only matters to the organization that runs it: everyone else sees an
+  // ordinary event, with no badge and no request for the rule.
+  const recurringEnabled = useRecurringEventsEnabled();
+  const isOrganizationMember = useIsOrganizationMember(rawEvent?.organization_id);
+  const seriesId = recurringEnabled && isOrganizationMember ? (rawEvent?.series_id ?? null) : null;
+  const { series, refresh: refreshSeries } = useEventSeries(seriesId);
 
   const event = useMemo<FormattedEvent | null>(
     () => (rawEvent ? formatEventForDisplay(rawEvent, userLanguage) : null),
@@ -264,8 +278,12 @@ export default function EventDetails() {
     }
   };
 
-  const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async (scope: SeriesScope) => {
     if (!assertOnlineOrAlert(isOffline)) return;
+    if (scope === 'following' && seriesId) {
+      await cancelFollowing(seriesId);
+      return;
+    }
     try {
       setIsCancelling(true);
       const result = await cancelEvent(eventId);
@@ -301,6 +319,29 @@ export default function EventDetails() {
       }
       logger.error('Failed to cancel event:', { eventId, error: err });
       Alert.alert(t('common.error'), err instanceof Error ? err.message : t('events.cancelError'));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  /** Cancel this date and every later one. No reason, as for a single event. */
+  const cancelFollowing = async (id: string) => {
+    try {
+      setIsCancelling(true);
+      const result = await cancelSeries(id, { fromEventId: eventId });
+      setRawEvent((prev) =>
+        prev ? { ...prev, status: 'cancelled', cancelled_at: new Date().toISOString() } : prev
+      );
+      setCancelModalOpen(false);
+      Alert.alert(t('common.success'), t('series.messages.cancelled', { count: result.cancelled }));
+      refreshSeries();
+      refetchEvents().catch((refreshErr) => {
+        logger.warn('Global events cache refresh failed', { error: refreshErr });
+      });
+    } catch (err) {
+      logger.error('Failed to cancel the series:', { eventId, error: err });
+      setCancelModalOpen(false);
+      Alert.alert(t('common.error'), seriesErrorMessage(err, userLanguage));
     } finally {
       setIsCancelling(false);
     }
@@ -368,6 +409,7 @@ export default function EventDetails() {
               <ThemedText style={styles.errorTitle}>{t('common.error')}</ThemedText>
               <ThemedText style={styles.errorMessage}>{error || t('errors.notFound')}</ThemedText>
               <TouchableOpacity
+                accessibilityRole="button"
                 onPress={onRefresh}
                 style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
               >
@@ -404,6 +446,15 @@ export default function EventDetails() {
             onRefresh={onRefresh}
             userLanguage={userLanguage}
             topInset={insets.top}
+            seriesBadge={
+              seriesId ? (
+                <SeriesBadge
+                  event={event}
+                  label={series ? seriesBadgeText(series, userLanguage) : undefined}
+                  testID="event-series-badge"
+                />
+              ) : undefined
+            }
           />
 
           <View style={styles.stickyBar}>
@@ -432,10 +483,12 @@ export default function EventDetails() {
                     onPress={() => setMenuOpen(true)}
                     accessibilityRole="button"
                     accessibilityLabel={t('events.manage')}
+                    accessibilityHint={t('a11y.hints.manageEvent')}
                   >
                     <IconSymbol name="ellipsis" size={IconSizes.md} color={themeColors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity
+                    accessibilityRole="button"
                     testID="event-sticky-edit"
                     style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
                     onPress={handleOpenEdit}
@@ -465,6 +518,7 @@ export default function EventDetails() {
                     accessibilityLabel={
                       isEventSaved ? t('events.savedEvent') : t('events.saveEvent')
                     }
+                    accessibilityHint={t('a11y.hints.toggleSave')}
                   >
                     <IconSymbol
                       name={isEventSaved ? 'bookmark.fill' : 'bookmark'}
@@ -474,6 +528,7 @@ export default function EventDetails() {
                   </TouchableOpacity>
                   {event.geocod_lat != null && event.geocod_lng != null && (
                     <TouchableOpacity
+                      accessibilityRole="button"
                       testID="button-directions"
                       style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
                       onPress={handleOpenDirections}
@@ -509,6 +564,7 @@ export default function EventDetails() {
         onDismiss={() => setCancelModalOpen(false)}
         onConfirm={handleConfirmCancel}
         submitting={isCancelling}
+        inSeries={!!seriesId}
       />
     </ThemedView>
   );

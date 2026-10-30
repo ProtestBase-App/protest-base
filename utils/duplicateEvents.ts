@@ -15,6 +15,7 @@ import type {
 } from '@/types/event.types';
 import { formatEventDateTimeLabel, isBelgiumMidnight } from '@/utils/eventFormatters';
 import { t } from '@/utils/i18n';
+import { formatOccurrenceDate } from '@/utils/recurrence';
 
 /**
  * Where "Open" on a match should go.
@@ -71,6 +72,29 @@ export function formatDuplicateMeta(
 }
 
 /**
+ * A stable key for a match: on a series, one existing event can clash with several of
+ * the dates being submitted, and then its id alone repeats.
+ */
+export function duplicateKey(duplicate: DuplicateSummary): string {
+  return `${duplicate.id}-${duplicate.occurrence_start_time ?? ''}`;
+}
+
+/** How many events these matches are: on a series, one event can be listed per date. */
+export function countDistinctDuplicates(duplicates: DuplicateSummary[]): number {
+  return new Set(duplicates.map((duplicate) => duplicate.id)).size;
+}
+
+/** "Your date: Tue 3 Nov", the date of a series that clashed; null on a single event. */
+export function formatDuplicateYourDate(
+  duplicate: DuplicateSummary,
+  locale: string = 'en'
+): string | null {
+  const start = duplicate.occurrence_start_time;
+  if (!start || Number.isNaN(new Date(start).getTime())) return null;
+  return t('duplicates.yourDate', { date: formatOccurrenceDate(start, locale) });
+}
+
+/**
  * The one-line explanation shown under a match, keyed by how the submitting
  * organization relates to it. `other_org` is the only one that suggests an
  * action the app cannot perform for the user: there is no co-organizer invite
@@ -100,17 +124,34 @@ export function relationshipOpenLabelKey(relationship: DuplicateRelationship): s
  * This is warn mode's whole client surface: the event was created/published, we
  * just tell the organizer what it resembles.
  */
-export function duplicateWarningNote(report: DuplicateWarningReport): string | null {
+export function duplicateWarningNote(
+  report: DuplicateWarningReport,
+  locale: string = 'en'
+): string | null {
   const matches = report.possibleDuplicates;
   if (!matches || matches.length === 0) return null;
 
   const first = matches[0];
-  return matches.length === 1
-    ? t('duplicates.warningNote', { title: duplicateTitle(first) })
-    : t('duplicates.warningNoteMany', {
-        title: duplicateTitle(first),
-        count: matches.length - 1,
-      });
+  const distinct = countDistinctDuplicates(matches);
+  const note =
+    distinct === 1
+      ? t('duplicates.warningNote', { title: duplicateTitle(first) })
+      : t('duplicates.warningNoteMany', {
+          title: duplicateTitle(first),
+          count: distinct - 1,
+        });
+
+  // On a series, say which of the submitted dates clashed, each one once.
+  const clashing = [
+    ...new Set(
+      matches
+        .map((match) => match.occurrence_start_time)
+        .filter((start): start is string => !!start && !Number.isNaN(new Date(start).getTime()))
+    ),
+  ].sort();
+  if (clashing.length === 0) return note;
+  const dates = clashing.map((start) => formatOccurrenceDate(start, locale)).join(', ');
+  return `${note}\n${t('duplicates.clashingDates', { dates })}`;
 }
 
 /**
@@ -130,9 +171,10 @@ export function alertWithDuplicateWarning(
   message: string,
   report: DuplicateWarningReport,
   onView: (duplicate: DuplicateSummary) => void,
-  onClean?: () => void
+  onClean?: () => void,
+  locale?: string
 ): void {
-  const note = duplicateWarningNote(report);
+  const note = duplicateWarningNote(report, locale);
   if (!note) {
     if (onClean) onClean();
     else Alert.alert(title, message);
