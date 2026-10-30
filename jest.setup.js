@@ -15,6 +15,20 @@ delete global.ReadableStream;
 require('@testing-library/jest-native/extend-expect');
 
 // ============================================================================
+// Async utility timeout
+// ============================================================================
+// waitFor/findBy give up after 1s, and a worker busy loading a module stalls for longer:
+// PostalCodes_FR.ts is 1.5 MB and loads inside a waitFor, which failed unrelated tests at
+// random on a cold cache. Configured in a factory rather than with a plain require so a
+// suite that never uses RNTL does not load it, and a suite that mocks react-native still
+// loads it after its own mock.
+jest.mock('@testing-library/react-native', () => {
+  const actual = jest.requireActual('@testing-library/react-native');
+  actual.configure({ asyncUtilTimeout: 5000 });
+  return actual;
+});
+
+// ============================================================================
 // Expo module mocks
 // ============================================================================
 jest.mock('expo-font');

@@ -5,6 +5,9 @@ module.exports = {
     './node_modules/react-native-gesture-handler/jestSetup.js',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  // The first test in a file pays for loading React Native on a cold transform cache,
+  // which took over 5s and failed whichever test happened to come first.
+  testTimeout: 20000,
   testMatch: [
     // Utility tests (pure logic, no mocks)
     '<rootDir>/utils/__tests__/**/*.test.{ts,tsx}',
