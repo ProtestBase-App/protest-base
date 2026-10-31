@@ -873,7 +873,7 @@ describe('EventForm — image picking', () => {
 
     render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -908,7 +908,7 @@ describe('EventForm — image picking', () => {
     render(<EventForm form={formWithImage} setForm={setForm} userLanguage="en" />);
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      fireEvent.press(screen.getByLabelText(/add.*(image|photo)/i));
       await flushPromises();
     });
 
@@ -942,7 +942,7 @@ describe('EventForm — image picking', () => {
     render(<EventForm form={fourImages} setForm={setForm} userLanguage="en" />);
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      fireEvent.press(screen.getByLabelText(/add.*(image|photo)/i));
       await flushPromises();
     });
 
@@ -962,7 +962,7 @@ describe('EventForm — image picking', () => {
 
     render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -981,7 +981,7 @@ describe('EventForm — image picking', () => {
 
     render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -999,7 +999,7 @@ describe('EventForm — image picking', () => {
     render(<EventForm form={formWithImage} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByLabelText(/remove.*image/i)).toBeTruthy();
     // The add tile stays visible while under the 5-image cap.
-    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/add.*(image|photo)/i)).toBeTruthy();
   });
 
   it('renders a thumbnail with a remove button when form has an image URL string', () => {
@@ -1043,7 +1043,7 @@ describe('EventForm — image picking', () => {
       images: ['https://1.jpg', 'https://2.jpg', 'https://3.jpg', 'https://4.jpg', 'https://5.jpg'],
     };
     render(<EventForm form={fullForm} setForm={jest.fn()} userLanguage="en" />);
-    expect(screen.queryByLabelText(/add.*image/i)).toBeNull();
+    expect(screen.queryByLabelText(/add.*(image|photo)/i)).toBeNull();
   });
 });
 
@@ -1065,7 +1065,7 @@ describe('EventForm — date and time fields', () => {
       <EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" mode="create-template" />
     );
     expect(screen.queryByTestId('form-date-field-Pick start date/time')).toBeNull();
-    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/add.*(image|photo)/i)).toBeTruthy();
   });
 });
 
@@ -1181,6 +1181,49 @@ describe('EventForm — progress bar', () => {
     };
     render(<EventForm form={fullForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByText('100%')).toBeTruthy();
+  });
+
+  it('names everything still needed', () => {
+    render(
+      <EventForm
+        form={{ ...mockForm, title: '', description: '', categories: '', start_time: '' }}
+        setForm={jest.fn()}
+        userLanguage="en"
+      />
+    );
+
+    expect(screen.getByText('Still needed: title, category, date, description')).toBeTruthy();
+  });
+
+  it('asks an edit for no category: an older event may have none', () => {
+    render(
+      <EventForm
+        form={{ ...mockForm, categories: '', start_time: '' }}
+        setForm={jest.fn()}
+        userLanguage="en"
+        mode="edit-event"
+      />
+    );
+
+    expect(screen.getByText('Still needed: date')).toBeTruthy();
+  });
+
+  it('says when nothing is left', () => {
+    render(
+      <EventForm
+        form={{
+          ...mockForm,
+          title: 'Rally',
+          description: 'For housing',
+          categories: 'protest',
+          start_time: '2099-01-02T10:00:00.000Z',
+        }}
+        setForm={jest.fn()}
+        userLanguage="en"
+      />
+    );
+
+    expect(screen.getByText('All required fields are filled')).toBeTruthy();
   });
 
   it('does not show progress bar in template mode', () => {
@@ -1533,8 +1576,8 @@ describe('EventForm — help_needed checkbox toggle', () => {
   it('toggles help_needed to true when checkbox is pressed', () => {
     const setForm = jest.fn();
     render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
-    // The checkbox label is "I need help in this event"
-    const checkboxText = screen.getByText('I need help in this event');
+    // The checkbox label is "We need volunteers"
+    const checkboxText = screen.getByText('We need volunteers');
     // Press the parent TouchableOpacity
     fireEvent.press(checkboxText);
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ help_needed: true }));
@@ -1544,7 +1587,7 @@ describe('EventForm — help_needed checkbox toggle', () => {
     const setForm = jest.fn();
     const helpForm = { ...mockForm, help_needed: true, help_description: 'Some help' };
     render(<EventForm form={helpForm} setForm={setForm} userLanguage="en" />);
-    const checkboxText = screen.getByText('I need help in this event');
+    const checkboxText = screen.getByText('We need volunteers');
     fireEvent.press(checkboxText);
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ help_needed: false }));
   });

@@ -260,6 +260,25 @@ export function formatCalendarDate(dateKey: string, locale: string): string {
   }).format(utcDate(dateKey));
 }
 
+/** "Saturday 14 November". */
+export function formatLongDate(dateKey: string, locale: string): string {
+  return getDateFormatter(dateLocale(locale), {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(utcDate(dateKey));
+}
+
+/** "November 2026", with `month` counted from 0. */
+export function formatMonthYear(year: number, month: number, locale: string): string {
+  return getDateFormatter(dateLocale(locale), {
+    timeZone: 'UTC',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(year, month, 1)));
+}
+
 /** "19:00–21:00", "19:00", or '' for an all-day series. Accepts `HH:MM:SS`. */
 export function formatLocalTimeRange(
   startLocal: string | null | undefined,

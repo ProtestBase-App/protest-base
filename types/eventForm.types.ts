@@ -40,6 +40,9 @@ export interface FormState {
   repeat?: RepeatFormState;
 }
 
+/** Which form the shell is showing. */
+export type EventFormKind = 'create' | 'draft' | 'edit' | 'template';
+
 /** What a submit asks of the form. */
 export type EventFormIntent = 'publish' | 'saveEdit' | 'saveDraft' | 'saveTemplate';
 
@@ -75,6 +78,13 @@ export type EventFormErrors = Partial<Record<EventFormField, string>>;
  * - 'edit-template': Editing an existing template (hides date/time)
  */
 export type EventFormMode = 'create-event' | 'edit-event' | 'create-template' | 'edit-template';
+
+/** The pin of a saved event: forms only hold one picked this session. */
+export interface SavedPin {
+  latitude: number;
+  longitude: number;
+  street: string;
+}
 
 export interface EventFormProps {
   form: FormState;

@@ -96,7 +96,7 @@ export default function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalP
 
               {/* Got It Button */}
               <Pressable
-                style={[styles.button, { backgroundColor: themeColors.tint }]}
+                style={[styles.button, { backgroundColor: themeColors.cta }]}
                 onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel={t('privacyInfo.closeAccessibility')}

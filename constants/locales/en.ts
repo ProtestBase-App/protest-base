@@ -100,6 +100,8 @@ const en: LocaleData = {
   // Common - General UI elements
   // ============================================
   common: {
+    saving: 'Saving…',
+    publishing: 'Publishing…',
     ok: 'OK',
     cancel: 'Cancel',
     save: 'Save',
@@ -162,9 +164,8 @@ const en: LocaleData = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Create Template',
-    createFromEventTitle: 'Create Template from Event',
-    editTitle: 'Edit Template',
+    createTitle: 'New template',
+    editTitle: 'Edit template',
 
     // Subtitles and descriptions
     createSubtitle:
@@ -175,13 +176,13 @@ const en: LocaleData = {
       'Add up to 5 images — they are saved with this template and added to events you create from it',
 
     // Field labels
-    nameLabel: 'Template Name *',
-    descriptionLabel: 'Template Description (Optional)',
-    namePlaceholder: 'Give your template a name (e.g., Monthly Meetup)',
+    nameLabel: 'Template name *',
+    descriptionLabel: 'Template description (optional)',
+    namePlaceholder: 'e.g. Monthly housing vigil',
     descriptionPlaceholder: 'What is this template for?',
 
     // Buttons
-    saveButton: 'Save Template',
+    saveButton: 'Save template',
     deleteButton: 'Delete Template',
 
     // Success messages
@@ -193,6 +194,15 @@ const en: LocaleData = {
     nameMissing: 'Please enter a template name.',
     dataTooLong: 'This template is too long to save. Shorten the description.',
     volunteerDescMissing: 'Please describe how volunteers can help.',
+    saveFromEventTitle: 'Save as template',
+    saveFromEventDesc: "Reuse this event's details later",
+    keepGroup: 'Keep',
+    datesNeverSaved: 'Dates are never saved in a template.',
+    partText: 'Title and text',
+    partLocation: 'Location',
+    nameHelp: 'Only your organization sees this name.',
+    dateAsked: 'Date and time',
+    dateAskedHint: 'You pick these when you use the template',
 
     // Delete confirmation
     deleteConfirmTitle: 'Delete Template',
@@ -207,11 +217,15 @@ const en: LocaleData = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Start',
+    templatesGroup: 'Your templates',
+    resume: 'Resume',
+    unfinished: 'Unfinished',
+    untitled: 'Untitled event',
     blankTitle: 'Plan a new action',
-    blankSubtitle: 'Create a new event with a blank form',
+    blankSubtitle: 'Start from a blank event',
     templateTitle: 'Use a template',
     templateSubtitle: 'Pre-fill with saved event details',
-    footer: 'Templates save time for recurring events with similar details.',
   },
 
   // ============================================
@@ -564,23 +578,23 @@ const en: LocaleData = {
     startTime: 'Start Time',
     endTime: 'End Time',
     country: 'Country',
-    postalCode: 'Postal Code',
-    streetAddress: 'Street Address',
+    postalCode: 'Postal code',
+    streetAddress: 'Street address',
     organizerName: 'Organizer Name',
     contactEmail: 'Contact Email',
     helpNeeded: 'Help Needed',
     helpDescription: 'What help do you need?',
-    uploadImage: 'Upload Image',
-    eventLink: 'Event Link',
-    coOrganizers: 'Co-Organizers',
-    volunteering: 'Volunteering',
-    volunteerRoles: 'Volunteer Roles & Details',
-    disclaimer: 'Disclaimer',
+    uploadImage: 'Photos',
+    addCoverPhoto: 'Add a cover photo',
+    eventLink: 'Event link',
+    coOrganizers: 'Co-organizers',
+    volunteering: 'Volunteers',
+    volunteerRoles: 'How can people help?',
+    disclaimer: 'Good to know',
 
     // Placeholders
     titlePlaceholder: 'Title of the Event',
-    descriptionPlaceholder:
-      "Describe your event - what it's about, what to expect, who should attend...",
+    descriptionPlaceholder: 'What is it about, who should come?',
     selectCategory: 'Select a category',
     categoryPlaceholder: 'Select a category',
     pickDateTime: 'Pick date/time',
@@ -633,7 +647,7 @@ const en: LocaleData = {
       'Important information attendees should know (safety, accessibility, requirements, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: 'I need help in this event',
+    needHelpCheckbox: 'We need volunteers',
 
     // Labels
     selected: 'Selected',
@@ -650,10 +664,37 @@ const en: LocaleData = {
     organizerNameRequired: 'Organizer name is required',
     contactEmailRequired: 'Contact email is required',
     contactEmailInvalid: 'Please enter a valid email address',
-    invalidUrlFormat: 'Website URL must start with www., http://, or https://',
-    disclaimerTooLong: 'Keep the disclaimer to {{max}} characters.',
-    volunteerTooLong: 'Keep the volunteer details to {{max}} characters.',
+    invalidUrlFormat: 'Enter a valid link, like example.com.',
+    disclaimerTooLong: 'Keep this to {{max}} characters.',
+    volunteerTooLong: 'Keep this to {{max}} characters.',
     linkTooLong: 'Keep the link to {{max}} characters.',
+    fromTemplate: 'From template: {{name}}',
+    pickTheDate: 'Pick the date and time',
+    onlyThingLeft: 'The only thing left',
+    starts: 'Starts',
+    ends: 'Ends',
+    noSetEnd: 'No set end',
+    endsAnotherDay: 'Ends another day',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    hours: {
+      one: '1 h',
+      other: '{{count}} h',
+    },
+    publishCheckTitle: 'Publish this event?',
+    publishCheckBody: 'It goes public right away on Explore, Map and Calendar.',
+    publishNow: 'Publish now',
+    timePlaceholder: 'Time',
+    brusselsTime: '{{time}}, Brussels time',
+    namePlaceholder: 'Name your action',
+    byOrganization: 'by {{name}}',
+    addDateTime: 'Add date and time',
+    addPlace: 'Add a place',
+    link: 'Link',
+    where: 'Where',
+    when: 'When',
+    addMore: 'Add more',
+    whenRange: '{{start}} to {{end}}',
     fixBeforePublishing: {
       one: '1 thing to fix before publishing',
       other: '{{count}} things to fix before publishing',
@@ -665,9 +706,16 @@ const en: LocaleData = {
 
     // Progress & Actions
     progressText: 'Required fields completed',
-    requiredFieldsProgress: 'Required fields completed: {{completed}}/{{total}}',
-    saveAsDraft: 'Save as Draft',
-    publish: 'Publish Event',
+    stillNeeded: 'Still needed: {{fields}}',
+    allRequiredFilled: 'All required fields are filled',
+    neededFields: {
+      title: 'title',
+      description: 'description',
+      category: 'category',
+      date: 'date',
+    },
+    saveAsDraft: 'Save draft',
+    publish: 'Publish event',
     creating: 'Creating Event...',
     updating: 'Updating Event...',
 
@@ -770,7 +818,6 @@ const en: LocaleData = {
     reusePastEvent: 'Reuse a past event',
     orReusePastEvent: 'Or reuse a past event',
     use: 'Use',
-    using: 'Using…',
     placeholderCard: 'Your saved templates will appear here',
     hintDefault: 'Tap a template to create an event with its details pre-filled.',
     hintEmpty: 'Using a past event creates a template from it automatically.',
@@ -1178,6 +1225,11 @@ const en: LocaleData = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Replace your unfinished event?',
+    replaceMessage: 'You have an unfinished event on this phone. Starting a new one removes it.',
+    replaceConfirm: 'Start new',
+    photosMissingTitle: 'Some photos are gone',
+    photosMissingMessage: 'Your phone cleared some photos from this event. Add them again.',
     checkingDraft: 'Checking for saved draft...',
     resumeTitle: 'Resume Draft?',
     resumeMessage:
@@ -1187,8 +1239,8 @@ const en: LocaleData = {
     closeTitle: 'Unsaved Changes',
     closeMessage: 'You have unsaved changes. What would you like to do?',
     discard: 'Discard',
-    saveDraft: 'Save Draft',
-    keepEditing: 'Keep Editing',
+    saveDraft: 'Keep and close',
+    keepEditing: 'Keep editing',
     saveWarningTitle: 'Auto-Save Issue',
     saveWarningMessage:
       'Your draft could not be saved automatically. Your changes may be lost if you leave this screen. Please try saving manually or check your device storage.',
@@ -1200,7 +1252,7 @@ const en: LocaleData = {
   // form-autosave / resume feature.
   // ============================================
   drafts: {
-    editTitle: 'Edit Draft',
+    editTitle: 'Edit draft',
     saveAsDraft: 'Save as draft',
     savedConfirmation: 'Draft saved.',
     save: 'Save draft',
@@ -1783,6 +1835,13 @@ const en: LocaleData = {
       startTriage: 'Starts going through your drafts one by one',
       openEditor: 'Opens this draft in the full editor',
       pickDate: 'Opens the date picker',
+      openRepeat: 'Opens how often the event repeats',
+      deleteTemplate: 'Deletes this template',
+      pickDay: 'Uses this day for the event',
+      openWhen: 'Opens the date and time',
+      openWhere: 'Opens the place',
+      openPhotos: 'Opens the photos',
+      resumeDraft: 'Opens your unfinished event',
       pickTime: 'Opens the time picker',
       resizeField: 'Changes how much of the text is shown',
       jumpToField: 'Moves to this field',

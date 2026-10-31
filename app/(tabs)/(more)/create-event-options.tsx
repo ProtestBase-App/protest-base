@@ -1,15 +1,34 @@
-import React from 'react';
-import { StyleSheet, Pressable, View } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { router } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedView } from '@/components/ThemedView';
+
+import TemplatePastEventRow from '@/components/TemplatePastEventRow';
+import { TemplateLaunchTile } from '@/components/TemplateTiles';
 import { ThemedText } from '@/components/ThemedText';
-import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
+import { ThemedView } from '@/components/ThemedView';
+import { GroupLabelRow } from '@/components/ui/GroupLabelRow';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/IconSymbol';
+import { BorderRadius, IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { Routes } from '@/constants/Routes';
-import { Spacing, BorderRadius, Typography, IconSizes } from '@/constants/DesignTokens';
-import { getThemeColors } from '@/utils/themeColors';
+import { useGlobalContext } from '@/context/GlobalProvider';
+import { usePastEvents } from '@/context/PastEventsProvider';
+import { useTemplates } from '@/context/TemplatesProvider';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { getEventDraft } from '@/services/localStorageService';
+import type { FormState } from '@/types/eventForm.types';
+import type { ParsedEventTemplate, PastEventForTemplate } from '@/types/template.types';
+import { getEditedAgoParts, sortDraftsByLastEdited } from '@/utils/draftStatusUtils';
+import { confirmReplaceDraft } from '@/utils/eventDraftGuard';
 import { t } from '@/utils/i18n';
+import { toPastEventForTemplate } from '@/utils/templateUtils';
+import { getThemeColors } from '@/utils/themeColors';
+
+const TEMPLATES_SHOWN = 4;
+const PAST_EVENTS_SHOWN = 3;
+const ACCENT_BORDER = 'rgba(249, 68, 96, 0.35)';
+
+type LocalDraft = { formData: FormState; savedAt: number };
 
 interface OptionRowProps {
   title: string;
@@ -27,11 +46,8 @@ function OptionRow({ title, subtitle, icon, onPress, testID }: OptionRowProps) {
     <Pressable
       style={({ pressed }) => [
         styles.optionRow,
-        {
-          backgroundColor: themeColors.cardBackground,
-          borderBottomColor: themeColors.border,
-        },
-        pressed && styles.optionRowPressed,
+        { borderBottomColor: themeColors.border },
+        pressed && styles.pressed,
       ]}
       onPress={onPress}
       accessibilityRole="button"
@@ -53,32 +69,118 @@ function OptionRow({ title, subtitle, icon, onPress, testID }: OptionRowProps) {
   );
 }
 
-export default function CreateEventOptionsScreen() {
+interface ResumeRowProps {
+  draft: LocalDraft;
+  onPress: () => void;
+}
+
+function ResumeRow({ draft, onPress }: ResumeRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  const handleCreateFromScratch = () => {
-    router.push({
-      pathname: Routes.CREATE_EVENT,
-      params: { source: 'scratch' },
-    });
+  const title = draft.formData.title?.trim() || t('createEventOptions.untitled');
+  const edited = getEditedAgoParts(
+    { $updatedAt: new Date(draft.savedAt).toISOString() },
+    new Date()
+  );
+  const detail = edited
+    ? `${t('createEventOptions.unfinished')} · ${t(edited.key, { count: edited.count })}`
+    : t('createEventOptions.unfinished');
+  const cover = draft.formData.images?.[0];
+  const coverUri = typeof cover === 'string' ? cover : cover?.uri;
+
+  return (
+    <Pressable
+      testID="btn-resume-draft"
+      style={({ pressed }) => [
+        styles.resumeRow,
+        { backgroundColor: themeColors.cardBackground, borderColor: ACCENT_BORDER },
+        pressed && styles.pressed,
+      ]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${detail}`}
+      accessibilityHint={t('a11y.hints.resumeDraft')}
+    >
+      {coverUri ? (
+        <Image accessibilityIgnoresInvertColors source={{ uri: coverUri }} style={styles.thumb} />
+      ) : (
+        <View style={[styles.thumb, { backgroundColor: themeColors.categoryBadgeBg }]}>
+          <IconSymbol name="pencil" size={IconSizes.md} color={themeColors.tint} />
+        </View>
+      )}
+      <View style={styles.textContent}>
+        <ThemedText style={styles.optionTitle} numberOfLines={2}>
+          {title}
+        </ThemedText>
+        <ThemedText style={[styles.optionSubtitle, { color: themeColors.secondaryText }]}>
+          {detail}
+        </ThemedText>
+      </View>
+      <ThemedText style={[styles.resumeAction, { color: themeColors.tint }]}>
+        {t('createEventOptions.resume')}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+export default function CreateEventOptionsScreen() {
+  const colorScheme = useColorScheme();
+  const { userLanguage } = useGlobalContext();
+  const themeColors = getThemeColors(colorScheme);
+  const { templates, isStale: isTemplatesStale, refreshTemplates } = useTemplates();
+  const { pastEvents, isStale: isPastEventsStale, refreshPastEvents } = usePastEvents();
+  const [draft, setDraft] = useState<LocalDraft | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      getEventDraft().then(setDraft);
+      if (isTemplatesStale()) refreshTemplates();
+      if (isPastEventsStale()) refreshPastEvents();
+    }, [isTemplatesStale, isPastEventsStale, refreshTemplates, refreshPastEvents])
+  );
+
+  const recentTemplates = useMemo(
+    () => sortDraftsByLastEdited(templates).slice(0, TEMPLATES_SHOWN),
+    [templates]
+  );
+  const recentPastEvents = useMemo(
+    () =>
+      pastEvents
+        .slice(0, PAST_EVENTS_SHOWN)
+        .map((event) => toPastEventForTemplate(event, userLanguage)),
+    [pastEvents, userLanguage]
+  );
+
+  const openForm = (params: Record<string, string>) => {
+    router.push({ pathname: Routes.CREATE_EVENT, params });
   };
 
-  const handleUseTemplate = () => {
-    router.push(Routes.EVENT_TEMPLATES);
+  const handleResume = () => openForm({ resume: '1', source: 'resume' });
+
+  const handleCreateFromScratch = () => {
+    confirmReplaceDraft(() => openForm({ source: 'scratch' }));
+  };
+
+  const handleLaunchTemplate = (template: ParsedEventTemplate) => {
+    confirmReplaceDraft(() => openForm({ templateId: template.$id, source: 'template' }));
+  };
+
+  const handleUsePastEvent = (event: PastEventForTemplate) => {
+    confirmReplaceDraft(() => openForm({ fromEventId: event.$id, source: 'past' }));
   };
 
   return (
     <ThemedView style={styles.wrapper}>
       <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-        <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          {draft && <ResumeRow draft={draft} onPress={handleResume} />}
+
+          <GroupLabelRow label={t('createEventOptions.startGroup')} />
           <View
             style={[
               styles.optionsCard,
-              {
-                backgroundColor: themeColors.cardBackground,
-                borderColor: themeColors.border,
-              },
+              { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border },
             ]}
           >
             <OptionRow
@@ -93,14 +195,40 @@ export default function CreateEventOptionsScreen() {
               title={t('createEventOptions.templateTitle')}
               subtitle={t('createEventOptions.templateSubtitle')}
               icon="doc.on.doc"
-              onPress={handleUseTemplate}
+              onPress={() => router.push(Routes.EVENT_TEMPLATES)}
             />
           </View>
 
-          <ThemedText style={[styles.footerText, { color: themeColors.subtleText }]}>
-            {t('createEventOptions.footer')}
-          </ThemedText>
-        </View>
+          {recentTemplates.length > 0 && (
+            <>
+              <GroupLabelRow label={t('createEventOptions.templatesGroup')} />
+              <View style={styles.tileGrid}>
+                {recentTemplates.map((template) => (
+                  <View key={template.$id} style={styles.tileCell}>
+                    <TemplateLaunchTile
+                      template={template}
+                      editedLabel=""
+                      onLaunch={() => handleLaunchTemplate(template)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {recentPastEvents.length > 0 && (
+            <>
+              <GroupLabelRow label={t('templates.reusePastEvent')} />
+              {recentPastEvents.map((event) => (
+                <TemplatePastEventRow
+                  key={event.$id}
+                  event={event}
+                  onUse={() => handleUsePastEvent(event)}
+                />
+              ))}
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -113,11 +241,36 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  container: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
+  content: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing['2xl'],
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  resumeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+  },
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeAction: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.families.semiBold,
   },
   optionsCard: {
+    marginHorizontal: Spacing.lg,
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
     borderWidth: 1,
@@ -128,9 +281,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  optionRowPressed: {
-    opacity: 0.7,
   },
   iconCircle: {
     width: 40,
@@ -153,11 +303,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     fontFamily: Typography.families.regular,
   },
-  footerText: {
-    fontSize: Typography.sizes.xs,
-    fontFamily: Typography.families.regular,
-    textAlign: 'center',
-    marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
+  tileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingHorizontal: Spacing.lg,
+  },
+  tileCell: {
+    width: '48.5%',
   },
 });

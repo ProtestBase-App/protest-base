@@ -3,6 +3,7 @@ import type {
   EventFormField,
   EventFormIntent,
   EventFormIssue,
+  EventFormKind,
   FormState,
 } from '@/types/eventForm.types';
 import type { RepeatFormState } from '@/types/eventSeries.types';
@@ -126,6 +127,10 @@ export function validateEventForm(form: FormState, check: EventFormCheck): Event
     }
   } else if (endsBeforeStart(form)) {
     messages.set('end_time', t('eventEdit.invalidTimeRangeError'));
+  } else if (form.end_time && !form.start_time && !messages.has('start_time')) {
+    // A draft may have no date at all, but the backend refuses an end with no start.
+    // The end can't be cleared, so the start is what the organizer can act on.
+    messages.set('start_time', t('createEvent.startTimeRequired'));
   }
 
   const websiteUrl = form.website_url?.trim();
@@ -165,6 +170,23 @@ export function validateEventForm(form: FormState, check: EventFormCheck): Event
     // Some labels are the form's, with its required mark.
     return [{ field, message, label: t(FIELD_LABEL_KEYS[field]).replace(/\s*\*$/, '') }];
   });
+}
+
+/** What the form still asks for, by the name `createEvent.neededFields` knows it by. */
+export function stillNeededFields(
+  form: FormState,
+  kind: EventFormKind,
+  repeat: RepeatFormState | null
+): string[] {
+  if (kind === 'template') return [];
+
+  const required = [
+    { name: 'title', value: form.title },
+    ...(kind === 'edit' ? [] : [{ name: 'category', value: form.categories }]),
+    { name: 'date', value: repeat ? repeat.startLocal : form.start_time },
+    { name: 'description', value: form.description },
+  ];
+  return required.filter((field) => field.value === '').map((field) => field.name);
 }
 
 /** The heading of the issue summary. */

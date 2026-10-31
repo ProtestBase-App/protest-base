@@ -1,9 +1,11 @@
-import { Text, type TextProps, StyleSheet } from 'react-native';
+import type { Ref } from 'react';
+import { Text, type TextInstance, type TextProps, StyleSheet } from 'react-native';
 
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Typography } from '@/constants/DesignTokens';
 
 export type ThemedTextProps = TextProps & {
+  ref?: Ref<TextInstance>;
   lightColor?: string;
   darkColor?: string;
   type?:

@@ -64,8 +64,8 @@ const {
 } = require('@/services/event.service');
 
 // A Tuesday evening in winter: 19:00 to 21:00 in Brussels.
-const START = '2026-12-01T18:00:00.000Z';
-const END = '2026-12-01T20:00:00.000Z';
+const START = '2099-12-01T18:00:00.000Z';
+const END = '2099-12-01T20:00:00.000Z';
 
 const FLAG_ON = { features: { recurringEvents: true } };
 const FLAG_OFF = { features: { recurringEvents: false } };
@@ -137,6 +137,15 @@ describe('EditEvent recurring events', () => {
     });
   };
 
+  const inWhenSurface = async (getByTestId: (id: string) => any, change: () => void) => {
+    fireEvent.press(getByTestId('row-event-when'));
+    change();
+    fireEvent.press(getByTestId('btn-when-done'));
+  };
+
+  const moveToDay = (getByTestId: (id: string) => any, day: string) =>
+    inWhenSurface(getByTestId, () => fireEvent.press(getByTestId(`calendar-day-${day}`)));
+
   const confirmScope = async (getByTestId: (id: string) => any, scope?: 'following') => {
     if (scope) fireEvent.press(getByTestId('series-edit-scope-following'));
     await act(async () => {
@@ -155,6 +164,8 @@ describe('EditEvent recurring events', () => {
       for (const chip of ['once', 'weekly', 'every_2_weeks', 'monthly']) {
         expect(queryByTestId(`repeat-chip-${chip}`)).toBeNull();
       }
+      fireEvent.press(getByTestId('row-event-when'));
+      expect(queryByTestId('row-event-repeat')).toBeNull();
       expect(getByTestId('input-event-start-time')).toBeTruthy();
       expect(getByTestId('input-event-end-time')).toBeTruthy();
     });
@@ -216,15 +227,14 @@ describe('EditEvent recurring events', () => {
 
       it('saves a moved date as a change to this event alone', async () => {
         const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-start-time', '2026-12-02T18:00:00.000Z');
-        changeField(getByTestId, 'input-event-end-time', '2026-12-02T20:00:00.000Z');
+        await moveToDay(getByTestId, '2099-12-02');
         await save(getByTestId);
 
         await confirmScope(getByTestId);
 
         expect(updateEvent.mock.calls[0][1]).toMatchObject({
-          start_time: '2026-12-02T18:00:00.000Z',
-          end_time: '2026-12-02T20:00:00.000Z',
+          start_time: '2099-12-02T18:00:00.000Z',
+          end_time: '2099-12-02T20:00:00.000Z',
         });
         expect(editSeries).not.toHaveBeenCalled();
       });
@@ -298,28 +308,19 @@ describe('EditEvent recurring events', () => {
 
       it('sends the new clock time when only the time of day changed', async () => {
         const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-start-time', '2026-12-01T18:30:00.000Z');
+        await inWhenSurface(getByTestId, () =>
+          changeField(getByTestId, 'input-event-start-time', '2099-12-01T18:30:00.000Z')
+        );
         await save(getByTestId);
 
         expect(scopeState(getByTestId, 'following')).toMatchObject({ disabled: false });
         await confirmScope(getByTestId, 'following');
 
+        // The end moves with the start, so the event keeps its length.
         expect(editSeries.mock.calls[0][1]).toMatchObject({
           start_local: '19:30',
-          end_local: '21:00',
+          end_local: '21:30',
         });
-      });
-
-      it('clears the end time of the series when the end was emptied', async () => {
-        const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-end-time', '');
-        await save(getByTestId);
-
-        await confirmScope(getByTestId, 'following');
-
-        const payload = editSeries.mock.calls[0][1];
-        expect(payload.start_local).toBe('19:00');
-        expect(payload.end_local).toBeNull();
       });
 
       it('reads the times in Brussels summer time too', async () => {
@@ -344,8 +345,8 @@ describe('EditEvent recurring events', () => {
         // Midnight in Brussels: the shape of a date-only event.
         getEventByIdBackend.mockResolvedValue(
           seriesEvent({
-            start_time: '2026-12-01T23:00:00.000Z',
-            end_time: '2026-12-02T22:59:59.999Z',
+            start_time: '2099-12-01T23:00:00.000Z',
+            end_time: '2099-12-02T22:59:59.999Z',
             all_day: true,
           })
         );
@@ -378,11 +379,9 @@ describe('EditEvent recurring events', () => {
     });
 
     describe('a date that moved', () => {
-      const MOVED = '2026-12-02T18:00:00.000Z';
-
       it('greys out "this and all following events", with the reason', async () => {
         const { getByTestId, getByText } = await renderEdit();
-        changeField(getByTestId, 'input-event-start-time', MOVED);
+        await moveToDay(getByTestId, '2099-12-02');
         await save(getByTestId);
 
         expect(scopeState(getByTestId, 'following')).toMatchObject({
@@ -395,8 +394,7 @@ describe('EditEvent recurring events', () => {
 
       it('cannot be widened: a press on it does nothing and confirming saves this event only', async () => {
         const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-start-time', MOVED);
-        changeField(getByTestId, 'input-event-end-time', '2026-12-02T20:00:00.000Z');
+        await moveToDay(getByTestId, '2099-12-02');
         await save(getByTestId);
 
         fireEvent.press(getByTestId('series-edit-scope-following'), {
@@ -406,12 +404,17 @@ describe('EditEvent recurring events', () => {
 
         expect(editSeries).not.toHaveBeenCalled();
         expect(updateEvent).toHaveBeenCalledTimes(1);
-        expect(updateEvent.mock.calls[0][1]).toMatchObject({ start_time: MOVED });
+        expect(updateEvent.mock.calls[0][1]).toMatchObject({
+          start_time: '2099-12-02T18:00:00.000Z',
+        });
       });
 
       it('is also what an event made to last several days is', async () => {
         const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-end-time', '2026-12-03T20:00:00.000Z');
+        await inWhenSurface(getByTestId, () => {
+          fireEvent.press(getByTestId('when-other-day'));
+          changeField(getByTestId, 'input-event-end-time', '2099-12-03T20:00:00.000Z');
+        });
         await save(getByTestId);
 
         expect(scopeState(getByTestId, 'following')).toMatchObject({ disabled: true });
@@ -419,7 +422,9 @@ describe('EditEvent recurring events', () => {
 
       it('is also what an end at the same clock time as the start is', async () => {
         const { getByTestId } = await renderEdit();
-        changeField(getByTestId, 'input-event-end-time', START);
+        await inWhenSurface(getByTestId, () =>
+          changeField(getByTestId, 'input-event-end-time', START)
+        );
         await save(getByTestId);
 
         expect(scopeState(getByTestId, 'following')).toMatchObject({ disabled: true });
@@ -472,7 +477,7 @@ describe('EditEvent recurring events', () => {
 
     it('refuses a moved date, which a series cannot take, and sends nothing', async () => {
       const { getByTestId } = await renderEdit();
-      changeField(getByTestId, 'input-event-start-time', '2026-12-02T18:00:00.000Z');
+      await moveToDay(getByTestId, '2099-12-02');
 
       await save(getByTestId);
 
@@ -508,12 +513,12 @@ describe('EditEvent recurring events', () => {
 
     it('lets a moved date through, as a single event can', async () => {
       const { getByTestId } = await renderEdit(FLAG_OFF);
-      changeField(getByTestId, 'input-event-start-time', '2026-12-02T18:00:00.000Z');
+      await moveToDay(getByTestId, '2099-12-02');
 
       await save(getByTestId);
 
       expect(updateEvent.mock.calls[0][1]).toMatchObject({
-        start_time: '2026-12-02T18:00:00.000Z',
+        start_time: '2099-12-02T18:00:00.000Z',
       });
       expect(alertSpy).not.toHaveBeenCalledWith('common.error', 'series.edit.dateLocked');
     });

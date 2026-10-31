@@ -252,6 +252,25 @@ describe('validateEventForm', () => {
       expect(fields(issues)).toEqual(['website_url']);
     });
 
+    it('asks for a start when an undated draft has an end, which the backend refuses', () => {
+      const issues = validateEventForm(
+        { ...filled, start_time: '', end_time: '2099-01-02T10:00:00.000Z' },
+        { intent: 'saveDraft', requireDraftContent: false }
+      );
+
+      expect(fields(issues)).toEqual(['start_time']);
+      expect(messageOf(issues, 'start_time')).toBe('createEvent.startTimeRequired');
+    });
+
+    it('leaves the end of a draft series alone: the rule sets its dates', () => {
+      const issues = validateEventForm(
+        { ...filled, start_time: '', end_time: '2099-01-02T10:00:00.000Z' },
+        { intent: 'saveDraft', repeat }
+      );
+
+      expect(issues).toEqual([]);
+    });
+
     it('always wants a title', () => {
       expect(fields(validateEventForm({ ...filled, title: '' }, { intent: 'saveDraft' }))).toEqual([
         'title',

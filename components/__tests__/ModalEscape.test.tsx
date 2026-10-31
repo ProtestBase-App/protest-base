@@ -21,6 +21,7 @@ describe('modals whose scrim is the only way out', () => {
         visible
         onClose={onClose}
         onEditDetails={jest.fn()}
+        onSaveAsTemplate={jest.fn()}
         onCancelEvent={jest.fn()}
       />
     );

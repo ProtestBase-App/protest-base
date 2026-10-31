@@ -101,6 +101,8 @@ const fr: LocaleData = {
   // Common - General UI elements
   // ============================================
   common: {
+    saving: 'Enregistrement…',
+    publishing: 'Publication…',
     ok: 'OK',
     cancel: 'Annuler',
     save: 'Enregistrer',
@@ -165,8 +167,7 @@ const fr: LocaleData = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Créer un modèle',
-    createFromEventTitle: "Créer un modèle à partir d'un événement",
+    createTitle: 'Nouveau modèle',
     editTitle: 'Modifier le modèle',
 
     // Subtitles and descriptions
@@ -181,7 +182,7 @@ const fr: LocaleData = {
     // Field labels
     nameLabel: 'Nom du modèle *',
     descriptionLabel: 'Description du modèle (Facultatif)',
-    namePlaceholder: 'Donnez un nom à votre modèle (ex: Réunion mensuelle)',
+    namePlaceholder: 'ex. : Veillée mensuelle pour le logement',
     descriptionPlaceholder: 'À quoi sert ce modèle ?',
 
     // Buttons
@@ -197,6 +198,15 @@ const fr: LocaleData = {
     nameMissing: 'Veuillez entrer un nom de modèle.',
     dataTooLong: 'Ce modèle est trop long pour être enregistré. Raccourcissez la description.',
     volunteerDescMissing: 'Veuillez décrire comment les bénévoles peuvent aider.',
+    saveFromEventTitle: 'Enregistrer comme modèle',
+    saveFromEventDesc: 'Réutiliser les détails de cet événement',
+    keepGroup: 'Garder',
+    datesNeverSaved: 'Les dates ne sont jamais enregistrées dans un modèle.',
+    partText: 'Titre et texte',
+    partLocation: 'Lieu',
+    nameHelp: 'Seule votre organisation voit ce nom.',
+    dateAsked: 'Date et heure',
+    dateAskedHint: 'Vous les choisissez en utilisant le modèle',
 
     // Delete confirmation
     deleteConfirmTitle: 'Supprimer le modèle',
@@ -211,12 +221,15 @@ const fr: LocaleData = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Commencer',
+    templatesGroup: 'Vos modèles',
+    resume: 'Reprendre',
+    unfinished: 'Inachevé',
+    untitled: 'Événement sans titre',
     blankTitle: 'Planifier une nouvelle action',
-    blankSubtitle: 'Créer un nouvel événement avec un formulaire vierge',
+    blankSubtitle: "Partir d'un événement vierge",
     templateTitle: 'Utiliser un modèle',
     templateSubtitle: "Pré-remplir avec les détails d'un événement enregistré",
-    footer:
-      'Les modèles font gagner du temps pour les événements récurrents aux détails similaires.',
   },
 
   // ============================================
@@ -573,17 +586,17 @@ const fr: LocaleData = {
     contactEmail: 'E-mail de contact',
     helpNeeded: 'Aide nécessaire',
     helpDescription: 'De quelle aide avez-vous besoin ?',
-    uploadImage: 'Télécharger une image',
+    uploadImage: 'Photos',
+    addCoverPhoto: 'Ajouter une photo de couverture',
     eventLink: "Lien de l'événement",
     coOrganizers: 'Co-organisateurs',
-    volunteering: 'Bénévolat',
-    volunteerRoles: 'Rôles et détails des bénévoles',
-    disclaimer: 'Avertissement',
+    volunteering: 'Bénévoles',
+    volunteerRoles: 'Comment aider ?',
+    disclaimer: 'Bon à savoir',
 
     // Placeholders
     titlePlaceholder: "Titre de l'événement",
-    descriptionPlaceholder:
-      "Décrivez votre événement - de quoi il s'agit, à quoi s'attendre, qui devrait y assister...",
+    descriptionPlaceholder: "De quoi s'agit-il, qui devrait venir ?",
     selectCategory: 'Sélectionnez une catégorie',
     categoryPlaceholder: 'Sélectionnez une catégorie',
     pickDateTime: 'Choisir date/heure',
@@ -641,7 +654,7 @@ const fr: LocaleData = {
       'Informations importantes que les participants doivent connaître (sécurité, accessibilité, exigences, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: "J'ai besoin d'aide pour cet événement",
+    needHelpCheckbox: 'Nous cherchons des bénévoles',
 
     // Labels
     selected: 'Sélectionné',
@@ -658,10 +671,37 @@ const fr: LocaleData = {
     organizerNameRequired: "Le nom de l'organisateur est obligatoire",
     contactEmailRequired: "L'e-mail de contact est obligatoire",
     contactEmailInvalid: 'Veuillez entrer une adresse e-mail valide',
-    invalidUrlFormat: "L'URL du site doit commencer par www., http:// ou https://",
-    disclaimerTooLong: "Limitez l'avertissement à {{max}} caractères.",
-    volunteerTooLong: 'Limitez les détails pour les bénévoles à {{max}} caractères.',
+    invalidUrlFormat: 'Saisissez un lien valide, comme example.com.',
+    disclaimerTooLong: 'Limitez ce texte à {{max}} caractères.',
+    volunteerTooLong: 'Limitez ce texte à {{max}} caractères.',
     linkTooLong: 'Limitez le lien à {{max}} caractères.',
+    fromTemplate: 'Du modèle : {{name}}',
+    pickTheDate: "Choisissez la date et l'heure",
+    onlyThingLeft: 'Il ne reste que ça',
+    starts: 'Début',
+    ends: 'Fin',
+    noSetEnd: 'Sans heure de fin',
+    endsAnotherDay: 'Finit un autre jour',
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
+    hours: {
+      one: '1 h',
+      other: '{{count}} h',
+    },
+    publishCheckTitle: 'Publier cet événement ?',
+    publishCheckBody: 'Il devient public tout de suite sur Explorer, Carte et Calendrier.',
+    publishNow: 'Publier maintenant',
+    timePlaceholder: 'Heure',
+    brusselsTime: '{{time}}, heure de Bruxelles',
+    namePlaceholder: 'Nommez votre action',
+    byOrganization: 'par {{name}}',
+    addDateTime: "Ajouter la date et l'heure",
+    addPlace: 'Ajouter un lieu',
+    link: 'Lien',
+    where: 'Où',
+    when: 'Quand',
+    addMore: 'Ajouter',
+    whenRange: '{{start}} à {{end}}',
     fixBeforePublishing: {
       one: '1 point à corriger avant de publier',
       other: '{{count}} points à corriger avant de publier',
@@ -673,9 +713,16 @@ const fr: LocaleData = {
 
     // Progress & Actions
     progressText: 'Champs obligatoires complétés',
-    requiredFieldsProgress: 'Champs obligatoires complétés : {{completed}}/{{total}}',
-    saveAsDraft: 'Enregistrer comme brouillon',
-    publish: "Publier l'événement",
+    stillNeeded: 'Il manque : {{fields}}',
+    allRequiredFilled: 'Tous les champs obligatoires sont remplis',
+    neededFields: {
+      title: 'titre',
+      description: 'description',
+      category: 'catégorie',
+      date: 'date',
+    },
+    saveAsDraft: 'Brouillon',
+    publish: 'Publier',
     creating: "Création de l'événement...",
     updating: "Mise à jour de l'événement...",
 
@@ -784,7 +831,6 @@ const fr: LocaleData = {
     reusePastEvent: 'Réutiliser un événement passé',
     orReusePastEvent: 'Ou réutilisez un événement passé',
     use: 'Utiliser',
-    using: 'En cours…',
     placeholderCard: 'Vos modèles enregistrés apparaîtront ici',
     hintDefault: 'Touchez un modèle pour créer un événement avec ses détails préremplis.',
     hintEmpty: 'Utiliser un événement passé crée automatiquement un modèle.',
@@ -1204,6 +1250,13 @@ const fr: LocaleData = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Remplacer votre événement inachevé ?',
+    replaceMessage:
+      'Vous avez un événement inachevé sur ce téléphone. En commencer un nouveau le supprime.',
+    replaceConfirm: 'Nouveau',
+    photosMissingTitle: 'Des photos ont disparu',
+    photosMissingMessage:
+      'Votre téléphone a effacé des photos de cet événement. Ajoutez-les à nouveau.',
     checkingDraft: 'Vérification du brouillon enregistré...',
     resumeTitle: 'Reprendre le brouillon ?',
     resumeMessage:
@@ -1213,7 +1266,7 @@ const fr: LocaleData = {
     closeTitle: 'Modifications non enregistrées',
     closeMessage: 'Vous avez des modifications non enregistrées. Que souhaitez-vous faire ?',
     discard: 'Supprimer',
-    saveDraft: 'Enregistrer le brouillon',
+    saveDraft: 'Garder et fermer',
     keepEditing: 'Continuer à modifier',
     saveWarningTitle: 'Problème de sauvegarde automatique',
     saveWarningMessage:
@@ -1417,7 +1470,7 @@ const fr: LocaleData = {
       weekOfMonth: 'Lequel dans le mois',
       startTime: 'Heure de début',
       endTime: 'Heure de fin',
-      pickTime: 'Choisissez une heure',
+      pickTime: "Choisir l'heure",
       timeHint:
         "Heure de Bruxelles. Une heure de fin antérieure à l'heure de début tombe le lendemain.",
       startsOn: 'À partir du',
@@ -1837,6 +1890,13 @@ const fr: LocaleData = {
       startTriage: 'Commence le tri de vos brouillons, un par un',
       openEditor: "Ouvre ce brouillon dans l'éditeur complet",
       pickDate: 'Ouvre le sélecteur de date',
+      openRepeat: "Ouvre la fréquence de l'événement",
+      deleteTemplate: 'Supprime ce modèle',
+      pickDay: "Utilise ce jour pour l'événement",
+      openWhen: "Ouvre la date et l'heure",
+      openWhere: 'Ouvre le lieu',
+      openPhotos: 'Ouvre les photos',
+      resumeDraft: 'Ouvre votre événement inachevé',
       pickTime: "Ouvre le sélecteur d'heure",
       resizeField: 'Change la quantité de texte affichée',
       jumpToField: 'Va à ce champ',

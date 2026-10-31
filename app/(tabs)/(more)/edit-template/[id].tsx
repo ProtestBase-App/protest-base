@@ -1,8 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
+import { StyleSheet, Alert, Pressable, TouchableOpacity, BackHandler } from 'react-native';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { TemplateMetaFields } from '@/components/event-form/TemplateMetaFields';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
 import { ThemedText } from '@/components/ThemedText';
@@ -12,7 +15,6 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { getTemplate } from '@/services/template.service';
 import { resolveImageUrls } from '@/services/storage.service';
 import { useTemplates } from '@/context/TemplatesProvider';
-import { TemplateEventData } from '@/types/template.types';
 import CustomButton from '@/components/CustomButton';
 import FormField from '@/components/FormField';
 import { useGlobalContext } from '@/context/GlobalProvider';
@@ -21,10 +23,12 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
-import { Spacing, Typography } from '@/constants/DesignTokens';
+import { Spacing, Typography, IconSizes } from '@/constants/DesignTokens';
 import { TEMPLATE_LIMITS } from '@/constants/EventConfig';
+import { buildTemplateEventData, createBlankForm } from '@/utils/eventFormData';
 import { isTemplateDataTooLong, validateEventForm } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
+import { getThemeColors } from '@/utils/themeColors';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
 
@@ -79,6 +83,7 @@ export default function EditTemplateScreen() {
   const { removeTemplate, editTemplate } = useTemplates();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const themeColors = getThemeColors(colorScheme);
   const { id } = useLocalSearchParams<{ id: string | string[] }>();
   const templateId = Array.isArray(id) ? id[0] : id;
 
@@ -89,28 +94,7 @@ export default function EditTemplateScreen() {
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
 
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [form, setForm] = useState<FormState>(createBlankForm);
 
   const validation = useEventFormValidation((intent) =>
     validateEventForm(form, { intent, templateName })
@@ -156,6 +140,8 @@ export default function EditTemplateScreen() {
   );
 
   const handleCloseAttempt = useCallback(() => {
+    if (isSubmitting) return;
+
     if (!formHasChanges) {
       router.back();
       return;
@@ -174,9 +160,11 @@ export default function EditTemplateScreen() {
         style: 'cancel',
       },
     ]);
-  }, [formHasChanges]);
+  }, [formHasChanges, isSubmitting]);
 
   useEffect(() => {
+    if (EVENT_FORM_SHELL.editTemplate) return;
+
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleCloseAttempt();
       return true;
@@ -248,25 +236,7 @@ export default function EditTemplateScreen() {
     if (!assertOnlineOrAlert(isOffline)) return;
     if (!validation.check('saveTemplate')) return;
 
-    const eventData: TemplateEventData = {};
-
-    if (form.organization_id) eventData.organization_id = form.organization_id;
-
-    if (form.title) eventData.title = form.title;
-    if (form.description) eventData.description = form.description;
-    if (form.street_address) eventData.street_address = form.street_address;
-    if (form.city) eventData.city = form.city;
-    if (form.region) eventData.region = form.region;
-    if (form.country) eventData.country = form.country;
-    if (form.postal_code) eventData.postal_code = form.postal_code;
-    if (form.website_url) eventData.website_url = form.website_url;
-    if (form.categories) eventData.categories = form.categories;
-    if (form.disclaimer) eventData.disclaimer = form.disclaimer;
-    if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
-    if (form.help_needed) {
-      eventData.help_needed = form.help_needed;
-      if (form.help_description) eventData.help_description = form.help_description;
-    }
+    const eventData = buildTemplateEventData(form, form.organization_id);
 
     if (isTemplateDataTooLong(eventData)) {
       Alert.alert(t('common.error'), t('template.dataTooLong'));
@@ -338,7 +308,7 @@ export default function EditTemplateScreen() {
     return <Redirect href="/(tabs)/(more)/event-templates" />;
   }
 
-  if (loading || isSubmitting || isDeleting) {
+  if (loading || isDeleting) {
     return (
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />
@@ -347,10 +317,73 @@ export default function EditTemplateScreen() {
     );
   }
 
+  if (EVENT_FORM_SHELL.editTemplate) {
+    return (
+      <>
+        <EventFormShell
+          kind="template"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          inSheet
+          busy={isSubmitting}
+          closeLabel="Close edit template screen"
+          onBack={() => {
+            handleCloseAttempt();
+            return true;
+          }}
+          coverActions={
+            <Pressable
+              testID="btn-edit-template-delete"
+              onPress={handleDelete}
+              style={[
+                styles.deleteAction,
+                {
+                  backgroundColor: themeColors.cardBackground,
+                  borderColor: themeColors.cardBorder,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('template.deleteButton')}
+              accessibilityHint={t('a11y.hints.deleteTemplate')}
+            >
+              <IconSymbol name="trash" size={IconSizes.md} color={themeColors.destructive} />
+            </Pressable>
+          }
+          heading={t('template.editTitle')}
+          intro={
+            <TemplateMetaFields
+              name={templateName}
+              onChangeName={setTemplateName}
+              note={templateDescription}
+              onChangeNote={setTemplateDescription}
+              nameError={validation.errors.template_name}
+              nameTestID="input-edit-template-name"
+              noteTestID="input-edit-template-description"
+            />
+          }
+          footer={
+            <CustomButton
+              testID="btn-edit-template-save"
+              title={isSubmitting ? t('common.saving') : t('common.save')}
+              handlePress={handleSave}
+              pill
+              containerStyles={styles.buttonSave}
+              isLoading={isSubmitting}
+            />
+          }
+        />
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
+    );
+  }
+
   return (
     <ThemedView style={styles.wrapper}>
       <FormScreenScaffold
         contentContainerStyle={styles.scrollViewContent}
+        inSheet
         footer={
           <ThemedView
             style={[styles.footerWrapper, { borderTopColor: isDark ? '#374151' : '#E5E7EB' }]}
@@ -361,10 +394,11 @@ export default function EditTemplateScreen() {
                 handlePress={handleBackPress}
                 containerStyles={styles.buttonCancel}
                 isLoading={false}
+                disabled={isSubmitting}
               />
               <CustomButton
                 testID="btn-edit-template-save"
-                title={t('common.save')}
+                title={isSubmitting ? t('common.saving') : t('common.save')}
                 handlePress={handleSave}
                 containerStyles={styles.buttonSave}
                 isLoading={isSubmitting}
@@ -373,7 +407,7 @@ export default function EditTemplateScreen() {
           </ThemedView>
         }
       >
-        <ThemedView style={styles.container}>
+        <ThemedView style={styles.container} pointerEvents={isSubmitting ? 'none' : 'auto'}>
           <TouchableOpacity
             onPress={handleBackPress}
             style={styles.closeButton}
@@ -531,5 +565,13 @@ const styles = StyleSheet.create({
   buttonSave: {
     flex: 1,
     minHeight: 48,
+  },
+  deleteAction: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

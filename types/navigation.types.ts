@@ -20,17 +20,3 @@ export type CreateEventScreenParams = {
   templateId?: string;
   source?: 'scratch' | 'template';
 };
-
-/**
- * Search params for create-template screen when pre-filling from past event.
- */
-export type CreateTemplateSearchParams = {
-  /** JSON stringified TemplateEventData from a past event */
-  sourceEventData?: string;
-  /** Source event ID for reference (optional, for analytics/debugging) */
-  sourceEventId?: string;
-  /** Pre-fill template name suggestion (e.g., "From: Monthly Meetup") */
-  suggestedName?: string;
-  /** JSON stringified array of hosted image URLs from the source event */
-  sourceImages?: string;
-};

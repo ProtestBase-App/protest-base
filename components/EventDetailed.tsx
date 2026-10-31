@@ -8,7 +8,6 @@ import {
   Alert,
   View,
   FlatList,
-  TurboModuleRegistry,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
@@ -20,7 +19,6 @@ import * as Calendar from 'expo-calendar/legacy';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
 import { EventWeatherCard } from '@/components/EventWeatherCard';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
@@ -37,33 +35,8 @@ import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
+import { EventMapPreview } from '@/components/EventMapPreview';
 
-// Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
-// import time, which throws when the native modules are missing (Expo Go,
-// Jest) — so probe non-throwingly first and require behind a guard.
-let MapLibreMap: any = null;
-let Camera: any = null;
-let MapMarker: any = null;
-let isMapAvailable = false;
-
-if (TurboModuleRegistry.get('MLRNMapViewModule')) {
-  try {
-    const MC = require('@/components/MapComponents');
-    MapLibreMap = MC.MapLibreMap;
-    Camera = MC.Camera;
-    MapMarker = MC.MapMarker;
-    isMapAvailable = !!(MapLibreMap && Camera && MapMarker);
-    logger.info('[EventDetailed] Map components loaded', { isMapAvailable });
-  } catch (error) {
-    logger.warn('[EventDetailed] MapLibre failed to load', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-} else {
-  logger.info('[EventDetailed] MapLibre native module not available — map hidden');
-}
-
-const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 const HERO_HEIGHT = 260;
 
 const isValidUrl = (url: string): boolean => {
@@ -135,7 +108,6 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const [mapLoaded, setMapLoaded] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -441,7 +413,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               {isCreator ? (
                 <TouchableOpacity
                   testID="event-creator-menu"
-                  style={[styles.creatorPill, { backgroundColor: themeColors.tint }]}
+                  style={[styles.creatorPill, { backgroundColor: themeColors.cta }]}
                   onPress={onOpenCreatorMenu}
                   accessibilityRole="button"
                   accessibilityLabel={t('events.modifyPill')}
@@ -877,49 +849,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <ThemedText style={styles.sectionTitle}>{t('events.location')}</ThemedText>
 
               <View style={[styles.mapContainer, { borderColor: themeColors.cardBorder }]}>
-                {isMapAvailable && MapLibreMap && Camera && MapMarker && (
-                  <>
-                    <MapLibreMap
-                      style={styles.map}
-                      mapStyle={OPENFREEMAP_STYLE}
-                      attribution={true}
-                      logo={false}
-                      dragPan={false}
-                      touchZoom={false}
-                      doubleTapZoom={false}
-                      doubleTapHoldZoom={false}
-                      touchRotate={false}
-                      touchPitch={false}
-                      onDidFinishLoadingMap={() => setMapLoaded(true)}
-                    >
-                      <Camera
-                        initialViewState={{
-                          center: [event.geocod_lng!, event.geocod_lat!],
-                          zoom: 13,
-                        }}
-                      />
-                      <MapMarker
-                        coordinate={[event.geocod_lng!, event.geocod_lat!]}
-                        markerWidth={40}
-                        markerHeight={22}
-                      />
-                    </MapLibreMap>
-                    {!mapLoaded && (
-                      <View
-                        style={[
-                          styles.mapLoadingOverlay,
-                          { backgroundColor: themeColors.cardBackground },
-                        ]}
-                      >
-                        <BrandLoader />
-                      </View>
-                    )}
-                  </>
-                )}
+                <EventMapPreview latitude={event.geocod_lat!} longitude={event.geocod_lng!} />
 
                 <TouchableOpacity
                   accessibilityRole="button"
-                  style={[styles.floatingDirections, { backgroundColor: themeColors.tint }]}
+                  style={[styles.floatingDirections, { backgroundColor: themeColors.cta }]}
                   onPress={() => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)}
                   activeOpacity={0.85}
                 >

@@ -10,6 +10,7 @@ jest.mock('@/utils/i18n', () => ({
 jest.mock('@/services/event.service', () => ({
   createEventBackend: jest.fn(),
   createDraftEvent: jest.fn(),
+  getEventByIdBackend: jest.fn(),
   // The screen branches on `instanceof DuplicateEventError`; without it in this
   // factory the import is undefined and `instanceof` throws a TypeError.
   DuplicateEventError: class DuplicateEventError extends Error {
@@ -38,12 +39,17 @@ jest.mock('@/services/localStorageService', () => ({
 import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
+import { spyOnBackHandler } from '@/test-utils/backHandler';
 import { renderWithProviders, createMockUser } from '@/test-utils/render';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import CreateEventModal from '../(tabs)/(more)/create-event';
 
 // Import router for mock access
 const { useLocalSearchParams } = require('expo-router');
+
+jest.mock('@/utils/localImages', () => ({
+  keepExistingImages: jest.fn((images) => images),
+}));
 
 describe('CreateEventModal', () => {
   const mockUser = createMockUser();
@@ -162,7 +168,7 @@ describe('CreateEventModal', () => {
 
   describe('Rendering', () => {
     it('should render EventForm component when user is logged in with organizations', async () => {
-      const { findAllByText } = renderWithProviders(<CreateEventModal />, {
+      const { findByTestId } = renderWithProviders(<CreateEventModal />, {
         providerOverrides: {
           globalContext: {
             user: mockUser,
@@ -190,9 +196,7 @@ describe('CreateEventModal', () => {
         },
       });
 
-      // Wait for form to render - title appears (possibly twice, title and button)
-      const elements = await findAllByText('more.createEvent');
-      expect(elements.length).toBeGreaterThan(0);
+      expect(await findByTestId('input-event-title')).toBeTruthy();
     });
 
     it('should show loading state when checking draft', async () => {
@@ -359,7 +363,7 @@ describe('CreateEventModal', () => {
       getEventDraft.mockResolvedValue(null);
       clearEventDraft.mockResolvedValue(undefined);
 
-      const { findAllByText } = renderWithProviders(<CreateEventModal />, {
+      const { findByTestId } = renderWithProviders(<CreateEventModal />, {
         providerOverrides: {
           globalContext: {
             user: mockUser,
@@ -388,9 +392,7 @@ describe('CreateEventModal', () => {
       });
 
       expect(getTemplate).toHaveBeenCalledWith('template-1');
-      expect(clearEventDraft).toHaveBeenCalled();
-      const elements = await findAllByText('more.createEvent');
-      expect(elements.length).toBeGreaterThan(0);
+      expect(await findByTestId('input-event-title')).toBeTruthy();
     });
   });
   // The backend's duplicate guard in block mode: create is refused with 409
@@ -481,22 +483,15 @@ describe('CreateEventModal', () => {
       const { getEventDraft } = require('@/services/localStorageService');
       getEventDraft.mockResolvedValue({ formData: { ...filledDraft, ...formOverrides } });
 
+      useLocalSearchParams.mockReturnValue({ resume: '1' });
+
       const utils = renderWithProviders(<CreateEventModal />, {
         providerOverrides: {
           ...providerOverrides,
           ...(features ? { versionCheckContext: { features } } : {}),
         },
       });
-
-      // The resume prompt fires on mount; take the "resume" branch.
-      await waitFor(() =>
-        expect(alertSpy.mock.calls.some((c) => c[0] === 'draft.resumeTitle')).toBe(true)
-      );
-      const resume = alertSpy.mock.calls.find((c) => c[0] === 'draft.resumeTitle');
-      const buttons = (resume?.[2] ?? []) as { text?: string; onPress?: () => void }[];
-      await act(async () => {
-        buttons.find((b) => b.text === 'draft.resumeDraft')?.onPress?.();
-      });
+      await utils.findByTestId('btn-create-event-submit');
 
       return { ...utils, alertSpy };
     };
@@ -504,6 +499,17 @@ describe('CreateEventModal', () => {
     const submit = async (getByTestId: (id: string) => any) => {
       await act(async () => {
         fireEvent.press(getByTestId('btn-create-event-submit'));
+      });
+
+      // A valid form stops at the publish check first.
+      let confirm;
+      try {
+        confirm = getByTestId('btn-publish-confirm');
+      } catch {
+        return;
+      }
+      await act(async () => {
+        fireEvent.press(confirm);
       });
     };
 
@@ -626,6 +632,139 @@ describe('CreateEventModal', () => {
       expect(createEventBackend.mock.calls[0][0].help_description).toBeUndefined();
 
       alertSpy.mockRestore();
+    });
+
+    describe('resuming the local draft', () => {
+      it('never brings a draft back without being asked to', async () => {
+        const { getEventDraft } = require('@/services/localStorageService');
+        useLocalSearchParams.mockReturnValue({});
+        getEventDraft.mockResolvedValue({ formData: filledDraft, savedAt: Date.now() });
+
+        const { findByTestId, queryByDisplayValue } = renderWithProviders(<CreateEventModal />, {
+          providerOverrides,
+        });
+        await findByTestId('btn-create-event-submit');
+
+        expect(queryByDisplayValue('Climate March')).toBeNull();
+      });
+
+      it('says so when photos saved with it are gone', async () => {
+        const { keepExistingImages } = require('@/utils/localImages');
+        keepExistingImages.mockReturnValueOnce([]);
+        const { alertSpy } = await renderWithFilledForm();
+
+        await waitFor(() =>
+          expect(alertSpy).toHaveBeenCalledWith(
+            'draft.photosMissingTitle',
+            'draft.photosMissingMessage'
+          )
+        );
+
+        alertSpy.mockRestore();
+      });
+    });
+
+    describe('reusing a past event', () => {
+      it('fills the form from the event, without its dates', async () => {
+        const { getEventByIdBackend } = require('@/services/event.service');
+        getEventByIdBackend.mockResolvedValue({
+          $id: 'evt-9',
+          title: 'Last march',
+          organization_id: 'org-1',
+          start_time: '2020-01-01T10:00:00.000Z',
+          images: ['https://example.com/a.jpg'],
+        });
+        useLocalSearchParams.mockReturnValue({ fromEventId: 'evt-9' });
+
+        const { findByDisplayValue, getByText } = renderWithProviders(<CreateEventModal />, {
+          providerOverrides,
+        });
+
+        expect(await findByDisplayValue('Last march')).toBeTruthy();
+        expect(getEventByIdBackend).toHaveBeenCalledWith('evt-9');
+        expect(getByText('createEvent.stillNeeded')).toBeTruthy();
+      });
+    });
+
+    describe('while sending', () => {
+      const neverFinishes = () => new Promise(() => {});
+
+      it('keeps the form on screen and says what it is doing', async () => {
+        createEventBackend.mockImplementation(neverFinishes);
+        const { getByTestId, getByDisplayValue, getByText, alertSpy } =
+          await renderWithFilledForm();
+
+        await submit(getByTestId);
+
+        expect(getByDisplayValue('Climate March')).toBeTruthy();
+        expect(getByText('common.publishing')).toBeTruthy();
+
+        alertSpy.mockRestore();
+      });
+
+      it('says so when it is the draft being saved', async () => {
+        const { createDraftEvent } = require('@/services/event.service');
+        createDraftEvent.mockImplementation(neverFinishes);
+        const { getByTestId, getByText, alertSpy } = await renderWithFilledForm();
+
+        await act(async () => {
+          fireEvent.press(getByTestId('btn-create-event-draft'));
+        });
+
+        expect(getByText('common.saving')).toBeTruthy();
+
+        alertSpy.mockRestore();
+      });
+
+      it('sends once, whichever button is pressed again', async () => {
+        const { createDraftEvent } = require('@/services/event.service');
+        createEventBackend.mockImplementation(neverFinishes);
+        const { getByTestId, alertSpy } = await renderWithFilledForm();
+
+        await submit(getByTestId);
+        await submit(getByTestId);
+        await act(async () => {
+          fireEvent.press(getByTestId('btn-create-event-draft'));
+        });
+
+        expect(createEventBackend).toHaveBeenCalledTimes(1);
+        expect(createDraftEvent).not.toHaveBeenCalled();
+
+        alertSpy.mockRestore();
+      });
+
+      it('ignores the close button and the back button', async () => {
+        createEventBackend.mockImplementation(neverFinishes);
+        const back = spyOnBackHandler();
+        const { getByTestId, getByLabelText, alertSpy } = await renderWithFilledForm();
+
+        await submit(getByTestId);
+        alertSpy.mockClear();
+        fireEvent.press(getByLabelText('createEvent.closeAccessibilityLabel'));
+        act(() => {
+          back.pressBack();
+        });
+
+        expect(alertSpy).not.toHaveBeenCalled();
+        expect(require('expo-router').router.back).not.toHaveBeenCalled();
+
+        back.restore();
+        alertSpy.mockRestore();
+      });
+
+      it('hands the form back as it was when the send fails', async () => {
+        createEventBackend.mockRejectedValue(new Error('Network Error'));
+        const { getByTestId, getByDisplayValue, getByText, alertSpy } =
+          await renderWithFilledForm();
+
+        await submit(getByTestId);
+
+        expect(alertSpy).toHaveBeenCalledWith('common.error', 'Network Error');
+        expect(getByDisplayValue('Climate March')).toBeTruthy();
+        expect(getByText('createEvent.publish')).toBeTruthy();
+
+        alertSpy.mockRestore();
+      });
     });
 
     describe('saving a draft', () => {

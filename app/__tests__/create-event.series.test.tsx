@@ -147,7 +147,7 @@ describe('CreateEventModal recurring events', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    useLocalSearchParams.mockReturnValue({});
+    useLocalSearchParams.mockReturnValue({ resume: '1' });
     getEventDraft.mockResolvedValue(null);
     clearEventDraft.mockResolvedValue(undefined);
     saveEventDraft.mockResolvedValue({ success: true });
@@ -196,14 +196,7 @@ describe('CreateEventModal recurring events', () => {
       },
     });
 
-    await waitFor(() =>
-      expect(alertSpy.mock.calls.some((call) => call[0] === 'draft.resumeTitle')).toBe(true)
-    );
-    const resume = alertSpy.mock.calls.find((call) => call[0] === 'draft.resumeTitle');
-    const buttons = (resume?.[2] ?? []) as { text?: string; onPress?: () => void }[];
-    await act(async () => {
-      buttons.find((button) => button.text === 'draft.resumeDraft')?.onPress?.();
-    });
+    await utils.findByTestId('btn-create-event-submit');
     alertSpy.mockClear();
 
     return utils;
@@ -213,6 +206,23 @@ describe('CreateEventModal recurring events', () => {
     await act(async () => {
       fireEvent.press(getByTestId(testID));
     });
+    if (testID !== 'btn-create-event-submit') return;
+
+    // A valid form stops at the publish check first.
+    let confirm;
+    try {
+      confirm = getByTestId('btn-publish-confirm');
+    } catch {
+      return;
+    }
+    await act(async () => {
+      fireEvent.press(confirm);
+    });
+  };
+
+  const openRepeat = async (getByTestId: (id: string) => any) => {
+    await press(getByTestId, 'row-event-when');
+    await press(getByTestId, 'row-event-repeat');
   };
 
   const alerted = (title: string) => alertSpy.mock.calls.filter((call) => call[0] === title);
@@ -221,19 +231,20 @@ describe('CreateEventModal recurring events', () => {
     it('is offered while the feature is on', async () => {
       const { getByTestId, queryByTestId } = await renderWithForm(singleEventForm, FLAG_ON);
 
+      await openRepeat(getByTestId);
+
       for (const chip of ['once', 'weekly', 'every_2_weeks', 'monthly']) {
         expect(getByTestId(`repeat-chip-${chip}`)).toBeTruthy();
       }
-      expect(getByTestId('input-event-start-time')).toBeTruthy();
       expect(queryByTestId('repeat-start-time')).toBeNull();
     });
 
     it('is not offered while the feature is off', async () => {
       const { getByTestId, queryByTestId } = await renderWithForm(singleEventForm, FLAG_OFF);
 
-      for (const chip of ['once', 'weekly', 'every_2_weeks', 'monthly']) {
-        expect(queryByTestId(`repeat-chip-${chip}`)).toBeNull();
-      }
+      await press(getByTestId, 'row-event-when');
+
+      expect(queryByTestId('row-event-repeat')).toBeNull();
       expect(getByTestId('input-event-start-time')).toBeTruthy();
       expect(getByTestId('input-event-end-time')).toBeTruthy();
     });
@@ -241,6 +252,7 @@ describe('CreateEventModal recurring events', () => {
     it('swaps the date fields for the rule when Weekly is chosen', async () => {
       const { getByTestId, queryByTestId } = await renderWithForm(singleEventForm, FLAG_ON);
 
+      await openRepeat(getByTestId);
       await press(getByTestId, 'repeat-chip-weekly');
 
       expect(queryByTestId('input-event-start-time')).toBeNull();
@@ -313,8 +325,10 @@ describe('CreateEventModal recurring events', () => {
       const { getByTestId, queryByTestId } = await renderWithForm(withRule, FLAG_OFF);
 
       // The form shows the single-event fields, so that is what the organizer sees...
+      await press(getByTestId, 'row-event-when');
       expect(getByTestId('input-event-start-time')).toBeTruthy();
       expect(queryByTestId('repeat-start-time')).toBeNull();
+      await press(getByTestId, 'btn-when-done');
 
       await press(getByTestId, 'btn-create-event-submit');
 

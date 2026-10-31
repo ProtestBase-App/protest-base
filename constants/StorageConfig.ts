@@ -7,8 +7,8 @@
  * Draft storage configuration
  */
 export const DRAFT_CONFIG = {
-  /** Time in milliseconds after which a draft expires (default: 24 hours) */
-  EXPIRY_MS: 24 * 60 * 60 * 1000,
+  /** Time in milliseconds after which a draft expires (14 days) */
+  EXPIRY_MS: 14 * 24 * 60 * 60 * 1000,
 
   /** Auto-save debounce delay in milliseconds */
   AUTO_SAVE_DEBOUNCE_MS: 500,
@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
   LIKED_EVENT_IDS: 'likedEventIds',
   FOLLOWED_ORG_IDS: 'followedOrgIds',
   EVENT_DRAFT: 'eventDraft',
+  TEMPLATE_DRAFT: 'templateDraft',
   SELECTED_ORGANIZATION_ID: 'selectedOrganizationId',
   PAST_EVENTS_CACHE: 'pastEventsCache',
   PAST_EVENTS_CACHE_TIMESTAMP: 'pastEventsCacheTimestamp',

@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Platform,
+  type TouchableOpacityInstance,
+} from 'react-native';
 import DateTimePicker, {
   DateTimePickerEvent,
   DateTimePickerAndroid,
@@ -9,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { FormErrorText } from '@/components/ui/FormErrorText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useFocusOnChange } from '@/hooks/useOverlayFocus';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
@@ -43,6 +50,10 @@ interface FormDateFieldProps {
   allDayLabel?: string;
   /** Localised explanation shown under the field while `allDayLabel` is active. */
   allDayHint?: string;
+  /** Where the picker opens while the field is empty, instead of now. */
+  openAt?: string;
+  /** The inline iOS picker opened or closed. It needs the full width. */
+  onPickerToggle?: (open: boolean) => void;
 }
 
 /**
@@ -86,20 +97,37 @@ export default function FormDateField({
   pickerMode = 'datetime',
   timeZoneName,
   formatValue,
+  openAt,
+  onPickerToggle,
 }: FormDateFieldProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = getThemeColors(colorScheme);
-  const initialDate = safeParseDate(value);
-  const [date, setDate] = useState<Date>(initialDate);
+  const [date, setDate] = useState<Date>(safeParseDate(value || openAt));
 
   // An edit screen fills the form in after this field mounts: the picker has to open
   // on that value, not on the moment the field appeared.
   useEffect(() => {
-    if (value) setDate(safeParseDate(value));
-  }, [value]);
+    const shown = value || openAt;
+    if (shown) setDate(safeParseDate(shown));
+  }, [value, openAt]);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
+  // Clearing an error reflows the form as the Android dialog closes, and TalkBack loses the
+  // field. Without one it finds the field itself, and a second focus would read it twice.
+  const fieldRef = useRef<TouchableOpacityInstance>(null);
+  const [errorsCleared, setErrorsCleared] = useState(0);
+  useFocusOnChange(errorsCleared || null, fieldRef);
+
+  const commitFromDialog = (iso: string) => {
+    handleChangeText(iso);
+    if (errorText) setErrorsCleared((count) => count + 1);
+  };
+
+  const togglePicker = (open: boolean) => {
+    setShowDatePicker(open);
+    onPickerToggle?.(open);
+  };
 
   // iOS: keep the picker open during intermediate selection steps. Only push
   // the value up and close on explicit 'set' / 'dismissed' events.
@@ -110,12 +138,12 @@ export default function FormDateField({
       setDate(currentDate);
 
       if (event.type === 'dismissed') {
-        setShowDatePicker(false);
+        togglePicker(false);
       } else if (event.type === 'set') {
         handleChangeText(currentDate.toISOString());
       }
     } else if (event.type === 'dismissed') {
-      setShowDatePicker(false);
+      togglePicker(false);
     }
   };
 
@@ -129,7 +157,7 @@ export default function FormDateField({
           setDate(currentDate);
 
           if (pickerMode === 'date') {
-            handleChangeText(currentDate.toISOString());
+            commitFromDialog(currentDate.toISOString());
           } else {
             showAndroidTimePicker(currentDate);
           }
@@ -151,7 +179,7 @@ export default function FormDateField({
           // the local getters below would read the device's clock instead.
           if (pickerMode === 'time') {
             setDate(selectedTime);
-            handleChangeText(selectedTime.toISOString());
+            commitFromDialog(selectedTime.toISOString());
             return;
           }
 
@@ -161,7 +189,7 @@ export default function FormDateField({
           newDate.setSeconds(0, 0);
 
           setDate(newDate);
-          handleChangeText(newDate.toISOString());
+          commitFromDialog(newDate.toISOString());
         }
       },
       mode: 'time',
@@ -183,9 +211,11 @@ export default function FormDateField({
       // iOS: toggle the picker. If it's already open, treat tap as "Done".
       if (showDatePicker) {
         handleChangeText(date.toISOString());
-        setShowDatePicker(false);
+        togglePicker(false);
       } else {
-        setShowDatePicker(true);
+        togglePicker(true);
+        // The wheel already shows a time, and it is one turn away from being sent.
+        if (pickerMode === 'time' && !value) handleChangeText(date.toISOString());
       }
     }
 
@@ -213,6 +243,7 @@ export default function FormDateField({
       <ThemedText style={styles.label}>{title}</ThemedText>
 
       <TouchableOpacity
+        ref={fieldRef}
         accessibilityRole="button"
         accessibilityLabel={[fieldAccessibilityLabel(title, errorText), displayValue]
           .filter(Boolean)
@@ -252,7 +283,11 @@ export default function FormDateField({
             editable={false}
             pointerEvents="none"
           />
-          <IconSymbol size={24} name="calendar" color={themeColors.text} />
+          <IconSymbol
+            size={24}
+            name={pickerMode === 'time' ? 'clock' : 'calendar'}
+            color={themeColors.text}
+          />
         </ThemedView>
       </TouchableOpacity>
 

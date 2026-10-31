@@ -63,7 +63,7 @@ export default function HelpNeededModal({
 
               {/* Got It Button */}
               <Pressable
-                style={[styles.button, { backgroundColor: colors.tint }]}
+                style={[styles.button, { backgroundColor: colors.cta }]}
                 onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel={t('help.gotIt')}

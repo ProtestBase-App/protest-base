@@ -1,5 +1,5 @@
 import { Event } from '@/types/event.types';
-import { TemplateEventData } from '@/types/template.types';
+import { PastEventForTemplate, TemplateEventData } from '@/types/template.types';
 import { toPostalCodeString } from '@/utils/eventLocation';
 
 /**
@@ -45,13 +45,72 @@ export function extractTemplateData(event: Event): TemplateEventData {
 /**
  * Formats a date string for display in past event cards.
  * @param isoDate - ISO date string (e.g., "2025-10-26T14:00:00Z")
+ * @param locale - The app's language
  * @returns Formatted date (e.g., "Oct 26, 2025")
  */
-export function formatPastEventDate(isoDate: string): string {
+export function formatPastEventDate(isoDate: string, locale = 'en'): string {
   const date = new Date(isoDate);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(locale === 'en' ? 'en-US' : locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+/** A past event as the reuse rows show it. */
+export function toPastEventForTemplate(event: Event, locale?: string): PastEventForTemplate {
+  return {
+    $id: event.$id,
+    title: event.title,
+    formattedDate: formatPastEventDate(event.start_time, locale),
+    city: event.city,
+    firstCategory: event.categories?.[0],
+  };
+}
+
+/** What a form reusing a past event starts from: its details, not its dates. */
+export function templateStartFromEvent(event: Event) {
+  return {
+    event_data: { ...extractTemplateData(event), organization_id: event.organization_id },
+    image_urls: event.images ?? [],
+  };
+}
+
+export const TEMPLATE_PARTS = [
+  'text',
+  'category',
+  'location',
+  'photos',
+  'link',
+  'coOrganizers',
+  'volunteers',
+  'goodToKnow',
+] as const;
+
+export type TemplatePart = (typeof TEMPLATE_PARTS)[number];
+
+const PART_FIELDS: Record<TemplatePart, (keyof TemplateEventData)[]> = {
+  text: ['title', 'description'],
+  category: ['categories'],
+  location: ['street_address', 'city', 'region', 'country', 'postal_code'],
+  photos: [],
+  link: ['website_url'],
+  coOrganizers: ['co_organizers'],
+  volunteers: ['help_needed', 'help_description'],
+  goodToKnow: ['disclaimer'],
+};
+
+/** The parts of an event kept in a new template. Never its dates. */
+export function templateFromEvent(event: Event, kept: readonly TemplatePart[]) {
+  const data = extractTemplateData(event);
+  const fields = kept.flatMap((part) => PART_FIELDS[part]);
+  const eventData = Object.fromEntries(
+    Object.entries(data).filter(([field]) => fields.includes(field as keyof TemplateEventData))
+  ) as TemplateEventData;
+
+  return {
+    organization_id: event.organization_id ?? '',
+    event_data: { ...eventData, organization_id: event.organization_id },
+    image_urls: kept.includes('photos') ? (event.images ?? []) : [],
+  };
 }

@@ -346,7 +346,7 @@ export default function ExploreTab() {
                   style={[
                     styles.filterBadge,
                     {
-                      backgroundColor: themeColors.tint,
+                      backgroundColor: themeColors.cta,
                       borderColor: themeColors.background,
                     },
                   ]}
@@ -397,7 +397,7 @@ export default function ExploreTab() {
               <TouchableOpacity
                 accessibilityRole="button"
                 testID="explore-retry"
-                style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
+                style={[styles.retryButton, { backgroundColor: themeColors.cta }]}
                 onPress={handleRefresh}
               >
                 <ThemedText style={styles.retryButtonText}>{t('common.retry')}</ThemedText>

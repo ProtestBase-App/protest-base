@@ -104,7 +104,7 @@ export function MaintenanceScreen({ message }: MaintenanceScreenProps): React.Re
           </ThemedText>
 
           {/* Pill badge */}
-          <View style={[styles.pill, { backgroundColor: themeColors.tint }]}>
+          <View style={[styles.pill, { backgroundColor: themeColors.cta }]}>
             <ThemedText style={styles.pillText}>{t('version.maintenance.badge')}</ThemedText>
           </View>
 

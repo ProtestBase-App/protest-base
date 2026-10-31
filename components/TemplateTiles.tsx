@@ -24,8 +24,8 @@ export interface TemplateLaunchTileProps {
   editedLabel: string;
   /** Tap on the tile body — launches Create Event pre-filled. */
   onLaunch: () => void;
-  /** Tap on the ··· button, with its measured window frame. */
-  onOpenMenu: (anchor: TemplateMenuAnchor) => void;
+  /** Tap on the ··· button, with its measured window frame. No button without it. */
+  onOpenMenu?: (anchor: TemplateMenuAnchor) => void;
   disabled?: boolean;
 }
 
@@ -49,10 +49,11 @@ export function TemplateLaunchTile({
     ? template.event_data.categories[0]
     : template.event_data.categories;
   const categoryColors = getCategoryColors(category);
+  const note = template.description?.trim();
 
   const handleMenuPress = () => {
     menuButtonRef.current?.measureInWindow((x, y, width, height) => {
-      onOpenMenu({ x, y, width, height });
+      onOpenMenu?.({ x, y, width, height });
     });
   };
 
@@ -67,7 +68,7 @@ export function TemplateLaunchTile({
         onPress={onLaunch}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={template.name}
+        accessibilityLabel={note ? `${template.name}. ${note}` : template.name}
         accessibilityHint={t('templates.hintDefault')}
         testID={`template-tile-${template.$id}`}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
@@ -85,6 +86,12 @@ export function TemplateLaunchTile({
           {template.name}
         </ThemedText>
 
+        {!!note && (
+          <ThemedText style={[styles.note, { color: themeColors.secondaryText }]} numberOfLines={2}>
+            {note}
+          </ThemedText>
+        )}
+
         {!!editedLabel && (
           <ThemedText style={[styles.meta, { color: themeColors.subtleText }]} numberOfLines={1}>
             {editedLabel}
@@ -99,19 +106,21 @@ export function TemplateLaunchTile({
         </View>
       </Pressable>
 
-      <Pressable
-        ref={menuButtonRef}
-        onPress={handleMenuPress}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('templates.tileMenu')}
-        accessibilityHint={t('a11y.hints.openTemplateMenu')}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        style={styles.menuButton}
-        testID={`template-menu-${template.$id}`}
-      >
-        <IconSymbol name="ellipsis" size={17} color={themeColors.subtleText} />
-      </Pressable>
+      {onOpenMenu && (
+        <Pressable
+          ref={menuButtonRef}
+          onPress={handleMenuPress}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('templates.tileMenu')}
+          accessibilityHint={t('a11y.hints.openTemplateMenu')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.menuButton}
+          testID={`template-menu-${template.$id}`}
+        >
+          <IconSymbol name="ellipsis" size={17} color={themeColors.subtleText} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -219,6 +228,11 @@ const styles = StyleSheet.create({
     // Two-line slot keeps tile heights aligned across a grid row.
     minHeight: 36,
   },
+  note: {
+    fontSize: Typography.sizes.xs,
+    fontFamily: Typography.families.regular,
+    lineHeight: 16,
+  },
   newTitle: {
     fontSize: 14.5,
     fontFamily: Typography.families.semiBold,
@@ -233,7 +247,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 2,
+    // Stays level across a row where only one tile has a note.
+    marginTop: 'auto',
   },
   launchText: {
     fontSize: 13,

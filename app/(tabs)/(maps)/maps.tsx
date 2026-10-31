@@ -528,7 +528,7 @@ export default function MapsScreen() {
               <View
                 style={[
                   styles.filterBadge,
-                  { backgroundColor: themeColors.tint, borderColor: themeColors.background },
+                  { backgroundColor: themeColors.cta, borderColor: themeColors.background },
                 ]}
               >
                 <ThemedText style={styles.filterBadgeText}>{activeFilterCount}</ThemedText>

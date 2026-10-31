@@ -102,7 +102,7 @@ export function ConnectionErrorScreen({ onRetry }: ConnectionErrorScreenProps): 
           />
 
           {/* Pill badge */}
-          <ThemedView style={[styles.pill, { backgroundColor: themeColors.tint }]}>
+          <ThemedView style={[styles.pill, { backgroundColor: themeColors.cta }]}>
             <ThemedText style={styles.pillText}>{t('version.connectionError.badge')}</ThemedText>
           </ThemedView>
         </ThemedView>

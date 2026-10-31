@@ -14,6 +14,12 @@ describe('CustomButton', () => {
     isLoading: false,
   };
 
+  it('tells a screen reader while it is busy', () => {
+    render(<CustomButton {...defaultProps} isLoading testID="button" />);
+
+    expect(screen.getByTestId('button').props.accessibilityState).toMatchObject({ busy: true });
+  });
+
   afterEach(() => jest.clearAllMocks());
 
   describe('Rendering', () => {

@@ -1,5 +1,11 @@
-import { StyleSheet, TextInput, TouchableOpacity, type TextInputProps } from 'react-native';
-import { useState } from 'react';
+import {
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  type TextInputProps,
+  type TextInstance,
+} from 'react-native';
+import { useState, type Ref } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { FormErrorText } from '@/components/ui/FormErrorText';
@@ -23,6 +29,8 @@ interface FormFieldProps extends TextInputProps {
   hasError?: boolean;
   /** What is wrong, shown under the field. Marks the field too. */
   errorText?: string;
+  /** 'bare' sits inside a card of its own: no box, and it grows with the text. */
+  variant?: 'boxed' | 'bare';
   isLongText?: boolean;
   /**
    * The return key type for the keyboard.
@@ -49,6 +57,8 @@ interface FormFieldProps extends TextInputProps {
   defaultExpanded?: boolean;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
+  /** For a screen reader to land on the label. */
+  labelRef?: Ref<TextInstance>;
 }
 
 export default function FormLongText({
@@ -61,10 +71,12 @@ export default function FormLongText({
   counterLimit,
   hasError = false,
   errorText,
+  variant = 'boxed',
   isLongText = false,
   onFocusCallback,
   defaultExpanded = false,
   testID,
+  labelRef,
   accessibilityHint,
   ...props
 }: FormFieldProps) {
@@ -74,21 +86,33 @@ export default function FormLongText({
   const isDark = colorScheme === 'dark';
   const themeColors = getThemeColors(colorScheme);
   const shownLimit = counterLimit ?? maxLength;
+  const isBare = variant === 'bare';
 
   return (
-    <ThemedView style={[styles.themedview1, otherStyles]}>
-      <ThemedText style={styles.themedtext1}>{title}</ThemedText>
+    <ThemedView style={[isBare ? styles.bareContainer : styles.themedview1, otherStyles]}>
+      <ThemedText
+        ref={labelRef}
+        style={
+          isBare ? [styles.bareLabel, { color: themeColors.secondaryText }] : styles.themedtext1
+        }
+      >
+        {title}
+      </ThemedText>
       <ThemedView
-        style={[
-          styles.themedview2,
-          {
-            backgroundColor: themeColors.cardBackground,
-            borderColor: themeColors.inputBorder,
-          },
-          isFocused && styles.focused,
-          isLongText && styles.longTextContainer,
-          (hasError || !!errorText) && { borderColor: themeColors.errorText },
-        ]}
+        style={
+          isBare
+            ? styles.bareBox
+            : [
+                styles.themedview2,
+                {
+                  backgroundColor: themeColors.cardBackground,
+                  borderColor: themeColors.inputBorder,
+                },
+                isFocused && styles.focused,
+                isLongText && styles.longTextContainer,
+                (hasError || !!errorText) && { borderColor: themeColors.errorText },
+              ]
+        }
       >
         <TextInput
           testID={testID}
@@ -98,6 +122,7 @@ export default function FormLongText({
             { fontFamily: value ? Typography.families.semiBold : Typography.families.regular },
             isLongText && styles.longTextInput,
             isExpanded && styles.expandedTextInput, // Apply expanded styles if needed
+            isBare && styles.bareInput,
           ]}
           value={value}
           placeholder={placeholder}
@@ -116,7 +141,7 @@ export default function FormLongText({
           {...props}
         />
 
-        {isLongText && (
+        {isLongText && !isBare && (
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={isExpanded ? t('a11y.collapseField') : t('a11y.expandField')}
@@ -139,7 +164,7 @@ export default function FormLongText({
       {errorText ? <FormErrorText message={errorText} /> : null}
       {/* Character count display for long text fields */}
       {isLongText && shownLimit && (
-        <ThemedView style={styles.charCountContainer}>
+        <ThemedView style={[styles.charCountContainer, isBare && styles.bareCounter]}>
           <ThemedText
             style={[
               styles.charCountText,
@@ -189,6 +214,25 @@ const styles = StyleSheet.create({
   textInputDark: {
     color: Colors.dark.text,
   },
+  bareContainer: {
+    backgroundColor: 'transparent',
+  },
+  bareLabel: {
+    fontSize: 12.5,
+    fontFamily: Typography.families.bold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  bareBox: {
+    minHeight: 44,
+    backgroundColor: 'transparent',
+  },
+  bareInput: {
+    padding: 0,
+    marginTop: 6,
+    marginRight: 0,
+    textAlignVertical: 'top',
+  },
   longTextContainer: {
     height: 'auto',
     minHeight: 56,
@@ -209,6 +253,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     marginTop: 4,
     paddingRight: 4,
+  },
+  bareCounter: {
+    backgroundColor: 'transparent',
+    paddingRight: 0,
   },
   charCountText: {
     fontSize: Typography.sizes.xs,

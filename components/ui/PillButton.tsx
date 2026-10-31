@@ -53,7 +53,7 @@ export function PillButton({
         styles.button,
         { height },
         isFilled
-          ? [styles.filled, { backgroundColor: themeColors.tint, shadowColor: themeColors.tint }]
+          ? [styles.filled, { backgroundColor: themeColors.cta, shadowColor: themeColors.cta }]
           : [styles.outline, { borderColor: ACCENT_OUTLINE_BORDER }],
         (pressed || disabled) && styles.pressed,
         style,

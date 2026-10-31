@@ -159,6 +159,19 @@ describe('EditTemplateScreen', () => {
       expect(editTemplate).not.toHaveBeenCalled();
     });
 
+    it('keeps the form on screen while it saves', async () => {
+      editTemplate.mockImplementation(() => new Promise(() => {}));
+      const { findByDisplayValue, getByTestId, getByDisplayValue, getByText } = renderScreen();
+
+      await findByDisplayValue('Monthly vigil');
+      await act(async () => {
+        fireEvent.press(getByTestId('btn-edit-template-save'));
+      });
+
+      expect(getByDisplayValue('Monthly vigil')).toBeTruthy();
+      expect(getByText('common.saving')).toBeTruthy();
+    });
+
     it('refuses volunteers with no text', async () => {
       getTemplate.mockResolvedValue({
         ...template,

@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
-import { router, Redirect, useLocalSearchParams } from 'expo-router';
+import { router, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { TemplateMetaFields } from '@/components/event-form/TemplateMetaFields';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
 import CustomButton from '@/components/CustomButton';
@@ -17,19 +20,23 @@ import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useEventFormValidation } from '@/hooks/useEventFormValidation';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
+import {
+  clearTemplateDraft,
+  getTemplateDraft,
+  saveTemplateDraft,
+} from '@/services/localStorageService';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import { resolveImageUrls } from '@/services/storage.service';
-import { MAX_EVENT_IMAGES, TEMPLATE_LIMITS } from '@/constants/EventConfig';
+import { TEMPLATE_LIMITS } from '@/constants/EventConfig';
 import type { FormState } from '@/types/eventForm.types';
-import type { TemplateEventData } from '@/types/template.types';
-import type { CreateTemplateSearchParams } from '@/types/navigation.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
+import { buildTemplateEventData, createBlankForm } from '@/utils/eventFormData';
 import { isTemplateDataTooLong, validateEventForm } from '@/utils/eventFormValidation';
-import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
+import { getThemeColors } from '@/utils/themeColors';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
-import { toPostalCodeString } from '@/utils/eventLocation';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -47,19 +54,6 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
 // (string equality for kept URLs).
 const areImageListsEqual = (a: FormState['images'], b: FormState['images']): boolean =>
   a.length === b.length && a.every((img, idx) => img === b[idx]);
-
-/** Parse the sourceImages navigation param (JSON string[] of hosted URLs). */
-const parseSourceImages = (raw: string | undefined): string[] => {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((u): u is string => typeof u === 'string').slice(0, MAX_EVENT_IMAGES)
-      : [];
-  } catch {
-    return [];
-  }
-};
 
 const hasTemplateFormChanges = (
   current: FormState,
@@ -103,9 +97,8 @@ export default function CreateTemplateScreen() {
   } = useUserOrganizations();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const params = useLocalSearchParams<CreateTemplateSearchParams>();
+  const themeColors = getThemeColors(colorScheme);
   const [isSubmitting, setSubmitting] = useState(false);
-  const isFromPastEvent = Boolean(params.sourceEventData);
 
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
 
@@ -113,28 +106,7 @@ export default function CreateTemplateScreen() {
   const [templateDescription, setTemplateDescription] = useState('');
 
   // Reuses the EventForm shape; dates/image fields are unused in template mode.
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [form, setForm] = useState<FormState>(createBlankForm);
 
   // Apply organization_id from context for single-org users.
   useEffect(() => {
@@ -143,85 +115,27 @@ export default function CreateTemplateScreen() {
     }
   }, [selectedOrganizationId, selectedOrgId]);
 
-  const initialFormState = useMemo<FormState>(
-    () => ({
-      organization_id: '',
-      title: '',
-      description: '',
-      images: [],
-      street_address: '',
-      city: '',
-      region: '',
-      country: '',
-      start_time: '',
-      end_time: '',
-      organizer_name: '',
-      website_url: '',
-      categories: '',
-      disclaimer: '',
-      postal_code: null,
-      co_organizers: [],
-      help_needed: false,
-      help_description: '',
-      geocod_lat: null,
-      geocod_lng: null,
-    }),
-    []
-  );
+  const initialFormState = useMemo<FormState>(() => createBlankForm(), []);
 
-  // Initial values accounting for pre-fill from a past event.
-  const initialTemplateName = useMemo(() => params.suggestedName || '', [params.suggestedName]);
-  const initialTemplateDescription = useMemo(() => '', []);
   const initialOrgId = useMemo(() => selectedOrganizationId || '', [selectedOrganizationId]);
-
-  const initialFormFromEvent = useMemo<FormState>(() => {
-    if (!params.sourceEventData) return initialFormState;
-
-    try {
-      const eventData: TemplateEventData = JSON.parse(params.sourceEventData);
-      return {
-        ...initialFormState,
-        title: eventData.title || '',
-        description: eventData.description || '',
-        images: parseSourceImages(params.sourceImages),
-        street_address: eventData.street_address || '',
-        city: eventData.city || '',
-        region: eventData.region || '',
-        country: eventData.country || '',
-        postal_code: toPostalCodeString(eventData.postal_code),
-        website_url: eventData.website_url || '',
-        categories: Array.isArray(eventData.categories)
-          ? eventData.categories.join(',')
-          : eventData.categories || '',
-        disclaimer: eventData.disclaimer || '',
-        co_organizers: eventData.co_organizers || [],
-        help_needed: eventData.help_needed || false,
-        help_description: eventData.help_description || '',
-      };
-    } catch {
-      return initialFormState;
-    }
-  }, [params.sourceEventData, params.sourceImages, initialFormState]);
 
   const formHasChanges = useMemo(
     () =>
       hasTemplateFormChanges(
         form,
-        initialFormFromEvent,
+        initialFormState,
         templateName,
-        initialTemplateName,
+        '',
         templateDescription,
-        initialTemplateDescription,
+        '',
         selectedOrgId || selectedOrganizationId || '',
         initialOrgId
       ),
     [
       form,
-      initialFormFromEvent,
+      initialFormState,
       templateName,
-      initialTemplateName,
       templateDescription,
-      initialTemplateDescription,
       selectedOrgId,
       selectedOrganizationId,
       initialOrgId,
@@ -229,6 +143,8 @@ export default function CreateTemplateScreen() {
   );
 
   const handleCloseAttempt = useCallback(() => {
+    if (isSubmitting) return;
+
     if (!formHasChanges) {
       router.back();
       return;
@@ -238,18 +154,25 @@ export default function CreateTemplateScreen() {
       {
         text: t('draft.discard'),
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          await clearTemplateDraft();
           router.back();
         },
+      },
+      {
+        text: t('draft.saveDraft'),
+        onPress: () => router.back(),
       },
       {
         text: t('draft.keepEditing'),
         style: 'cancel',
       },
     ]);
-  }, [formHasChanges]);
+  }, [formHasChanges, isSubmitting]);
 
   useEffect(() => {
+    if (EVENT_FORM_SHELL.createTemplate) return;
+
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleCloseAttempt();
       return true;
@@ -258,44 +181,26 @@ export default function CreateTemplateScreen() {
     return () => backHandler.remove();
   }, [handleCloseAttempt]);
 
-  // Pre-fill form when navigating from a past event.
-  useEffect(() => {
-    if (params.sourceEventData) {
-      try {
-        const eventData: TemplateEventData = JSON.parse(params.sourceEventData);
-
-        if (params.suggestedName) {
-          setTemplateName(params.suggestedName);
-        }
-
-        setForm((prev) => ({
-          ...prev,
-          title: eventData.title || '',
-          description: eventData.description || '',
-          images: parseSourceImages(params.sourceImages),
-          street_address: eventData.street_address || '',
-          city: eventData.city || '',
-          region: eventData.region || '',
-          country: eventData.country || '',
-          postal_code: toPostalCodeString(eventData.postal_code),
-          website_url: eventData.website_url || '',
-          categories: Array.isArray(eventData.categories)
-            ? eventData.categories.join(',')
-            : eventData.categories || '',
-          disclaimer: eventData.disclaimer || '',
-          co_organizers: eventData.co_organizers || [],
-          help_needed: eventData.help_needed || false,
-          help_description: eventData.help_description || '',
-        }));
-      } catch (e) {
-        logger.error('Failed to parse sourceEventData:', { error: e });
-      }
-    }
-  }, [params.sourceEventData, params.sourceImages, params.suggestedName]);
-
   const handleBackPress = () => {
     handleCloseAttempt();
   };
+
+  // An unfinished template comes back as it was left; the autosave below keeps it.
+  useEffect(() => {
+    getTemplateDraft().then((draft) => {
+      if (!draft) return;
+      setForm(draft.form as FormState);
+      setTemplateName(draft.name);
+      setTemplateDescription(draft.note);
+      setSelectedOrgId(draft.organizationId);
+    });
+  }, []);
+
+  const templateDraft = useMemo(
+    () => ({ form, name: templateName, note: templateDescription, organizationId: selectedOrgId }),
+    [form, templateName, templateDescription, selectedOrgId]
+  );
+  useFormAutosave({ value: templateDraft, enabled: formHasChanges, save: saveTemplateDraft });
 
   const validation = useEventFormValidation((intent) =>
     validateEventForm(form, {
@@ -310,29 +215,7 @@ export default function CreateTemplateScreen() {
     if (!validation.check('saveTemplate')) return;
     const effectiveOrgId = selectedOrgId || selectedOrganizationId || '';
 
-    // Build event_data from form (date/time/organizer fields are excluded —
-    // templates only carry static event metadata; images are stored on the
-    // template record itself as image_urls, not inside event_data).
-    const eventData: TemplateEventData = {};
-
-    // organization_id is stored in event_data so it can pre-fill when creating events.
-    eventData.organization_id = effectiveOrgId;
-
-    if (form.title) eventData.title = form.title;
-    if (form.description) eventData.description = form.description;
-    if (form.street_address) eventData.street_address = form.street_address;
-    if (form.city) eventData.city = form.city;
-    if (form.region) eventData.region = form.region;
-    if (form.country) eventData.country = form.country;
-    if (form.postal_code) eventData.postal_code = form.postal_code;
-    if (form.website_url) eventData.website_url = form.website_url;
-    if (form.categories) eventData.categories = form.categories;
-    if (form.disclaimer) eventData.disclaimer = form.disclaimer;
-    if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
-    if (form.help_needed) {
-      eventData.help_needed = form.help_needed;
-      if (form.help_description) eventData.help_description = form.help_description;
-    }
+    const eventData = buildTemplateEventData(form, effectiveOrgId);
 
     if (isTemplateDataTooLong(eventData)) {
       Alert.alert(t('common.error'), t('template.dataTooLong'));
@@ -353,6 +236,7 @@ export default function CreateTemplateScreen() {
         image_urls: imageUrls.length ? imageUrls : undefined,
       });
 
+      await clearTemplateDraft();
       Alert.alert(t('common.success'), t('template.createdSuccess'));
       router.back();
     } catch (error) {
@@ -378,19 +262,91 @@ export default function CreateTemplateScreen() {
     return <Redirect href="/(tabs)/(more)/become-organizer?from=create-template" />;
   }
 
-  if (isSubmitting) {
+  if (EVENT_FORM_SHELL.createTemplate) {
     return (
-      <ThemedView style={styles.splashContainer}>
-        <BrandLoader />
-      </ThemedView>
+      <>
+        <EventFormShell
+          kind="template"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          inSheet
+          busy={isSubmitting}
+          closeLabel="Close create template screen"
+          onBack={() => {
+            handleCloseAttempt();
+            return true;
+          }}
+          heading={t('template.createTitle')}
+          intro={
+            <>
+              <FormFieldAnchor field="organization">
+                <OrganizationPicker
+                  value={selectedOrgId || selectedOrganizationId || undefined}
+                  onValueChange={setSelectedOrgId}
+                  error={!!validation.errors.organization}
+                  errorMessage={validation.errors.organization}
+                />
+              </FormFieldAnchor>
+              <TemplateMetaFields
+                name={templateName}
+                onChangeName={setTemplateName}
+                note={templateDescription}
+                onChangeNote={setTemplateDescription}
+                nameError={validation.errors.template_name}
+                nameTestID="input-template-name"
+                noteTestID="input-template-description"
+              />
+            </>
+          }
+          footer={
+            <CustomButton
+              testID="btn-template-submit"
+              title={isSubmitting ? t('common.saving') : t('template.saveButton')}
+              handlePress={submit}
+              pill
+              containerStyles={styles.saveButton}
+              isLoading={isSubmitting}
+            />
+          }
+        />
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
     );
   }
 
   return (
     <ThemedView style={styles.wrapper}>
-      {/* No footer: buttons stay inline at the end of the form. */}
-      <FormScreenScaffold contentContainerStyle={styles.scrollContent}>
-        <ThemedView style={styles.container}>
+      <FormScreenScaffold
+        contentContainerStyle={styles.scrollContent}
+        inSheet
+        footer={
+          <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
+            <CustomButton
+              title={t('common.cancel')}
+              handlePress={handleBackPress}
+              containerStyles={[
+                styles.cancelButton,
+                {
+                  backgroundColor: themeColors.buttonSecondaryBackground,
+                  borderColor: themeColors.buttonSecondaryBorder,
+                },
+              ]}
+              textStyles={{ color: themeColors.text }}
+              isLoading={isSubmitting}
+            />
+            <CustomButton
+              testID="btn-template-submit"
+              title={isSubmitting ? t('common.saving') : t('template.saveButton')}
+              handlePress={submit}
+              containerStyles={styles.saveButton}
+              isLoading={isSubmitting}
+            />
+          </ThemedView>
+        }
+      >
+        <ThemedView style={styles.container} pointerEvents={isSubmitting ? 'none' : 'auto'}>
           <TouchableOpacity
             onPress={handleBackPress}
             style={styles.closeButton}
@@ -403,7 +359,7 @@ export default function CreateTemplateScreen() {
           </TouchableOpacity>
 
           <ThemedText type="title" style={styles.titleSpacing}>
-            {isFromPastEvent ? t('template.createFromEventTitle') : t('template.createTitle')}
+            {t('template.createTitle')}
           </ThemedText>
 
           <ThemedText style={[styles.subtitle, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
@@ -462,29 +418,6 @@ export default function CreateTemplateScreen() {
             userLanguage={userLanguage}
             mode="create-template"
           />
-
-          <ThemedView style={styles.buttonContainer}>
-            <CustomButton
-              testID="btn-template-submit"
-              title={t('template.saveButton')}
-              handlePress={submit}
-              containerStyles={styles.saveButton}
-              isLoading={isSubmitting}
-            />
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={[styles.cancelButton, { borderColor: isDark ? '#4B5563' : '#D1D5DB' }]}
-              onPress={handleBackPress}
-              activeOpacity={0.7}
-            >
-              <ThemedText
-                style={[styles.cancelButtonText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}
-              >
-                {t('common.cancel')}
-              </ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
         </ThemedView>
       </FormScreenScaffold>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -546,26 +479,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     lineHeight: 20,
   },
-  buttonContainer: {
-    marginTop: Spacing.xl,
-    gap: Spacing.sm,
-    paddingBottom: Spacing.lg,
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
   },
   saveButton: {
+    flex: 1,
     minHeight: 48,
   },
   cancelButton: {
     minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  cancelButtonText: {
-    fontSize: Typography.sizes.base,
-    fontFamily: Typography.families.semiBold,
-    color: '#6B7280',
   },
   splashContainer: {
     flex: 1,

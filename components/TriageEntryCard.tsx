@@ -74,7 +74,7 @@ export default function TriageEntryCard({
           testID="triage-start"
           style={({ pressed }) => [
             styles.primaryButton,
-            { backgroundColor: themeColors.tint, opacity: pressed ? 0.8 : 1 },
+            { backgroundColor: themeColors.cta, opacity: pressed ? 0.8 : 1 },
           ]}
         >
           <ThemedText style={styles.primaryLabel}>{t('drafts.triageStart')}</ThemedText>

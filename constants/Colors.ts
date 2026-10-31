@@ -5,12 +5,14 @@
 
 const tintColorLight = '#F94460';
 const tintColorDark = '#F94460';
+const ctaColor = '#DC2A48';
 
 export const Colors = {
   light: {
     text: '#1A1A1A',
     background: '#FAFAFA',
     tint: tintColorLight,
+    cta: ctaColor,
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
@@ -45,6 +47,7 @@ export const Colors = {
     text: '#FFFFFF',
     background: '#161622',
     tint: tintColorDark,
+    cta: ctaColor,
     icon: '#CDCDE0',
     tabIconDefault: '#CDCDE0',
     tabIconSelected: tintColorDark,

@@ -33,10 +33,11 @@ jest.mock('@react-native-community/datetimepicker', () => {
 });
 
 import React from 'react';
-import { Platform } from 'react-native';
+import { AccessibilityInfo, Platform } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import FormDateField from '@/components/FormDateField';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { OVERLAY_FOCUS_DELAY_MS } from '@/hooks/useOverlayFocus';
 
 describe('FormDateField', () => {
   const minDate = new Date('2025-01-01');
@@ -208,6 +209,35 @@ describe('FormDateField', () => {
       expect(new Date(isoString).getTime()).not.toBeNaN();
     });
 
+    it.each([
+      ['set', 'Required', 1],
+      ['set', undefined, 0],
+      ['dismissed', 'Required', 0],
+    ])(
+      'after a %s dialog with error %s, moves a screen reader %i time(s)',
+      (type, errorText, focusCalls) => {
+        (Platform as any).OS = 'android';
+        jest.useFakeTimers();
+        const focus = jest
+          .spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
+          .mockImplementation(() => {});
+        const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
+        DateTimePickerAndroid.open.mockImplementationOnce(({ onChange }: any) => {
+          onChange({ type }, type === 'set' ? new Date('2025-07-14T14:30:00.000Z') : undefined);
+        });
+
+        render(<FormDateField {...defaultProps} pickerMode="time" errorText={errorText} />);
+        fireEvent.press(screen.getByPlaceholderText('Select date'));
+        act(() => {
+          jest.advanceTimersByTime(OVERLAY_FOCUS_DELAY_MS);
+        });
+
+        expect(focus).toHaveBeenCalledTimes(focusCalls);
+        focus.mockRestore();
+        jest.useRealTimers();
+      }
+    );
+
     it('does not proceed to time picker when date selection is dismissed on Android', () => {
       (Platform as any).OS = 'android';
       const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
@@ -234,6 +264,54 @@ describe('FormDateField', () => {
       render(<FormDateField {...defaultProps} />);
       fireEvent.press(screen.getByPlaceholderText('Select date'));
       expect(screen.getByText('Start Date')).toBeTruthy();
+    });
+
+    it('sends the time the wheel shows when it opens on an empty field', () => {
+      const handleChangeText = jest.fn();
+      render(
+        <FormDateField
+          {...defaultProps}
+          pickerMode="time"
+          openAt="2025-07-14T15:00:00.000Z"
+          handleChangeText={handleChangeText}
+        />
+      );
+
+      fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+      expect(handleChangeText).toHaveBeenCalledWith('2025-07-14T15:00:00.000Z');
+    });
+
+    it('leaves a filled field alone when the wheel opens', () => {
+      const handleChangeText = jest.fn();
+      render(
+        <FormDateField
+          {...defaultProps}
+          pickerMode="time"
+          value="2025-07-14T14:30:00.000Z"
+          handleChangeText={handleChangeText}
+        />
+      );
+
+      fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+      expect(handleChangeText).not.toHaveBeenCalled();
+    });
+
+    it('says when the wheel opens and closes', () => {
+      const onPickerToggle = jest.fn();
+      render(
+        <FormDateField
+          {...defaultProps}
+          value="2025-07-14T14:30:00.000Z"
+          onPickerToggle={onPickerToggle}
+        />
+      );
+
+      fireEvent.press(screen.getByPlaceholderText('Select date'));
+      fireEvent.press(screen.getByPlaceholderText('Select date'));
+
+      expect(onPickerToggle.mock.calls).toEqual([[true], [false]]);
     });
 
     it('closes date picker on second press (Done) on iOS', () => {

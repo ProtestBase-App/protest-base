@@ -42,6 +42,8 @@ export interface RepeatFieldsProps {
   userLanguage: string;
   /** What a refused submit found wrong with the rule, by field. */
   formErrors?: EventFormErrors;
+  /** Leave out the label where the screen is already titled Repeat. */
+  hideLabel?: boolean;
 }
 
 const FREQUENCIES: { value: RepeatFrequency; labelKey: string }[] = [
@@ -76,6 +78,7 @@ export default function RepeatFields({
   endTime,
   userLanguage,
   formErrors = NO_ERRORS,
+  hideLabel = false,
 }: RepeatFieldsProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -108,9 +111,11 @@ export default function RepeatFields({
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={[styles.label, styles.fieldSpacing]}>
-        {t('series.repeat.label')}
-      </ThemedText>
+      {!hideLabel && (
+        <ThemedText style={[styles.label, styles.fieldSpacing]}>
+          {t('series.repeat.label')}
+        </ThemedText>
+      )}
       <ThemedView style={styles.chipRow}>
         {FREQUENCIES.map(({ value, labelKey }) => (
           <FilterChip

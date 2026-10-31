@@ -47,7 +47,7 @@ export function ActionPill({
   const themeColors = getThemeColors(colorScheme);
 
   const palette = {
-    primary: { container: { backgroundColor: themeColors.tint }, content: 'white' },
+    primary: { container: { backgroundColor: themeColors.cta }, content: 'white' },
     ghost: {
       container: {
         backgroundColor: themeColors.badgeBg,

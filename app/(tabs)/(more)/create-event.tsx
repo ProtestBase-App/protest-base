@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
+import { StyleSheet, Alert, TouchableOpacity, BackHandler, View } from 'react-native';
 import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { router, Link, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { FormByline } from '@/components/event-form/FormByline';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
 
-import { createEventBackend, createDraftEvent } from '@/services/event.service';
+import {
+  createEventBackend,
+  createDraftEvent,
+  getEventByIdBackend,
+} from '@/services/event.service';
 import { getTemplate } from '@/services/template.service';
 import { saveEventDraft, getEventDraft, clearEventDraft } from '@/services/localStorageService';
 import CustomButton from '@/components/CustomButton';
@@ -25,19 +32,22 @@ import {
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { useEventFormValidation } from '@/hooks/useEventFormValidation';
+import { useFormAutosave } from '@/hooks/useFormAutosave';
 import { getThemeColors } from '@/utils/themeColors';
 import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
-import type { PickedImage } from '@/types/event.types';
+import type { CreateEventRequest, PickedImage } from '@/types/event.types';
 import type { CreateEventReport, RepeatFormState } from '@/types/eventSeries.types';
 import type { ParsedEventTemplate } from '@/types/template.types';
-import { Typography } from '@/constants/DesignTokens';
+import { IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
-import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
-import { validateEventForm } from '@/utils/eventFormValidation';
+import { buildEventRequest, createBlankForm } from '@/utils/eventFormData';
+import { keepExistingImages } from '@/utils/localImages';
+import { templateStartFromEvent } from '@/utils/templateUtils';
+import { stillNeededFields, validateEventForm } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -81,11 +91,13 @@ const migrateDraftFormState = (saved: FormState & { image?: unknown }): FormStat
   };
 };
 
+type TemplateStart = Pick<ParsedEventTemplate, 'event_data' | 'image_urls'> & { name?: string };
+
 /**
  * The form with a template's saved details laid over it. Empty strings saved in the
  * template are kept; only fields the template never had fall back to `prevForm`.
  */
-const applyTemplate = (prevForm: FormState, template: ParsedEventTemplate): FormState => {
+const applyTemplate = (prevForm: FormState, template: TemplateStart): FormState => {
   const eventData = template.event_data;
   return {
     ...prevForm,
@@ -165,13 +177,20 @@ export default function CreateEventModal() {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const isPresented = router.canGoBack();
-  const params = useLocalSearchParams<{ templateId?: string; source?: string }>();
+  const params = useLocalSearchParams<{
+    templateId?: string;
+    fromEventId?: string;
+    resume?: string;
+    source?: string;
+  }>();
 
   const [isSubmitting, setSubmitting] = useState(false);
   const [isSavingDraft, setSavingDraft] = useState(false);
+  const isSending = isSubmitting || isSavingDraft;
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
-  const [isCheckingDraft, setIsCheckingDraft] = useState(true);
-  const [startingTemplate, setStartingTemplate] = useState<ParsedEventTemplate | null>(null);
+  const [isResuming, setIsResuming] = useState(params.resume === '1');
+  const [publishCheckOpen, setPublishCheckOpen] = useState(false);
+  const [startingTemplate, setStartingTemplate] = useState<TemplateStart | null>(null);
 
   // 409 DUPLICATE_EVENT. The context records WHICH button was pressed, so
   // "Create anyway" re-sends that same submission — routing a refused draft save
@@ -180,54 +199,17 @@ export default function CreateEventModal() {
   // refused request never uploaded.
   const duplicatePrompt = useDuplicatePrompt<'event' | 'draft'>({ isOffline });
 
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: user?.name || '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [form, setForm] = useState<FormState>(() =>
+    createBlankForm({ organizer_name: user?.name || '' })
+  );
 
   // What the form holds before the organizer touches it: the auto-filled organization
   // and a launched template are its starting point, not edits to autosave or warn about.
   const initialFormState = useMemo<FormState>(() => {
-    const blankForm: FormState = {
+    const blankForm = createBlankForm({
       organization_id: selectedOrganizationId || '',
-      title: '',
-      description: '',
-      images: [],
-      street_address: '',
-      city: '',
-      region: '',
-      country: '',
-      start_time: '',
-      end_time: '',
       organizer_name: user?.name || '',
-      website_url: '',
-      categories: '',
-      disclaimer: '',
-      postal_code: null,
-      co_organizers: [],
-      help_needed: false,
-      help_description: '',
-      geocod_lat: null,
-      geocod_lng: null,
-    };
+    });
     return startingTemplate ? applyTemplate(blankForm, startingTemplate) : blankForm;
   }, [user?.name, selectedOrganizationId, startingTemplate]);
 
@@ -243,13 +225,13 @@ export default function CreateEventModal() {
     [form, initialFormState]
   );
 
-  const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftCheckedRef = useRef(false);
-  const saveFailureCountRef = useRef(0);
 
   const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
 
   const handleCloseAttempt = useCallback(() => {
+    if (isSending) return;
+
     if (!formHasChanges) {
       router.back();
       return;
@@ -276,110 +258,45 @@ export default function CreateEventModal() {
         style: 'cancel',
       },
     ]);
-  }, [form, formHasChanges]);
+  }, [form, formHasChanges, isSending]);
 
-  // Check for existing draft on mount (before template loading)
+  // Resuming is a choice made on the start screen, which also guards every other way
+  // in, so a new form never autosaves over the local draft unasked.
   useEffect(() => {
-    const checkDraft = async () => {
-      // If a template is being loaded, the template wins and any existing draft is discarded.
-      if (draftCheckedRef.current || params.templateId) {
-        if (params.templateId) {
-          await clearEventDraft();
-        }
-        setIsCheckingDraft(false);
-        return;
-      }
+    if (params.resume !== '1' || draftCheckedRef.current || loading) return;
+    draftCheckedRef.current = true;
 
-      draftCheckedRef.current = true;
-
+    const resumeDraft = async () => {
       try {
         const draft = await getEventDraft();
-        if (draft) {
-          Alert.alert(
-            t('draft.resumeTitle'),
-            t('draft.resumeMessage'),
-            [
-              {
-                text: t('draft.startFresh'),
-                onPress: () => {
-                  clearEventDraft();
-                  setIsCheckingDraft(false);
-                },
-              },
-              {
-                text: t('draft.resumeDraft'),
-                onPress: () => {
-                  setForm(migrateDraftFormState(draft.formData));
-                  setIsCheckingDraft(false);
-                },
-              },
-            ],
-            { cancelable: false }
-          );
-        } else {
-          setIsCheckingDraft(false);
+        if (!draft) return;
+        const saved = migrateDraftFormState(draft.formData);
+        const images = keepExistingImages(saved.images);
+        setForm({ ...saved, images });
+        if (images.length < saved.images.length) {
+          Alert.alert(t('draft.photosMissingTitle'), t('draft.photosMissingMessage'));
         }
       } catch (error) {
-        logger.warn('Failed to check for draft', {
+        logger.warn('Failed to resume draft', {
           error: error instanceof Error ? error.message : String(error),
         });
-        setIsCheckingDraft(false);
+      } finally {
+        setIsResuming(false);
       }
     };
 
-    if (!loading) {
-      checkDraft();
-    }
-  }, [loading, params.templateId]);
+    resumeDraft();
+  }, [loading, params.resume]);
 
-  // Auto-save draft on form changes (debounced with retry)
-  useEffect(() => {
-    if (draftTimeoutRef.current) {
-      clearTimeout(draftTimeoutRef.current);
-    }
-
-    if (!formHasChanges || isCheckingDraft) {
-      return;
-    }
-
-    draftTimeoutRef.current = setTimeout(async () => {
-      const maxRetries = 3;
-      let lastError: Error | null = null;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const result = await saveEventDraft(form);
-
-        if (result.success) {
-          saveFailureCountRef.current = 0;
-          return;
-        }
-
-        lastError = new Error(String(result.error));
-
-        // Exponential backoff between retries
-        if (attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-        }
-      }
-
-      saveFailureCountRef.current += 1;
-      logger.warn('Draft save failed after retries', { error: lastError?.message });
-
-      if (saveFailureCountRef.current === DRAFT_CONFIG.SAVE_FAILURE_THRESHOLD) {
-        Alert.alert(t('draft.saveWarningTitle'), t('draft.saveWarningMessage'), [
-          { text: t('common.ok') },
-        ]);
-      }
-    }, DRAFT_CONFIG.AUTO_SAVE_DEBOUNCE_MS);
-
-    return () => {
-      if (draftTimeoutRef.current) {
-        clearTimeout(draftTimeoutRef.current);
-      }
-    };
-  }, [form, formHasChanges, isCheckingDraft]);
+  useFormAutosave({
+    value: form,
+    enabled: formHasChanges && !isResuming,
+    save: saveEventDraft,
+  });
 
   useEffect(() => {
+    if (EVENT_FORM_SHELL.createEvent) return;
+
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleCloseAttempt();
       return true;
@@ -388,20 +305,23 @@ export default function CreateEventModal() {
     return () => backHandler.remove();
   }, [handleCloseAttempt]);
 
-  // Pre-fill form from template if templateId is provided
+  // Pre-fill from a template or a past event, whichever the start screen chose.
   useEffect(() => {
-    const loadTemplate = async () => {
-      if (!params.templateId) return;
+    const { templateId, fromEventId } = params;
+    if (!templateId && !fromEventId) return;
 
+    const loadStart = async () => {
       setIsLoadingTemplate(true);
-
       try {
-        const template = await getTemplate(params.templateId);
-        setForm((prevForm) => applyTemplate(prevForm, template));
-        setStartingTemplate(template);
+        const start = templateId
+          ? await getTemplate(templateId)
+          : templateStartFromEvent(await getEventByIdBackend(fromEventId as string));
+        setForm((prevForm) => applyTemplate(prevForm, start));
+        setStartingTemplate(start);
       } catch (error) {
-        logger.warn('Failed to load template', {
-          templateId: params.templateId,
+        logger.warn('Failed to load what the form starts from', {
+          templateId,
+          fromEventId,
           error: error instanceof Error ? error.message : String(error),
         });
         Alert.alert(t('createEvent.templateError'), t('createEvent.templateErrorMessage'), [
@@ -412,8 +332,9 @@ export default function CreateEventModal() {
       }
     };
 
-    loadTemplate();
-  }, [params.templateId]);
+    loadStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.templateId, params.fromEventId]);
 
   const handleBackPress = () => {
     handleCloseAttempt();
@@ -437,23 +358,15 @@ export default function CreateEventModal() {
     })
   );
 
-  /** Whitespace-trimmed copy of the form, shared by both submit paths. */
-  const trimForm = () => ({
-    ...form,
-    title: form.title.trim(),
-    description: form.description.trim(),
-    street_address: form.street_address?.trim() || '',
-    city: form.city?.trim() || '',
-    region: form.region?.trim() || '',
-    website_url: form.website_url?.trim() || '',
-    disclaimer: form.disclaimer?.trim() || '',
-    help_description: form.help_description?.trim() || '',
-  });
-
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
     if (!validation.check('publish')) return;
-    await runCreateEvent(false);
+
+    if (EVENT_FORM_SHELL.createEvent) {
+      setPublishCheckOpen(true);
+    } else {
+      await runCreateEvent(false);
+    }
   };
 
   /**
@@ -462,57 +375,22 @@ export default function CreateEventModal() {
    * explicitly confirmed.
    */
   const runCreateEvent = async (duplicateOverride: boolean) => {
-    const trimmedForm = trimForm();
-    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
     const repeat = activeRepeat();
     const rule = repeat ? buildRecurrenceRule(repeat).rule : null;
     if (repeat && !rule) return;
 
     setSubmitting(true);
     try {
-      // co_organizers holds org IDs (the dropdown values) — sent through as-is.
-      const finalCoOrganizers = trimmedForm.co_organizers?.length
-        ? trimmedForm.co_organizers
-        : undefined;
-
       // Non-blocking duplicate verdicts, when the backend has something to say
       // about an event it accepted anyway (warn mode, or a weak match).
       const report: CreateEventReport = {};
 
-      // Backend handles image upload, geocoding, URL validation, category
-      // formatting; it also fills in organizer_id and organizer_name from the JWT.
-      // images may mix freshly picked files with hosted URL strings (template
-      // images on create-from-template), attached verbatim by the service.
       const resultCreateEvent = await createEventBackend(
-        {
-          organization_id: effectiveOrgId,
-          title: trimmedForm.title,
-          description: trimmedForm.description,
-          ...(rule
-            ? { recurrence: rule }
-            : {
-                start_time: trimmedForm.start_time,
-                end_time: trimmedForm.end_time || undefined,
-              }),
-          street_address: trimmedForm.street_address || undefined,
-          city: trimmedForm.city || undefined,
-          region: trimmedForm.region || undefined,
-          country: trimmedForm.country || undefined,
-          postal_code: trimmedForm.postal_code || undefined,
-          // Coordinates of an accepted suggestion (this session only) — the backend
-          // adopts the confirmed pin. Omitted when no street was picked this session.
-          geocod_lat: trimmedForm.geocod_lat ?? undefined,
-          geocod_lng: trimmedForm.geocod_lng ?? undefined,
-          images: trimmedForm.images.length ? trimmedForm.images : undefined, // Omitted → backend uses default
-          website_url: trimmedForm.website_url || undefined,
-          categories: trimmedForm.categories, // Service normalizes string -> string[]
-          disclaimer: trimmedForm.disclaimer || undefined,
-          co_organizers: finalCoOrganizers,
-          help_needed: trimmedForm.help_needed,
-          help_description: trimmedForm.help_needed
-            ? trimmedForm.help_description || undefined
-            : undefined,
-        },
+        buildEventRequest(
+          form,
+          form.organization_id || selectedOrganizationId || '',
+          rule
+        ) as CreateEventRequest,
         { duplicateOverride, report }
       );
 
@@ -570,50 +448,16 @@ export default function CreateEventModal() {
 
   /** Send the draft-create request; see runCreateEvent for `duplicateOverride`. */
   const runCreateDraft = async (duplicateOverride: boolean) => {
-    const trimmedForm = trimForm();
-    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
     const repeat = activeRepeat();
     const rule = repeat ? buildRecurrenceRule(repeat).rule : null;
     if (repeat && !rule) return;
 
     setSavingDraft(true);
     try {
-      const finalCoOrganizers = trimmedForm.co_organizers?.length
-        ? trimmedForm.co_organizers
-        : undefined;
-
       const report: CreateEventReport = {};
 
       await createDraftEvent(
-        {
-          organization_id: effectiveOrgId,
-          title: trimmedForm.title,
-          description: trimmedForm.description || undefined,
-          ...(rule
-            ? { recurrence: rule }
-            : {
-                start_time: trimmedForm.start_time || undefined,
-                end_time: trimmedForm.end_time || undefined,
-              }),
-          street_address: trimmedForm.street_address || undefined,
-          city: trimmedForm.city || undefined,
-          region: trimmedForm.region || undefined,
-          country: trimmedForm.country || undefined,
-          postal_code: trimmedForm.postal_code || undefined,
-          // Coordinates of an accepted suggestion (this session only) — adopted as
-          // the draft's pin so it stays correct once published.
-          geocod_lat: trimmedForm.geocod_lat ?? undefined,
-          geocod_lng: trimmedForm.geocod_lng ?? undefined,
-          images: trimmedForm.images.length ? trimmedForm.images : undefined,
-          website_url: trimmedForm.website_url || undefined,
-          categories: trimmedForm.categories,
-          disclaimer: trimmedForm.disclaimer || undefined,
-          co_organizers: finalCoOrganizers,
-          help_needed: trimmedForm.help_needed,
-          help_description: trimmedForm.help_needed
-            ? trimmedForm.help_description || undefined
-            : undefined,
-        },
+        buildEventRequest(form, form.organization_id || selectedOrganizationId || '', rule),
         { duplicateOverride, report }
       );
 
@@ -658,31 +502,158 @@ export default function CreateEventModal() {
     return <Redirect href="/(tabs)/(more)/become-organizer?from=create-event" />;
   }
 
-  if (
-    isSubmitting ||
-    isSavingDraft ||
-    isLoadingTemplate ||
-    (isCheckingDraft && !params.templateId) ||
-    userOrgsLoading
-  ) {
+  if (isLoadingTemplate || isResuming || userOrgsLoading) {
     return (
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />
         {isLoadingTemplate && (
           <ThemedText style={styles.loadingText}>{t('templates.loadingTemplate')}</ThemedText>
         )}
-        {isCheckingDraft && !params.templateId && (
+        {isResuming && (
           <ThemedText style={styles.loadingText}>{t('draft.checkingDraft')}</ThemedText>
         )}
       </ThemedView>
     );
   }
 
+  if (EVENT_FORM_SHELL.createEvent) {
+    const onlyDateLeft =
+      !!startingTemplate && stillNeededFields(form, 'create', activeRepeat()).join() === 'date';
+
+    return (
+      <>
+        <EventFormShell
+          kind="create"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          inSheet
+          busy={isSending}
+          showRepeat={recurringEnabled}
+          scrollViewRef={scrollViewRef}
+          closeLabel={t('createEvent.closeAccessibilityLabel')}
+          onBack={() => {
+            handleCloseAttempt();
+            return true;
+          }}
+          intro={
+            !!startingTemplate?.name && (
+              <View style={styles.fromTemplate}>
+                <IconSymbol
+                  name="doc.on.doc"
+                  size={IconSizes.xs}
+                  color={themeColors.secondaryText}
+                />
+                <ThemedText style={[styles.fromTemplateText, { color: themeColors.secondaryText }]}>
+                  {t('createEvent.fromTemplate', { name: startingTemplate.name })}
+                </ThemedText>
+              </View>
+            )
+          }
+          byline={
+            <>
+              <FormFieldAnchor field="organization">
+                <OrganizationPicker
+                  value={form.organization_id || selectedOrganizationId || undefined}
+                  onValueChange={(id) => setForm({ ...form, organization_id: id })}
+                  error={!!validation.errors.organization}
+                  errorMessage={validation.errors.organization}
+                />
+              </FormFieldAnchor>
+              {userOrganizations.length === 1 && <FormByline name={userOrganizations[0].Name} />}
+            </>
+          }
+          whenPrompt={
+            onlyDateLeft
+              ? {
+                  title: t('createEvent.pickTheDate'),
+                  subtitle: t('createEvent.onlyThingLeft'),
+                }
+              : undefined
+          }
+          highlightWhen={onlyDateLeft}
+          publishCheck={{
+            open: publishCheckOpen,
+            onConfirm: () => {
+              setPublishCheckOpen(false);
+              runCreateEvent(false);
+            },
+            onClose: () => setPublishCheckOpen(false),
+          }}
+          footer={
+            <>
+              <CustomButton
+                testID="btn-create-event-draft"
+                title={isSavingDraft ? t('common.saving') : t('createEvent.saveAsDraft')}
+                handlePress={submitDraft}
+                pill
+                containerStyles={[
+                  styles.buttonDraft,
+                  {
+                    backgroundColor: themeColors.buttonSecondaryBackground,
+                    borderColor: themeColors.buttonSecondaryBorder,
+                  },
+                ]}
+                textStyles={{ color: themeColors.text }}
+                isLoading={isSending}
+              />
+              <CustomButton
+                testID="btn-create-event-submit"
+                title={isSubmitting ? t('common.publishing') : t('createEvent.publish')}
+                handlePress={submit}
+                pill
+                containerStyles={styles.button}
+                isLoading={isSending}
+              />
+            </>
+          }
+        />
+        <DuplicateEventModal
+          mode="create"
+          locale={userLanguage}
+          {...duplicatePrompt.modalProps((submitted) =>
+            submitted === 'draft' ? runCreateDraft(true) : runCreateEvent(true)
+          )}
+        />
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
+    );
+  }
+
   return (
     <>
-      {/* No footer: create-event keeps its submit/draft buttons inline. */}
-      <FormScreenScaffold scrollViewRef={scrollViewRef}>
-        <ThemedView style={styles.container}>
+      <FormScreenScaffold
+        scrollViewRef={scrollViewRef}
+        inSheet
+        footer={
+          <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
+            <CustomButton
+              testID="btn-create-event-draft"
+              title={isSavingDraft ? t('common.saving') : t('createEvent.saveAsDraft')}
+              handlePress={submitDraft}
+              containerStyles={[
+                styles.buttonDraft,
+                {
+                  backgroundColor: themeColors.buttonSecondaryBackground,
+                  borderColor: themeColors.buttonSecondaryBorder,
+                },
+              ]}
+              textStyles={{ color: themeColors.text }}
+              isLoading={isSending}
+            />
+            <CustomButton
+              testID="btn-create-event-submit"
+              title={isSubmitting ? t('common.publishing') : t('createEvent.publish')}
+              handlePress={submit}
+              containerStyles={styles.button}
+              isLoading={isSending}
+            />
+          </ThemedView>
+        }
+      >
+        {/* Stays on screen while sending, so a refused send comes back as it left. */}
+        <ThemedView style={styles.container} pointerEvents={isSending ? 'none' : 'auto'}>
           <ThemedView style={styles.headerRow}>
             <ThemedText type="title" style={styles.titleText}>
               {t('more.createEvent')}
@@ -717,29 +688,6 @@ export default function CreateEventModal() {
             userLanguage={userLanguage}
             scrollViewRef={scrollViewRef}
             showRepeat={recurringEnabled}
-          />
-
-          <CustomButton
-            testID="btn-create-event-submit"
-            title={t('more.createEvent')}
-            handlePress={submit}
-            containerStyles={styles.button}
-            isLoading={isSubmitting}
-          />
-
-          <CustomButton
-            testID="btn-create-event-draft"
-            title={t('drafts.saveAsDraft')}
-            handlePress={submitDraft}
-            containerStyles={[
-              styles.buttonDraft,
-              {
-                backgroundColor: themeColors.buttonSecondaryBackground,
-                borderColor: themeColors.buttonSecondaryBorder,
-              },
-            ]}
-            textStyles={{ color: themeColors.text }}
-            isLoading={isSavingDraft}
           />
 
           {!isPresented && <Link href="../">{t('common.dismiss')}</Link>}
@@ -780,17 +728,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+  },
   // Slimmer than CustomButton's tall default (containerStyles win over the
   // base minHeight), matching the edit screens' 48px action buttons.
   button: {
-    marginTop: 20,
-    marginBottom: 12,
+    flex: 1,
     minHeight: 48,
   },
   buttonDraft: {
-    marginBottom: 20,
     minHeight: 48,
+    paddingHorizontal: 20,
     borderWidth: 1,
+  },
+  fromTemplate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  fromTemplateText: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontFamily: Typography.families.medium,
   },
   splashContainer: {
     flex: 1,

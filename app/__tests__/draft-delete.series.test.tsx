@@ -233,6 +233,12 @@ describe('recurring drafts', () => {
       });
     };
 
+    const moveToNextDay = async (utils: Utils) => {
+      await press(utils, 'row-event-when');
+      await press(utils, 'calendar-day-2099-01-14');
+      await press(utils, 'btn-when-done');
+    };
+
     describe('saving a date of a series', () => {
       // The schedule of a series cannot change, so no edit form offers a rule.
       it('offers no Repeat control: the form keeps the date fields of the one draft', async () => {
@@ -241,8 +247,10 @@ describe('recurring drafts', () => {
         for (const chip of ['once', 'weekly', 'every_2_weeks', 'monthly']) {
           expect(utils.queryByTestId(`repeat-chip-${chip}`)).toBeNull();
         }
+        await press(utils, 'row-event-when');
         expect(utils.getByTestId('input-event-start-time')).toBeTruthy();
         expect(utils.getByTestId('input-event-end-time')).toBeTruthy();
+        expect(utils.queryByTestId('row-event-repeat')).toBeNull();
       });
 
       it('asks which drafts to change, and says it is part of a series', async () => {
@@ -311,12 +319,7 @@ describe('recurring drafts', () => {
 
       it('cannot widen a date that moved: the option is greyed out and confirming saves one draft', async () => {
         const utils = await renderEditor();
-        act(() => {
-          fireEvent.changeText(
-            utils.getByTestId('input-event-start-time'),
-            '2099-01-14T18:00:00.000Z'
-          );
-        });
+        await moveToNextDay(utils);
         await press(utils, 'btn-draft-save');
 
         expect(scopeState(utils, 'series-edit-scope', 'following')).toMatchObject({
@@ -378,12 +381,7 @@ describe('recurring drafts', () => {
       it('refuses a moved date when editing every upcoming date, and sends nothing', async () => {
         useLocalSearchParams.mockReturnValue({ id: 'draft-1', allUpcoming: 'true' });
         const utils = await renderEditor();
-        act(() => {
-          fireEvent.changeText(
-            utils.getByTestId('input-event-start-time'),
-            '2099-01-14T18:00:00.000Z'
-          );
-        });
+        await moveToNextDay(utils);
 
         await press(utils, 'btn-draft-save');
 
@@ -445,7 +443,7 @@ describe('recurring drafts', () => {
         await waitFor(() =>
           expect(alertSpy).toHaveBeenCalledWith('common.success', 'drafts.deleted')
         );
-        expect(router.replace).toHaveBeenCalledWith(Routes.DRAFT_EVENTS);
+        expect(router.replace).toHaveBeenCalledWith(Routes.DRAFT_EVENTS, { withAnchor: true });
       });
 
       it('deletes this and all following drafts when every later date is a draft', async () => {
@@ -469,7 +467,7 @@ describe('recurring drafts', () => {
             'series.messages.deleted:{"count":2}'
           )
         );
-        expect(router.replace).toHaveBeenCalledWith(Routes.DRAFT_EVENTS);
+        expect(router.replace).toHaveBeenCalledWith(Routes.DRAFT_EVENTS, { withAnchor: true });
       });
 
       it('is not blocked by a published date that comes before this draft', async () => {

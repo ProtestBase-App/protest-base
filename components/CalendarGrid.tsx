@@ -16,6 +16,7 @@ import { generateCalendarGrid, getDayHeaders, CalendarDay } from '@/utils/calend
 import { getCategoryColors } from '@/constants/CategoryColors';
 import { eventCategories } from '@/constants/EventCategories';
 import { t } from '@/utils/i18n';
+import { formatLongDate } from '@/utils/recurrence';
 
 const SWIPE_THRESHOLD = 50;
 const ANIMATION_DURATION = 250;
@@ -34,6 +35,12 @@ export interface CalendarGridProps {
   onNextMonth: () => void;
   canGoPrev: boolean;
   userLanguage: string;
+  /** Days before this one can't be picked. */
+  minDateKey?: string;
+  /** Read days out in the app's language. */
+  localizedDayLabels?: boolean;
+  /** What pressing a day does, where it isn't showing that day's events. */
+  dayHint?: string;
 }
 
 export default function CalendarGrid({
@@ -47,6 +54,9 @@ export default function CalendarGrid({
   onNextMonth,
   canGoPrev,
   userLanguage,
+  minDateKey,
+  localizedDayLabels = false,
+  dayHint,
 }: CalendarGridProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
@@ -158,6 +168,7 @@ export default function CalendarGrid({
           <View key={weekIdx} style={styles.weekRow}>
             {week.days.map((day, dayIdx) => {
               const isSelected = day.dateKey === selectedDateKey;
+              const isBlocked = !!minDateKey && day.dateKey < minDateKey;
               const markerColors = dayMarkers[day.dateKey] ?? [];
               const hasEvents = markerColors.length > 0;
               const showOverflow = markerColors.length > MAX_VISIBLE_DOTS;
@@ -168,20 +179,27 @@ export default function CalendarGrid({
               return (
                 <Pressable
                   key={dayIdx}
-                  style={styles.dayCell}
+                  style={[styles.dayCell, isBlocked && styles.dayCellBlocked]}
                   onPress={() => onSelectDay(day)}
+                  disabled={isBlocked}
                   accessibilityRole="button"
-                  accessibilityLabel={`${day.date.toDateString()}${
-                    hasEvents ? ', has events' : ''
-                  }`}
-                  accessibilityHint={t('a11y.hints.selectDay')}
+                  accessibilityState={{ selected: isSelected, disabled: isBlocked }}
+                  accessibilityLabel={
+                    localizedDayLabels
+                      ? formatLongDate(day.dateKey, userLanguage)
+                      : `${day.date.toDateString()}${hasEvents ? ', has events' : ''}`
+                  }
+                  accessibilityHint={dayHint ?? t('a11y.hints.selectDay')}
+                  testID={localizedDayLabels ? `calendar-day-${day.dateKey}` : undefined}
                 >
+                  {/* Android draws a flattened view square once it gains a fill or border. */}
                   <View
+                    collapsable={false}
                     style={[
                       styles.dayCircle,
                       isSelected && [
                         styles.dayCircleSelected,
-                        { backgroundColor: themeColors.tint, shadowColor: themeColors.tint },
+                        { backgroundColor: themeColors.cta, shadowColor: themeColors.cta },
                       ],
                       !isSelected &&
                         day.isToday && [styles.dayCircleToday, { borderColor: themeColors.tint }],
@@ -198,7 +216,9 @@ export default function CalendarGrid({
                               ? [styles.dayTextOutOfMonth, { color: themeColors.placeholder }]
                               : hasEvents
                                 ? [styles.dayTextHasEvents, { color: themeColors.text }]
-                                : [styles.dayTextDefault, { color: themeColors.secondaryText }],
+                                : minDateKey
+                                  ? [styles.dayTextPickable, { color: themeColors.text }]
+                                  : [styles.dayTextDefault, { color: themeColors.secondaryText }],
                       ]}
                     >
                       {day.day}
@@ -279,6 +299,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 3,
   },
+  dayCellBlocked: {
+    opacity: 0.35,
+  },
   dayCircle: {
     width: 34,
     height: 34,
@@ -312,6 +335,9 @@ const styles = StyleSheet.create({
   },
   dayTextHasEvents: {
     fontFamily: Typography.families.semiBold,
+  },
+  dayTextPickable: {
+    fontFamily: Typography.families.medium,
   },
   dayTextDefault: {
     fontFamily: Typography.families.regular,

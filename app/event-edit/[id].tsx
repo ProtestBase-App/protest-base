@@ -4,6 +4,8 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
 
@@ -26,6 +28,7 @@ import type { SeriesEditRequest, SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
+import { createBlankForm } from '@/utils/eventFormData';
 import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -53,28 +56,9 @@ export default function EditEvent() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setSubmitting] = useState(false);
   const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: user?.name || '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [form, setForm] = useState<FormState>(() =>
+    createBlankForm({ organizer_name: user?.name || '' })
+  );
 
   const validation = useEventFormValidation((intent) => validateEventForm(form, { intent }));
 
@@ -187,6 +171,8 @@ export default function EditEvent() {
   // Intercept the Android hardware back so it honours the unsaved-changes guard
   // instead of silently discarding edits.
   useEffect(() => {
+    if (EVENT_FORM_SHELL.eventEdit) return;
+
     const onHardwareBack = () => {
       if (isDirty()) {
         handleBackPress();
@@ -321,6 +307,96 @@ export default function EditEvent() {
     );
   }
 
+  const scopeDialog = (
+    <SeriesScopeDialog
+      visible={scopeDialogOpen}
+      title={t('series.edit.scopeTitle')}
+      onlyHint={t('series.edit.onlyNote')}
+      followingHint={t('series.edit.followingNote')}
+      followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
+      dismissLabel={t('common.cancel')}
+      onDismiss={() => setScopeDialogOpen(false)}
+      confirmLabel={t('common.save')}
+      onConfirm={handleScopeConfirm}
+      testID="series-edit-scope"
+    />
+  );
+
+  const seriesNote = !!seriesId && (
+    <HelperText
+      text={
+        editsAllUpcoming
+          ? t('series.edit.allNote')
+          : `${t('series.edit.partOfSeries')} ${t('series.edit.onlyNote')}`
+      }
+      isDark={colorScheme === 'dark'}
+    />
+  );
+
+  if (EVENT_FORM_SHELL.eventEdit) {
+    const event = eventDetail[0];
+    return (
+      <>
+        <EventFormShell
+          kind="edit"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          busy={isSubmitting}
+          isAllDay={wasAllDayRef.current}
+          savedPin={
+            event?.geocod_lat != null && event.geocod_lng != null
+              ? {
+                  latitude: event.geocod_lat,
+                  longitude: event.geocod_lng,
+                  street: event.street_address || '',
+                }
+              : null
+          }
+          scrollViewRef={scrollViewRef}
+          closeLabel={t('eventEdit.closeAccessibilityLabel')}
+          onBack={() => {
+            handleBackPress();
+            return true;
+          }}
+          heading={t('eventEdit.title')}
+          intro={seriesNote}
+          footer={
+            <>
+              <CustomButton
+                testID="button-cancel"
+                title={t('common.cancel')}
+                handlePress={() => handleBackPress()}
+                pill
+                containerStyles={[
+                  styles.buttonCancel,
+                  {
+                    backgroundColor: themeColors.buttonSecondaryBackground,
+                    borderColor: themeColors.buttonSecondaryBorder,
+                  },
+                ]}
+                textStyles={{ color: themeColors.text }}
+                isLoading={false}
+                disabled={isSubmitting}
+              />
+              <CustomButton
+                testID="button-save"
+                title={isSubmitting ? t('common.saving') : t('common.save')}
+                handlePress={submit}
+                pill
+                containerStyles={styles.buttonSave}
+                isLoading={isSubmitting}
+              />
+            </>
+          }
+        />
+        {scopeDialog}
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
+    );
+  }
+
   return (
     <>
       <FormScreenScaffold
@@ -396,18 +472,7 @@ export default function EditEvent() {
           />
         </ThemedView>
       </FormScreenScaffold>
-      <SeriesScopeDialog
-        visible={scopeDialogOpen}
-        title={t('series.edit.scopeTitle')}
-        onlyHint={t('series.edit.onlyNote')}
-        followingHint={t('series.edit.followingNote')}
-        followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
-        dismissLabel={t('common.cancel')}
-        onDismiss={() => setScopeDialogOpen(false)}
-        confirmLabel={t('common.save')}
-        onConfirm={handleScopeConfirm}
-        testID="series-edit-scope"
-      />
+      {scopeDialog}
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );

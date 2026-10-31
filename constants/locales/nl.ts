@@ -115,6 +115,8 @@ const nl = {
   // Common translations used across the app
   // ============================================
   common: {
+    saving: 'Opslaan…',
+    publishing: 'Publiceren…',
     ok: 'OK',
     cancel: 'Annuleren',
     save: 'Opslaan',
@@ -179,8 +181,7 @@ const nl = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Sjabloon aanmaken',
-    createFromEventTitle: 'Sjabloon aanmaken van evenement',
+    createTitle: 'Nieuw sjabloon',
     editTitle: 'Sjabloon bewerken',
 
     // Subtitles and descriptions
@@ -195,7 +196,7 @@ const nl = {
     // Field labels
     nameLabel: 'Sjabloonnaam *',
     descriptionLabel: 'Sjabloonbeschrijving (Optioneel)',
-    namePlaceholder: 'Geef je sjabloon een naam (bv. Maandelijkse bijeenkomst)',
+    namePlaceholder: 'bv. Maandelijkse wake voor wonen',
     descriptionPlaceholder: 'Waar is dit sjabloon voor?',
 
     // Buttons
@@ -211,6 +212,15 @@ const nl = {
     nameMissing: 'Voer een sjabloonnaam in.',
     dataTooLong: 'Deze sjabloon is te lang om op te slaan. Maak de beschrijving korter.',
     volunteerDescMissing: 'Beschrijf hoe vrijwilligers kunnen helpen.',
+    saveFromEventTitle: 'Opslaan als sjabloon',
+    saveFromEventDesc: 'De details van dit evenement hergebruiken',
+    keepGroup: 'Bewaren',
+    datesNeverSaved: 'Datums worden nooit in een sjabloon bewaard.',
+    partText: 'Titel en tekst',
+    partLocation: 'Locatie',
+    nameHelp: 'Alleen je organisatie ziet deze naam.',
+    dateAsked: 'Datum en tijd',
+    dateAskedHint: 'Die kies je wanneer je het sjabloon gebruikt',
 
     // Delete confirmation
     deleteConfirmTitle: 'Sjabloon verwijderen',
@@ -225,11 +235,15 @@ const nl = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Beginnen',
+    templatesGroup: 'Je sjablonen',
+    resume: 'Hervatten',
+    unfinished: 'Onafgewerkt',
+    untitled: 'Naamloos evenement',
     blankTitle: 'Plan een nieuwe actie',
-    blankSubtitle: 'Maak een nieuw evenement met een leeg formulier',
+    blankSubtitle: 'Begin met een leeg evenement',
     templateTitle: 'Gebruik een sjabloon',
     templateSubtitle: 'Vooraf invullen met opgeslagen evenementdetails',
-    footer: 'Sjablonen besparen tijd voor terugkerende evenementen met vergelijkbare details.',
   },
 
   // ============================================
@@ -609,21 +623,21 @@ const nl = {
     city: 'Stad',
     helpNeeded: 'Hulp nodig',
     eventImage: 'Evenementafbeelding',
-    uploadImage: 'Afbeelding uploaden',
+    uploadImage: "Foto's",
+    addCoverPhoto: 'Omslagfoto toevoegen',
     changeImage: 'Afbeelding wijzigen',
     removeImage: 'Afbeelding verwijderen',
     eventLink: 'Evenementlink',
     coOrganizers: 'Mede-organisatoren',
-    volunteering: 'Vrijwilligerswerk',
-    volunteerRoles: 'Vrijwilligersrollen en details',
+    volunteering: 'Vrijwilligers',
+    volunteerRoles: 'Hoe kunnen mensen helpen?',
     volunteerNeeded: 'Vrijwilligers nodig',
     volunteerDetails: 'Wat voor vrijwilligers heb je nodig?',
-    disclaimer: 'Disclaimer',
+    disclaimer: 'Goed om te weten',
 
     // Placeholders
     titlePlaceholder: 'Titel van het evenement',
-    descriptionPlaceholder:
-      'Beschrijf je evenement - waar het over gaat, wat te verwachten, wie er moet komen...',
+    descriptionPlaceholder: 'Waar gaat het over, wie moet er komen?',
     selectCategory: 'Selecteer een categorie',
     categoryPlaceholder: 'Selecteer een categorie',
     pickDateTime: 'Kies datum/tijd',
@@ -676,14 +690,21 @@ const nl = {
       'Belangrijke informatie die deelnemers moeten weten (veiligheid, toegankelijkheid, vereisten, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: 'Ik heb hulp nodig bij dit evenement',
+    needHelpCheckbox: 'We zoeken vrijwilligers',
 
     // Labels
     selected: 'Geselecteerd',
     mainImageBadge: 'Hoofd',
 
     // Progress & Actions
-    requiredFieldsProgress: 'Verplichte velden ingevuld: {{completed}}/{{total}}',
+    stillNeeded: 'Nog nodig: {{fields}}',
+    allRequiredFilled: 'Alle verplichte velden zijn ingevuld',
+    neededFields: {
+      title: 'titel',
+      description: 'beschrijving',
+      category: 'categorie',
+      date: 'datum',
+    },
     createButton: 'Evenement aanmaken',
     updateButton: 'Evenement bijwerken',
     cancelButton: 'Annuleren',
@@ -717,10 +738,39 @@ const nl = {
     // Additional validation
     fillMandatoryFields: 'Vul alle verplichte velden in.',
     organizationsLoading: 'Wacht tot de organisaties zijn geladen voordat je indient.',
-    invalidUrlFormat: 'Website URL moet beginnen met www., http:// of https://',
-    disclaimerTooLong: 'Houd de disclaimer op maximaal {{max}} tekens.',
-    volunteerTooLong: 'Houd de vrijwilligersdetails op maximaal {{max}} tekens.',
+    invalidUrlFormat: 'Voer een geldige link in, zoals example.com.',
+    disclaimerTooLong: 'Houd dit op maximaal {{max}} tekens.',
+    volunteerTooLong: 'Houd dit op maximaal {{max}} tekens.',
+    saveAsDraft: 'Concept',
+    publish: 'Publiceren',
     linkTooLong: 'Houd de link op maximaal {{max}} tekens.',
+    fromTemplate: 'Uit sjabloon: {{name}}',
+    pickTheDate: 'Kies de datum en tijd',
+    onlyThingLeft: 'Het enige wat nog ontbreekt',
+    starts: 'Begint',
+    ends: 'Eindigt',
+    noSetEnd: 'Geen vast einde',
+    endsAnotherDay: 'Eindigt op een andere dag',
+    previousMonth: 'Vorige maand',
+    nextMonth: 'Volgende maand',
+    hours: {
+      one: '1 u',
+      other: '{{count}} u',
+    },
+    publishCheckTitle: 'Dit evenement publiceren?',
+    publishCheckBody: 'Het is meteen openbaar op Verkennen, Kaart en Kalender.',
+    publishNow: 'Nu publiceren',
+    timePlaceholder: 'Tijd',
+    brusselsTime: '{{time}}, Brusselse tijd',
+    namePlaceholder: 'Geef je actie een naam',
+    byOrganization: 'door {{name}}',
+    addDateTime: 'Datum en tijd toevoegen',
+    addPlace: 'Een plaats toevoegen',
+    link: 'Link',
+    where: 'Waar',
+    when: 'Wanneer',
+    addMore: 'Meer toevoegen',
+    whenRange: '{{start}} tot {{end}}',
     fixBeforePublishing: {
       one: '1 punt om op te lossen voor je publiceert',
       other: '{{count}} punten om op te lossen voor je publiceert',
@@ -845,7 +895,6 @@ const nl = {
     reusePastEvent: 'Een eerder evenement hergebruiken',
     orReusePastEvent: 'Of hergebruik een eerder evenement',
     use: 'Gebruiken',
-    using: 'Bezig…',
     placeholderCard: 'Je opgeslagen sjablonen verschijnen hier',
     hintDefault: 'Tik op een sjabloon om een evenement met vooraf ingevulde details aan te maken.',
     hintEmpty: 'Een eerder evenement gebruiken maakt er automatisch een sjabloon van.',
@@ -1489,6 +1538,12 @@ const nl = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Je onafgewerkte evenement vervangen?',
+    replaceMessage:
+      'Je hebt een onafgewerkt evenement op deze telefoon. Een nieuw beginnen verwijdert het.',
+    replaceConfirm: 'Nieuw beginnen',
+    photosMissingTitle: "Sommige foto's zijn weg",
+    photosMissingMessage: "Je telefoon heeft foto's van dit evenement gewist. Voeg ze opnieuw toe.",
     checkingDraft: 'Controleren op opgeslagen concept...',
     resumeTitle: 'Concept hervatten?',
     resumeMessage:
@@ -1498,7 +1553,7 @@ const nl = {
     closeTitle: 'Niet-opgeslagen wijzigingen',
     closeMessage: 'Je hebt niet-opgeslagen wijzigingen. Wat wil je doen?',
     discard: 'Verwijderen',
-    saveDraft: 'Concept opslaan',
+    saveDraft: 'Bewaren en sluiten',
     keepEditing: 'Blijven bewerken',
     saveWarningTitle: 'Probleem met automatisch opslaan',
     saveWarningMessage:
@@ -2099,6 +2154,13 @@ const nl = {
       startTriage: 'Start het nakijken van je concepten, één voor één',
       openEditor: 'Opent dit concept in de volledige editor',
       pickDate: 'Opent de datumkiezer',
+      openRepeat: 'Opent hoe vaak het evenement terugkomt',
+      deleteTemplate: 'Verwijdert dit sjabloon',
+      pickDay: 'Gebruikt deze dag voor het evenement',
+      openWhen: 'Opent de datum en tijd',
+      openWhere: 'Opent de plaats',
+      openPhotos: "Opent de foto's",
+      resumeDraft: 'Opent je onafgewerkte evenement',
       pickTime: 'Opent de tijdkiezer',
       resizeField: 'Wijzigt hoeveel tekst zichtbaar is',
       jumpToField: 'Gaat naar dit veld',

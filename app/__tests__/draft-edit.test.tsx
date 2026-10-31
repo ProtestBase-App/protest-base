@@ -71,6 +71,7 @@ import {
   fireEvent,
   act,
 } from '@/test-utils/render';
+import { spyOnBackHandler } from '@/test-utils/backHandler';
 import DraftEdit from '../draft-edit/[id]';
 
 const { useLocalSearchParams } = require('expo-router');
@@ -173,13 +174,16 @@ describe('DraftEdit', () => {
       })
     );
 
-    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+    const { findByTestId, getByTestId } = renderWithProviders(<DraftEdit />, {
       providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
     });
 
     const publish = await findByTestId('btn-draft-publish');
     await act(async () => {
       fireEvent.press(publish);
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('btn-publish-confirm'));
     });
 
     expect(publishDraft).toHaveBeenCalled();
@@ -204,6 +208,90 @@ describe('DraftEdit', () => {
     });
 
     expect(patchEvent).toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('keeps the form on screen while it saves', async () => {
+    patchEvent.mockImplementation(() => new Promise(() => {}));
+    getDraftEventPreview.mockResolvedValue(createMockEvent({ $id: 'draft-1', title: 'Rally' }));
+
+    const { findByTestId, getByDisplayValue, getByText } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    const save = await findByTestId('btn-draft-save');
+    await act(async () => {
+      fireEvent.press(save);
+    });
+
+    expect(getByDisplayValue('Rally')).toBeTruthy();
+    expect(getByText('common.saving')).toBeTruthy();
+  });
+
+  it('says so when it is publishing, and ignores the back button meanwhile', async () => {
+    patchEvent.mockImplementation(() => new Promise(() => {}));
+    const back = spyOnBackHandler();
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({
+        $id: 'draft-1',
+        title: 'Rally',
+        start_time: '2099-06-01T12:00:00.000Z',
+        end_time: undefined,
+        description: 'Ready',
+        categories: ['protest'],
+      })
+    );
+
+    const { findByTestId, getByTestId, getByText, findByDisplayValue } = renderWithProviders(
+      <DraftEdit />,
+      {
+        providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+      }
+    );
+
+    await findByDisplayValue('Rally');
+    const publish = await findByTestId('btn-draft-publish');
+    await act(async () => {
+      fireEvent.press(publish);
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('btn-publish-confirm'));
+    });
+
+    expect(getByText('common.publishing')).toBeTruthy();
+    let handled = false;
+    act(() => {
+      handled = back.pressBack();
+    });
+    expect(handled).toBe(true);
+
+    back.restore();
+  });
+
+  it('shows the date and place before publishing, and can go back to editing', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({
+        $id: 'draft-1',
+        start_time: '2099-06-01T12:00:00.000Z',
+        end_time: undefined,
+        description: 'Ready',
+        categories: ['protest'],
+      })
+    );
+
+    const { findByTestId, getByTestId, queryByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    fireEvent.press(await findByTestId('btn-draft-publish'));
+    expect(getByTestId('surface-publish')).toBeTruthy();
+    expect(publishDraft).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId('btn-publish-keep-editing'));
+    expect(queryByTestId('surface-publish')).toBeNull();
+    expect(publishDraft).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
   });
@@ -360,7 +448,13 @@ describe('DraftEdit', () => {
       const { getByTestId } = await renderDraft();
 
       await act(async () => {
+        fireEvent.press(getByTestId('row-event-where'));
+      });
+      await act(async () => {
         fireEvent.press(getByTestId('country-chip-netherlands'));
+      });
+      await act(async () => {
+        fireEvent.press(getByTestId('btn-where-done'));
       });
       await act(async () => {
         fireEvent.press(getByTestId('btn-draft-save'));
@@ -526,6 +620,9 @@ describe('DraftEdit', () => {
       const publishButton = await utils.findByTestId('btn-draft-publish');
       await act(async () => {
         fireEvent.press(publishButton);
+      });
+      await act(async () => {
+        fireEvent.press(utils.getByTestId('btn-publish-confirm'));
       });
 
       return { ...utils, alertSpy };

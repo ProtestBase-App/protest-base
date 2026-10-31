@@ -22,6 +22,7 @@ export default function MoreLayout() {
           options={{
             headerShown: true,
             headerBackVisible: true,
+            headerBackButtonDisplayMode: 'minimal',
             headerTitle: t('more.createEvent'),
           }}
         />

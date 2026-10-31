@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { StyleSheet, TouchableOpacity, Alert, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, Alert, View, type ViewInstance } from 'react-native';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import { openMap } from '@/utils/mapHelpers';
 import { shareEventWithAlert } from '@/utils/shareHelpers';
 import EventDetailed from '@/components/EventDetailed';
 import CreatorActionSheet from '@/components/CreatorActionSheet';
+import { SaveAsTemplateDialog } from '@/components/SaveAsTemplateDialog';
 import CancelEventModal from '@/components/CancelEventModal';
 import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedView } from '@/components/ThemedView';
@@ -38,6 +39,7 @@ import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useIsOrganizationMember } from '@/context/UserOrganizationsProvider';
 import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useEventSeries } from '@/hooks/useEventSeries';
+import { useReturnFocus } from '@/hooks/useOverlayFocus';
 import { useEventWeather } from '@/hooks/useEventWeather';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { IconSizes, Spacing, Typography } from '@/constants/DesignTokens';
@@ -83,7 +85,10 @@ export default function EventDetails() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const manageRef = useRef<ViewInstance>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  useReturnFocus(saveTemplateOpen ? 'dialog' : null, () => manageRef);
   const [isCancelling, setIsCancelling] = useState(false);
   const [viewCount, setViewCount] = useState(() => cachedEvent?.view_count ?? 0);
 
@@ -411,7 +416,7 @@ export default function EventDetails() {
               <TouchableOpacity
                 accessibilityRole="button"
                 onPress={onRefresh}
-                style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
+                style={[styles.retryButton, { backgroundColor: themeColors.cta }]}
               >
                 <ThemedText style={styles.retryButtonText}>{t('common.tryAgain')}</ThemedText>
               </TouchableOpacity>
@@ -428,7 +433,7 @@ export default function EventDetails() {
     <ThemedView style={styles.wrapper}>
       {/* SafeAreaView omits 'top' so the hero can extend behind the status bar. */}
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-        <ThemedView style={styles.container}>
+        <ThemedView style={styles.container} aria-hidden={saveTemplateOpen}>
           <EventDetailed
             event={event}
             isCreator={userCanEdit}
@@ -472,6 +477,7 @@ export default function EventDetails() {
               {userCanEdit ? (
                 <>
                   <TouchableOpacity
+                    ref={manageRef}
                     style={[
                       styles.iconButton,
                       {
@@ -490,7 +496,7 @@ export default function EventDetails() {
                   <TouchableOpacity
                     accessibilityRole="button"
                     testID="event-sticky-edit"
-                    style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
+                    style={[styles.primaryButton, { backgroundColor: themeColors.cta }]}
                     onPress={handleOpenEdit}
                     activeOpacity={0.85}
                   >
@@ -530,7 +536,7 @@ export default function EventDetails() {
                     <TouchableOpacity
                       accessibilityRole="button"
                       testID="button-directions"
-                      style={[styles.primaryButton, { backgroundColor: themeColors.tint }]}
+                      style={[styles.primaryButton, { backgroundColor: themeColors.cta }]}
                       onPress={handleOpenDirections}
                       activeOpacity={0.85}
                     >
@@ -555,9 +561,16 @@ export default function EventDetails() {
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
         onEditDetails={handleOpenEdit}
+        onSaveAsTemplate={() => {
+          if (assertOnlineOrAlert(isOffline)) setSaveTemplateOpen(true);
+        }}
         onCancelEvent={() => setCancelModalOpen(true)}
         cancelDisabled={event.status === 'cancelled'}
       />
+
+      {saveTemplateOpen && rawEvent && (
+        <SaveAsTemplateDialog event={rawEvent} onClose={() => setSaveTemplateOpen(false)} />
+      )}
 
       <CancelEventModal
         visible={cancelModalOpen}

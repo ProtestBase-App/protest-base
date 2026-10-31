@@ -13,6 +13,7 @@ jest.mock('@/services/event.service', () => ({
 }));
 
 jest.mock('@/utils/eventFormatters', () => ({
+  ...jest.requireActual('@/utils/eventFormatters'),
   formatEventForDisplay: jest.fn((event) => ({
     ...event,
     title: event.title,
@@ -22,11 +23,6 @@ jest.mock('@/utils/eventFormatters', () => ({
     organization_id: event.organization_id,
     all_day: event.all_day,
   })),
-  // Real: these two ARE the all-day conversion rule under test, and EventForm
-  // calls isBelgiumMidnight on every render.
-  allDaySubmitField: jest.requireActual('@/utils/eventFormatters').allDaySubmitField,
-  isBelgiumMidnight: jest.requireActual('@/utils/eventFormatters').isBelgiumMidnight,
-  parseAsUTC: jest.requireActual('@/utils/eventFormatters').parseAsUTC,
 }));
 
 jest.mock('@/utils/themeColors', () => ({
@@ -510,7 +506,9 @@ describe('EditEvent', () => {
     it("sends '' for the address it emptied on a country switch, and no stale pin", async () => {
       const { getByTestId } = await renderBelgianEvent();
 
+      fireEvent.press(getByTestId('row-event-where'));
       fireEvent.press(getByTestId('country-chip-netherlands'));
+      fireEvent.press(getByTestId('btn-where-done'));
       fireEvent.press(getByTestId('button-save'));
 
       const [, update] = updateEvent.mock.calls[0];

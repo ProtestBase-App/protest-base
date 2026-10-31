@@ -366,8 +366,8 @@ export function FiltersSheetFooter({
         style={[
           styles.applyButton,
           {
-            backgroundColor: themeColors.tint,
-            shadowColor: themeColors.tint,
+            backgroundColor: themeColors.cta,
+            shadowColor: themeColors.cta,
             opacity: applyDisabled ? 0.5 : 1,
           },
         ]}

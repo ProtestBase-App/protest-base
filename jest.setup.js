@@ -303,6 +303,15 @@ jest.mock('react-native-reanimated', () => {
 });
 
 // ============================================================================
+// expo-file-system mock
+// ============================================================================
+jest.mock('expo-file-system', () => ({
+  File: class {
+    exists = true;
+  },
+}));
+
+// ============================================================================
 // react-native-keyboard-controller mock
 // ============================================================================
 // The shipped mock is an exported object, not self-registering, so wire it up here.

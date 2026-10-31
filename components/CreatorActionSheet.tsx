@@ -12,6 +12,7 @@ interface CreatorActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onEditDetails: () => void;
+  onSaveAsTemplate: () => void;
   /**
    * Invoked when the user taps "Cancel event". The parent is responsible for
    * showing the confirmation + reason prompt and calling the cancelEvent API.
@@ -26,6 +27,7 @@ export default function CreatorActionSheet({
   visible,
   onClose,
   onEditDetails,
+  onSaveAsTemplate,
   onCancelEvent,
   cancelDisabled = false,
 }: CreatorActionSheetProps) {
@@ -64,6 +66,20 @@ export default function CreatorActionSheet({
               onPress={() => {
                 onClose();
                 onEditDetails();
+              }}
+            />
+
+            <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
+
+            <ActionRow
+              testID="creator-action-template"
+              icon="doc.on.doc"
+              label={t('template.saveFromEventTitle')}
+              description={t('template.saveFromEventDesc')}
+              iconColor={themeColors.text}
+              onPress={() => {
+                onClose();
+                onSaveAsTemplate();
               }}
             />
 
@@ -118,7 +134,7 @@ export default function CreatorActionSheet({
 }
 
 interface ActionRowProps {
-  icon: 'pencil' | 'bell.badge' | 'eye' | 'xmark.circle';
+  icon: 'pencil' | 'doc.on.doc' | 'bell.badge' | 'eye' | 'xmark.circle';
   label: string;
   description: string;
   iconColor: string;

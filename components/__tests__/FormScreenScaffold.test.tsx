@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   Keyboard,
+  Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -15,6 +17,9 @@ import {
   useFormFieldJump,
   useFormKeyboard,
 } from '@/components/FormScreenScaffold';
+import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+
 import { Spacing } from '@/constants/DesignTokens';
 import { DROPDOWN_HEADROOM, DROPDOWN_LABEL_ROOM } from '@/utils/keyboardReveal';
 
@@ -287,5 +292,61 @@ describe('FormScreenScaffold field jumps', () => {
     );
 
     expect(() => fireEvent.press(getByTestId('jump'))).not.toThrow();
+  });
+});
+
+describe('FormScreenScaffold footer in a sheet', () => {
+  const realOS = Platform.OS;
+  const realKeyboard = useReanimatedKeyboardAnimation();
+
+  afterEach(() => {
+    Platform.OS = realOS;
+    jest.mocked(useReanimatedKeyboardAnimation).mockReturnValue(realKeyboard);
+  });
+
+  const renderFooter = (inSheet: boolean, tabBarHeight?: number, keyboardHeight = -300) => {
+    jest.mocked(useReanimatedKeyboardAnimation).mockReturnValue({
+      height: { value: keyboardHeight },
+      progress: { value: 1 },
+    } as unknown as ReturnType<typeof useReanimatedKeyboardAnimation>);
+
+    const utils = renderWithProviders(
+      <BottomTabBarHeightContext.Provider value={tabBarHeight}>
+        <FormScreenScaffold inSheet={inSheet} footer={<Text>Footer</Text>}>
+          <Text>Form body</Text>
+        </FormScreenScaffold>
+      </BottomTabBarHeightContext.Provider>
+    );
+    const safeArea = utils.getByText('Footer').parent?.parent;
+    return {
+      marginBottom: StyleSheet.flatten(safeArea?.props.style)?.marginBottom,
+      bottomEdge: safeArea?.props.edges.bottom,
+      lift: StyleSheet.flatten(utils.getByTestId('form-footer').props.style).transform[0]
+        .translateY,
+    };
+  };
+
+  it('clears the home indicator on iOS, and lands on the keyboard without the inset', () => {
+    Platform.OS = 'ios';
+    expect(renderFooter(true, 80)).toEqual({
+      marginBottom: 34,
+      bottomEdge: 'additive',
+      lift: -266,
+    });
+  });
+
+  it('lets the tab bar clear the inset on Android, and rides the keyboard from there', () => {
+    Platform.OS = 'android';
+    expect(renderFooter(true, 80)).toEqual({ marginBottom: 0, bottomEdge: 'off', lift: -220 });
+  });
+
+  it('stays above the tab bar when an open keyboard takes no height', () => {
+    Platform.OS = 'android';
+    expect(renderFooter(true, 80, 0).lift).toBe(0);
+  });
+
+  it('leaves full screens to SafeAreaView', () => {
+    Platform.OS = 'ios';
+    expect(renderFooter(false)).toEqual({ marginBottom: 0, bottomEdge: 'additive', lift: -300 });
   });
 });

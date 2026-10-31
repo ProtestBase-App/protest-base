@@ -5,6 +5,9 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { FormByline } from '@/components/event-form/FormByline';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
 
@@ -33,7 +36,7 @@ import { useEventSeries } from '@/hooks/useEventSeries';
 import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
 import SeriesScopeDialog from '@/components/SeriesScopeDialog';
-import type { FormState } from '@/types/eventForm.types';
+import type { FormState, SavedPin } from '@/types/eventForm.types';
 import type { DuplicateWarningReport, UpdateEventRequest } from '@/types/event.types';
 import type { SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
@@ -42,6 +45,7 @@ import { getThemeColors } from '@/utils/themeColors';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { allDaySubmitField } from '@/utils/eventFormatters';
+import { createBlankForm } from '@/utils/eventFormData';
 import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -65,35 +69,19 @@ export default function DraftEdit() {
   const recurringEnabled = useRecurringEventsEnabled();
 
   const [loading, setLoading] = useState(true);
-  const [actionBusy, setActionBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<'save' | 'publish' | 'delete' | null>(null);
+  const [publishCheckOpen, setPublishCheckOpen] = useState(false);
+  const [savedPin, setSavedPin] = useState<SavedPin | null>(null);
+  const actionBusy = busyAction !== null;
   const [draftSeriesId, setDraftSeriesId] = useState<string | null>(null);
   const [saveScopeOpen, setSaveScopeOpen] = useState(false);
   const [deleteScopeOpen, setDeleteScopeOpen] = useState(false);
   // 409 DUPLICATE_EVENT. The edits are already saved by the time publish runs,
   // so the retry re-sends only the publish — never the patch again.
   const duplicatePrompt = useDuplicatePrompt({ isOffline });
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: user?.name || '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [form, setForm] = useState<FormState>(() =>
+    createBlankForm({ organizer_name: user?.name || '' })
+  );
 
   const validation = useEventFormValidation((intent) =>
     validateEventForm(form, { intent, existingDraft: true })
@@ -120,6 +108,13 @@ export default function DraftEdit() {
         const event = await getDraftEventPreview(eventId);
         wasAllDayRef.current = event.all_day === true;
         setDraftSeriesId(event.series_id ?? null);
+        if (event.geocod_lat != null && event.geocod_lng != null) {
+          setSavedPin({
+            latitude: event.geocod_lat,
+            longitude: event.geocod_lng,
+            street: event.street_address || '',
+          });
+        }
         setForm((prev) => {
           const next: FormState = {
             ...prev,
@@ -197,7 +192,10 @@ export default function DraftEdit() {
   // instead of silently discarding edits (the iOS swipe-back is disabled via
   // gestureEnabled: false in app/_layout.tsx).
   useEffect(() => {
+    if (EVENT_FORM_SHELL.draftEdit) return;
+
     const onHardwareBack = () => {
+      if (actionBusy) return true;
       if (isDirty()) {
         handleClosePress();
         return true;
@@ -206,7 +204,7 @@ export default function DraftEdit() {
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
     return () => sub?.remove?.();
-  }, [isDirty, handleClosePress]);
+  }, [actionBusy, isDirty, handleClosePress]);
 
   // Build the partial update payload from the current form (empty optionals omitted).
   const buildDraftPatch = useCallback((): UpdateEventRequest => {
@@ -250,7 +248,7 @@ export default function DraftEdit() {
   };
 
   const saveDraft = async () => {
-    setActionBusy(true);
+    setBusyAction('save');
     try {
       await patchEvent(eventId, buildDraftPatch());
       Alert.alert(t('common.success'), t('drafts.savedConfirmation'));
@@ -258,7 +256,7 @@ export default function DraftEdit() {
     } catch (error) {
       Alert.alert(t('common.error'), (error as Error).message);
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -275,7 +273,7 @@ export default function DraftEdit() {
       Alert.alert(t('common.error'), t('series.edit.dateLocked'));
       return;
     }
-    setActionBusy(true);
+    setBusyAction('save');
     try {
       // The schedule fields of the patch cannot be sent to a series.
       const {
@@ -294,7 +292,7 @@ export default function DraftEdit() {
     } catch (error) {
       Alert.alert(t('common.error'), seriesErrorMessage(error, userLanguage));
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -313,14 +311,23 @@ export default function DraftEdit() {
     // would otherwise allow.
     if (!validation.check('publish')) return;
 
-    setActionBusy(true);
+    if (EVENT_FORM_SHELL.draftEdit) {
+      setPublishCheckOpen(true);
+    } else {
+      await confirmPublish();
+    }
+  };
+
+  const confirmPublish = async () => {
+    setPublishCheckOpen(false);
+    setBusyAction('publish');
     try {
       // Persist the latest edits first so the server publishes what the user sees.
       await patchEvent(eventId, buildDraftPatch());
     } catch (error) {
       // The patch failed — nothing was published; keep the editor.
       alertPublishFailure(error);
-      setActionBusy(false);
+      setBusyAction(null);
       return;
     }
 
@@ -346,7 +353,7 @@ export default function DraftEdit() {
    * the duplicate-override retry re-sends only this call — never the patch.
    */
   const runPublish = async (duplicateOverride: boolean) => {
-    setActionBusy(true);
+    setBusyAction('publish');
     // Set when publish reports the event was already published elsewhere; the
     // success path below runs either way, only the confirmation copy differs.
     let publishedElsewhere = false;
@@ -363,11 +370,11 @@ export default function DraftEdit() {
       } else if (duplicatePrompt.capture(error)) {
         // The opposite of the case above: nothing was published. The prompt now
         // holds the matches and waits for an explicit "publish anyway".
-        setActionBusy(false);
+        setBusyAction(null);
         return;
       } else {
         alertPublishFailure(error);
-        setActionBusy(false);
+        setBusyAction(null);
         return;
       }
     }
@@ -416,7 +423,7 @@ export default function DraftEdit() {
 
   const runDelete = async (scope: SeriesScope) => {
     setDeleteScopeOpen(false);
-    setActionBusy(true);
+    setBusyAction('delete');
     try {
       let message = t('drafts.deleted');
       if (scope === 'following' && seriesId) {
@@ -432,7 +439,8 @@ export default function DraftEdit() {
           error: refreshErr instanceof Error ? refreshErr.message : String(refreshErr),
         })
       );
-      router.replace(Routes.DRAFT_EVENTS);
+      // This screen sits outside the tabs: without the anchor, More loses its hub.
+      router.replace(Routes.DRAFT_EVENTS, { withAnchor: true });
       Alert.alert(t('common.success'), message);
     } catch (error) {
       Alert.alert(
@@ -440,7 +448,7 @@ export default function DraftEdit() {
         scope === 'following' ? seriesErrorMessage(error, userLanguage) : (error as Error).message
       );
     } finally {
-      setActionBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -448,11 +456,147 @@ export default function DraftEdit() {
     return <Redirect href="/(tabs)/(more)/more" />;
   }
 
-  if (loading || actionBusy) {
+  if (loading) {
     return (
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />
       </ThemedView>
+    );
+  }
+
+  const dialogs = (
+    <>
+      <SeriesScopeDialog
+        visible={saveScopeOpen}
+        title={t('series.edit.scopeTitle')}
+        onlyHint={t('series.edit.onlyNote')}
+        followingHint={t('series.edit.followingNote')}
+        followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
+        dismissLabel={t('common.cancel')}
+        onDismiss={() => setSaveScopeOpen(false)}
+        confirmLabel={t('drafts.save')}
+        onConfirm={handleSaveScopeConfirm}
+        testID="series-edit-scope"
+      />
+      <SeriesScopeDialog
+        visible={deleteScopeOpen}
+        title={t('series.dialogs.deleteScopeTitle')}
+        message={t('series.dialogs.deleteScopeBody')}
+        followingDisabledReason={
+          series && isDraftsOnlyScope(series, eventId)
+            ? undefined
+            : t('series.dialogs.deleteFollowingLocked')
+        }
+        dismissLabel={t('common.cancel')}
+        onDismiss={() => setDeleteScopeOpen(false)}
+        confirmLabel={t('drafts.delete')}
+        onConfirm={runDelete}
+        destructive
+        testID="series-delete-scope"
+      />
+      <DuplicateEventModal
+        mode="publish"
+        locale={userLanguage}
+        {...duplicatePrompt.modalProps(() => runPublish(true))}
+      />
+    </>
+  );
+
+  const seriesNote = !!seriesId && (
+    <HelperText
+      text={
+        editsAllUpcoming
+          ? t('series.edit.allNote')
+          : `${t('series.edit.partOfSeries')} ${t('series.edit.onlyNote')}`
+      }
+      isDark={colorScheme === 'dark'}
+    />
+  );
+
+  if (EVENT_FORM_SHELL.draftEdit) {
+    return (
+      <>
+        <EventFormShell
+          kind="draft"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          busy={actionBusy}
+          isAllDay={wasAllDayRef.current}
+          savedPin={savedPin}
+          scrollViewRef={scrollViewRef}
+          closeLabel={t('common.close')}
+          closeTestID="btn-draft-close"
+          onBack={() => {
+            handleClosePress();
+            return true;
+          }}
+          heading={t('drafts.editTitle')}
+          intro={seriesNote}
+          byline={
+            <FormByline
+              name={userOrganizations.find((org) => org.$id === form.organization_id)?.Name}
+            />
+          }
+          coverActions={
+            !editsAllUpcoming && (
+              <TouchableOpacity
+                onPress={handleDelete}
+                style={[
+                  styles.coverButton,
+                  {
+                    backgroundColor: themeColors.cardBackground,
+                    borderColor: themeColors.cardBorder,
+                  },
+                ]}
+                accessibilityLabel={t('drafts.delete')}
+                accessibilityHint={t('a11y.hints.deleteDraft')}
+                accessibilityRole="button"
+                testID="btn-draft-delete"
+              >
+                <IconSymbol name="trash" size={22} color={themeColors.destructive} />
+              </TouchableOpacity>
+            )
+          }
+          publishCheck={{
+            open: publishCheckOpen,
+            onConfirm: confirmPublish,
+            onClose: () => setPublishCheckOpen(false),
+          }}
+          footer={
+            <>
+              <CustomButton
+                testID="btn-draft-save"
+                title={busyAction === 'save' ? t('common.saving') : t('drafts.save')}
+                handlePress={handleSave}
+                pill
+                containerStyles={[
+                  styles.buttonSecondary,
+                  {
+                    backgroundColor: themeColors.buttonSecondaryBackground,
+                    borderColor: themeColors.buttonSecondaryBorder,
+                  },
+                ]}
+                textStyles={{ color: themeColors.text }}
+                isLoading={actionBusy}
+              />
+              {!editsAllUpcoming && (
+                <CustomButton
+                  testID="btn-draft-publish"
+                  title={busyAction === 'publish' ? t('common.publishing') : t('drafts.publish')}
+                  handlePress={handlePublish}
+                  pill
+                  containerStyles={styles.buttonPrimary}
+                  isLoading={actionBusy}
+                />
+              )}
+            </>
+          }
+        />
+        {dialogs}
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
     );
   }
 
@@ -464,7 +608,7 @@ export default function DraftEdit() {
           <ThemedView style={[styles.footer, { borderTopColor: themeColors.border }]}>
             <CustomButton
               testID="btn-draft-save"
-              title={t('drafts.save')}
+              title={busyAction === 'save' ? t('common.saving') : t('drafts.save')}
               handlePress={handleSave}
               containerStyles={[
                 styles.buttonSecondary,
@@ -481,7 +625,7 @@ export default function DraftEdit() {
             {!editsAllUpcoming && (
               <CustomButton
                 testID="btn-draft-publish"
-                title={t('drafts.publish')}
+                title={busyAction === 'publish' ? t('common.publishing') : t('drafts.publish')}
                 handlePress={handlePublish}
                 containerStyles={styles.buttonPrimary}
                 isLoading={actionBusy}
@@ -490,7 +634,8 @@ export default function DraftEdit() {
           </ThemedView>
         }
       >
-        <ThemedView style={styles.container}>
+        {/* Stays on screen while sending, so a refused send comes back as it left. */}
+        <ThemedView style={styles.container} pointerEvents={actionBusy ? 'none' : 'auto'}>
           <ThemedView style={styles.headerRow}>
             <ThemedText type="title" style={styles.titleText}>
               {t('drafts.editTitle')}
@@ -546,39 +691,7 @@ export default function DraftEdit() {
           />
         </ThemedView>
       </FormScreenScaffold>
-      <SeriesScopeDialog
-        visible={saveScopeOpen}
-        title={t('series.edit.scopeTitle')}
-        onlyHint={t('series.edit.onlyNote')}
-        followingHint={t('series.edit.followingNote')}
-        followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
-        dismissLabel={t('common.cancel')}
-        onDismiss={() => setSaveScopeOpen(false)}
-        confirmLabel={t('drafts.save')}
-        onConfirm={handleSaveScopeConfirm}
-        testID="series-edit-scope"
-      />
-      <SeriesScopeDialog
-        visible={deleteScopeOpen}
-        title={t('series.dialogs.deleteScopeTitle')}
-        message={t('series.dialogs.deleteScopeBody')}
-        followingDisabledReason={
-          series && isDraftsOnlyScope(series, eventId)
-            ? undefined
-            : t('series.dialogs.deleteFollowingLocked')
-        }
-        dismissLabel={t('common.cancel')}
-        onDismiss={() => setDeleteScopeOpen(false)}
-        confirmLabel={t('drafts.delete')}
-        onConfirm={runDelete}
-        destructive
-        testID="series-delete-scope"
-      />
-      <DuplicateEventModal
-        mode="publish"
-        locale={userLanguage}
-        {...duplicatePrompt.modalProps(() => runPublish(true))}
-      />
+      {dialogs}
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );
@@ -622,6 +735,14 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     flex: 1,
     minHeight: 48,
+  },
+  coverButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   splashContainer: {
     flex: 1,

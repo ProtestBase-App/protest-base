@@ -28,6 +28,8 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
   return {
     tint: c.tint,
+    // Fills with white text. `tint` stays for accent text and icons.
+    cta: c.cta,
 
     // Semantic colors (consistent across themes).
     success: Colors.semantic.success,

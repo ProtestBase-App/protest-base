@@ -25,7 +25,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
-import { DynamicRoutes, Routes } from '@/constants/Routes';
+import { DynamicRoutes } from '@/constants/Routes';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
@@ -517,7 +517,7 @@ export default function DraftTriageScreen() {
                   testID="triage-back-to-drafts"
                   style={({ pressed }) => [
                     styles.receiptCta,
-                    { backgroundColor: themeColors.tint, opacity: pressed ? 0.8 : 1 },
+                    { backgroundColor: themeColors.cta, opacity: pressed ? 0.8 : 1 },
                   ]}
                 >
                   <ThemedText style={styles.receiptCtaLabel}>{t('drafts.backToDrafts')}</ThemedText>
