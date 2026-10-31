@@ -650,10 +650,18 @@ const en: LocaleData = {
     organizerNameRequired: 'Organizer name is required',
     contactEmailRequired: 'Contact email is required',
     contactEmailInvalid: 'Please enter a valid email address',
-    endTimeBeforeStart: 'End time must be after start time',
     invalidUrlFormat: 'Website URL must start with www., http://, or https://',
     disclaimerTooLong: 'Keep the disclaimer to {{max}} characters.',
     volunteerTooLong: 'Keep the volunteer details to {{max}} characters.',
+    linkTooLong: 'Keep the link to {{max}} characters.',
+    fixBeforePublishing: {
+      one: '1 thing to fix before publishing',
+      other: '{{count}} things to fix before publishing',
+    },
+    fixBeforeSaving: {
+      one: '1 thing to fix before saving',
+      other: '{{count}} things to fix before saving',
+    },
 
     // Progress & Actions
     progressText: 'Required fields completed',
@@ -685,7 +693,6 @@ const en: LocaleData = {
     postalCodeLoadError: 'Failed to load postal codes. Please try again.',
     imagePickerError: 'Failed to select image. Please try again.',
     maxImagesReached: 'You can add up to {{max}} images.',
-    missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 
   // ============================================
@@ -1738,6 +1745,9 @@ const en: LocaleData = {
     },
   },
   a11y: {
+    required: 'required',
+    expandField: 'Make this field taller',
+    collapseField: 'Make this field shorter',
     hints: {
       goBack: 'Returns to the previous screen',
       closeScreen: 'Closes this screen',
@@ -1773,6 +1783,9 @@ const en: LocaleData = {
       startTriage: 'Starts going through your drafts one by one',
       openEditor: 'Opens this draft in the full editor',
       pickDate: 'Opens the date picker',
+      pickTime: 'Opens the time picker',
+      resizeField: 'Changes how much of the text is shown',
+      jumpToField: 'Moves to this field',
       setDate: 'Uses this date for the draft',
       clearField: 'Clears this field',
       useAddress: 'Fills in this address',

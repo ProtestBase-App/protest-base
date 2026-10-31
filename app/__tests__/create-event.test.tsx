@@ -508,41 +508,93 @@ describe('CreateEventModal', () => {
     };
 
     it('refuses an end time before the start', async () => {
-      const { getByTestId, alertSpy } = await renderWithFilledForm({
+      const { getByTestId, getByText, alertSpy } = await renderWithFilledForm({
         end_time: '2099-01-02T09:00:00.000Z',
       });
       alertSpy.mockClear();
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.endTimeBeforeStart');
+      expect(getByText('eventEdit.invalidTimeRangeError')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(createEventBackend).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
     });
 
     it('refuses to publish without a category, and names it', async () => {
-      const { t } = require('@/utils/i18n');
-      const { getByTestId, alertSpy } = await renderWithFilledForm({ categories: '' });
+      const { getByTestId, getByText, alertSpy } = await renderWithFilledForm({ categories: '' });
       alertSpy.mockClear();
       await submit(getByTestId);
 
-      expect(t).toHaveBeenCalledWith('createEvent.missingFieldsError', {
-        fields: 'createEvent.category',
-      });
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.missingFieldsError');
+      expect(getByText('drafts.issueCategory')).toBeTruthy();
+      expect(getByTestId('form-issue-categories')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(createEventBackend).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
     });
 
+    it('refuses a start that has passed, as publishing a draft does', async () => {
+      const { getByTestId, getByText, alertSpy } = await renderWithFilledForm({
+        start_time: '2001-01-01T10:00:00.000Z',
+        end_time: '',
+      });
+      alertSpy.mockClear();
+      await submit(getByTestId);
+
+      expect(getByText('drafts.issueStartTime')).toBeTruthy();
+      expect(createEventBackend).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
+    it('shows nothing until a submit is refused', async () => {
+      const { queryByTestId, queryByText, alertSpy } = await renderWithFilledForm({ title: '' });
+
+      expect(queryByTestId('form-issue-summary')).toBeNull();
+      expect(queryByText('createEvent.titleRequired')).toBeNull();
+
+      alertSpy.mockRestore();
+    });
+
+    it('takes a message away as soon as its field is fixed', async () => {
+      const { getByTestId, queryByText, queryByTestId, alertSpy } = await renderWithFilledForm({
+        title: '',
+      });
+      await submit(getByTestId);
+      expect(queryByText('createEvent.titleRequired')).toBeTruthy();
+
+      fireEvent.changeText(getByTestId('input-event-title'), 'A title');
+
+      expect(queryByText('createEvent.titleRequired')).toBeNull();
+      expect(queryByTestId('form-issue-summary')).toBeNull();
+
+      alertSpy.mockRestore();
+    });
+
+    it('still sends once the problem is gone', async () => {
+      createEventBackend.mockResolvedValue({ $id: 'evt-1' });
+      const { getByTestId, alertSpy } = await renderWithFilledForm({ title: '' });
+      await submit(getByTestId);
+      expect(createEventBackend).not.toHaveBeenCalled();
+
+      fireEvent.changeText(getByTestId('input-event-title'), 'A title');
+      await submit(getByTestId);
+
+      expect(createEventBackend).toHaveBeenCalledTimes(1);
+
+      alertSpy.mockRestore();
+    });
+
     it('refuses a disclaimer over the server limit', async () => {
-      const { getByTestId, alertSpy } = await renderWithFilledForm({
+      const { getByTestId, getByText, alertSpy } = await renderWithFilledForm({
         disclaimer: 'x'.repeat(501),
       });
       alertSpy.mockClear();
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+      expect(getByText('createEvent.disclaimerTooLong')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(createEventBackend).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
@@ -584,16 +636,16 @@ describe('CreateEventModal', () => {
       };
 
       it.each([
-        ['description', { description: '' }, 'createEvent.description'],
-        ['start time', { start_time: '' }, 'createEvent.startTime'],
-      ])('asks for a %s, because the backend does', async (_name, formOverrides, fields) => {
-        const { t } = require('@/utils/i18n');
+        ['description', { description: '' }, 'drafts.issueDescription'],
+        ['start time', { start_time: '' }, 'createEvent.startTimeRequired'],
+      ])('asks for a %s, because the backend does', async (_name, formOverrides, message) => {
         const { createDraftEvent } = require('@/services/event.service');
-        const { getByTestId, alertSpy } = await renderWithFilledForm(formOverrides);
+        const { getByTestId, getByText, alertSpy } = await renderWithFilledForm(formOverrides);
         alertSpy.mockClear();
         await saveDraft(getByTestId);
 
-        expect(t).toHaveBeenCalledWith('createEvent.missingFieldsError', { fields });
+        expect(getByText(message)).toBeTruthy();
+        expect(alertSpy).not.toHaveBeenCalled();
         expect(createDraftEvent).not.toHaveBeenCalled();
 
         alertSpy.mockRestore();

@@ -720,6 +720,15 @@ const nl = {
     invalidUrlFormat: 'Website URL moet beginnen met www., http:// of https://',
     disclaimerTooLong: 'Houd de disclaimer op maximaal {{max}} tekens.',
     volunteerTooLong: 'Houd de vrijwilligersdetails op maximaal {{max}} tekens.',
+    linkTooLong: 'Houd de link op maximaal {{max}} tekens.',
+    fixBeforePublishing: {
+      one: '1 punt om op te lossen voor je publiceert',
+      other: '{{count}} punten om op te lossen voor je publiceert',
+    },
+    fixBeforeSaving: {
+      one: '1 punt om op te lossen voor je opslaat',
+      other: '{{count}} punten om op te lossen voor je opslaat',
+    },
     // Accessibility
     closeAccessibilityLabel: 'Sluit evenement aanmaken scherm',
     progressAccessibilityLabel: 'Formuliervoortgang: {{percentage}}% voltooid',
@@ -735,7 +744,6 @@ const nl = {
     postalCodeLoadError: 'Kon postcodes niet laden. Probeer het opnieuw.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
     maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen toevoegen.',
-    missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
   },
 
   // ============================================
@@ -2053,6 +2061,9 @@ const nl = {
     },
   },
   a11y: {
+    required: 'verplicht',
+    expandField: 'Dit veld groter maken',
+    collapseField: 'Dit veld kleiner maken',
     hints: {
       goBack: 'Gaat terug naar het vorige scherm',
       closeScreen: 'Sluit dit scherm',
@@ -2088,6 +2099,9 @@ const nl = {
       startTriage: 'Start het nakijken van je concepten, één voor één',
       openEditor: 'Opent dit concept in de volledige editor',
       pickDate: 'Opent de datumkiezer',
+      pickTime: 'Opent de tijdkiezer',
+      resizeField: 'Wijzigt hoeveel tekst zichtbaar is',
+      jumpToField: 'Gaat naar dit veld',
       setDate: 'Gebruikt deze datum voor het concept',
       clearField: 'Maakt dit veld leeg',
       useAddress: 'Vult dit adres in',

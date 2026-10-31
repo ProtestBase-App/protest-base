@@ -3,12 +3,15 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import FormDateField from '@/components/FormDateField';
 import FormFieldNumeric from '@/components/FormFieldNumeric';
+import { FormFieldAnchor } from '@/components/FormScreenScaffold';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRecurrencePreview } from '@/hooks/useRecurrencePreview';
+import type { EventFormErrors } from '@/types/eventForm.types';
 import type { RepeatFormState, RepeatFrequency } from '@/types/eventSeries.types';
 import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { EVENT_TIMEZONE } from '@/utils/eventFormatters';
@@ -37,8 +40,8 @@ export interface RepeatFieldsProps {
   startTime: string;
   endTime: string;
   userLanguage: string;
-  /** Flags an empty start time, once a submit has asked for one. */
-  hasError?: boolean;
+  /** What a refused submit found wrong with the rule, by field. */
+  formErrors?: EventFormErrors;
 }
 
 const FREQUENCIES: { value: RepeatFrequency; labelKey: string }[] = [
@@ -47,6 +50,8 @@ const FREQUENCIES: { value: RepeatFrequency; labelKey: string }[] = [
   { value: 'every_2_weeks', labelKey: 'series.repeat.everyTwoWeeks' },
   { value: 'monthly', labelKey: 'series.repeat.monthly' },
 ];
+
+const NO_ERRORS: EventFormErrors = {};
 
 const WEEK_OF_MONTH_LABELS: Record<string, string> = {
   '1': 'series.ordinals.first',
@@ -70,7 +75,7 @@ export default function RepeatFields({
   startTime,
   endTime,
   userLanguage,
-  hasError = false,
+  formErrors = NO_ERRORS,
 }: RepeatFieldsProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -156,43 +161,51 @@ export default function RepeatFields({
             ))}
           </ThemedView>
 
-          <FormDateField
-            testID="repeat-start-time"
-            title={`${t('series.repeat.startTime')} *`}
-            value={repeat.startLocal ? brusselsInstant(today, repeat.startLocal) : ''}
-            placeholder={t('series.repeat.pickTime')}
-            handleChangeText={(iso) => update({ startLocal: brusselsTimeOf(iso) })}
-            pickerMode="time"
-            timeZoneName={EVENT_TIMEZONE}
-            formatValue={brusselsTimeOf}
-            hasError={hasError && !repeat.startLocal}
-            otherStyles={styles.fieldSpacing}
-          />
-          <FormDateField
-            testID="repeat-end-time"
-            title={`${t('series.repeat.endTime')} (${t('common.optional')})`}
-            value={repeat.endLocal ? brusselsInstant(today, repeat.endLocal) : ''}
-            placeholder={t('series.repeat.pickTime')}
-            handleChangeText={(iso) => update({ endLocal: brusselsTimeOf(iso) })}
-            pickerMode="time"
-            timeZoneName={EVENT_TIMEZONE}
-            formatValue={brusselsTimeOf}
-            otherStyles={styles.fieldSpacing}
-          />
+          <FormFieldAnchor field="start_local">
+            <FormDateField
+              testID="repeat-start-time"
+              title={`${t('series.repeat.startTime')} *`}
+              value={repeat.startLocal ? brusselsInstant(today, repeat.startLocal) : ''}
+              placeholder={t('series.repeat.pickTime')}
+              handleChangeText={(iso) => update({ startLocal: brusselsTimeOf(iso) })}
+              pickerMode="time"
+              timeZoneName={EVENT_TIMEZONE}
+              formatValue={brusselsTimeOf}
+              errorText={formErrors.start_local}
+              otherStyles={styles.fieldSpacing}
+            />
+          </FormFieldAnchor>
+          <FormFieldAnchor field="end_local">
+            <FormDateField
+              testID="repeat-end-time"
+              title={`${t('series.repeat.endTime')} (${t('common.optional')})`}
+              value={repeat.endLocal ? brusselsInstant(today, repeat.endLocal) : ''}
+              placeholder={t('series.repeat.pickTime')}
+              handleChangeText={(iso) => update({ endLocal: brusselsTimeOf(iso) })}
+              pickerMode="time"
+              timeZoneName={EVENT_TIMEZONE}
+              formatValue={brusselsTimeOf}
+              errorText={formErrors.end_local}
+              otherStyles={styles.fieldSpacing}
+            />
+          </FormFieldAnchor>
           <HelperText text={t('series.repeat.timeHint')} isDark={isDark} />
 
-          <FormDateField
-            testID="repeat-starts-on"
-            title={t('series.repeat.startsOn')}
-            value={repeat.startsOn ? brusselsInstant(repeat.startsOn, NOON) : ''}
-            placeholder={t('series.repeat.pickDate')}
-            handleChangeText={(iso) => update({ startsOn: brusselsDateOf(iso) })}
-            pickerMode="date"
-            timeZoneName={EVENT_TIMEZONE}
-            formatValue={(value) => formatCalendarDate(brusselsDateOf(value), userLanguage)}
-            minDate={new Date()}
-            otherStyles={styles.fieldSpacing}
-          />
+          <FormFieldAnchor field="starts_on">
+            <FormDateField
+              testID="repeat-starts-on"
+              title={t('series.repeat.startsOn')}
+              value={repeat.startsOn ? brusselsInstant(repeat.startsOn, NOON) : ''}
+              placeholder={t('series.repeat.pickDate')}
+              handleChangeText={(iso) => update({ startsOn: brusselsDateOf(iso) })}
+              pickerMode="date"
+              timeZoneName={EVENT_TIMEZONE}
+              formatValue={(value) => formatCalendarDate(brusselsDateOf(value), userLanguage)}
+              minDate={new Date()}
+              errorText={formErrors.starts_on}
+              otherStyles={styles.fieldSpacing}
+            />
+          </FormFieldAnchor>
           <HelperText text={t('series.repeat.startsOnHint')} isDark={isDark} />
 
           <ThemedText style={[styles.label, styles.fieldSpacing]}>
@@ -214,28 +227,35 @@ export default function RepeatFields({
           </ThemedView>
 
           {repeat.endMode === 'count' ? (
-            <FormFieldNumeric
-              testID="repeat-count"
-              title={t('series.repeat.countLabel')}
-              value={repeat.count}
-              placeholder={t('series.repeat.countPlaceholder')}
-              handleChangeText={(count) => update({ count })}
-              maxLength={2}
-              otherStyles={styles.fieldSpacing}
-            />
+            <FormFieldAnchor field="count">
+              <FormFieldNumeric
+                testID="repeat-count"
+                title={t('series.repeat.countLabel')}
+                value={repeat.count}
+                placeholder={t('series.repeat.countPlaceholder')}
+                handleChangeText={(count) => update({ count })}
+                maxLength={2}
+                hasError={!!formErrors.count}
+                otherStyles={styles.fieldSpacing}
+              />
+              {formErrors.count ? <FormErrorText message={formErrors.count} /> : null}
+            </FormFieldAnchor>
           ) : (
-            <FormDateField
-              testID="repeat-until"
-              title={t('series.repeat.untilLabel')}
-              value={repeat.until ? brusselsInstant(repeat.until, NOON) : ''}
-              placeholder={t('series.repeat.pickDate')}
-              handleChangeText={(iso) => update({ until: brusselsDateOf(iso) })}
-              pickerMode="date"
-              timeZoneName={EVENT_TIMEZONE}
-              formatValue={(value) => formatCalendarDate(brusselsDateOf(value), userLanguage)}
-              minDate={new Date(brusselsInstant(repeat.startsOn, NOON))}
-              otherStyles={styles.fieldSpacing}
-            />
+            <FormFieldAnchor field="until">
+              <FormDateField
+                testID="repeat-until"
+                title={t('series.repeat.untilLabel')}
+                value={repeat.until ? brusselsInstant(repeat.until, NOON) : ''}
+                placeholder={t('series.repeat.pickDate')}
+                handleChangeText={(iso) => update({ until: brusselsDateOf(iso) })}
+                pickerMode="date"
+                timeZoneName={EVENT_TIMEZONE}
+                formatValue={(value) => formatCalendarDate(brusselsDateOf(value), userLanguage)}
+                minDate={new Date(brusselsInstant(repeat.startsOn, NOON))}
+                errorText={formErrors.until}
+                otherStyles={styles.fieldSpacing}
+              />
+            </FormFieldAnchor>
           )}
           <HelperText text={t('series.repeat.capHint')} isDark={isDark} />
 

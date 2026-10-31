@@ -147,14 +147,15 @@ describe('EditTemplateScreen', () => {
     });
 
     it('refuses an empty template name', async () => {
-      const { findByDisplayValue, getByTestId } = renderScreen();
+      const { findByDisplayValue, getByTestId, getByText } = renderScreen();
 
       fireEvent.changeText(await findByDisplayValue('Monthly vigil'), '   ');
       await act(async () => {
         fireEvent.press(getByTestId('btn-edit-template-save'));
       });
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'template.nameMissing');
+      expect(getByText('template.nameMissing')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(editTemplate).not.toHaveBeenCalled();
     });
 
@@ -163,14 +164,15 @@ describe('EditTemplateScreen', () => {
         ...template,
         event_data: { ...template.event_data, help_needed: true },
       });
-      const { findByDisplayValue, getByTestId } = renderScreen();
+      const { findByDisplayValue, getByTestId, getByText } = renderScreen();
 
       await findByDisplayValue('Monthly vigil');
       await act(async () => {
         fireEvent.press(getByTestId('btn-edit-template-save'));
       });
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'template.volunteerDescMissing');
+      expect(getByText('template.volunteerDescMissing')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(editTemplate).not.toHaveBeenCalled();
     });
 
@@ -179,14 +181,15 @@ describe('EditTemplateScreen', () => {
         ...template,
         event_data: { ...template.event_data, disclaimer: 'x'.repeat(501) },
       });
-      const { findByDisplayValue, getByTestId } = renderScreen();
+      const { findByDisplayValue, getByTestId, getByText } = renderScreen();
 
       await findByDisplayValue('Monthly vigil');
       await act(async () => {
         fireEvent.press(getByTestId('btn-edit-template-save'));
       });
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+      expect(getByText('createEvent.disclaimerTooLong')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(editTemplate).not.toHaveBeenCalled();
     });
 

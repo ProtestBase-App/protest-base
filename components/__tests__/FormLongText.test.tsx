@@ -211,6 +211,31 @@ describe('FormLongText', () => {
       render(<FormLongText {...defaultProps} hasError />);
       expect(screen.getByPlaceholderText('Enter description')).toBeTruthy();
     });
+
+    it('says what is wrong under the field', () => {
+      render(<FormLongText {...defaultProps} errorText="Add a description" />);
+      expect(screen.getByText('Add a description')).toBeTruthy();
+    });
+  });
+
+  describe('Screen readers', () => {
+    it('names the input after its title', () => {
+      render(<FormLongText {...defaultProps} />);
+      expect(screen.getByLabelText('Description')).toBeTruthy();
+    });
+
+    it('reads what is wrong with the name', () => {
+      render(<FormLongText {...defaultProps} errorText="Add a description" />);
+      expect(screen.getByLabelText('Description: Add a description')).toBeTruthy();
+    });
+
+    it('names the resize button for what it does next', () => {
+      render(<FormLongText {...defaultProps} isLongText />);
+
+      fireEvent.press(screen.getByLabelText('Make this field taller'));
+
+      expect(screen.getByLabelText('Make this field shorter')).toBeTruthy();
+    });
   });
 
   describe('Theme support', () => {

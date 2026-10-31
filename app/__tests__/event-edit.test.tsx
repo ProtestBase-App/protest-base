@@ -26,6 +26,7 @@ jest.mock('@/utils/eventFormatters', () => ({
   // calls isBelgiumMidnight on every render.
   allDaySubmitField: jest.requireActual('@/utils/eventFormatters').allDaySubmitField,
   isBelgiumMidnight: jest.requireActual('@/utils/eventFormatters').isBelgiumMidnight,
+  parseAsUTC: jest.requireActual('@/utils/eventFormatters').parseAsUTC,
 }));
 
 jest.mock('@/utils/themeColors', () => ({
@@ -426,13 +427,14 @@ describe('EditEvent', () => {
       });
       getEventByIdBackend.mockResolvedValue(event);
 
-      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+      const { findByDisplayValue, getByTestId, getByText } = renderWithProviders(<EditEvent />, {
         providerOverrides,
       });
       await findByDisplayValue(event.title);
       fireEvent.press(getByTestId('button-save'));
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'eventEdit.invalidTimeRangeError');
+      expect(getByText('eventEdit.invalidTimeRangeError')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(updateEvent).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
@@ -479,7 +481,7 @@ describe('EditEvent', () => {
       });
       getEventByIdBackend.mockResolvedValue(event);
 
-      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+      const { findByDisplayValue, getByTestId, getByText } = renderWithProviders(<EditEvent />, {
         providerOverrides,
       });
       await findByDisplayValue(event.title);
@@ -487,7 +489,8 @@ describe('EditEvent', () => {
       expect(await findByDisplayValue(longText)).toBeTruthy();
       fireEvent.press(getByTestId('button-save'));
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.volunteerTooLong');
+      expect(getByText('createEvent.volunteerTooLong')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(updateEvent).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();

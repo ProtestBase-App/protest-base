@@ -4,7 +4,8 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { router, Link, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 
 import { createEventBackend, createDraftEvent } from '@/services/event.service';
 import { getTemplate } from '@/services/template.service';
@@ -23,6 +24,7 @@ import {
 } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import { getThemeColors } from '@/utils/themeColors';
 import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
@@ -35,17 +37,12 @@ import { Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
-import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
+import { validateEventForm } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
-import {
-  buildRecurrenceRule,
-  isRepeating,
-  repeatFieldMessage,
-  seriesErrorMessage,
-} from '@/utils/recurrence';
+import { buildRecurrenceRule, isRepeating, seriesErrorMessage } from '@/utils/recurrence';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -204,14 +201,6 @@ export default function CreateEventModal() {
     help_description: '',
     geocod_lat: null,
     geocod_lng: null,
-  });
-
-  const [emptyFields, setEmptyFields] = useState({
-    organization_id: false,
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
   });
 
   // What the form holds before the organizer touches it: the auto-filled organization
@@ -430,10 +419,6 @@ export default function CreateEventModal() {
     handleCloseAttempt();
   };
 
-  const scrollToTop = useCallback(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-  }, []);
-
   /**
    * The rule this form is asking for, or null for a single event. Read at every
    * submit: a resumed autosave can hold a rule from when the feature was on, and the
@@ -442,13 +427,15 @@ export default function CreateEventModal() {
   const activeRepeat = (): RepeatFormState | null =>
     recurringEnabled && isRepeating(form.repeat) ? form.repeat : null;
 
-  /** Alert what is wrong with the rule, if anything. A rule that fails stops the submit. */
-  const alertRepeatErrors = (repeat: RepeatFormState): boolean => {
-    const { errors } = buildRecurrenceRule(repeat);
-    if (errors.length === 0) return false;
-    Alert.alert(t('common.error'), errors.map(repeatFieldMessage).join('\n'));
-    return true;
-  };
+  const validation = useEventFormValidation((intent) =>
+    validateEventForm(form, {
+      intent,
+      // Form value takes precedence, fall back to context (single-org users)
+      organizationId: form.organization_id || selectedOrganizationId || '',
+      repeat: activeRepeat(),
+      requireDraftContent: !titleOnlyDrafts,
+    })
+  );
 
   /** Whitespace-trimmed copy of the form, shared by both submit paths. */
   const trimForm = () => ({
@@ -465,68 +452,7 @@ export default function CreateEventModal() {
 
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const trimmedForm = trimForm();
-
-    // Form value takes precedence, fall back to context (single-org users)
-    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
-    const repeat = activeRepeat();
-
-    const newEmptyFields = {
-      organization_id: !effectiveOrgId,
-      title: trimmedForm.title === '',
-      start_time: repeat ? repeat.startLocal === '' : trimmedForm.start_time === '',
-      description: trimmedForm.description === '',
-      help_description: trimmedForm.help_needed && !trimmedForm.help_description,
-    };
-    const missingCategory = !trimmedForm.categories;
-
-    setEmptyFields(newEmptyFields);
-
-    if (
-      newEmptyFields.organization_id ||
-      newEmptyFields.title ||
-      newEmptyFields.start_time ||
-      newEmptyFields.description ||
-      newEmptyFields.help_description ||
-      missingCategory
-    ) {
-      const missingFields: string[] = [];
-      if (newEmptyFields.organization_id) missingFields.push(t('createEvent.organization'));
-      if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
-      if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
-      if (missingCategory) missingFields.push(t('createEvent.category'));
-      if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
-      if (newEmptyFields.help_description) missingFields.push(t('createEvent.volunteerRoles'));
-
-      const errorMessage = t('createEvent.missingFieldsError', {
-        fields: missingFields.join(', '),
-      });
-      Alert.alert(t('common.error'), errorMessage);
-
-      scrollToTop();
-      return;
-    }
-
-    if (repeat) {
-      if (alertRepeatErrors(repeat)) return;
-    } else if (trimmedForm.end_time && trimmedForm.end_time < trimmedForm.start_time) {
-      Alert.alert(t('common.error'), t('createEvent.endTimeBeforeStart'));
-      return;
-    }
-
-    if (trimmedForm.website_url) {
-      if (!isValidEventUrl(trimmedForm.website_url)) {
-        Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
-        return;
-      }
-    }
-
-    const tooLong = textLimitMessage(trimmedForm);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return;
-    }
-
+    if (!validation.check('publish')) return;
     await runCreateEvent(false);
   };
 
@@ -638,55 +564,7 @@ export default function CreateEventModal() {
   // form autosave (clearEventDraft below only clears that local snapshot).
   const submitDraft = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const trimmedForm = trimForm();
-
-    const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
-    const repeat = activeRepeat();
-
-    const newEmptyFields = {
-      organization_id: !effectiveOrgId,
-      title: trimmedForm.title === '',
-      // A series gets its start from the rule, which is checked below.
-      start_time: !titleOnlyDrafts && !repeat && trimmedForm.start_time === '',
-      description: !titleOnlyDrafts && trimmedForm.description === '',
-      help_description: false,
-    };
-    setEmptyFields(newEmptyFields);
-
-    if (
-      newEmptyFields.organization_id ||
-      newEmptyFields.title ||
-      newEmptyFields.description ||
-      newEmptyFields.start_time
-    ) {
-      const missingFields: string[] = [];
-      if (newEmptyFields.organization_id) missingFields.push(t('createEvent.organization'));
-      if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
-      if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
-      if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
-      Alert.alert(
-        t('common.error'),
-        t('createEvent.missingFieldsError', { fields: missingFields.join(', ') })
-      );
-      scrollToTop();
-      return;
-    }
-
-    if (trimmedForm.website_url && !isValidEventUrl(trimmedForm.website_url)) {
-      Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
-      return;
-    }
-
-    const tooLong = textLimitMessage(trimmedForm);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return;
-    }
-
-    // A draft may be incomplete, but a draft series is still a series: without a rule
-    // that can be sent it must not fall back to one draft.
-    if (repeat && alertRepeatErrors(repeat)) return;
-
+    if (!validation.check('saveDraft')) return;
     await runCreateDraft(false);
   };
 
@@ -821,17 +699,21 @@ export default function CreateEventModal() {
             </TouchableOpacity>
           </ThemedView>
 
-          <OrganizationPicker
-            value={form.organization_id || selectedOrganizationId || undefined}
-            onValueChange={(id) => setForm({ ...form, organization_id: id })}
-            error={emptyFields.organization_id}
-            errorMessage={t('createEvent.organizationRequired')}
-          />
+          <FormIssueSummary validation={validation} />
+
+          <FormFieldAnchor field="organization">
+            <OrganizationPicker
+              value={form.organization_id || selectedOrganizationId || undefined}
+              onValueChange={(id) => setForm({ ...form, organization_id: id })}
+              error={!!validation.errors.organization}
+              errorMessage={validation.errors.organization}
+            />
+          </FormFieldAnchor>
 
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             scrollViewRef={scrollViewRef}
             showRepeat={recurringEnabled}

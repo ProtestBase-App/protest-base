@@ -168,12 +168,13 @@ describe('getThemeColors', () => {
       const propertyCount = Object.keys(colors).length;
 
       // Dynamically validate against actual source — count should stay in sync
-      // 48 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
+      // 50 = 34 original tokens + surfaceAltBackground (calendar tab redesign)
       //    + 8 map overlay tokens (maps tab) + live/liveBg ("En cours" badge)
       //    + liveBorder (upcoming timeline ongoing rows)
       //    + liveText/modalBackdrop (drafts redesign: contrast-safe green text,
       //      recessed triage backdrop)
-      expect(propertyCount).toBe(48);
+      //    + errorText/errorBg (inline form validation)
+      expect(propertyCount).toBe(50);
     });
 
     it('should have all properties as strings', () => {

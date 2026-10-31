@@ -658,10 +658,18 @@ const fr: LocaleData = {
     organizerNameRequired: "Le nom de l'organisateur est obligatoire",
     contactEmailRequired: "L'e-mail de contact est obligatoire",
     contactEmailInvalid: 'Veuillez entrer une adresse e-mail valide',
-    endTimeBeforeStart: "L'heure de fin doit être après l'heure de début",
     invalidUrlFormat: "L'URL du site doit commencer par www., http:// ou https://",
     disclaimerTooLong: "Limitez l'avertissement à {{max}} caractères.",
     volunteerTooLong: 'Limitez les détails pour les bénévoles à {{max}} caractères.',
+    linkTooLong: 'Limitez le lien à {{max}} caractères.',
+    fixBeforePublishing: {
+      one: '1 point à corriger avant de publier',
+      other: '{{count}} points à corriger avant de publier',
+    },
+    fixBeforeSaving: {
+      one: "1 point à corriger avant d'enregistrer",
+      other: "{{count}} points à corriger avant d'enregistrer",
+    },
 
     // Progress & Actions
     progressText: 'Champs obligatoires complétés',
@@ -693,7 +701,6 @@ const fr: LocaleData = {
     postalCodeLoadError: 'Échec du chargement des codes postaux. Veuillez réessayer.',
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
     maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
-    missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
   },
 
   // ============================================
@@ -1792,6 +1799,9 @@ const fr: LocaleData = {
     },
   },
   a11y: {
+    required: 'obligatoire',
+    expandField: 'Agrandir ce champ',
+    collapseField: 'Réduire ce champ',
     hints: {
       goBack: "Revient à l'écran précédent",
       closeScreen: 'Ferme cet écran',
@@ -1827,6 +1837,9 @@ const fr: LocaleData = {
       startTriage: 'Commence le tri de vos brouillons, un par un',
       openEditor: "Ouvre ce brouillon dans l'éditeur complet",
       pickDate: 'Ouvre le sélecteur de date',
+      pickTime: "Ouvre le sélecteur d'heure",
+      resizeField: 'Change la quantité de texte affichée',
+      jumpToField: 'Va à ce champ',
       setDate: 'Utilise cette date pour le brouillon',
       clearField: 'Efface ce champ',
       useAddress: 'Remplit avec cette adresse',

@@ -2,11 +2,13 @@ import { StyleSheet, TextInput, TouchableOpacity, type TextInputProps } from 're
 import { useState } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
+import { inputAccessibilityLabel } from '@/utils/fieldAccessibility';
 import { t } from '@/utils/i18n';
 
 interface FormFieldProps extends TextInputProps {
@@ -16,6 +18,8 @@ interface FormFieldProps extends TextInputProps {
   handleChangeText: (text: string) => void;
   maxLength?: number;
   hasError?: boolean;
+  /** What is wrong, shown under the field. Marks the field too. */
+  errorText?: string;
   disabled?: boolean;
   otherStyles?: object;
   /**
@@ -48,10 +52,12 @@ export default function FormField({
   handleChangeText,
   maxLength,
   hasError = false,
+  errorText,
   disabled = false,
   otherStyles,
   isPassword,
   testID,
+  accessibilityHint,
   ...props
 }: FormFieldProps) {
   const colorScheme = useColorScheme();
@@ -76,7 +82,7 @@ export default function FormField({
             borderColor: themeColors.inputBorder,
           },
           isFocused && styles.focused,
-          hasError && styles.errorField,
+          (hasError || !!errorText) && { borderColor: themeColors.errorText },
         ]}
       >
         <TextInput
@@ -95,6 +101,8 @@ export default function FormField({
           onBlur={() => setIsFocused(false)}
           maxLength={maxLength}
           editable={!disabled}
+          accessibilityLabel={inputAccessibilityLabel(title, errorText)}
+          accessibilityHint={accessibilityHint}
           {...props}
         />
 
@@ -113,6 +121,7 @@ export default function FormField({
           </TouchableOpacity>
         )}
       </ThemedView>
+      {errorText ? <FormErrorText message={errorText} /> : null}
     </ThemedView>
   );
 }
@@ -137,10 +146,6 @@ const styles = StyleSheet.create({
   },
   focused: {
     borderColor: '#F5A4B1',
-  },
-  errorField: {
-    borderColor: 'red',
-    borderWidth: 1,
   },
   textInput: {
     flex: 1,

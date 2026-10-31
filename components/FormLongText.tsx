@@ -2,11 +2,14 @@ import { StyleSheet, TextInput, TouchableOpacity, type TextInputProps } from 're
 import { useState } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
+import { inputAccessibilityLabel } from '@/utils/fieldAccessibility';
+import { t } from '@/utils/i18n';
 
 interface FormFieldProps extends TextInputProps {
   title: string;
@@ -18,6 +21,8 @@ interface FormFieldProps extends TextInputProps {
   /** The limit the counter shows, when the input must hold more than it (older text). */
   counterLimit?: number;
   hasError?: boolean;
+  /** What is wrong, shown under the field. Marks the field too. */
+  errorText?: string;
   isLongText?: boolean;
   /**
    * The return key type for the keyboard.
@@ -55,10 +60,12 @@ export default function FormLongText({
   maxLength,
   counterLimit,
   hasError = false,
+  errorText,
   isLongText = false,
   onFocusCallback,
   defaultExpanded = false,
   testID,
+  accessibilityHint,
   ...props
 }: FormFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -80,7 +87,7 @@ export default function FormLongText({
           },
           isFocused && styles.focused,
           isLongText && styles.longTextContainer,
-          hasError && styles.errorField,
+          (hasError || !!errorText) && { borderColor: themeColors.errorText },
         ]}
       >
         <TextInput
@@ -104,12 +111,16 @@ export default function FormLongText({
           maxLength={maxLength}
           multiline={isLongText} // Enable multiline for long text
           numberOfLines={isLongText ? (isExpanded ? 10 : 4) : 1} // Control the number of lines
+          accessibilityLabel={inputAccessibilityLabel(title, errorText)}
+          accessibilityHint={accessibilityHint}
           {...props}
         />
 
         {isLongText && (
           <TouchableOpacity
             accessibilityRole="button"
+            accessibilityLabel={isExpanded ? t('a11y.collapseField') : t('a11y.expandField')}
+            accessibilityHint={t('a11y.hints.resizeField')}
             onPress={() => setIsExpanded(!isExpanded)}
             style={styles.icon}
           >
@@ -125,6 +136,7 @@ export default function FormLongText({
           </TouchableOpacity>
         )}
       </ThemedView>
+      {errorText ? <FormErrorText message={errorText} /> : null}
       {/* Character count display for long text fields */}
       {isLongText && shownLimit && (
         <ThemedView style={styles.charCountContainer}>
@@ -164,10 +176,6 @@ const styles = StyleSheet.create({
   },
   focused: {
     borderColor: '#F5A4B1',
-  },
-  errorField: {
-    borderColor: 'red',
-    borderWidth: 1,
   },
   textInput: {
     flex: 1,

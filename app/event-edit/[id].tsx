@@ -5,6 +5,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -16,6 +17,7 @@ import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import { allDaySubmitField, formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
 import SeriesScopeDialog from '@/components/SeriesScopeDialog';
@@ -24,7 +26,7 @@ import type { SeriesEditRequest, SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
-import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
+import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -74,12 +76,7 @@ export default function EditEvent() {
     geocod_lng: null,
   });
 
-  const [emptyFields, setEmptyFields] = useState({
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
-  });
+  const validation = useEventFormValidation((intent) => validateEventForm(form, { intent }));
 
   const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   // Baseline snapshot of the freshly loaded form; drives the unsaved-changes
@@ -88,10 +85,6 @@ export default function EditEvent() {
   // Whether the event ARRIVED date-only. A ref rather than form state: it never
   // changes after load, and the dirty check above stringifies the whole form.
   const wasAllDayRef = useRef(false);
-
-  const scrollToTop = useCallback(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-  }, []);
 
   // One date of a series, while the feature is on. "Edit all upcoming" opens the form
   // on the first date in scope, and then there is no choice left to offer.
@@ -207,54 +200,7 @@ export default function EditEvent() {
 
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const newEmptyFields = {
-      title: form.title === '',
-      start_time: form.start_time === '',
-      description: form.description === '',
-      help_description: form.help_needed && !form.help_description?.trim(),
-    };
-
-    setEmptyFields(newEmptyFields);
-
-    if (
-      newEmptyFields.title ||
-      newEmptyFields.start_time ||
-      newEmptyFields.description ||
-      newEmptyFields.help_description
-    ) {
-      const missingFields: string[] = [];
-      if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
-      if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
-      if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
-      if (newEmptyFields.help_description) missingFields.push(t('createEvent.volunteerRoles'));
-
-      const errorMessage = t('createEvent.missingFieldsError', {
-        fields: missingFields.join(', '),
-      });
-      Alert.alert(t('common.error'), errorMessage);
-
-      scrollToTop();
-      return;
-    }
-
-    if (form.end_time && form.end_time < form.start_time) {
-      Alert.alert(t('common.error'), t('eventEdit.invalidTimeRangeError'));
-      return;
-    }
-
-    if (form.website_url && form.website_url.trim()) {
-      const urlValue = form.website_url.trim();
-      if (!isValidEventUrl(urlValue)) {
-        Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
-        return;
-      }
-    }
-
-    const tooLong = textLimitMessage(form);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return;
-    }
+    if (!validation.check('saveEdit')) return;
 
     if (editsAllUpcoming) {
       await saveSeries();
@@ -426,6 +372,8 @@ export default function EditEvent() {
             </TouchableOpacity>
           </ThemedView>
 
+          <FormIssueSummary validation={validation} />
+
           {!!seriesId && (
             <HelperText
               text={
@@ -440,7 +388,7 @@ export default function EditEvent() {
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             mode="edit-event"
             scrollViewRef={scrollViewRef}

@@ -58,7 +58,7 @@ export default function FormFieldNumeric({
           styles.themedview2,
           { borderColor: themeColors.inputBorder },
           isFocused && styles.focused,
-          hasError && styles.errorField,
+          hasError && { borderColor: themeColors.errorText },
         ]}
       >
         <TextInput
@@ -102,10 +102,6 @@ const styles = StyleSheet.create({
   },
   focused: {
     borderColor: '#F5A4B1',
-  },
-  errorField: {
-    borderColor: 'red',
-    borderWidth: 1,
   },
   textInput: {
     flex: 1,

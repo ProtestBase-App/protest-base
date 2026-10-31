@@ -88,6 +88,40 @@ describe('FormDateField', () => {
       render(<FormDateField {...defaultProps} hasError />);
       expect(screen.getByPlaceholderText('Select date')).toBeTruthy();
     });
+
+    it('says what is wrong under the field', () => {
+      render(<FormDateField {...defaultProps} errorText="Pick a date" />);
+      expect(screen.getByText('Pick a date')).toBeTruthy();
+    });
+  });
+
+  describe('Screen readers', () => {
+    it('names the button after its title', () => {
+      render(<FormDateField {...defaultProps} />);
+      expect(screen.getByLabelText('Start Date')).toBeTruthy();
+    });
+
+    it('reads the value the field holds', () => {
+      render(<FormDateField {...defaultProps} value="2099-01-02T10:00:00.000Z" />);
+      expect(screen.getByLabelText(/^Start Date, 02\/01\/2099/)).toBeTruthy();
+    });
+
+    it('reads what is wrong with the name', () => {
+      render(<FormDateField {...defaultProps} errorText="Pick a date" />);
+      expect(screen.getByLabelText('Start Date: Pick a date')).toBeTruthy();
+    });
+
+    it('promises the picker it opens', () => {
+      const { rerender } = render(<FormDateField {...defaultProps} />);
+      expect(screen.getByLabelText('Start Date').props.accessibilityHint).toBe(
+        'Opens the date picker'
+      );
+
+      rerender(<FormDateField {...defaultProps} pickerMode="time" />);
+      expect(screen.getByLabelText('Start Date').props.accessibilityHint).toBe(
+        'Opens the time picker'
+      );
+    });
   });
 
   describe('Theme support', () => {

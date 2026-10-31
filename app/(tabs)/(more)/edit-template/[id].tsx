@@ -3,7 +3,8 @@ import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -17,11 +18,12 @@ import FormField from '@/components/FormField';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { TEMPLATE_LIMITS } from '@/constants/EventConfig';
-import { isTemplateDataTooLong, textLimitMessage } from '@/utils/eventFormValidation';
+import { isTemplateDataTooLong, validateEventForm } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
@@ -86,7 +88,6 @@ export default function EditTemplateScreen() {
 
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
-  const [templateNameError, setTemplateNameError] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     organization_id: '',
@@ -111,12 +112,9 @@ export default function EditTemplateScreen() {
     geocod_lng: null,
   });
 
-  const [emptyFields, setEmptyFields] = useState({
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
-  });
+  const validation = useEventFormValidation((intent) =>
+    validateEventForm(form, { intent, templateName })
+  );
 
   // Initial values loaded from the template, used for change detection.
   const initialTemplateNameRef = useRef('');
@@ -248,24 +246,7 @@ export default function EditTemplateScreen() {
 
   const handleSave = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    if (!templateName.trim()) {
-      setTemplateNameError(true);
-      Alert.alert(t('common.error'), t('template.nameMissing'));
-      return;
-    }
-    setTemplateNameError(false);
-
-    if (form.help_needed && !form.help_description?.trim()) {
-      setEmptyFields((prev) => ({ ...prev, help_description: true }));
-      Alert.alert(t('common.error'), t('template.volunteerDescMissing'));
-      return;
-    }
-
-    const tooLong = textLimitMessage(form);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return;
-    }
+    if (!validation.check('saveTemplate')) return;
 
     const eventData: TemplateEventData = {};
 
@@ -408,20 +389,21 @@ export default function EditTemplateScreen() {
             {t('template.editTitle')}
           </ThemedText>
 
+          <FormIssueSummary validation={validation} />
+
           <ThemedView style={styles.templateMetaSection}>
-            <FormField
-              testID="input-edit-template-name"
-              title={t('template.nameLabel')}
-              value={templateName}
-              placeholder={t('template.namePlaceholder')}
-              handleChangeText={(value) => {
-                setTemplateName(value);
-                if (value.trim()) setTemplateNameError(false);
-              }}
-              otherStyles={styles.fieldSpacing}
-              maxLength={TEMPLATE_LIMITS.name}
-              hasError={templateNameError}
-            />
+            <FormFieldAnchor field="template_name">
+              <FormField
+                testID="input-edit-template-name"
+                title={t('template.nameLabel')}
+                value={templateName}
+                placeholder={t('template.namePlaceholder')}
+                handleChangeText={setTemplateName}
+                otherStyles={styles.fieldSpacing}
+                maxLength={TEMPLATE_LIMITS.name}
+                errorText={validation.errors.template_name}
+              />
+            </FormFieldAnchor>
 
             <FormField
               title={t('template.descriptionLabel')}
@@ -442,7 +424,7 @@ export default function EditTemplateScreen() {
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             mode="edit-template"
           />

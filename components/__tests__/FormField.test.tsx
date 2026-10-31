@@ -81,6 +81,33 @@ describe('FormField', () => {
       render(<FormField {...defaultProps} hasError={true} />);
       expect(screen.getByPlaceholderText('Enter your email')).toBeTruthy();
     });
+
+    it('says what is wrong under the field', () => {
+      render(<FormField {...defaultProps} errorText="Add your email" />);
+      expect(screen.getByText('Add your email')).toBeTruthy();
+    });
+
+    it('shows no message without one', () => {
+      render(<FormField {...defaultProps} hasError={true} />);
+      expect(screen.queryByText('Add your email')).toBeNull();
+    });
+  });
+
+  describe('Screen readers', () => {
+    it('names the input after its title', () => {
+      render(<FormField {...defaultProps} />);
+      expect(screen.getByLabelText(defaultProps.title)).toBeTruthy();
+    });
+
+    it('reads what is wrong with the name', () => {
+      render(<FormField {...defaultProps} errorText="Add your email" />);
+      expect(screen.getByLabelText(`${defaultProps.title}: Add your email`)).toBeTruthy();
+    });
+
+    it('lets a screen name the input itself', () => {
+      render(<FormField {...defaultProps} accessibilityLabel="Work email" />);
+      expect(screen.getByLabelText('Work email')).toBeTruthy();
+    });
   });
 
   describe('Disabled state', () => {

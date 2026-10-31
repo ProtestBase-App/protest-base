@@ -75,6 +75,9 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
     link: c.link,
     destructive: c.destructive,
+    // Validation text and borders. `error` misses 4.5:1 on light backgrounds at this size.
+    errorText: c.errorText,
+    errorBg: c.errorBg,
 
     buttonSecondaryBackground: c.buttonSecondaryBackground,
     buttonSecondaryBorder: c.buttonSecondaryBorder,

@@ -140,7 +140,7 @@ describe('DraftEdit', () => {
       })
     );
 
-    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+    const { findByTestId, getByText, getByTestId } = renderWithProviders(<DraftEdit />, {
       providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
     });
 
@@ -148,7 +148,79 @@ describe('DraftEdit', () => {
     fireEvent.press(publishButton);
 
     expect(publishDraft).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledWith('drafts.publishIssuesTitle', expect.any(String));
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(getByText('drafts.issueDescription')).toBeTruthy();
+    expect(getByText('drafts.issueCategory')).toBeTruthy();
+    expect(getByText('drafts.issueStartTime')).toBeTruthy();
+    expect(getByTestId('form-issue-summary')).toBeTruthy();
+
+    alertSpy.mockRestore();
+  });
+
+  it('publishes a draft the list calls ready, with the volunteer box ticked and empty', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    patchEvent.mockResolvedValue(undefined);
+    publishDraft.mockResolvedValue(undefined);
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({
+        $id: 'draft-1',
+        start_time: '2099-06-01T12:00:00.000Z',
+        end_time: undefined,
+        description: 'Ready',
+        categories: ['protest'],
+        help_needed: true,
+        help_description: '',
+      })
+    );
+
+    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    const publish = await findByTestId('btn-draft-publish');
+    await act(async () => {
+      fireEvent.press(publish);
+    });
+
+    expect(publishDraft).toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('keeps saving an unfinished draft, which only publishing has to complete', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    patchEvent.mockResolvedValue(undefined);
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({ $id: 'draft-1', start_time: '', description: '', categories: [] })
+    );
+
+    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    const save = await findByTestId('btn-draft-save');
+    await act(async () => {
+      fireEvent.press(save);
+    });
+
+    expect(patchEvent).toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('refuses a blank title rather than quietly keeping the old one', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getDraftEventPreview.mockResolvedValue(createMockEvent({ $id: 'draft-1', title: 'Rally' }));
+
+    const { findByDisplayValue, findByTestId, getByText } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    fireEvent.changeText(await findByDisplayValue('Rally'), '  ');
+    fireEvent.press(await findByTestId('btn-draft-save'));
+
+    expect(getByText('createEvent.titleRequired')).toBeTruthy();
+    expect(patchEvent).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
   });
@@ -163,13 +235,14 @@ describe('DraftEdit', () => {
       })
     );
 
-    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+    const { findByTestId, getByText } = renderWithProviders(<DraftEdit />, {
       providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
     });
 
     fireEvent.press(await findByTestId('btn-draft-save'));
 
-    expect(alertSpy).toHaveBeenCalledWith('common.error', 'eventEdit.invalidTimeRangeError');
+    expect(getByText('eventEdit.invalidTimeRangeError')).toBeTruthy();
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(patchEvent).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
@@ -191,7 +264,6 @@ describe('DraftEdit', () => {
       fireEvent.press(save);
     });
 
-    expect(alertSpy).not.toHaveBeenCalledWith('common.error', 'createEvent.invalidUrlFormat');
     expect(patchEvent).toHaveBeenCalled();
 
     alertSpy.mockRestore();
@@ -203,13 +275,14 @@ describe('DraftEdit', () => {
       createMockEvent({ $id: 'draft-1', disclaimer: 'x'.repeat(501) })
     );
 
-    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+    const { findByTestId, getByText } = renderWithProviders(<DraftEdit />, {
       providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
     });
 
     fireEvent.press(await findByTestId('btn-draft-save'));
 
-    expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+    expect(getByText('createEvent.disclaimerTooLong')).toBeTruthy();
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(patchEvent).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();

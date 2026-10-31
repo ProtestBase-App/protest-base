@@ -7,9 +7,8 @@ import {
 } from '@/components/SheetSearchMultiSelect';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { getThemeColors } from '@/utils/themeColors';
 import { t } from '@/utils/i18n';
 import { Typography } from '@/constants/DesignTokens';
 
@@ -47,8 +46,6 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
   errorMessage,
 }) => {
   const { dropdownItems, hasSingleOrganization, hasMultipleOrganizations } = useUserOrganizations();
-  const colorScheme = useColorScheme();
-  const themeColors = getThemeColors(colorScheme);
   const { setDropdownFocused } = useFormKeyboard();
 
   const options = useMemo<SheetSearchMultiSelectOption[]>(
@@ -87,11 +84,7 @@ export const OrganizationPicker: React.FC<OrganizationPickerProps> = ({
         singleSelect
         onFocusChange={setDropdownFocused}
       />
-      {error && errorMessage ? (
-        <ThemedText style={[styles.errorText, { color: themeColors.error }]}>
-          {errorMessage}
-        </ThemedText>
-      ) : null}
+      {error && errorMessage ? <FormErrorText message={errorMessage} /> : null}
     </ThemedView>
   );
 };
@@ -104,11 +97,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontFamily: Typography.families.medium,
     marginBottom: 8,
-  },
-  errorText: {
-    fontSize: Typography.sizes.xs,
-    fontFamily: Typography.families.regular,
-    marginTop: 6,
   },
 });
 

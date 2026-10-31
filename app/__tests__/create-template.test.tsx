@@ -294,38 +294,42 @@ describe('CreateTemplateScreen', () => {
 
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.organizationRequired');
+      expect(getByTestId('form-issue-organization')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(addTemplate).not.toHaveBeenCalled();
     });
 
     it('refuses a missing template name', async () => {
-      const { getByTestId } = renderForm();
+      const { getByTestId, getByText } = renderForm();
 
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'template.nameMissing');
+      expect(getByText('template.nameMissing')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(addTemplate).not.toHaveBeenCalled();
     });
 
     it('refuses volunteers with no text', async () => {
-      const { getByTestId } = renderForm();
+      const { getByTestId, getByText } = renderForm();
 
       fireEvent.changeText(getByTestId('input-template-name'), 'Monthly vigil');
       fireEvent.press(getByTestId('checkbox-event-help-needed'));
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'template.volunteerDescMissing');
+      expect(getByText('template.volunteerDescMissing')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(addTemplate).not.toHaveBeenCalled();
     });
 
     it('refuses a disclaimer an event could not use', async () => {
-      const { getByTestId } = renderForm();
+      const { getByTestId, getByText } = renderForm();
 
       fireEvent.changeText(getByTestId('input-template-name'), 'Monthly vigil');
       fireEvent.changeText(getByTestId('input-event-disclaimer'), 'x'.repeat(501));
       await submit(getByTestId);
 
-      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+      expect(getByText('createEvent.disclaimerTooLong')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
       expect(addTemplate).not.toHaveBeenCalled();
     });
 

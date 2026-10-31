@@ -337,7 +337,7 @@ describe('CreateEventModal recurring events', () => {
       await press(getByTestId, 'btn-create-event-submit');
 
       expect(createEventBackend).not.toHaveBeenCalled();
-      expect(alerted('common.error')[0][1]).toContain('createEvent.startTime');
+      expect(getByTestId('form-issue-start_time')).toBeTruthy();
     });
 
     it('saves a single draft with its dates and no rule', async () => {
@@ -525,10 +525,7 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalledWith(
-          'common.error',
-          'createEvent.missingFieldsError:{"fields":"createEvent.startTime"}'
-        );
+        expect(getByTestId('form-issue-start_local')).toBeTruthy();
       });
 
       it('is blocked when the title is missing as well, naming both', async () => {
@@ -541,9 +538,8 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alerted('common.error')[0][1]).toBe(
-          'createEvent.missingFieldsError:{"fields":"createEvent.title, createEvent.startTime"}'
-        );
+        expect(getByTestId('form-issue-title')).toBeTruthy();
+        expect(getByTestId('form-issue-start_local')).toBeTruthy();
       });
 
       it('is blocked, with the field message, for a count of 1', async () => {
@@ -555,7 +551,7 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalledWith('common.error', 'series.repeat.errors.count');
+        expect(getByTestId('form-issue-count')).toBeTruthy();
       });
 
       it('is blocked when no end was picked', async () => {
@@ -567,10 +563,10 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalledWith('common.error', 'series.repeat.errors.count');
+        expect(getByTestId('form-issue-count')).toBeTruthy();
       });
 
-      it('lists every field that is wrong, one per line', async () => {
+      it('lists every field that is wrong', async () => {
         const { getByTestId } = await renderWithForm({
           ...weekly,
           repeat: weeklyRule({ startsOn: '2001-01-01', endLocal: '19:00', count: '40' }),
@@ -579,13 +575,9 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alerted('common.error')[0][1]).toBe(
-          [
-            'series.repeat.errors.endLocal',
-            'series.repeat.errors.startsOn',
-            'series.repeat.errors.count',
-          ].join('\n')
-        );
+        expect(getByTestId('form-issue-end_local')).toBeTruthy();
+        expect(getByTestId('form-issue-starts_on')).toBeTruthy();
+        expect(getByTestId('form-issue-count')).toBeTruthy();
       });
 
       it('is blocked when the last date is before the first', async () => {
@@ -597,7 +589,7 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-submit');
 
         expect(createEventBackend).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalledWith('common.error', 'series.repeat.errors.until');
+        expect(getByTestId('form-issue-until')).toBeTruthy();
       });
 
       it('sends a rule that ends on a date as `until`, with no count', async () => {
@@ -803,7 +795,7 @@ describe('CreateEventModal recurring events', () => {
       await press(getByTestId, 'btn-create-event-draft');
 
       expect(createDraftEvent).not.toHaveBeenCalled();
-      expect(alerted('common.error')[0][1]).toContain('createEvent.description');
+      expect(getByTestId('form-issue-description')).toBeTruthy();
     });
 
     it('sends a series with no description once the backend announces it', async () => {
@@ -820,11 +812,11 @@ describe('CreateEventModal recurring events', () => {
 
     describe('an invalid rule never falls back to a single draft', () => {
       it.each([
-        ['a count of 1', { count: '1' }, 'series.repeat.errors.count'],
-        ['no end picked', { count: '' }, 'series.repeat.errors.count'],
-        ['no start time', { startLocal: '' }, 'series.repeat.errors.startLocal'],
-        ['a start in the past', { startsOn: '2001-01-01' }, 'series.repeat.errors.startsOn'],
-      ])('with %s', async (_label, overrides, message) => {
+        ['a count of 1', { count: '1' }, 'count'],
+        ['no end picked', { count: '' }, 'count'],
+        ['no start time', { startLocal: '' }, 'start_local'],
+        ['a start in the past', { startsOn: '2001-01-01' }, 'starts_on'],
+      ])('with %s', async (_label, overrides, field) => {
         const { getByTestId } = await renderWithForm({
           ...weekly,
           repeat: weeklyRule(overrides as Partial<RepeatFormState>),
@@ -833,7 +825,7 @@ describe('CreateEventModal recurring events', () => {
         await press(getByTestId, 'btn-create-event-draft');
 
         expect(createDraftEvent).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalledWith('common.error', message);
+        expect(getByTestId(`form-issue-${field}`)).toBeTruthy();
         expect(router.replace).not.toHaveBeenCalled();
       });
 

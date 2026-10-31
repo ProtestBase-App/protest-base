@@ -6,11 +6,14 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
+import { fieldAccessibilityLabel } from '@/utils/fieldAccessibility';
+import { t } from '@/utils/i18n';
 
 interface FormDateFieldProps {
   title: string;
@@ -18,6 +21,8 @@ interface FormDateFieldProps {
   placeholder: string;
   handleChangeText: (text: string) => void;
   hasError?: boolean;
+  /** What is wrong, shown under the field. Marks the field too. */
+  errorText?: string;
   /** Earliest pickable date. A time-only field has no use for it. */
   minDate?: Date;
   otherStyles?: object;
@@ -72,6 +77,7 @@ export default function FormDateField({
   placeholder,
   handleChangeText,
   hasError = false,
+  errorText,
   minDate,
   otherStyles,
   testID,
@@ -208,6 +214,12 @@ export default function FormDateField({
 
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel={[fieldAccessibilityLabel(title, errorText), displayValue]
+          .filter(Boolean)
+          .join(', ')}
+        accessibilityHint={
+          pickerMode === 'time' ? t('a11y.hints.pickTime') : t('a11y.hints.pickDate')
+        }
         testID={testID}
         onPress={handleInputPress}
         activeOpacity={0.8}
@@ -220,7 +232,7 @@ export default function FormDateField({
               borderColor: themeColors.inputBorder,
             },
             isFocused && styles.focused,
-            hasError && styles.errorField,
+            (hasError || !!errorText) && { borderColor: themeColors.errorText },
           ]}
         >
           <TextInput
@@ -243,6 +255,8 @@ export default function FormDateField({
           <IconSymbol size={24} name="calendar" color={themeColors.text} />
         </ThemedView>
       </TouchableOpacity>
+
+      {errorText ? <FormErrorText message={errorText} /> : null}
 
       {showingAllDay && !!allDayHint && (
         <ThemedText style={[styles.hint, { color: themeColors.subtleText }]}>
@@ -284,10 +298,6 @@ const styles = StyleSheet.create({
   },
   focused: {
     borderColor: '#F5A4B1',
-  },
-  errorField: {
-    borderColor: 'red',
-    borderWidth: 1,
   },
   textInput: {
     flex: 1,

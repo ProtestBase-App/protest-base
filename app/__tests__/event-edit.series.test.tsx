@@ -192,10 +192,7 @@ describe('EditEvent recurring events', () => {
       await save(getByTestId);
 
       expect(queryByTestId('series-edit-scope-confirm')).toBeNull();
-      expect(alertSpy).toHaveBeenCalledWith(
-        'common.error',
-        'createEvent.missingFieldsError:{"fields":"createEvent.title"}'
-      );
+      expect(getByTestId('form-issue-title')).toBeTruthy();
     });
 
     describe('only this event', () => {

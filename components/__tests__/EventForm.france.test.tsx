@@ -52,7 +52,7 @@ jest.mock('@/context/PostalCodeProvider', () => ({
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react-native';
 import EventForm from '@/components/EventForm';
-import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
+import type { FormState } from '@/types/eventForm.types';
 import { searchAddress } from '@/services/address.service';
 
 const mockSearchAddress = searchAddress as jest.Mock;
@@ -82,13 +82,6 @@ const baseForm: FormState = {
 
 const franceForm: FormState = { ...baseForm, country: 'france' };
 
-const emptyFields: EmptyFieldsState = {
-  title: false,
-  start_time: false,
-  description: false,
-  help_description: false,
-};
-
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // Apply the latest functional setForm updater to read the resulting state.
@@ -101,9 +94,7 @@ const latestNext = (setForm: jest.Mock, base: FormState) => {
 };
 
 const renderForm = async (form: FormState, setForm = jest.fn()) => {
-  const view = render(
-    <EventForm form={form} setForm={setForm} emptyFields={emptyFields} userLanguage="en" />
-  );
+  const view = render(<EventForm form={form} setForm={setForm} userLanguage="en" />);
   await act(async () => {
     await flushPromises();
   });
@@ -238,9 +229,7 @@ describe('EventForm — France', () => {
       const { setForm, rerender } = await renderForm(loaded);
 
       mockFranceEnabled = true;
-      rerender(
-        <EventForm form={loaded} setForm={setForm} emptyFields={emptyFields} userLanguage="en" />
-      );
+      rerender(<EventForm form={loaded} setForm={setForm} userLanguage="en" />);
       await act(async () => {
         await flushPromises();
       });

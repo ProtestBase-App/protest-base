@@ -6,6 +6,7 @@ import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -27,6 +28,7 @@ import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import { useEventSeries } from '@/hooks/useEventSeries';
 import EventForm from '@/components/EventForm';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
@@ -38,9 +40,9 @@ import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
-import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
+import { publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { allDaySubmitField } from '@/utils/eventFormatters';
-import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
+import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -93,12 +95,9 @@ export default function DraftEdit() {
     geocod_lng: null,
   });
 
-  const [emptyFields] = useState({
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
-  });
+  const validation = useEventFormValidation((intent) =>
+    validateEventForm(form, { intent, existingDraft: true })
+  );
 
   const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   // Baseline snapshot of the freshly loaded draft; drives the unsaved-changes
@@ -238,26 +237,9 @@ export default function DraftEdit() {
     };
   }, [form]);
 
-  const validateLight = (): boolean => {
-    if (form.start_time && form.end_time && form.end_time < form.start_time) {
-      Alert.alert(t('common.error'), t('eventEdit.invalidTimeRangeError'));
-      return false;
-    }
-    if (form.website_url && form.website_url.trim() && !isValidEventUrl(form.website_url.trim())) {
-      Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
-      return false;
-    }
-    const tooLong = textLimitMessage(form);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return false;
-    }
-    return true;
-  };
-
   const handleSave = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    if (!validateLight()) return;
+    if (!validation.check('saveDraft')) return;
     if (editsAllUpcoming) {
       await saveSeries();
     } else if (seriesId) {
@@ -327,21 +309,9 @@ export default function DraftEdit() {
 
   const handlePublish = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    if (!validateLight()) return;
-
-    // Client-side readiness — reports every problem at once and blocks the
-    // past-date publish that the backend would otherwise allow.
-    const issues = getPublishIssues({
-      description: form.description,
-      categories: form.categories,
-      city: form.city,
-      street_address: form.street_address,
-      start_time: form.start_time,
-    });
-    if (issues.length > 0) {
-      Alert.alert(t('drafts.publishIssuesTitle'), issues.map((i) => t(i.messageKey)).join('\n'));
-      return;
-    }
+    // Reports every problem at once, and blocks the past-date publish that the backend
+    // would otherwise allow.
+    if (!validation.check('publish')) return;
 
     setActionBusy(true);
     try {
@@ -553,6 +523,8 @@ export default function DraftEdit() {
             </View>
           </ThemedView>
 
+          <FormIssueSummary validation={validation} />
+
           {!!seriesId && (
             <HelperText
               text={
@@ -567,7 +539,7 @@ export default function DraftEdit() {
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             scrollViewRef={scrollViewRef}
             isAllDay={wasAllDayRef.current}

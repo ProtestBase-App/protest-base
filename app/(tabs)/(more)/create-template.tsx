@@ -3,7 +3,8 @@ import { StyleSheet, Alert, TouchableOpacity, BackHandler } from 'react-native';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 import CustomButton from '@/components/CustomButton';
 import FormField from '@/components/FormField';
 import { ThemedText } from '@/components/ThemedText';
@@ -15,6 +16,7 @@ import { useTemplates } from '@/context/TemplatesProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import { resolveImageUrls } from '@/services/storage.service';
@@ -23,7 +25,7 @@ import type { FormState } from '@/types/eventForm.types';
 import type { TemplateEventData } from '@/types/template.types';
 import type { CreateTemplateSearchParams } from '@/types/navigation.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
-import { isTemplateDataTooLong, textLimitMessage } from '@/utils/eventFormValidation';
+import { isTemplateDataTooLong, validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -106,11 +108,9 @@ export default function CreateTemplateScreen() {
   const isFromPastEvent = Boolean(params.sourceEventData);
 
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
-  const [orgError, setOrgError] = useState(false);
 
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
-  const [templateNameError, setTemplateNameError] = useState(false);
 
   // Reuses the EventForm shape; dates/image fields are unused in template mode.
   const [form, setForm] = useState<FormState>({
@@ -142,13 +142,6 @@ export default function CreateTemplateScreen() {
       setSelectedOrgId(selectedOrganizationId);
     }
   }, [selectedOrganizationId, selectedOrgId]);
-
-  const [emptyFields, setEmptyFields] = useState({
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
-  });
 
   const initialFormState = useMemo<FormState>(
     () => ({
@@ -304,35 +297,18 @@ export default function CreateTemplateScreen() {
     handleCloseAttempt();
   };
 
+  const validation = useEventFormValidation((intent) =>
+    validateEventForm(form, {
+      intent,
+      organizationId: selectedOrgId || selectedOrganizationId || '',
+      templateName,
+    })
+  );
+
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
+    if (!validation.check('saveTemplate')) return;
     const effectiveOrgId = selectedOrgId || selectedOrganizationId || '';
-
-    if (!effectiveOrgId) {
-      setOrgError(true);
-      Alert.alert(t('common.error'), t('createEvent.organizationRequired'));
-      return;
-    }
-    setOrgError(false);
-
-    if (!templateName.trim()) {
-      setTemplateNameError(true);
-      Alert.alert(t('common.error'), t('template.nameMissing'));
-      return;
-    }
-    setTemplateNameError(false);
-
-    if (form.help_needed && !form.help_description?.trim()) {
-      setEmptyFields((prev) => ({ ...prev, help_description: true }));
-      Alert.alert(t('common.error'), t('template.volunteerDescMissing'));
-      return;
-    }
-
-    const tooLong = textLimitMessage(form);
-    if (tooLong) {
-      Alert.alert(t('common.error'), tooLong);
-      return;
-    }
 
     // Build event_data from form (date/time/organizer fields are excluded —
     // templates only carry static event metadata; images are stored on the
@@ -434,30 +410,30 @@ export default function CreateTemplateScreen() {
             {t('template.createSubtitle')}
           </ThemedText>
 
-          <OrganizationPicker
-            value={selectedOrgId || selectedOrganizationId || undefined}
-            onValueChange={(id) => {
-              setSelectedOrgId(id);
-              setOrgError(false);
-            }}
-            error={orgError}
-            errorMessage={t('createEvent.organizationRequired')}
-          />
+          <FormIssueSummary validation={validation} />
+
+          <FormFieldAnchor field="organization">
+            <OrganizationPicker
+              value={selectedOrgId || selectedOrganizationId || undefined}
+              onValueChange={setSelectedOrgId}
+              error={!!validation.errors.organization}
+              errorMessage={validation.errors.organization}
+            />
+          </FormFieldAnchor>
 
           <ThemedView style={styles.templateMetaSection}>
-            <FormField
-              testID="input-template-name"
-              title={t('template.nameLabel')}
-              value={templateName}
-              placeholder={t('template.namePlaceholder')}
-              handleChangeText={(value) => {
-                setTemplateName(value);
-                if (value.trim()) setTemplateNameError(false);
-              }}
-              otherStyles={styles.fieldSpacing}
-              maxLength={TEMPLATE_LIMITS.name}
-              hasError={templateNameError}
-            />
+            <FormFieldAnchor field="template_name">
+              <FormField
+                testID="input-template-name"
+                title={t('template.nameLabel')}
+                value={templateName}
+                placeholder={t('template.namePlaceholder')}
+                handleChangeText={setTemplateName}
+                otherStyles={styles.fieldSpacing}
+                maxLength={TEMPLATE_LIMITS.name}
+                errorText={validation.errors.template_name}
+              />
+            </FormFieldAnchor>
 
             <FormField
               testID="input-template-description"
@@ -482,7 +458,7 @@ export default function CreateTemplateScreen() {
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             mode="create-template"
           />

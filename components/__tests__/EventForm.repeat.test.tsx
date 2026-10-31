@@ -90,15 +90,7 @@ function Harness({
   React.useEffect(() => {
     onFormRender(form);
   }, [form]);
-  return (
-    <EventForm
-      form={form}
-      setForm={setForm}
-      emptyFields={{ title: false, start_time: false, description: false, help_description: false }}
-      userLanguage="en"
-      {...props}
-    />
-  );
+  return <EventForm form={form} setForm={setForm} userLanguage="en" {...props} />;
 }
 
 const renderForm = (

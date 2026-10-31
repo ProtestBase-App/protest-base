@@ -47,6 +47,7 @@ const MAPPING = {
   'rectangle.fill': 'rectangle',
   key: 'key',
   'exclamationmark.triangle': 'warning-amber',
+  'exclamationmark.circle': 'error-outline',
   bookmark: 'bookmark-border',
   'bookmark.fill': 'bookmark',
   'person.2': 'people',

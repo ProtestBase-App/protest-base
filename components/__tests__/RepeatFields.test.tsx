@@ -355,15 +355,36 @@ describe('RepeatFields', () => {
       expect(onChange).toHaveBeenCalledWith({ ...repeat, until: '2026-12-01' });
     });
 
-    it('flags the start time only when a submit asked for it and it is empty', () => {
-      renderFields(repeatForm({ startLocal: '' }), { hasError: true });
-      expect(mockDateFieldProps['repeat-start-time'].hasError).toBe(true);
+    it('shows what a refused submit found at each field of the rule', () => {
+      renderFields(repeatForm({ startLocal: '' }), {
+        formErrors: {
+          start_local: 'Pick a start time',
+          end_local: 'Not the same time',
+          starts_on: 'Not in the past',
+        },
+      });
 
-      renderFields(repeatForm({ startLocal: '' }), { hasError: false });
-      expect(mockDateFieldProps['repeat-start-time'].hasError).toBe(false);
+      expect(mockDateFieldProps['repeat-start-time'].errorText).toBe('Pick a start time');
+      expect(mockDateFieldProps['repeat-end-time'].errorText).toBe('Not the same time');
+      expect(mockDateFieldProps['repeat-starts-on'].errorText).toBe('Not in the past');
+    });
 
-      renderFields(repeatForm({ startLocal: '19:00' }), { hasError: true });
-      expect(mockDateFieldProps['repeat-start-time'].hasError).toBe(false);
+    it('asks for how the rule ends, whichever way it does', () => {
+      const count = renderFields(repeatForm({ endMode: 'count', count: '' }), {
+        formErrors: { count: 'How many times?' },
+      });
+      expect(count.getByText('How many times?')).toBeTruthy();
+      count.unmount();
+
+      renderFields(repeatForm({ endMode: 'until', until: '' }), {
+        formErrors: { until: 'Until when?' },
+      });
+      expect(mockDateFieldProps['repeat-until'].errorText).toBe('Until when?');
+    });
+
+    it('flags nothing before a submit', () => {
+      renderFields(repeatForm({ startLocal: '' }));
+      expect(mockDateFieldProps['repeat-start-time'].errorText).toBeUndefined();
     });
   });
 

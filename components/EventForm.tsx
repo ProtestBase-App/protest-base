@@ -25,9 +25,10 @@ import {
   SheetSearchMultiSelectOption,
 } from '@/components/SheetSearchMultiSelect';
 import AddressAutocompleteField from '@/components/AddressAutocompleteField';
-import { useFormKeyboard } from '@/components/FormScreenScaffold';
+import { FormFieldAnchor, useFormKeyboard } from '@/components/FormScreenScaffold';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { FilterChip } from '@/components/ui/FilterChip';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { eventCategories } from '@/constants/EventCategories';
 import { getCategoryColors } from '@/constants/CategoryColors';
 import { EVENT_TEXT_LIMITS, MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
@@ -39,7 +40,7 @@ import type {
   LuxembourgCommune,
   LuxembourgLocality,
 } from '@/constants/PostalCodes_LU';
-import type { EventFormProps } from '@/types/eventForm.types';
+import type { EventFormErrors, EventFormProps } from '@/types/eventForm.types';
 import { isBelgiumMidnight } from '@/utils/eventFormatters';
 import { inputMaxLength } from '@/utils/eventFormValidation';
 import type { PickedImage } from '@/types/event.types';
@@ -80,10 +81,12 @@ const ADDRESS_COUNTRY_CODES: Record<string, AddressCountryCode> = {
   france: 'fr',
 };
 
+const NO_ERRORS: EventFormErrors = {};
+
 const EventForm: React.FC<EventFormProps> = ({
   form,
   setForm,
-  emptyFields,
+  errors = NO_ERRORS,
   userLanguage,
   mode = 'create-event',
   scrollViewRef,
@@ -826,58 +829,67 @@ const EventForm: React.FC<EventFormProps> = ({
 
       <SectionHeader title={t('createEvent.basicInformation')} isDark={isDark} />
 
-      <FormField
-        testID="input-event-title"
-        title={isTemplateMode ? t('createEvent.title') : `${t('createEvent.title')} *`}
-        value={form.title}
-        placeholder={t('createEvent.titlePlaceholder')}
-        handleChangeText={(value) => setForm({ ...form, title: value })}
-        otherStyles={styles.fieldSpacing}
-        maxLength={EVENT_TEXT_LIMITS.title}
-        hasError={!isTemplateMode && emptyFields.title}
-      />
+      <FormFieldAnchor field="title">
+        <FormField
+          testID="input-event-title"
+          title={isTemplateMode ? t('createEvent.title') : `${t('createEvent.title')} *`}
+          value={form.title}
+          placeholder={t('createEvent.titlePlaceholder')}
+          handleChangeText={(value) => setForm({ ...form, title: value })}
+          otherStyles={styles.fieldSpacing}
+          maxLength={EVENT_TEXT_LIMITS.title}
+          errorText={errors.title}
+        />
+      </FormFieldAnchor>
 
-      <FormLongText
-        testID="input-event-description"
-        title={isTemplateMode ? t('createEvent.description') : `${t('createEvent.description')} *`}
-        value={form.description}
-        placeholder={t('createEvent.descriptionPlaceholder')}
-        handleChangeText={(value) => setForm({ ...form, description: value })}
-        otherStyles={styles.fieldSpacing}
-        isLongText={true}
-        maxLength={EVENT_TEXT_LIMITS.description}
-        hasError={!isTemplateMode && emptyFields.description}
-        defaultExpanded={true}
-      />
+      <FormFieldAnchor field="description">
+        <FormLongText
+          testID="input-event-description"
+          title={
+            isTemplateMode ? t('createEvent.description') : `${t('createEvent.description')} *`
+          }
+          value={form.description}
+          placeholder={t('createEvent.descriptionPlaceholder')}
+          handleChangeText={(value) => setForm({ ...form, description: value })}
+          otherStyles={styles.fieldSpacing}
+          isLongText={true}
+          maxLength={EVENT_TEXT_LIMITS.description}
+          errorText={errors.description}
+          defaultExpanded={true}
+        />
+      </FormFieldAnchor>
 
-      <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>{categoryLabel}</ThemedText>
-      <ThemedView style={styles.chipRow}>
-        {eventCategories.map(({ value }) => {
-          const categoryColors = getCategoryColors(value);
-          const active = form.categories === value;
-          return (
-            <FilterChip
-              key={value}
-              testID={`category-chip-${value}`}
-              label={t(`categories.${value.toLowerCase()}`)}
-              active={active}
-              activeColor={categoryColors.color}
-              activeBackground={categoryColors.bg}
-              leading={
-                <View
-                  style={[
-                    styles.categoryDot,
-                    { backgroundColor: categoryColors.color, opacity: active ? 1 : 0.6 },
-                  ]}
-                />
-              }
-              onPress={() =>
-                setForm({ ...form, categories: active && isTemplateMode ? '' : value })
-              }
-            />
-          );
-        })}
-      </ThemedView>
+      <FormFieldAnchor field="categories">
+        <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>{categoryLabel}</ThemedText>
+        <ThemedView style={styles.chipRow}>
+          {eventCategories.map(({ value }) => {
+            const categoryColors = getCategoryColors(value);
+            const active = form.categories === value;
+            return (
+              <FilterChip
+                key={value}
+                testID={`category-chip-${value}`}
+                label={t(`categories.${value.toLowerCase()}`)}
+                active={active}
+                activeColor={categoryColors.color}
+                activeBackground={categoryColors.bg}
+                leading={
+                  <View
+                    style={[
+                      styles.categoryDot,
+                      { backgroundColor: categoryColors.color, opacity: active ? 1 : 0.6 },
+                    ]}
+                  />
+                }
+                onPress={() =>
+                  setForm({ ...form, categories: active && isTemplateMode ? '' : value })
+                }
+              />
+            );
+          })}
+        </ThemedView>
+        {errors.categories ? <FormErrorText message={errors.categories} /> : null}
+      </FormFieldAnchor>
       <HelperText text={t('createEvent.categoryHelper')} isDark={isDark} />
 
       {!isTemplateMode && (
@@ -891,37 +903,44 @@ const EventForm: React.FC<EventFormProps> = ({
               startTime={form.start_time}
               endTime={form.end_time}
               userLanguage={userLang}
-              hasError={emptyFields.start_time}
+              formErrors={errors}
             />
           )}
 
           {!repeat && (
             <>
-              <FormDateField
-                testID="input-event-start-time"
-                title={`${t('createEvent.startTime')} *`}
-                value={form.start_time}
-                placeholder={t('createEvent.pickStartDateTime')}
-                handleChangeText={handleStartTimeChange}
-                otherStyles={styles.fieldSpacing}
-                hasError={emptyFields.start_time}
-                minDate={new Date()}
-                allDayLabel={stillAllDay ? t('events.allDay') : undefined}
-                allDayHint={stillAllDay ? t('eventEdit.allDayHint') : undefined}
-              />
+              <FormFieldAnchor field="start_time">
+                <FormDateField
+                  testID="input-event-start-time"
+                  title={`${t('createEvent.startTime')} *`}
+                  value={form.start_time}
+                  placeholder={t('createEvent.pickStartDateTime')}
+                  handleChangeText={handleStartTimeChange}
+                  otherStyles={styles.fieldSpacing}
+                  errorText={errors.start_time}
+                  minDate={new Date()}
+                  allDayLabel={stillAllDay ? t('events.allDay') : undefined}
+                  allDayHint={stillAllDay ? t('eventEdit.allDayHint') : undefined}
+                />
+              </FormFieldAnchor>
 
-              <FormDateField
-                testID="input-event-end-time"
-                title={`${t('createEvent.endTime')} (${t('common.optional')})`}
-                value={form.end_time}
-                placeholder={t('createEvent.pickEndDateTime')}
-                handleChangeText={(isoString: string) => setForm({ ...form, end_time: isoString })}
-                otherStyles={styles.fieldSpacing}
-                minDate={safeParseDate(form.start_time)}
-                // No hint here: the end of an all-day event is a storage artifact
-                // (23:59:59.999), not something the organizer is asked to set.
-                allDayLabel={stillAllDay ? t('events.allDay') : undefined}
-              />
+              <FormFieldAnchor field="end_time">
+                <FormDateField
+                  testID="input-event-end-time"
+                  title={`${t('createEvent.endTime')} (${t('common.optional')})`}
+                  value={form.end_time}
+                  placeholder={t('createEvent.pickEndDateTime')}
+                  handleChangeText={(isoString: string) =>
+                    setForm({ ...form, end_time: isoString })
+                  }
+                  otherStyles={styles.fieldSpacing}
+                  errorText={errors.end_time}
+                  minDate={safeParseDate(form.start_time)}
+                  // No hint here: the end of an all-day event is a storage artifact
+                  // (23:59:59.999), not something the organizer is asked to set.
+                  allDayLabel={stillAllDay ? t('events.allDay') : undefined}
+                />
+              </FormFieldAnchor>
               <HelperText text={t('createEvent.endTimeHelper')} isDark={isDark} />
             </>
           )}
@@ -1110,17 +1129,20 @@ const EventForm: React.FC<EventFormProps> = ({
         />
       </ThemedView>
 
-      <FormField
-        testID="input-event-website-url"
-        title={`${t('createEvent.eventLink')} (${t('common.optional')})`}
-        value={form.website_url}
-        placeholder={t('createEvent.eventLinkPlaceholder')}
-        handleChangeText={(value) => setForm({ ...form, website_url: value })}
-        otherStyles={styles.fieldSpacing}
-        maxLength={inputMaxLength(EVENT_TEXT_LIMITS.websiteUrl, form.website_url)}
-        keyboardType="url"
-        autoCapitalize="none"
-      />
+      <FormFieldAnchor field="website_url">
+        <FormField
+          testID="input-event-website-url"
+          title={`${t('createEvent.eventLink')} (${t('common.optional')})`}
+          value={form.website_url}
+          placeholder={t('createEvent.eventLinkPlaceholder')}
+          handleChangeText={(value) => setForm({ ...form, website_url: value })}
+          otherStyles={styles.fieldSpacing}
+          maxLength={inputMaxLength(EVENT_TEXT_LIMITS.websiteUrl, form.website_url)}
+          errorText={errors.website_url}
+          keyboardType="url"
+          autoCapitalize="none"
+        />
+      </FormFieldAnchor>
       <HelperText text={t('createEvent.eventLinkHelper')} isDark={isDark} />
 
       <ThemedView style={styles.labelWithLoadingWrapper}>
@@ -1177,34 +1199,39 @@ const EventForm: React.FC<EventFormProps> = ({
 
       {form.help_needed && (
         <ThemedView style={styles.conditionalFieldGroup}>
-          <FormLongText
-            testID="input-event-help-description"
-            title={`${t('createEvent.volunteerRoles')} *`}
-            value={form.help_description || ''}
-            placeholder={t('createEvent.volunteerRolesPlaceholder')}
-            handleChangeText={(value) => setForm({ ...form, help_description: value })}
-            otherStyles={styles.fieldSpacingConditional}
-            isLongText={true}
-            maxLength={inputMaxLength(EVENT_TEXT_LIMITS.helpDescription, form.help_description)}
-            counterLimit={EVENT_TEXT_LIMITS.helpDescription}
-            hasError={emptyFields.help_description}
-          />
+          <FormFieldAnchor field="help_description">
+            <FormLongText
+              testID="input-event-help-description"
+              title={`${t('createEvent.volunteerRoles')} *`}
+              value={form.help_description || ''}
+              placeholder={t('createEvent.volunteerRolesPlaceholder')}
+              handleChangeText={(value) => setForm({ ...form, help_description: value })}
+              otherStyles={styles.fieldSpacingConditional}
+              isLongText={true}
+              maxLength={inputMaxLength(EVENT_TEXT_LIMITS.helpDescription, form.help_description)}
+              counterLimit={EVENT_TEXT_LIMITS.helpDescription}
+              errorText={errors.help_description}
+            />
+          </FormFieldAnchor>
           <HelperText text={t('createEvent.volunteerHelper')} isDark={isDark} />
         </ThemedView>
       )}
 
-      <FormLongText
-        testID="input-event-disclaimer"
-        title={`${t('createEvent.disclaimer')} (${t('common.optional')})`}
-        value={form.disclaimer}
-        placeholder={t('createEvent.disclaimerPlaceholder')}
-        handleChangeText={(value) => setForm({ ...form, disclaimer: value })}
-        otherStyles={styles.fieldSpacing}
-        isLongText={true}
-        maxLength={inputMaxLength(EVENT_TEXT_LIMITS.disclaimer, form.disclaimer)}
-        counterLimit={EVENT_TEXT_LIMITS.disclaimer}
-        onFocusCallback={handleDisclaimerFocus}
-      />
+      <FormFieldAnchor field="disclaimer">
+        <FormLongText
+          testID="input-event-disclaimer"
+          title={`${t('createEvent.disclaimer')} (${t('common.optional')})`}
+          value={form.disclaimer}
+          placeholder={t('createEvent.disclaimerPlaceholder')}
+          handleChangeText={(value) => setForm({ ...form, disclaimer: value })}
+          otherStyles={styles.fieldSpacing}
+          isLongText={true}
+          maxLength={inputMaxLength(EVENT_TEXT_LIMITS.disclaimer, form.disclaimer)}
+          counterLimit={EVENT_TEXT_LIMITS.disclaimer}
+          errorText={errors.disclaimer}
+          onFocusCallback={handleDisclaimerFocus}
+        />
+      </FormFieldAnchor>
       <HelperText text={t('createEvent.disclaimerHelper')} isDark={isDark} />
     </ThemedView>
   );
