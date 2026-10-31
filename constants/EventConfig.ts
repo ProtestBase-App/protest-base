@@ -27,6 +27,26 @@ export const MAX_EVENT_IMAGES = 5;
 export const MAX_CO_ORGANIZERS = 10;
 
 /**
+ * Text limits mirroring the backend, so the form refuses only what the server would.
+ * Volunteer text takes the stricter of the backend's two routes: JSON allows 500,
+ * multipart 1,000. Raise it once they match.
+ */
+export const EVENT_TEXT_LIMITS = {
+  title: 100,
+  description: 8000,
+  disclaimer: 500,
+  helpDescription: 500,
+  websiteUrl: 500,
+} as const;
+
+/** Mirrors the backend's template caps. `eventData` applies to the serialized `event_data`. */
+export const TEMPLATE_LIMITS = {
+  name: 100,
+  description: 200,
+  eventData: 10000,
+} as const;
+
+/**
  * Lower bounds for the source-match ("confidence") score bands on automation
  * drafts: >= 80 high, >= 50 medium, below that low. Mirrors the website's bands.
  *

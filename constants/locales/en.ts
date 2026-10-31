@@ -191,6 +191,7 @@ const en: LocaleData = {
 
     // Error messages
     nameMissing: 'Please enter a template name.',
+    dataTooLong: 'This template is too long to save. Shorten the description.',
     volunteerDescMissing: 'Please describe how volunteers can help.',
 
     // Delete confirmation
@@ -651,6 +652,8 @@ const en: LocaleData = {
     contactEmailInvalid: 'Please enter a valid email address',
     endTimeBeforeStart: 'End time must be after start time',
     invalidUrlFormat: 'Website URL must start with www., http://, or https://',
+    disclaimerTooLong: 'Keep the disclaimer to {{max}} characters.',
+    volunteerTooLong: 'Keep the volunteer details to {{max}} characters.',
 
     // Progress & Actions
     progressText: 'Required fields completed',

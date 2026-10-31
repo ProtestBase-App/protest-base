@@ -280,6 +280,7 @@ jest.mock('react-native-reanimated', () => {
     FadeOutDown: { duration: jest.fn().mockReturnThis() },
     SlideInRight: { duration: jest.fn().mockReturnThis() },
     SlideOutLeft: { duration: jest.fn().mockReturnThis() },
+    SlideOutRight: { duration: jest.fn().mockReturnThis() },
     SlideInDown: (() => {
       const builder = {};
       builder.duration = jest.fn(() => builder);
@@ -381,6 +382,10 @@ jest.mock('@maplibre/maplibre-react-native', () => {
       setAccessToken: jest.fn(),
     },
     MapView: mockMapView,
+    // What components/MapComponents.tsx imports from this package's current API.
+    Map: mockMapView,
+    Marker: ({ children, ...props }) =>
+      React.createElement(View, { testID: 'map-marker', ...props }, children),
     Camera: mockCamera,
     PointAnnotation: ({ children, ...props }) =>
       React.createElement(View, { testID: 'map-point-annotation', ...props }, children),

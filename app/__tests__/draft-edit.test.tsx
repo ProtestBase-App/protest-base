@@ -153,6 +153,68 @@ describe('DraftEdit', () => {
     alertSpy.mockRestore();
   });
 
+  it('refuses an end time before the start', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({
+        $id: 'draft-1',
+        start_time: '2099-06-01T12:00:00.000Z',
+        end_time: '2099-06-01T10:00:00.000Z',
+      })
+    );
+
+    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    fireEvent.press(await findByTestId('btn-draft-save'));
+
+    expect(alertSpy).toHaveBeenCalledWith('common.error', 'eventEdit.invalidTimeRangeError');
+    expect(patchEvent).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('accepts a long top-level domain', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    patchEvent.mockResolvedValue(undefined);
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({ $id: 'draft-1', website_url: 'actie.brussels' })
+    );
+
+    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    const save = await findByTestId('btn-draft-save');
+    await act(async () => {
+      fireEvent.press(save);
+    });
+
+    expect(alertSpy).not.toHaveBeenCalledWith('common.error', 'createEvent.invalidUrlFormat');
+    expect(patchEvent).toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('refuses a disclaimer over the server limit', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getDraftEventPreview.mockResolvedValue(
+      createMockEvent({ $id: 'draft-1', disclaimer: 'x'.repeat(501) })
+    );
+
+    const { findByTestId } = renderWithProviders(<DraftEdit />, {
+      providerOverrides: { globalContext: loggedInGlobal, ...orgOverrides },
+    });
+
+    fireEvent.press(await findByTestId('btn-draft-save'));
+
+    expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+    expect(patchEvent).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
   it('deletes the draft and shows a success message after confirming', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     getDraftEventPreview.mockResolvedValue(createMockEvent({ $id: 'draft-1' }));

@@ -175,7 +175,7 @@ export interface MockVersionCheckContext {
   maintenanceMessage?: string | null;
   updateMessage?: string | null;
   updateUrl?: string;
-  features?: { recurringEvents: boolean };
+  features?: { recurringEvents: boolean; titleOnlyDrafts?: boolean };
   isLoading?: boolean;
   dismissUpdatePrompt?: jest.Mock;
   openStore?: jest.Mock;
@@ -349,7 +349,7 @@ const defaultVersionCheckContext: Required<MockVersionCheckContext> = {
   maintenanceMessage: null,
   updateMessage: null,
   updateUrl: '',
-  features: { recurringEvents: false },
+  features: { recurringEvents: false, titleOnlyDrafts: false },
   isLoading: false,
   dismissUpdatePrompt: jest.fn(),
   openStore: jest.fn(),
@@ -428,6 +428,9 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
   jest
     .spyOn(require('@/context/VersionCheckProvider'), 'useRecurringEventsEnabled')
     .mockReturnValue(version.features.recurringEvents);
+  jest
+    .spyOn(require('@/context/VersionCheckProvider'), 'useTitleOnlyDraftsEnabled')
+    .mockReturnValue(version.features.titleOnlyDrafts === true);
 }
 
 // ============================================================================

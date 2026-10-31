@@ -209,6 +209,7 @@ const nl = {
 
     // Error messages
     nameMissing: 'Voer een sjabloonnaam in.',
+    dataTooLong: 'Deze sjabloon is te lang om op te slaan. Maak de beschrijving korter.',
     volunteerDescMissing: 'Beschrijf hoe vrijwilligers kunnen helpen.',
 
     // Delete confirmation
@@ -717,6 +718,8 @@ const nl = {
     fillMandatoryFields: 'Vul alle verplichte velden in.',
     organizationsLoading: 'Wacht tot de organisaties zijn geladen voordat je indient.',
     invalidUrlFormat: 'Website URL moet beginnen met www., http:// of https://',
+    disclaimerTooLong: 'Houd de disclaimer op maximaal {{max}} tekens.',
+    volunteerTooLong: 'Houd de vrijwilligersdetails op maximaal {{max}} tekens.',
     // Accessibility
     closeAccessibilityLabel: 'Sluit evenement aanmaken scherm',
     progressAccessibilityLabel: 'Formuliervoortgang: {{percentage}}% voltooid',

@@ -169,7 +169,7 @@ describe('CreateEventModal recurring events', () => {
    */
   const renderWithForm = async (
     formData: Record<string, unknown>,
-    flag: { features: { recurringEvents: boolean } } = FLAG_ON
+    flag: { features: { recurringEvents: boolean; titleOnlyDrafts?: boolean } } = FLAG_ON
   ) => {
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     getEventDraft.mockResolvedValue({ formData });
@@ -782,11 +782,10 @@ describe('CreateEventModal recurring events', () => {
       expect(refetchEvents).not.toHaveBeenCalled();
     });
 
-    it('needs only a title and an organization, as any draft does', async () => {
+    it('needs no category or single date, since the rule supplies the dates', async () => {
       createDraftEvent.mockResolvedValue({ $id: 'draft-1' });
       const { getByTestId } = await renderWithForm({
         ...weekly,
-        description: '',
         categories: '',
         start_time: '',
         end_time: '',
@@ -796,6 +795,27 @@ describe('CreateEventModal recurring events', () => {
 
       expect(createDraftEvent).toHaveBeenCalledTimes(1);
       expect(createDraftEvent.mock.calls[0][0].recurrence).toEqual(WIRE_RULE);
+    });
+
+    it('asks for a description, because the backend does for a series too', async () => {
+      const { getByTestId } = await renderWithForm({ ...weekly, description: '' });
+
+      await press(getByTestId, 'btn-create-event-draft');
+
+      expect(createDraftEvent).not.toHaveBeenCalled();
+      expect(alerted('common.error')[0][1]).toContain('createEvent.description');
+    });
+
+    it('sends a series with no description once the backend announces it', async () => {
+      createDraftEvent.mockResolvedValue({ $id: 'draft-1' });
+      const { getByTestId } = await renderWithForm(
+        { ...weekly, description: '' },
+        { features: { recurringEvents: true, titleOnlyDrafts: true } }
+      );
+
+      await press(getByTestId, 'btn-create-event-draft');
+
+      expect(createDraftEvent).toHaveBeenCalledTimes(1);
     });
 
     describe('an invalid rule never falls back to a single draft', () => {

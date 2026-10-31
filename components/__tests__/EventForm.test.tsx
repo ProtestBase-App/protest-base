@@ -161,7 +161,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react-native';
 import EventForm from '@/components/EventForm';
-import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
+import type { FormState, EmptyFieldsState, EventFormMode } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
 import { searchAddress } from '@/services/address.service';
 
@@ -1556,7 +1556,7 @@ describe('EventForm — progress bar', () => {
     expect(screen.getByText('0%')).toBeTruthy();
   });
 
-  it('shows 33% progress when 1 of 3 required fields is filled', () => {
+  it('shows 25% progress when 1 of 4 required fields is filled', () => {
     const partialForm = { ...mockForm, title: 'Test', description: '', start_time: '' };
     render(
       <EventForm
@@ -1564,6 +1564,20 @@ describe('EventForm — progress bar', () => {
         setForm={jest.fn()}
         emptyFields={mockEmptyFields}
         userLanguage="en"
+      />
+    );
+    expect(screen.getByText('25%')).toBeTruthy();
+  });
+
+  it('leaves the category out when editing a live event, where it is not required', () => {
+    const partialForm = { ...mockForm, title: 'Test', description: '', start_time: '' };
+    render(
+      <EventForm
+        form={partialForm}
+        setForm={jest.fn()}
+        emptyFields={mockEmptyFields}
+        userLanguage="en"
+        mode="edit-event"
       />
     );
     expect(screen.getByText('33%')).toBeTruthy();
@@ -1575,6 +1589,7 @@ describe('EventForm — progress bar', () => {
       title: 'Test',
       description: 'Desc',
       start_time: '2025-06-15T14:00:00.000Z',
+      categories: 'Protest',
     };
     render(
       <EventForm
@@ -1828,20 +1843,58 @@ describe('EventForm — filteredPostalCodes branches', () => {
 describe('EventForm — category chip toggle', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears the selected category when its active chip is tapped again', () => {
-    const setForm = jest.fn();
-    const formWithCategory = { ...mockForm, categories: 'Protest' };
+  const renderWithCategory = (mode: EventFormMode, setForm: jest.Mock) =>
     render(
       <EventForm
-        form={formWithCategory}
+        form={{ ...mockForm, categories: 'Protest' }}
         setForm={setForm}
         emptyFields={mockEmptyFields}
         userLanguage="en"
+        mode={mode}
       />
     );
-    // The chip is active; tapping it again toggles the category back off.
-    fireEvent.press(screen.getByTestId('category-chip-Protest'));
-    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: '' }));
+
+  it.each<EventFormMode>(['create-event', 'edit-event'])(
+    'keeps the category when its active chip is tapped again in %s',
+    (mode) => {
+      const setForm = jest.fn();
+      renderWithCategory(mode, setForm);
+
+      fireEvent.press(screen.getByTestId('category-chip-Protest'));
+
+      expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: 'Protest' }));
+    }
+  );
+
+  it.each<EventFormMode>(['create-template', 'edit-template'])(
+    'clears the category when its active chip is tapped again in %s',
+    (mode) => {
+      const setForm = jest.fn();
+      renderWithCategory(mode, setForm);
+
+      fireEvent.press(screen.getByTestId('category-chip-Protest'));
+
+      expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: '' }));
+    }
+  );
+
+  it('moves between categories in every mode', () => {
+    const setForm = jest.fn();
+    renderWithCategory('edit-event', setForm);
+
+    fireEvent.press(screen.getByTestId('category-chip-Act'));
+
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: 'Act' }));
+  });
+
+  it.each<[EventFormMode, string]>([
+    ['create-event', 'Category *'],
+    ['edit-event', 'Category'],
+    ['create-template', 'Category (Optional)'],
+  ])('labels the category for %s', (mode, label) => {
+    renderWithCategory(mode, jest.fn());
+
+    expect(screen.getByText(label)).toBeTruthy();
   });
 });
 

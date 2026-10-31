@@ -30,7 +30,7 @@ const FAIL_OPEN_RESULT: VersionCheckResult = {
   maintenanceMessage: null,
   updateMessage: null,
   updateUrl: '',
-  features: { recurringEvents: false },
+  features: { recurringEvents: false, titleOnlyDrafts: false },
 };
 
 /**
@@ -55,7 +55,10 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     await setApiPrefix(data.apiPrefix ?? '');
 
     // Strictly true: a backend without `features`, or with anything else there, is off.
-    const features: AppFeatures = { recurringEvents: data.features?.recurringEvents === true };
+    const features: AppFeatures = {
+      recurringEvents: data.features?.recurringEvents === true,
+      titleOnlyDrafts: data.features?.titleOnlyDrafts === true,
+    };
 
     const installedVersion = getInstalledAppVersion() ?? '0.0.0';
     const platform = Platform.OS;

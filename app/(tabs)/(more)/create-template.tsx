@@ -18,11 +18,12 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import { OrganizationPicker } from '@/components/OrganizationPicker';
 import { resolveImageUrls } from '@/services/storage.service';
-import { MAX_EVENT_IMAGES } from '@/constants/EventConfig';
+import { MAX_EVENT_IMAGES, TEMPLATE_LIMITS } from '@/constants/EventConfig';
 import type { FormState } from '@/types/eventForm.types';
 import type { TemplateEventData } from '@/types/template.types';
 import type { CreateTemplateSearchParams } from '@/types/navigation.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
+import { isTemplateDataTooLong, textLimitMessage } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -327,32 +328,43 @@ export default function CreateTemplateScreen() {
       return;
     }
 
+    const tooLong = textLimitMessage(form);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
+      return;
+    }
+
+    // Build event_data from form (date/time/organizer fields are excluded —
+    // templates only carry static event metadata; images are stored on the
+    // template record itself as image_urls, not inside event_data).
+    const eventData: TemplateEventData = {};
+
+    // organization_id is stored in event_data so it can pre-fill when creating events.
+    eventData.organization_id = effectiveOrgId;
+
+    if (form.title) eventData.title = form.title;
+    if (form.description) eventData.description = form.description;
+    if (form.street_address) eventData.street_address = form.street_address;
+    if (form.city) eventData.city = form.city;
+    if (form.region) eventData.region = form.region;
+    if (form.country) eventData.country = form.country;
+    if (form.postal_code) eventData.postal_code = form.postal_code;
+    if (form.website_url) eventData.website_url = form.website_url;
+    if (form.categories) eventData.categories = form.categories;
+    if (form.disclaimer) eventData.disclaimer = form.disclaimer;
+    if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
+    if (form.help_needed) {
+      eventData.help_needed = form.help_needed;
+      if (form.help_description) eventData.help_description = form.help_description;
+    }
+
+    if (isTemplateDataTooLong(eventData)) {
+      Alert.alert(t('common.error'), t('template.dataTooLong'));
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // Build event_data from form (date/time/organizer fields are excluded —
-      // templates only carry static event metadata; images are stored on the
-      // template record itself as image_urls, not inside event_data).
-      const eventData: TemplateEventData = {};
-
-      // organization_id is stored in event_data so it can pre-fill when creating events.
-      eventData.organization_id = effectiveOrgId;
-
-      if (form.title) eventData.title = form.title;
-      if (form.description) eventData.description = form.description;
-      if (form.street_address) eventData.street_address = form.street_address;
-      if (form.city) eventData.city = form.city;
-      if (form.region) eventData.region = form.region;
-      if (form.country) eventData.country = form.country;
-      if (form.postal_code) eventData.postal_code = form.postal_code;
-      if (form.website_url) eventData.website_url = form.website_url;
-      if (form.categories) eventData.categories = form.categories;
-      if (form.disclaimer) eventData.disclaimer = form.disclaimer;
-      if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
-      if (form.help_needed) {
-        eventData.help_needed = form.help_needed;
-        if (form.help_description) eventData.help_description = form.help_description;
-      }
-
       // New picks are uploaded to hosted URLs first (the templates API is
       // JSON-only); URLs kept from a past event pass through verbatim.
       const imageUrls = await resolveImageUrls(form.images);
@@ -443,7 +455,7 @@ export default function CreateTemplateScreen() {
                 if (value.trim()) setTemplateNameError(false);
               }}
               otherStyles={styles.fieldSpacing}
-              maxLength={100}
+              maxLength={TEMPLATE_LIMITS.name}
               hasError={templateNameError}
             />
 
@@ -454,7 +466,7 @@ export default function CreateTemplateScreen() {
               placeholder={t('template.descriptionPlaceholder')}
               handleChangeText={setTemplateDescription}
               otherStyles={styles.fieldSpacing}
-              maxLength={8000}
+              maxLength={TEMPLATE_LIMITS.description}
             />
           </ThemedView>
 

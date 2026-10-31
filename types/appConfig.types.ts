@@ -56,6 +56,8 @@ export interface AppConfigData {
 export interface AppFeatures {
   /** Repeat control, series badge, series screen, "this and following" choices. */
   recurringEvents: boolean;
+  /** The backend accepts a draft with no description or start time. */
+  titleOnlyDrafts: boolean;
 }
 
 /**

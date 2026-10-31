@@ -20,6 +20,8 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import EventForm from '@/components/EventForm';
 import type { FormState } from '@/types/eventForm.types';
 import { Spacing, Typography } from '@/constants/DesignTokens';
+import { TEMPLATE_LIMITS } from '@/constants/EventConfig';
+import { isTemplateDataTooLong, textLimitMessage } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
@@ -259,28 +261,39 @@ export default function EditTemplateScreen() {
       return;
     }
 
+    const tooLong = textLimitMessage(form);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
+      return;
+    }
+
+    const eventData: TemplateEventData = {};
+
+    if (form.organization_id) eventData.organization_id = form.organization_id;
+
+    if (form.title) eventData.title = form.title;
+    if (form.description) eventData.description = form.description;
+    if (form.street_address) eventData.street_address = form.street_address;
+    if (form.city) eventData.city = form.city;
+    if (form.region) eventData.region = form.region;
+    if (form.country) eventData.country = form.country;
+    if (form.postal_code) eventData.postal_code = form.postal_code;
+    if (form.website_url) eventData.website_url = form.website_url;
+    if (form.categories) eventData.categories = form.categories;
+    if (form.disclaimer) eventData.disclaimer = form.disclaimer;
+    if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
+    if (form.help_needed) {
+      eventData.help_needed = form.help_needed;
+      if (form.help_description) eventData.help_description = form.help_description;
+    }
+
+    if (isTemplateDataTooLong(eventData)) {
+      Alert.alert(t('common.error'), t('template.dataTooLong'));
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const eventData: TemplateEventData = {};
-
-      if (form.organization_id) eventData.organization_id = form.organization_id;
-
-      if (form.title) eventData.title = form.title;
-      if (form.description) eventData.description = form.description;
-      if (form.street_address) eventData.street_address = form.street_address;
-      if (form.city) eventData.city = form.city;
-      if (form.region) eventData.region = form.region;
-      if (form.country) eventData.country = form.country;
-      if (form.postal_code) eventData.postal_code = form.postal_code;
-      if (form.website_url) eventData.website_url = form.website_url;
-      if (form.categories) eventData.categories = form.categories;
-      if (form.disclaimer) eventData.disclaimer = form.disclaimer;
-      if (form.co_organizers?.length) eventData.co_organizers = form.co_organizers;
-      if (form.help_needed) {
-        eventData.help_needed = form.help_needed;
-        if (form.help_description) eventData.help_description = form.help_description;
-      }
-
       // Authoritative full list: kept URLs verbatim, new picks uploaded first.
       // An empty array clears all template images.
       const imageUrls = await resolveImageUrls(form.images);
@@ -406,7 +419,7 @@ export default function EditTemplateScreen() {
                 if (value.trim()) setTemplateNameError(false);
               }}
               otherStyles={styles.fieldSpacing}
-              maxLength={100}
+              maxLength={TEMPLATE_LIMITS.name}
               hasError={templateNameError}
             />
 
@@ -416,7 +429,7 @@ export default function EditTemplateScreen() {
               placeholder={t('template.descriptionPlaceholder')}
               handleChangeText={setTemplateDescription}
               otherStyles={styles.fieldSpacing}
-              maxLength={8000}
+              maxLength={TEMPLATE_LIMITS.description}
             />
           </ThemedView>
 

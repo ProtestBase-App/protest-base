@@ -17,7 +17,10 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
-import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
+import {
+  useRecurringEventsEnabled,
+  useTitleOnlyDraftsEnabled,
+} from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { getThemeColors } from '@/utils/themeColors';
@@ -27,10 +30,12 @@ import { OrganizationPicker } from '@/components/OrganizationPicker';
 import type { FormState } from '@/types/eventForm.types';
 import type { PickedImage } from '@/types/event.types';
 import type { CreateEventReport, RepeatFormState } from '@/types/eventSeries.types';
+import type { ParsedEventTemplate } from '@/types/template.types';
 import { Typography } from '@/constants/DesignTokens';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
+import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
@@ -41,26 +46,6 @@ import {
   repeatFieldMessage,
   seriesErrorMessage,
 } from '@/utils/recurrence';
-
-/**
- * Validate URL format using URL constructor.
- * Only allows http/https protocols for security.
- */
-const isValidUrl = (url: string): boolean => {
-  try {
-    const urlWithProtocol = url.match(/^https?:\/\//) ? url : `https://${url}`;
-    const parsed = new URL(urlWithProtocol);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return false;
-    }
-    // Hostname must have at least 2 non-empty parts (domain + TLD) to reject
-    // "..." or "domain..com" while accepting "a.io".
-    const hostnameParts = parsed.hostname.split('.');
-    return hostnameParts.length >= 2 && hostnameParts.every((part) => part.length > 0);
-  } catch {
-    return false;
-  }
-};
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -96,6 +81,45 @@ const migrateDraftFormState = (saved: FormState & { image?: unknown }): FormStat
   return {
     ...withCoords,
     images: legacy && typeof legacy === 'object' ? [legacy as PickedImage] : [],
+  };
+};
+
+/**
+ * The form with a template's saved details laid over it. Empty strings saved in the
+ * template are kept; only fields the template never had fall back to `prevForm`.
+ */
+const applyTemplate = (prevForm: FormState, template: ParsedEventTemplate): FormState => {
+  const eventData = template.event_data;
+  return {
+    ...prevForm,
+    organization_id:
+      eventData.organization_id !== undefined
+        ? eventData.organization_id
+        : prevForm.organization_id,
+    // Template images are hosted URLs attached verbatim on create — the event gets
+    // its own list entries; the template's images are never consumed or moved.
+    images: template.image_urls?.length ? template.image_urls : prevForm.images,
+    title: eventData.title !== undefined ? eventData.title : prevForm.title,
+    description: eventData.description !== undefined ? eventData.description : prevForm.description,
+    street_address:
+      eventData.street_address !== undefined ? eventData.street_address : prevForm.street_address,
+    city: eventData.city !== undefined ? eventData.city : prevForm.city,
+    region: eventData.region !== undefined ? eventData.region : prevForm.region,
+    country: eventData.country !== undefined ? eventData.country : prevForm.country,
+    postal_code: toPostalCodeString(eventData.postal_code) ?? prevForm.postal_code,
+    website_url: eventData.website_url !== undefined ? eventData.website_url : prevForm.website_url,
+    categories: Array.isArray(eventData.categories)
+      ? eventData.categories.join(',')
+      : eventData.categories !== undefined
+        ? eventData.categories
+        : prevForm.categories,
+    disclaimer: eventData.disclaimer !== undefined ? eventData.disclaimer : prevForm.disclaimer,
+    co_organizers: eventData.co_organizers ?? prevForm.co_organizers,
+    help_needed: eventData.help_needed ?? prevForm.help_needed,
+    help_description:
+      eventData.help_description !== undefined
+        ? eventData.help_description
+        : prevForm.help_description,
   };
 };
 
@@ -140,6 +164,7 @@ export default function CreateEventModal() {
   } = useUserOrganizations();
   const { isOffline } = useConnectivity();
   const recurringEnabled = useRecurringEventsEnabled();
+  const titleOnlyDrafts = useTitleOnlyDraftsEnabled();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const isPresented = router.canGoBack();
@@ -149,6 +174,7 @@ export default function CreateEventModal() {
   const [isSavingDraft, setSavingDraft] = useState(false);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isCheckingDraft, setIsCheckingDraft] = useState(true);
+  const [startingTemplate, setStartingTemplate] = useState<ParsedEventTemplate | null>(null);
 
   // 409 DUPLICATE_EVENT. The context records WHICH button was pressed, so
   // "Create anyway" re-sends that same submission — routing a refused draft save
@@ -188,9 +214,11 @@ export default function CreateEventModal() {
     help_description: false,
   });
 
-  const initialFormState = useMemo<FormState>(
-    () => ({
-      organization_id: '',
+  // What the form holds before the organizer touches it: the auto-filled organization
+  // and a launched template are its starting point, not edits to autosave or warn about.
+  const initialFormState = useMemo<FormState>(() => {
+    const blankForm: FormState = {
+      organization_id: selectedOrganizationId || '',
       title: '',
       description: '',
       images: [],
@@ -210,9 +238,9 @@ export default function CreateEventModal() {
       help_description: '',
       geocod_lat: null,
       geocod_lng: null,
-    }),
-    [user?.name, user?.email]
-  );
+    };
+    return startingTemplate ? applyTemplate(blankForm, startingTemplate) : blankForm;
+  }, [user?.name, selectedOrganizationId, startingTemplate]);
 
   // Apply organization_id from context for single-org users
   useEffect(() => {
@@ -380,48 +408,8 @@ export default function CreateEventModal() {
 
       try {
         const template = await getTemplate(params.templateId);
-        const eventData = template.event_data;
-
-        // Use nullish coalescing for fields where empty string should be preserved
-        // from template; use logical OR only for fields where we want to fall back
-        // to prevForm on empty.
-        setForm((prevForm) => ({
-          ...prevForm,
-          organization_id:
-            eventData.organization_id !== undefined
-              ? eventData.organization_id
-              : prevForm.organization_id,
-          // Template images are hosted URLs attached verbatim on create — the
-          // event gets its own list entries; the template's images are never
-          // consumed or moved.
-          images: template.image_urls?.length ? template.image_urls : prevForm.images,
-          title: eventData.title !== undefined ? eventData.title : prevForm.title,
-          description:
-            eventData.description !== undefined ? eventData.description : prevForm.description,
-          street_address:
-            eventData.street_address !== undefined
-              ? eventData.street_address
-              : prevForm.street_address,
-          city: eventData.city !== undefined ? eventData.city : prevForm.city,
-          region: eventData.region !== undefined ? eventData.region : prevForm.region,
-          country: eventData.country !== undefined ? eventData.country : prevForm.country,
-          postal_code: toPostalCodeString(eventData.postal_code) ?? prevForm.postal_code,
-          website_url:
-            eventData.website_url !== undefined ? eventData.website_url : prevForm.website_url,
-          categories: Array.isArray(eventData.categories)
-            ? eventData.categories.join(',')
-            : eventData.categories !== undefined
-              ? eventData.categories
-              : prevForm.categories,
-          disclaimer:
-            eventData.disclaimer !== undefined ? eventData.disclaimer : prevForm.disclaimer,
-          co_organizers: eventData.co_organizers ?? prevForm.co_organizers,
-          help_needed: eventData.help_needed ?? prevForm.help_needed,
-          help_description:
-            eventData.help_description !== undefined
-              ? eventData.help_description
-              : prevForm.help_description,
-        }));
+        setForm((prevForm) => applyTemplate(prevForm, template));
+        setStartingTemplate(template);
       } catch (error) {
         logger.warn('Failed to load template', {
           templateId: params.templateId,
@@ -490,6 +478,7 @@ export default function CreateEventModal() {
       description: trimmedForm.description === '',
       help_description: trimmedForm.help_needed && !trimmedForm.help_description,
     };
+    const missingCategory = !trimmedForm.categories;
 
     setEmptyFields(newEmptyFields);
 
@@ -498,12 +487,14 @@ export default function CreateEventModal() {
       newEmptyFields.title ||
       newEmptyFields.start_time ||
       newEmptyFields.description ||
-      newEmptyFields.help_description
+      newEmptyFields.help_description ||
+      missingCategory
     ) {
       const missingFields: string[] = [];
       if (newEmptyFields.organization_id) missingFields.push(t('createEvent.organization'));
       if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
       if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
+      if (missingCategory) missingFields.push(t('createEvent.category'));
       if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
       if (newEmptyFields.help_description) missingFields.push(t('createEvent.volunteerRoles'));
 
@@ -524,10 +515,16 @@ export default function CreateEventModal() {
     }
 
     if (trimmedForm.website_url) {
-      if (!isValidUrl(trimmedForm.website_url)) {
+      if (!isValidEventUrl(trimmedForm.website_url)) {
         Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
         return;
       }
+    }
+
+    const tooLong = textLimitMessage(trimmedForm);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
+      return;
     }
 
     await runCreateEvent(false);
@@ -586,7 +583,9 @@ export default function CreateEventModal() {
           disclaimer: trimmedForm.disclaimer || undefined,
           co_organizers: finalCoOrganizers,
           help_needed: trimmedForm.help_needed,
-          help_description: trimmedForm.help_description || undefined,
+          help_description: trimmedForm.help_needed
+            ? trimmedForm.help_description || undefined
+            : undefined,
         },
         { duplicateOverride, report }
       );
@@ -633,29 +632,38 @@ export default function CreateEventModal() {
     }
   };
 
-  // Save the in-progress form as a backend draft (status: 'draft'). Drafts may
-  // be incomplete, so validation is relaxed to just organization + title; the
-  // rest is enforced at publish time. This is unrelated to the LOCAL form
-  // autosave (clearEventDraft below only clears that local snapshot).
+  // Save the in-progress form as a backend draft (status: 'draft'). The backend wants
+  // a description and a start on every create, drafts included, until it announces
+  // `titleOnlyDrafts`; publishing enforces the rest. This is unrelated to the LOCAL
+  // form autosave (clearEventDraft below only clears that local snapshot).
   const submitDraft = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
     const trimmedForm = trimForm();
 
     const effectiveOrgId = trimmedForm.organization_id || selectedOrganizationId || '';
+    const repeat = activeRepeat();
 
     const newEmptyFields = {
       organization_id: !effectiveOrgId,
       title: trimmedForm.title === '',
-      start_time: false,
-      description: false,
+      // A series gets its start from the rule, which is checked below.
+      start_time: !titleOnlyDrafts && !repeat && trimmedForm.start_time === '',
+      description: !titleOnlyDrafts && trimmedForm.description === '',
       help_description: false,
     };
     setEmptyFields(newEmptyFields);
 
-    if (newEmptyFields.organization_id || newEmptyFields.title) {
+    if (
+      newEmptyFields.organization_id ||
+      newEmptyFields.title ||
+      newEmptyFields.description ||
+      newEmptyFields.start_time
+    ) {
       const missingFields: string[] = [];
       if (newEmptyFields.organization_id) missingFields.push(t('createEvent.organization'));
       if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
+      if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
+      if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
       Alert.alert(
         t('common.error'),
         t('createEvent.missingFieldsError', { fields: missingFields.join(', ') })
@@ -664,14 +672,19 @@ export default function CreateEventModal() {
       return;
     }
 
-    if (trimmedForm.website_url && !isValidUrl(trimmedForm.website_url)) {
+    if (trimmedForm.website_url && !isValidEventUrl(trimmedForm.website_url)) {
       Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
+      return;
+    }
+
+    const tooLong = textLimitMessage(trimmedForm);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
       return;
     }
 
     // A draft may be incomplete, but a draft series is still a series: without a rule
     // that can be sent it must not fall back to one draft.
-    const repeat = activeRepeat();
     if (repeat && alertRepeatErrors(repeat)) return;
 
     await runCreateDraft(false);
@@ -719,7 +732,9 @@ export default function CreateEventModal() {
           disclaimer: trimmedForm.disclaimer || undefined,
           co_organizers: finalCoOrganizers,
           help_needed: trimmedForm.help_needed,
-          help_description: trimmedForm.help_description || undefined,
+          help_description: trimmedForm.help_needed
+            ? trimmedForm.help_description || undefined
+            : undefined,
         },
         { duplicateOverride, report }
       );

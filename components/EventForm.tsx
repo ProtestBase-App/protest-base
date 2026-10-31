@@ -30,7 +30,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { FilterChip } from '@/components/ui/FilterChip';
 import { eventCategories } from '@/constants/EventCategories';
 import { getCategoryColors } from '@/constants/CategoryColors';
-import { MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
+import { EVENT_TEXT_LIMITS, MAX_EVENT_IMAGES, MAX_CO_ORGANIZERS } from '@/constants/EventConfig';
 import { useOrganizations } from '@/context/OrganizationsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
 import type { FranceAreas } from '@/constants/PostalCodes_FR';
@@ -41,6 +41,7 @@ import type {
 } from '@/constants/PostalCodes_LU';
 import type { EventFormProps } from '@/types/eventForm.types';
 import { isBelgiumMidnight } from '@/utils/eventFormatters';
+import { inputMaxLength } from '@/utils/eventFormValidation';
 import type { PickedImage } from '@/types/event.types';
 import type { AddressSuggestion, AddressCountryCode, AddressLang } from '@/types/address.types';
 import { getSelectableCountries } from '@/utils/countryOptions';
@@ -101,6 +102,14 @@ const EventForm: React.FC<EventFormProps> = ({
 
   // Template mode hides date/time fields.
   const isTemplateMode = mode === 'create-template' || mode === 'edit-template';
+
+  // Required to create and to publish. An older live event with none can still be saved,
+  // as on the website; once set, only a template can clear it.
+  const categoryLabel = isTemplateMode
+    ? `${t('createEvent.category')} (${t('common.optional')})`
+    : mode === 'edit-event'
+      ? t('createEvent.category')
+      : `${t('createEvent.category')} *`;
 
   // A series has a rule instead of the two date fields.
   const repeat = showRepeat && isRepeating(form.repeat) ? form.repeat : null;
@@ -387,11 +396,24 @@ const EventForm: React.FC<EventFormProps> = ({
     // Templates don't require start_time; only title is "recommended" for templates.
     const requiredFields = isTemplateMode
       ? [form.title]
-      : [form.title, form.description, repeat ? repeat.startLocal : form.start_time];
+      : [
+          form.title,
+          form.description,
+          repeat ? repeat.startLocal : form.start_time,
+          ...(mode === 'edit-event' ? [] : [form.categories]),
+        ];
     const completed = requiredFields.filter((field) => field !== '').length;
     const total = requiredFields.length;
     return { completed, total, percentage: Math.round((completed / total) * 100) };
-  }, [form.title, form.description, form.start_time, repeat, isTemplateMode]);
+  }, [
+    form.title,
+    form.description,
+    form.start_time,
+    form.categories,
+    repeat,
+    isTemplateMode,
+    mode,
+  ]);
 
   // O(1) lookup when resolving co-organizer chip labels.
   const orgLookup = useMemo(
@@ -811,7 +833,7 @@ const EventForm: React.FC<EventFormProps> = ({
         placeholder={t('createEvent.titlePlaceholder')}
         handleChangeText={(value) => setForm({ ...form, title: value })}
         otherStyles={styles.fieldSpacing}
-        maxLength={100}
+        maxLength={EVENT_TEXT_LIMITS.title}
         hasError={!isTemplateMode && emptyFields.title}
       />
 
@@ -823,14 +845,12 @@ const EventForm: React.FC<EventFormProps> = ({
         handleChangeText={(value) => setForm({ ...form, description: value })}
         otherStyles={styles.fieldSpacing}
         isLongText={true}
-        maxLength={8000}
+        maxLength={EVENT_TEXT_LIMITS.description}
         hasError={!isTemplateMode && emptyFields.description}
         defaultExpanded={true}
       />
 
-      <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>
-        {t('createEvent.category')} ({t('common.optional')})
-      </ThemedText>
+      <ThemedText style={[styles.fieldLabel, styles.fieldSpacing]}>{categoryLabel}</ThemedText>
       <ThemedView style={styles.chipRow}>
         {eventCategories.map(({ value }) => {
           const categoryColors = getCategoryColors(value);
@@ -851,7 +871,9 @@ const EventForm: React.FC<EventFormProps> = ({
                   ]}
                 />
               }
-              onPress={() => setForm({ ...form, categories: active ? '' : value })}
+              onPress={() =>
+                setForm({ ...form, categories: active && isTemplateMode ? '' : value })
+              }
             />
           );
         })}
@@ -1095,6 +1117,7 @@ const EventForm: React.FC<EventFormProps> = ({
         placeholder={t('createEvent.eventLinkPlaceholder')}
         handleChangeText={(value) => setForm({ ...form, website_url: value })}
         otherStyles={styles.fieldSpacing}
+        maxLength={inputMaxLength(EVENT_TEXT_LIMITS.websiteUrl, form.website_url)}
         keyboardType="url"
         autoCapitalize="none"
       />
@@ -1162,7 +1185,8 @@ const EventForm: React.FC<EventFormProps> = ({
             handleChangeText={(value) => setForm({ ...form, help_description: value })}
             otherStyles={styles.fieldSpacingConditional}
             isLongText={true}
-            maxLength={1000}
+            maxLength={inputMaxLength(EVENT_TEXT_LIMITS.helpDescription, form.help_description)}
+            counterLimit={EVENT_TEXT_LIMITS.helpDescription}
             hasError={emptyFields.help_description}
           />
           <HelperText text={t('createEvent.volunteerHelper')} isDark={isDark} />
@@ -1177,7 +1201,8 @@ const EventForm: React.FC<EventFormProps> = ({
         handleChangeText={(value) => setForm({ ...form, disclaimer: value })}
         otherStyles={styles.fieldSpacing}
         isLongText={true}
-        maxLength={3000}
+        maxLength={inputMaxLength(EVENT_TEXT_LIMITS.disclaimer, form.disclaimer)}
+        counterLimit={EVENT_TEXT_LIMITS.disclaimer}
         onFocusCallback={handleDisclaimerFocus}
       />
       <HelperText text={t('createEvent.disclaimerHelper')} isDark={isDark} />

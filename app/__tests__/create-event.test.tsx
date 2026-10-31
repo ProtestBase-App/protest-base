@@ -39,6 +39,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { renderWithProviders, createMockUser } from '@/test-utils/render';
+import { DRAFT_CONFIG } from '@/constants/StorageConfig';
 import CreateEventModal from '../(tabs)/(more)/create-event';
 
 // Import router for mock access
@@ -60,6 +61,103 @@ describe('CreateEventModal', () => {
     getEventDraft.mockResolvedValue(null);
     clearEventDraft.mockResolvedValue(undefined);
     saveEventDraft.mockResolvedValue({ success: true });
+  });
+
+  describe('Unedited form', () => {
+    const { router } = require('expo-router');
+    const providerOverrides = {
+      globalContext: {
+        user: mockUser,
+        isLogged: true,
+        loading: false,
+        userLanguage: 'en',
+        eventsCache: {},
+        refetchEvents: jest.fn(),
+        refreshUserEventCounts: jest.fn(),
+        upsertEventInCache: jest.fn(),
+      },
+      userOrganizationsContext: {
+        hasOrganizations: true,
+        selectedOrganizationId: 'org-1',
+        userOrganizations: [{ $id: 'org-1', name: 'Test Org' }],
+        loading: false,
+      },
+    };
+
+    const template = {
+      $id: 'tpl-1',
+      name: 'Monthly vigil',
+      event_data: { title: 'Vigil', description: 'Bring a candle', categories: ['Protest'] },
+      image_urls: ['https://cdn.example.com/a.jpg'],
+    };
+
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+    });
+
+    const waitPastAutosave = () =>
+      act(async () => {
+        await new Promise((resolve) =>
+          setTimeout(resolve, DRAFT_CONFIG.AUTO_SAVE_DEBOUNCE_MS + 50)
+        );
+      });
+
+    it('does not treat the auto-filled organization as an edit', async () => {
+      const { saveEventDraft } = require('@/services/localStorageService');
+      const { findByLabelText } = renderWithProviders(<CreateEventModal />, { providerOverrides });
+
+      const close = await findByLabelText('createEvent.closeAccessibilityLabel');
+      await waitPastAutosave();
+      fireEvent.press(close);
+
+      expect(saveEventDraft).not.toHaveBeenCalled();
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(router.back).toHaveBeenCalled();
+    });
+
+    it('does not treat a launched template as an edit', async () => {
+      const { getTemplate } = require('@/services/template.service');
+      const { saveEventDraft } = require('@/services/localStorageService');
+      useLocalSearchParams.mockReturnValue({ templateId: 'tpl-1' });
+      getTemplate.mockResolvedValue(template);
+
+      const { findByDisplayValue, findByLabelText } = renderWithProviders(<CreateEventModal />, {
+        providerOverrides,
+      });
+
+      await findByDisplayValue('Vigil');
+      await waitPastAutosave();
+      fireEvent.press(await findByLabelText('createEvent.closeAccessibilityLabel'));
+
+      expect(saveEventDraft).not.toHaveBeenCalled();
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(router.back).toHaveBeenCalled();
+    });
+
+    it('still asks once a launched template is edited', async () => {
+      const { getTemplate } = require('@/services/template.service');
+      useLocalSearchParams.mockReturnValue({ templateId: 'tpl-1' });
+      getTemplate.mockResolvedValue(template);
+
+      const { findByDisplayValue, findByLabelText } = renderWithProviders(<CreateEventModal />, {
+        providerOverrides,
+      });
+
+      fireEvent.changeText(await findByDisplayValue('Vigil'), 'Vigil for housing');
+      fireEvent.press(await findByLabelText('createEvent.closeAccessibilityLabel'));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        'draft.closeTitle',
+        'draft.closeMessage',
+        expect.any(Array)
+      );
+    });
   });
 
   describe('Rendering', () => {
@@ -375,12 +473,20 @@ describe('CreateEventModal', () => {
      * far less brittle than driving every field through the UI, and it is the
      * same FormState the submit handler reads either way.
      */
-    const renderWithFilledForm = async () => {
+    const renderWithFilledForm = async (
+      formOverrides: Record<string, unknown> = {},
+      features?: { recurringEvents: boolean; titleOnlyDrafts: boolean }
+    ) => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getEventDraft } = require('@/services/localStorageService');
-      getEventDraft.mockResolvedValue({ formData: filledDraft });
+      getEventDraft.mockResolvedValue({ formData: { ...filledDraft, ...formOverrides } });
 
-      const utils = renderWithProviders(<CreateEventModal />, { providerOverrides });
+      const utils = renderWithProviders(<CreateEventModal />, {
+        providerOverrides: {
+          ...providerOverrides,
+          ...(features ? { versionCheckContext: { features } } : {}),
+        },
+      });
 
       // The resume prompt fires on mount; take the "resume" branch.
       await waitFor(() =>
@@ -400,6 +506,113 @@ describe('CreateEventModal', () => {
         fireEvent.press(getByTestId('btn-create-event-submit'));
       });
     };
+
+    it('refuses an end time before the start', async () => {
+      const { getByTestId, alertSpy } = await renderWithFilledForm({
+        end_time: '2099-01-02T09:00:00.000Z',
+      });
+      alertSpy.mockClear();
+      await submit(getByTestId);
+
+      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.endTimeBeforeStart');
+      expect(createEventBackend).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
+    it('refuses to publish without a category, and names it', async () => {
+      const { t } = require('@/utils/i18n');
+      const { getByTestId, alertSpy } = await renderWithFilledForm({ categories: '' });
+      alertSpy.mockClear();
+      await submit(getByTestId);
+
+      expect(t).toHaveBeenCalledWith('createEvent.missingFieldsError', {
+        fields: 'createEvent.category',
+      });
+      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.missingFieldsError');
+      expect(createEventBackend).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
+    it('refuses a disclaimer over the server limit', async () => {
+      const { getByTestId, alertSpy } = await renderWithFilledForm({
+        disclaimer: 'x'.repeat(501),
+      });
+      alertSpy.mockClear();
+      await submit(getByTestId);
+
+      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.disclaimerTooLong');
+      expect(createEventBackend).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
+    it('accepts a long top-level domain', async () => {
+      createEventBackend.mockResolvedValue({ $id: 'evt-new', title: 'Climate March' });
+      const { getByTestId, alertSpy } = await renderWithFilledForm({
+        website_url: 'actie.brussels',
+      });
+      await submit(getByTestId);
+
+      expect(createEventBackend).toHaveBeenCalledWith(
+        expect.objectContaining({ website_url: 'actie.brussels' }),
+        expect.anything()
+      );
+
+      alertSpy.mockRestore();
+    });
+
+    it('does not send volunteer text once the toggle is off', async () => {
+      createEventBackend.mockResolvedValue({ $id: 'evt-new', title: 'Climate March' });
+      const { getByTestId, alertSpy } = await renderWithFilledForm({
+        help_needed: false,
+        help_description: 'x'.repeat(800),
+      });
+      await submit(getByTestId);
+
+      expect(createEventBackend.mock.calls[0][0].help_description).toBeUndefined();
+
+      alertSpy.mockRestore();
+    });
+
+    describe('saving a draft', () => {
+      const saveDraft = async (getByTestId: (id: string) => any) => {
+        await act(async () => {
+          fireEvent.press(getByTestId('btn-create-event-draft'));
+        });
+      };
+
+      it.each([
+        ['description', { description: '' }, 'createEvent.description'],
+        ['start time', { start_time: '' }, 'createEvent.startTime'],
+      ])('asks for a %s, because the backend does', async (_name, formOverrides, fields) => {
+        const { t } = require('@/utils/i18n');
+        const { createDraftEvent } = require('@/services/event.service');
+        const { getByTestId, alertSpy } = await renderWithFilledForm(formOverrides);
+        alertSpy.mockClear();
+        await saveDraft(getByTestId);
+
+        expect(t).toHaveBeenCalledWith('createEvent.missingFieldsError', { fields });
+        expect(createDraftEvent).not.toHaveBeenCalled();
+
+        alertSpy.mockRestore();
+      });
+
+      it('sends a title-only draft once the backend announces it', async () => {
+        const { createDraftEvent } = require('@/services/event.service');
+        createDraftEvent.mockResolvedValue({ $id: 'draft-1' });
+        const { getByTestId, alertSpy } = await renderWithFilledForm(
+          { description: '', start_time: '' },
+          { recurringEvents: false, titleOnlyDrafts: true }
+        );
+        await saveDraft(getByTestId);
+
+        expect(createDraftEvent).toHaveBeenCalledTimes(1);
+
+        alertSpy.mockRestore();
+      });
+    });
 
     it('shows the matches instead of a bare error alert', async () => {
       createEventBackend.mockRejectedValue(new DuplicateEventError('dup', [duplicate], true));

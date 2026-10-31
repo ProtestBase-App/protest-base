@@ -195,6 +195,7 @@ const fr: LocaleData = {
 
     // Error messages
     nameMissing: 'Veuillez entrer un nom de modèle.',
+    dataTooLong: 'Ce modèle est trop long pour être enregistré. Raccourcissez la description.',
     volunteerDescMissing: 'Veuillez décrire comment les bénévoles peuvent aider.',
 
     // Delete confirmation
@@ -659,6 +660,8 @@ const fr: LocaleData = {
     contactEmailInvalid: 'Veuillez entrer une adresse e-mail valide',
     endTimeBeforeStart: "L'heure de fin doit être après l'heure de début",
     invalidUrlFormat: "L'URL du site doit commencer par www., http:// ou https://",
+    disclaimerTooLong: "Limitez l'avertissement à {{max}} caractères.",
+    volunteerTooLong: 'Limitez les détails pour les bénévoles à {{max}} caractères.',
 
     // Progress & Actions
     progressText: 'Champs obligatoires complétés',

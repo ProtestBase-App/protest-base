@@ -270,13 +270,41 @@ describe('version.service', () => {
         makeConfigResponse({ features: { recurringEvents: true } })
       );
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: true });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: true,
+        titleOnlyDrafts: false,
+      });
     });
+
+    it('turns title-only drafts on only when the backend says true', async () => {
+      mockApi.get.mockResolvedValueOnce(
+        makeConfigResponse({ features: { titleOnlyDrafts: true } })
+      );
+
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: true,
+      });
+    });
+
+    it.each([['true'], [1], [{}], [null]])(
+      'keeps title-only drafts off on the non-boolean %j',
+      async (value) => {
+        mockApi.get.mockResolvedValueOnce(
+          makeConfigResponse({ features: { titleOnlyDrafts: value } })
+        );
+
+        expect((await checkAppVersion()).features.titleOnlyDrafts).toBe(false);
+      }
+    );
 
     it('stays off on a backend without features', async () => {
       mockApi.get.mockResolvedValueOnce(makeConfigResponse());
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: false });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: false,
+      });
     });
 
     it('stays off when the backend says false', async () => {
@@ -284,7 +312,10 @@ describe('version.service', () => {
         makeConfigResponse({ features: { recurringEvents: false } })
       );
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: false });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: false,
+      });
     });
 
     it.each([['true'], [1], [{}], [null]])('stays off on the non-boolean %j', async (value) => {
@@ -292,7 +323,10 @@ describe('version.service', () => {
         makeConfigResponse({ features: { recurringEvents: value } })
       );
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: false });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: false,
+      });
     });
 
     it('stays off on the fail-open path when the request fails', async () => {
@@ -301,13 +335,16 @@ describe('version.service', () => {
       const result = await checkAppVersion();
 
       expect(result.canProceed).toBe(true);
-      expect(result.features).toEqual({ recurringEvents: false });
+      expect(result.features).toEqual({ recurringEvents: false, titleOnlyDrafts: false });
     });
 
     it('stays off when the config answers success: false', async () => {
       mockApi.get.mockResolvedValueOnce({ data: { success: false, data: {} } });
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: false });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: false,
+      });
     });
 
     it('stays off when the config cannot be trusted, even with the flag on', async () => {
@@ -318,7 +355,10 @@ describe('version.service', () => {
         })
       );
 
-      expect((await checkAppVersion()).features).toEqual({ recurringEvents: false });
+      expect((await checkAppVersion()).features).toEqual({
+        recurringEvents: false,
+        titleOnlyDrafts: false,
+      });
     });
 
     it('carries the flag through a dismissible update prompt', async () => {
@@ -333,7 +373,7 @@ describe('version.service', () => {
       const result = await checkAppVersion();
 
       expect(result.showDismissibleUpdatePrompt).toBe(true);
-      expect(result.features).toEqual({ recurringEvents: true });
+      expect(result.features).toEqual({ recurringEvents: true, titleOnlyDrafts: false });
     });
   });
 

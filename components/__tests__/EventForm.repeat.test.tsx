@@ -49,7 +49,7 @@ const baseForm: FormState = {
   end_time: '',
   organizer_name: '',
   website_url: '',
-  categories: '',
+  categories: 'Protest',
   disclaimer: '',
   postal_code: null,
   co_organizers: [],
@@ -339,7 +339,7 @@ describe('EventForm Repeat control', () => {
       utils.getByRole('progressbar').props.accessibilityValue.now;
 
     it('counts the start time of a single event', () => {
-      expect(percentage(renderForm({}, { showRepeat: true }))).toBe(67);
+      expect(percentage(renderForm({}, { showRepeat: true }))).toBe(75);
       expect(percentage(renderForm(TUESDAY_EVENING, { showRepeat: true }))).toBe(100);
     });
 
@@ -349,7 +349,7 @@ describe('EventForm Repeat control', () => {
         { showRepeat: true }
       );
       // The single date is still in the form but is no longer the one that is asked for.
-      expect(percentage(withoutTime)).toBe(67);
+      expect(percentage(withoutTime)).toBe(75);
 
       const withTime = renderForm(
         { repeat: weeklyRepeat({ startLocal: '19:00' }) },

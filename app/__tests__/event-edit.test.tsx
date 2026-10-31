@@ -417,6 +417,82 @@ describe('EditEvent', () => {
       return utils;
     };
 
+    it('refuses an end time before the start', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const event = createMockEvent({
+        title: 'Backwards march',
+        start_time: '2099-06-01T12:00:00.000Z',
+        end_time: '2099-06-01T10:00:00.000Z',
+      });
+      getEventByIdBackend.mockResolvedValue(event);
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+      await findByDisplayValue(event.title);
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(alertSpy).toHaveBeenCalledWith('common.error', 'eventEdit.invalidTimeRangeError');
+      expect(updateEvent).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
+    it('accepts a long top-level domain', async () => {
+      const event = createMockEvent({ title: 'Long TLD', website_url: 'actie.brussels' });
+      getEventByIdBackend.mockResolvedValue(event);
+      updateEvent.mockResolvedValue(event);
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+      await findByDisplayValue(event.title);
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalledWith(
+        'event-1',
+        expect.objectContaining({ website_url: 'actie.brussels' })
+      );
+    });
+
+    it('saves an older event that has no category', async () => {
+      const event = createMockEvent({ title: 'No category', categories: [] });
+      getEventByIdBackend.mockResolvedValue(event);
+      updateEvent.mockResolvedValue(event);
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+      await findByDisplayValue(event.title);
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent).toHaveBeenCalled();
+    });
+
+    it('flags older volunteer text over the limit without cutting it', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const longText = 'x'.repeat(800);
+      const event = createMockEvent({
+        title: 'Long volunteers',
+        help_needed: true,
+        help_description: longText,
+      });
+      getEventByIdBackend.mockResolvedValue(event);
+
+      const { findByDisplayValue, getByTestId } = renderWithProviders(<EditEvent />, {
+        providerOverrides,
+      });
+      await findByDisplayValue(event.title);
+
+      expect(await findByDisplayValue(longText)).toBeTruthy();
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(alertSpy).toHaveBeenCalledWith('common.error', 'createEvent.volunteerTooLong');
+      expect(updateEvent).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+
     it('re-sends the loaded string postcode unchanged', async () => {
       const { getByTestId } = await renderBelgianEvent();
 

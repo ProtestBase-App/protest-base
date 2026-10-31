@@ -24,16 +24,13 @@ import type { SeriesEditRequest, SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
+import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
 import { HelperText } from '@/utils/formHelpers';
 import { seriesErrorMessage, seriesTimesFromForm } from '@/utils/recurrence';
-
-// Matches common URL patterns, with or without protocol/www.
-const URL_REGEX =
-  /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/;
 
 export default function EditEvent() {
   const { user, isLogged, userLanguage, refetchEvents, refreshUserEventCounts } =
@@ -247,10 +244,16 @@ export default function EditEvent() {
 
     if (form.website_url && form.website_url.trim()) {
       const urlValue = form.website_url.trim();
-      if (!URL_REGEX.test(urlValue)) {
+      if (!isValidEventUrl(urlValue)) {
         Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
         return;
       }
+    }
+
+    const tooLong = textLimitMessage(form);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
+      return;
     }
 
     if (editsAllUpcoming) {

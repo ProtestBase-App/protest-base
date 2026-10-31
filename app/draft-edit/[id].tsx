@@ -40,16 +40,13 @@ import { getThemeColors } from '@/utils/themeColors';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
 import { allDaySubmitField } from '@/utils/eventFormatters';
+import { isValidEventUrl, textLimitMessage } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
 import { HelperText } from '@/utils/formHelpers';
 import { isDraftsOnlyScope, seriesErrorMessage, seriesTimesFromForm } from '@/utils/recurrence';
-
-// Matches common URL patterns, with or without protocol/www.
-const URL_REGEX =
-  /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/;
 
 export default function DraftEdit() {
   const { user, isLogged, userLanguage, refetchEvents, refreshUserEventCounts } =
@@ -246,8 +243,13 @@ export default function DraftEdit() {
       Alert.alert(t('common.error'), t('eventEdit.invalidTimeRangeError'));
       return false;
     }
-    if (form.website_url && form.website_url.trim() && !URL_REGEX.test(form.website_url.trim())) {
+    if (form.website_url && form.website_url.trim() && !isValidEventUrl(form.website_url.trim())) {
       Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
+      return false;
+    }
+    const tooLong = textLimitMessage(form);
+    if (tooLong) {
+      Alert.alert(t('common.error'), tooLong);
       return false;
     }
     return true;

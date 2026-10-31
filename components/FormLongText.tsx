@@ -15,6 +15,8 @@ interface FormFieldProps extends TextInputProps {
   handleChangeText: (text: string) => void;
   otherStyles?: object;
   maxLength?: number;
+  /** The limit the counter shows, when the input must hold more than it (older text). */
+  counterLimit?: number;
   hasError?: boolean;
   isLongText?: boolean;
   /**
@@ -51,6 +53,7 @@ export default function FormLongText({
   handleChangeText,
   otherStyles,
   maxLength,
+  counterLimit,
   hasError = false,
   isLongText = false,
   onFocusCallback,
@@ -63,6 +66,7 @@ export default function FormLongText({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const themeColors = getThemeColors(colorScheme);
+  const shownLimit = counterLimit ?? maxLength;
 
   return (
     <ThemedView style={[styles.themedview1, otherStyles]}>
@@ -122,17 +126,17 @@ export default function FormLongText({
         )}
       </ThemedView>
       {/* Character count display for long text fields */}
-      {isLongText && maxLength && (
+      {isLongText && shownLimit && (
         <ThemedView style={styles.charCountContainer}>
           <ThemedText
             style={[
               styles.charCountText,
               { color: themeColors.secondaryText },
-              value.length > maxLength * 0.9 && styles.charCountWarning,
-              value.length >= maxLength && styles.charCountError,
+              value.length > shownLimit * 0.9 && styles.charCountWarning,
+              value.length >= shownLimit && styles.charCountError,
             ]}
           >
-            {value.length.toLocaleString()} / {maxLength.toLocaleString()}
+            {value.length.toLocaleString()} / {shownLimit.toLocaleString()}
           </ThemedText>
         </ThemedView>
       )}

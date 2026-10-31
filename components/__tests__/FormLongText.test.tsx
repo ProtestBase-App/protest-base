@@ -13,6 +13,24 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import FormLongText from '@/components/FormLongText';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+describe('FormLongText counter limit', () => {
+  it('shows the limit, not the input cap, for older text over it', () => {
+    const { getByText } = render(
+      <FormLongText
+        title="Volunteers"
+        value={'x'.repeat(800)}
+        placeholder="Details"
+        handleChangeText={jest.fn()}
+        isLongText
+        maxLength={800}
+        counterLimit={500}
+      />
+    );
+
+    expect(getByText(`${(800).toLocaleString()} / ${(500).toLocaleString()}`)).toBeTruthy();
+  });
+});
+
 describe('FormLongText', () => {
   const defaultProps = {
     title: 'Description',
