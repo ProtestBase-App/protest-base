@@ -2,8 +2,23 @@ import {
   DROPDOWN_HEADROOM,
   DROPDOWN_LABEL_ROOM,
   getDropdownHeadroom,
+  getFooterLift,
   getRevealScrollOffset,
 } from '@/utils/keyboardReveal';
+
+describe('getFooterLift', () => {
+  it('rides the keyboard once it reaches the bar', () => {
+    expect(getFooterLift(-300, 80)).toBe(-220);
+  });
+
+  it('holds still while the keyboard is below the bar', () => {
+    expect(getFooterLift(-40, 80)).toBe(0);
+  });
+
+  it('never pushes the bar down: a floating keyboard is open at zero height', () => {
+    expect(getFooterLift(0, 80)).toBe(0);
+  });
+});
 
 describe('getRevealScrollOffset', () => {
   it('keeps the current offset when the band is already in view', () => {

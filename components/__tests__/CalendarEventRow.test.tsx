@@ -8,7 +8,9 @@ jest.mock('@expo/vector-icons/MaterialIcons', () => {
 
 import React from 'react';
 import { renderWithProviders, fireEvent, createMockEvent } from '@/test-utils/render';
+import { router } from 'expo-router';
 import CalendarEventRow from '@/components/CalendarEventRow';
+import { DynamicRoutes } from '@/constants/Routes';
 import { Event } from '@/types/event.types';
 import { CalendarDayEntry } from '@/utils/calendarTabUtils';
 
@@ -16,6 +18,7 @@ function buildEvent(overrides: Partial<Event> = {}): Event {
   return createMockEvent({
     $id: 'event-row-1',
     title: 'Climate March',
+    organization_id: 'org-1',
     // 11:00 UTC = 13:00 in Europe/Brussels (CEST) on the pinned day.
     start_time: '2026-05-12T11:00:00Z',
     city: 'Brussels',
@@ -313,6 +316,93 @@ describe('CalendarEventRow', () => {
       );
 
       expect(queryByText(/home\.going/)).toBeNull();
+    });
+  });
+
+  describe('series badge', () => {
+    const FLAG_ON = {
+      versionCheckContext: { features: { recurringEvents: true } },
+      userOrganizationsContext: { userOrganizations: [{ $id: 'org-1' }] },
+    };
+    const FLAG_OFF = { ...FLAG_ON, versionCheckContext: { features: { recurringEvents: false } } };
+    const OTHER_ORG = {
+      ...FLAG_ON,
+      userOrganizationsContext: { userOrganizations: [{ $id: 'org-2' }] },
+    };
+    const GUEST = { ...FLAG_ON, userOrganizationsContext: { userOrganizations: [] } };
+
+    const renderRow = (event: Event, providerOverrides = FLAG_ON) =>
+      renderWithProviders(
+        <CalendarEventRow {...defaultProps} entry={singleDayEntry(event)} testID="row" />,
+        { providerOverrides }
+      );
+
+    it('marks a date of a series while the feature is on', () => {
+      const { getByTestId, getByText } = renderRow(buildEvent({ series_id: 'series-1' }));
+
+      expect(getByTestId('row-series')).toBeTruthy();
+      expect(getByText('series.badge.generic')).toBeTruthy();
+    });
+
+    it('shows nothing while the feature is off', () => {
+      const { queryByTestId, queryByText } = renderRow(
+        buildEvent({ series_id: 'series-1' }),
+        FLAG_OFF
+      );
+
+      expect(queryByTestId('row-series')).toBeNull();
+      expect(queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('shows nothing to a guest or to a member of another organization', () => {
+      for (const viewer of [GUEST, OTHER_ORG]) {
+        const { queryByTestId, unmount } = renderRow(buildEvent({ series_id: 'series-1' }), viewer);
+
+        expect(queryByTestId('row-series')).toBeNull();
+        unmount();
+      }
+    });
+
+    it('shows nothing for an event that is not in a series', () => {
+      expect(renderRow(buildEvent({ series_id: null })).queryByTestId('row-series')).toBeNull();
+      expect(
+        renderRow(buildEvent({ series_id: undefined })).queryByTestId('row-series')
+      ).toBeNull();
+    });
+
+    // The badges row is only there for a category, a live or multi-day event, or help.
+    it('still shows the badge on an event with nothing else to badge', () => {
+      const event = buildEvent({ series_id: 'series-1', categories: [], help_needed: false });
+
+      expect(renderRow(event).getByTestId('row-series')).toBeTruthy();
+    });
+
+    it('adds nothing to an event with nothing to badge and no series', () => {
+      const event = buildEvent({ series_id: null, categories: [], help_needed: false });
+
+      const { queryByTestId, queryByText } = renderRow(event);
+
+      expect(queryByTestId('row-series')).toBeNull();
+      expect(queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('opens the series, not the event, when it is pressed', () => {
+      const onPress = jest.fn();
+      const event = buildEvent({ series_id: 'series-1' });
+      const { getByTestId } = renderWithProviders(
+        <CalendarEventRow
+          {...defaultProps}
+          entry={singleDayEntry(event)}
+          testID="row"
+          onPress={onPress}
+        />,
+        { providerOverrides: FLAG_ON }
+      );
+
+      fireEvent.press(getByTestId('row-series'), { stopPropagation: jest.fn() });
+
+      expect(router.push).toHaveBeenCalledWith(DynamicRoutes.series('series-1'));
+      expect(onPress).not.toHaveBeenCalled();
     });
   });
 });

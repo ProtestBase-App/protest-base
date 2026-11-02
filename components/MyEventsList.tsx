@@ -53,6 +53,7 @@ const MyEventsList: React.FC<EventListProps> = ({
 
     return (
       <TouchableOpacity
+        accessibilityRole="button"
         onPress={() => {
           const newPath = `/event/${item.id}`;
           router.push(`${newPath}` as any);

@@ -35,6 +35,7 @@ const USER_DATA_KEYS = [
   'rsvpedEventIds',
   STORAGE_KEYS.FOLLOWED_ORG_IDS,
   STORAGE_KEYS.EVENT_DRAFT,
+  STORAGE_KEYS.TEMPLATE_DRAFT,
   STORAGE_KEYS.SELECTED_ORGANIZATION_ID,
   STORAGE_KEYS.PAST_EVENTS_CACHE,
   STORAGE_KEYS.PAST_EVENTS_CACHE_TIMESTAMP,
@@ -288,6 +289,54 @@ export const clearEventDraft = async (): Promise<void> => {
     await AsyncStorage.removeItem(EVENT_DRAFT_KEY);
   } catch (error: any) {
     logger.error('Failed to clear event draft', { errorMessage: error.message });
+  }
+};
+
+export interface TemplateDraft {
+  form: unknown;
+  name: string;
+  note: string;
+  organizationId: string;
+}
+
+export const saveTemplateDraft = async (
+  draft: TemplateDraft
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.TEMPLATE_DRAFT,
+      JSON.stringify({ draft, savedAt: Date.now() })
+    );
+    return { success: true };
+  } catch (error: any) {
+    logger.error('Failed to save template draft', { errorMessage: error.message });
+    return { success: false, error: error.message };
+  }
+};
+
+/** The unfinished template, unless it expired. */
+export const getTemplateDraft = async (): Promise<TemplateDraft | null> => {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.TEMPLATE_DRAFT);
+    if (!stored) return null;
+
+    const { draft, savedAt } = JSON.parse(stored);
+    if (Date.now() - savedAt > DRAFT_CONFIG.EXPIRY_MS) {
+      await clearTemplateDraft();
+      return null;
+    }
+    return draft;
+  } catch (error: any) {
+    logger.error('Failed to get template draft', { errorMessage: error.message });
+    return null;
+  }
+};
+
+export const clearTemplateDraft = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.TEMPLATE_DRAFT);
+  } catch (error: any) {
+    logger.error('Failed to clear template draft', { errorMessage: error.message });
   }
 };
 

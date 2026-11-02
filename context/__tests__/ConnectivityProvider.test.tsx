@@ -6,11 +6,12 @@
  */
 import React from 'react';
 import { renderHook, act } from '@testing-library/react-native';
-import { useNetworkState } from 'expo-network';
+import { getNetworkStateAsync, useNetworkState } from 'expo-network';
 
 import { ConnectivityProvider, useConnectivity } from '@/context/ConnectivityProvider';
 
 const mockUseNetworkState = useNetworkState as jest.Mock;
+const mockGetNetworkState = getNetworkStateAsync as jest.Mock;
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <ConnectivityProvider>{children}</ConnectivityProvider>;
@@ -22,16 +23,18 @@ function setNetwork(state: {
   type?: string;
 }) {
   mockUseNetworkState.mockReturnValue(state);
+  mockGetNetworkState.mockResolvedValue(state);
 }
+
+const passDebounce = () =>
+  act(async () => {
+    jest.advanceTimersByTime(2000);
+  });
 
 describe('ConnectivityProvider', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    mockUseNetworkState.mockReturnValue({
-      isConnected: true,
-      isInternetReachable: true,
-      type: 'WIFI',
-    });
+    setNetwork({ isConnected: true, isInternetReachable: true, type: 'WIFI' });
   });
 
   afterEach(() => {
@@ -76,27 +79,63 @@ describe('ConnectivityProvider', () => {
       expect(result.current.isOffline).toBe(false);
     });
 
-    it('goes offline (after debounce) when isConnected === false', () => {
+    it('goes offline (after debounce) when isConnected === false', async () => {
       setNetwork({ isConnected: false, isInternetReachable: false });
       const { result } = renderHook(() => useConnectivity(), { wrapper });
 
       // Debounced: not offline immediately.
       expect(result.current.isOffline).toBe(false);
 
-      act(() => {
-        jest.advanceTimersByTime(2000);
-      });
+      await passDebounce();
       expect(result.current.isOffline).toBe(true);
     });
 
-    it('goes offline (after debounce) when isInternetReachable === false (captive portal)', () => {
+    it('goes offline (after debounce) when isInternetReachable === false (captive portal)', async () => {
       setNetwork({ isConnected: true, isInternetReachable: false });
       const { result } = renderHook(() => useConnectivity(), { wrapper });
 
       expect(result.current.isOffline).toBe(false);
+      await passDebounce();
+      expect(result.current.isOffline).toBe(true);
+    });
+  });
+
+  describe('a lost network the current state contradicts', () => {
+    const offline = { isConnected: false, isInternetReachable: false };
+    const online = { isConnected: true, isInternetReachable: true };
+
+    it('stays online', async () => {
+      setNetwork(offline);
+      mockGetNetworkState.mockResolvedValue(online);
+      const { result } = renderHook(() => useConnectivity(), { wrapper });
+
+      await passDebounce();
+
+      expect(result.current.isOffline).toBe(false);
+    });
+
+    it('still catches a real outage on the next event', async () => {
+      setNetwork(offline);
+      mockGetNetworkState.mockResolvedValue(online);
+      const { result, rerender } = renderHook(() => useConnectivity(), { wrapper });
+      await passDebounce();
+
+      setNetwork({ ...offline });
       act(() => {
-        jest.advanceTimersByTime(2000);
+        rerender({});
       });
+      await passDebounce();
+
+      expect(result.current.isOffline).toBe(true);
+    });
+
+    it('trusts the event when the current state cannot be read', async () => {
+      setNetwork(offline);
+      mockGetNetworkState.mockRejectedValue(new Error('unavailable'));
+      const { result } = renderHook(() => useConnectivity(), { wrapper });
+
+      await passDebounce();
+
       expect(result.current.isOffline).toBe(true);
     });
   });
@@ -123,13 +162,11 @@ describe('ConnectivityProvider', () => {
       expect(result.current.isOffline).toBe(false);
     });
 
-    it('flips back online immediately on recovery (no debounce on the way back)', () => {
+    it('flips back online immediately on recovery (no debounce on the way back)', async () => {
       setNetwork({ isConnected: false, isInternetReachable: false });
       const { result, rerender } = renderHook(() => useConnectivity(), { wrapper });
 
-      act(() => {
-        jest.advanceTimersByTime(2000);
-      });
+      await passDebounce();
       expect(result.current.isOffline).toBe(true);
 
       setNetwork({ isConnected: true, isInternetReachable: true });

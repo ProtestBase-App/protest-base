@@ -100,6 +100,8 @@ const en: LocaleData = {
   // Common - General UI elements
   // ============================================
   common: {
+    saving: 'Saving…',
+    publishing: 'Publishing…',
     ok: 'OK',
     cancel: 'Cancel',
     save: 'Save',
@@ -162,9 +164,8 @@ const en: LocaleData = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Create Template',
-    createFromEventTitle: 'Create Template from Event',
-    editTitle: 'Edit Template',
+    createTitle: 'New template',
+    editTitle: 'Edit template',
 
     // Subtitles and descriptions
     createSubtitle:
@@ -175,13 +176,13 @@ const en: LocaleData = {
       'Add up to 5 images — they are saved with this template and added to events you create from it',
 
     // Field labels
-    nameLabel: 'Template Name *',
-    descriptionLabel: 'Template Description (Optional)',
-    namePlaceholder: 'Give your template a name (e.g., Monthly Meetup)',
+    nameLabel: 'Template name *',
+    descriptionLabel: 'Template description (optional)',
+    namePlaceholder: 'e.g. Monthly housing vigil',
     descriptionPlaceholder: 'What is this template for?',
 
     // Buttons
-    saveButton: 'Save Template',
+    saveButton: 'Save template',
     deleteButton: 'Delete Template',
 
     // Success messages
@@ -191,7 +192,17 @@ const en: LocaleData = {
 
     // Error messages
     nameMissing: 'Please enter a template name.',
+    dataTooLong: 'This template is too long to save. Shorten the description.',
     volunteerDescMissing: 'Please describe how volunteers can help.',
+    saveFromEventTitle: 'Save as template',
+    saveFromEventDesc: "Reuse this event's details later",
+    keepGroup: 'Keep',
+    datesNeverSaved: 'Dates are never saved in a template.',
+    partText: 'Title and text',
+    partLocation: 'Location',
+    nameHelp: 'Only your organization sees this name.',
+    dateAsked: 'Date and time',
+    dateAskedHint: 'You pick these when you use the template',
 
     // Delete confirmation
     deleteConfirmTitle: 'Delete Template',
@@ -206,11 +217,15 @@ const en: LocaleData = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Start',
+    templatesGroup: 'Your templates',
+    resume: 'Resume',
+    unfinished: 'Unfinished',
+    untitled: 'Untitled event',
     blankTitle: 'Plan a new action',
-    blankSubtitle: 'Create a new event with a blank form',
+    blankSubtitle: 'Start from a blank event',
     templateTitle: 'Use a template',
     templateSubtitle: 'Pre-fill with saved event details',
-    footer: 'Templates save time for recurring events with similar details.',
   },
 
   // ============================================
@@ -563,23 +578,23 @@ const en: LocaleData = {
     startTime: 'Start Time',
     endTime: 'End Time',
     country: 'Country',
-    postalCode: 'Postal Code',
-    streetAddress: 'Street Address',
+    postalCode: 'Postal code',
+    streetAddress: 'Street address',
     organizerName: 'Organizer Name',
     contactEmail: 'Contact Email',
     helpNeeded: 'Help Needed',
     helpDescription: 'What help do you need?',
-    uploadImage: 'Upload Image',
-    eventLink: 'Event Link',
-    coOrganizers: 'Co-Organizers',
-    volunteering: 'Volunteering',
-    volunteerRoles: 'Volunteer Roles & Details',
-    disclaimer: 'Disclaimer',
+    uploadImage: 'Photos',
+    addCoverPhoto: 'Add a cover photo',
+    eventLink: 'Event link',
+    coOrganizers: 'Co-organizers',
+    volunteering: 'Volunteers',
+    volunteerRoles: 'How can people help?',
+    disclaimer: 'Good to know',
 
     // Placeholders
     titlePlaceholder: 'Title of the Event',
-    descriptionPlaceholder:
-      "Describe your event - what it's about, what to expect, who should attend...",
+    descriptionPlaceholder: 'What is it about, who should come?',
     selectCategory: 'Select a category',
     categoryPlaceholder: 'Select a category',
     pickDateTime: 'Pick date/time',
@@ -632,7 +647,7 @@ const en: LocaleData = {
       'Important information attendees should know (safety, accessibility, requirements, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: 'I need help in this event',
+    needHelpCheckbox: 'We need volunteers',
 
     // Labels
     selected: 'Selected',
@@ -649,14 +664,58 @@ const en: LocaleData = {
     organizerNameRequired: 'Organizer name is required',
     contactEmailRequired: 'Contact email is required',
     contactEmailInvalid: 'Please enter a valid email address',
-    endTimeBeforeStart: 'End time must be after start time',
-    invalidUrlFormat: 'Website URL must start with www., http://, or https://',
+    invalidUrlFormat: 'Enter a valid link, like example.com.',
+    disclaimerTooLong: 'Keep this to {{max}} characters.',
+    volunteerTooLong: 'Keep this to {{max}} characters.',
+    linkTooLong: 'Keep the link to {{max}} characters.',
+    fromTemplate: 'From template: {{name}}',
+    pickTheDate: 'Pick the date and time',
+    onlyThingLeft: 'The only thing left',
+    starts: 'Starts',
+    ends: 'Ends',
+    noSetEnd: 'No set end',
+    endsAnotherDay: 'Ends another day',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    hours: {
+      one: '1 h',
+      other: '{{count}} h',
+    },
+    publishCheckTitle: 'Publish this event?',
+    publishCheckBody: 'It goes public right away on Explore, Map and Calendar.',
+    publishNow: 'Publish now',
+    timePlaceholder: 'Time',
+    brusselsTime: '{{time}}, Brussels time',
+    namePlaceholder: 'Name your action',
+    byOrganization: 'by {{name}}',
+    addDateTime: 'Add date and time',
+    addPlace: 'Add a place',
+    link: 'Link',
+    where: 'Where',
+    when: 'When',
+    addMore: 'Add more',
+    whenRange: '{{start}} to {{end}}',
+    fixBeforePublishing: {
+      one: '1 thing to fix before publishing',
+      other: '{{count}} things to fix before publishing',
+    },
+    fixBeforeSaving: {
+      one: '1 thing to fix before saving',
+      other: '{{count}} things to fix before saving',
+    },
 
     // Progress & Actions
     progressText: 'Required fields completed',
-    requiredFieldsProgress: 'Required fields completed: {{completed}}/{{total}}',
-    saveAsDraft: 'Save as Draft',
-    publish: 'Publish Event',
+    stillNeeded: 'Still needed: {{fields}}',
+    allRequiredFilled: 'All required fields are filled',
+    neededFields: {
+      title: 'title',
+      description: 'description',
+      category: 'category',
+      date: 'date',
+    },
+    saveAsDraft: 'Save draft',
+    publish: 'Publish event',
     creating: 'Creating Event...',
     updating: 'Updating Event...',
 
@@ -682,7 +741,6 @@ const en: LocaleData = {
     postalCodeLoadError: 'Failed to load postal codes. Please try again.',
     imagePickerError: 'Failed to select image. Please try again.',
     maxImagesReached: 'You can add up to {{max}} images.',
-    missingFieldsError: 'Please fill in the following required fields: {{fields}}',
   },
 
   // ============================================
@@ -760,7 +818,6 @@ const en: LocaleData = {
     reusePastEvent: 'Reuse a past event',
     orReusePastEvent: 'Or reuse a past event',
     use: 'Use',
-    using: 'Using…',
     placeholderCard: 'Your saved templates will appear here',
     hintDefault: 'Tap a template to create an event with its details pre-filled.',
     hintEmpty: 'Using a past event creates a template from it automatically.',
@@ -1168,6 +1225,11 @@ const en: LocaleData = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Replace your unfinished event?',
+    replaceMessage: 'You have an unfinished event on this phone. Starting a new one removes it.',
+    replaceConfirm: 'Start new',
+    photosMissingTitle: 'Some photos are gone',
+    photosMissingMessage: 'Your phone cleared some photos from this event. Add them again.',
     checkingDraft: 'Checking for saved draft...',
     resumeTitle: 'Resume Draft?',
     resumeMessage:
@@ -1177,8 +1239,8 @@ const en: LocaleData = {
     closeTitle: 'Unsaved Changes',
     closeMessage: 'You have unsaved changes. What would you like to do?',
     discard: 'Discard',
-    saveDraft: 'Save Draft',
-    keepEditing: 'Keep Editing',
+    saveDraft: 'Keep and close',
+    keepEditing: 'Keep editing',
     saveWarningTitle: 'Auto-Save Issue',
     saveWarningMessage:
       'Your draft could not be saved automatically. Your changes may be lost if you leave this screen. Please try saving manually or check your device storage.',
@@ -1190,7 +1252,7 @@ const en: LocaleData = {
   // form-autosave / resume feature.
   // ============================================
   drafts: {
-    editTitle: 'Edit Draft',
+    editTitle: 'Edit draft',
     saveAsDraft: 'Save as draft',
     savedConfirmation: 'Draft saved.',
     save: 'Save draft',
@@ -1351,7 +1413,210 @@ const en: LocaleData = {
       one: 'Heads up: this looks similar to “{{title}}” and {{count}} other event.',
       other: 'Heads up: this looks similar to “{{title}}” and {{count}} other events.',
     },
+    yourDate: 'Your date: {{date}}',
+    clashingDates: 'Dates that clash: {{dates}}',
     accessibilityOpen: 'Open “{{title}}”',
+  },
+
+  // ============================================
+  // Series - recurring events
+  // ============================================
+  series: {
+    repeat: {
+      label: 'Repeat',
+      once: 'Once',
+      weekly: 'Weekly',
+      everyTwoWeeks: 'Every 2 weeks',
+      monthly: 'Monthly',
+      weekday: 'Day',
+      weekOfMonth: 'Which one of the month',
+      startTime: 'Start time',
+      endTime: 'End time',
+      pickTime: 'Pick a time',
+      timeHint: 'Brussels time. An end time earlier than the start time ends the next day.',
+      startsOn: 'Starting',
+      startsOnHint: 'The first date is the first matching day from this date on.',
+      ends: 'Ends',
+      endsAfter: 'After a number of times',
+      endsOn: 'On a date',
+      countLabel: 'Number of times',
+      countPlaceholder: '2 to 31',
+      untilLabel: 'Last date',
+      pickDate: 'Pick a date',
+      capHint: 'A series runs for at most 3 months after its first date.',
+      errors: {
+        startLocal: 'Pick a start time.',
+        endLocal: 'The end time cannot be the same as the start time.',
+        startsOn: 'The start date cannot be in the past.',
+        until: 'Pick an end date on or after the start date.',
+        count: 'Enter a number from 2 to 31.',
+      },
+    },
+    rule: {
+      weekly: 'Every {{weekday}}',
+      everyTwoWeeks: 'Every other {{weekday}}',
+      monthly: 'Every {{ordinal}} {{weekday}} of the month',
+      until: 'until {{date}}',
+    },
+    weekdays: {
+      monday: 'Monday',
+      tuesday: 'Tuesday',
+      wednesday: 'Wednesday',
+      thursday: 'Thursday',
+      friday: 'Friday',
+      saturday: 'Saturday',
+      sunday: 'Sunday',
+    },
+    weekdaysShort: {
+      monday: 'Mon',
+      tuesday: 'Tue',
+      wednesday: 'Wed',
+      thursday: 'Thu',
+      friday: 'Fri',
+      saturday: 'Sat',
+      sunday: 'Sun',
+    },
+    ordinals: {
+      first: '1st',
+      second: '2nd',
+      third: '3rd',
+      fourth: '4th',
+      last: 'last',
+    },
+    preview: {
+      heading: 'Dates',
+      loading: 'Working out the dates…',
+      creates: {
+        one: 'This creates 1 event:',
+        other: 'This creates {{count}} events:',
+      },
+      upTo: 'Up to {{count}} events, the last one on or before {{date}}.',
+      unavailable: 'The dates cannot be shown right now. They will be checked when you save.',
+    },
+    badge: {
+      weekly: 'Repeats weekly',
+      everyTwoWeeks: 'Repeats every 2 weeks',
+      monthly: 'Repeats monthly',
+      count: {
+        one: '1 event',
+        other: '{{count}} events',
+      },
+      generic: 'Recurring event',
+      seeAll: 'See all dates',
+    },
+    scope: {
+      only: 'Only this event',
+      following: 'This and all following events',
+    },
+    edit: {
+      partOfSeries: 'This event is one date of a recurring series.',
+      onlyNote:
+        'Saving for this date only? A later edit of “this and all following events” will overwrite it.',
+      allNote:
+        'Your changes apply to every upcoming date of this series. Their dates stay as scheduled; only the times can change.',
+      scopeTitle: 'Apply your changes to',
+      followingNote:
+        'Every later date is overwritten with this form, even one edited on its own. The dates stay as scheduled; only the times can change.',
+      dateLocked:
+        'You changed the date or made it last several days, which only works on this event: the schedule of a series cannot change.',
+    },
+    page: {
+      heading: 'All dates',
+      upcoming: 'Upcoming',
+      past: 'Past',
+      noUpcoming: 'No upcoming dates.',
+      status: {
+        draft: 'Draft',
+        active: 'Published',
+        cancelled: 'Cancelled',
+        past: 'Past',
+      },
+      manageHeading: 'Manage this series',
+      manageNote: 'These buttons act on every upcoming date. Past dates are never changed.',
+      editAll: 'Edit all upcoming',
+      cancelAll: 'Cancel all upcoming',
+      deleteAll: 'Delete all upcoming',
+      publishAll: 'Publish all',
+      addDates: 'Add more dates',
+      addDatesLabel: 'Number of dates to add',
+      windowNote: 'This series can run until {{date}} at the latest.',
+      notFound: 'This series does not exist any more.',
+      loadError: 'The series could not be loaded. Check your connection and try again.',
+    },
+    dialogs: {
+      cancelAllTitle: 'Cancel all upcoming dates?',
+      cancelAllBody: {
+        one: '1 date affected. Published dates will be cancelled and drafts deleted. This cannot be undone.',
+        other:
+          '{{count}} dates affected. Published dates will be cancelled and drafts deleted. This cannot be undone.',
+      },
+      deleteAllTitle: 'Delete all upcoming dates?',
+      deleteAllBody: {
+        one: '1 date affected. It will be deleted for good. Past dates stay.',
+        other: '{{count}} dates affected. They will be deleted for good. Past dates stay.',
+      },
+      publishAllTitle: 'Publish all upcoming drafts?',
+      publishAllBody: {
+        one: '1 draft to publish. Past drafts stay drafts.',
+        other: '{{count}} drafts to publish. Past drafts stay drafts.',
+      },
+      addDatesTitle: 'Add more dates',
+      addDatesConfirm: 'Add dates',
+      deleteScopeTitle: 'Delete which drafts?',
+      deleteScopeBody: 'They will be deleted for good. This cannot be undone.',
+      cancelFollowingHint: 'Every later date is cancelled too; upcoming drafts are deleted.',
+      deleteFollowingLocked:
+        'Some later dates are already published, so only this draft can be deleted here.',
+    },
+    messages: {
+      created: {
+        one: '1 event created.',
+        other: '{{count}} events created.',
+      },
+      draftsCreated: {
+        one: '1 draft saved.',
+        other: '{{count}} drafts saved.',
+      },
+      updated: {
+        one: '1 date updated.',
+        other: '{{count}} dates updated.',
+      },
+      cancelled: {
+        one: '1 date cancelled.',
+        other: '{{count}} dates cancelled.',
+      },
+      deleted: {
+        one: '1 date deleted.',
+        other: '{{count}} dates deleted.',
+      },
+      published: {
+        one: '1 date published.',
+        other: '{{count}} dates published.',
+      },
+      datesAdded: {
+        one: '1 date added.',
+        other: '{{count}} dates added.',
+      },
+    },
+    errors: {
+      disabled: 'Recurring events are not available right now.',
+      invalid: 'These repeat settings are not valid. Check the day, the times and the dates.',
+      untilBeforeStart: 'The end date is before the first date of the series.',
+      tooFew: 'A series needs at least 2 dates. Pick a later end date or more times.',
+      tooMany: 'A series can have at most {{max}} dates, the last one on or before {{date}}.',
+      lostRule: 'The repeat settings did not reach the server, so nothing was created. Try again.',
+      notConfirmed: 'The server did not confirm the series. Check your events before trying again.',
+      notFound: 'This series does not exist any more.',
+      nothingUpcoming: 'There is no upcoming date left to change.',
+      scheduleImmutable:
+        'The schedule of a series cannot be changed. Cancel or delete the dates you want to drop, or create a new series.',
+      ended: 'Every date of this series is cancelled or over. Create a new series instead.',
+      invalidFromEvent: 'This date is no longer part of the series. Refresh and try again.',
+      reasonTooLong: 'The reason is too long (1000 characters at most).',
+      conflict: 'Someone else just added these dates. Refresh to see them.',
+      notMember: 'Only members of the organization can change this series.',
+      generic: 'Something went wrong. Please try again.',
+    },
   },
 
   // ============================================
@@ -1529,6 +1794,83 @@ const en: LocaleData = {
       sunny_2: 'Perfect protest weather: bring your sunglasses.',
       sunny_3: "Perfect protest weather: don't get sunburnt!",
       perfect: 'Perfect protest weather: no excuses not to come!',
+    },
+  },
+  a11y: {
+    required: 'required',
+    tabPosition: '{{title}}, tab, {{position}} of {{count}}',
+    expandField: 'Make this field taller',
+    collapseField: 'Make this field shorter',
+    hints: {
+      goBack: 'Returns to the previous screen',
+      closeScreen: 'Closes this screen',
+      closeDialog: 'Closes this dialog',
+      closeMenu: 'Closes the menu',
+      openEvent: 'Opens the event details',
+      openFilters: 'Opens the filters',
+      toggleSave: 'Adds this event to your saved events, or removes it',
+      toggleLike: 'Adds your like, or removes it',
+      shareEvent: 'Opens the share options',
+      viewImage: 'Opens the image full screen',
+      removeFilter: 'Removes this filter',
+      removeSelection: 'Removes this selection',
+      openOrganizer: 'Opens the organizer profile',
+      manageEvent: 'Opens the actions for this event',
+      openSettings: 'Opens the app settings on your device',
+      openExternalLink: 'Opens the link outside the app',
+      zoomInMap: 'Zooms in on the map',
+      zoomOutMap: 'Zooms out on the map',
+      selectOnMap: 'Selects this event on the map',
+      applyMapFilter: 'Filters the events shown on the map',
+      showHomeArea: 'Filters the list to your area',
+      resetPassword: 'Opens the password reset',
+      togglePassword: 'Shows or hides the password',
+      openAccount: 'Opens your account',
+      deleteDraft: 'Deletes this draft',
+      undoDelete: 'Cancels the deletion of this draft',
+      skipDraft: 'Leaves this draft for later',
+      publishDraft: 'Publishes this draft',
+      publishReady: 'Publishes the drafts that are ready',
+      removePastDrafts: 'Deletes the drafts whose date has passed',
+      backToDrafts: 'Returns to your drafts',
+      startTriage: 'Starts going through your drafts one by one',
+      openEditor: 'Opens this draft in the full editor',
+      pickDate: 'Opens the date picker',
+      openRepeat: 'Opens how often the event repeats',
+      deleteTemplate: 'Deletes this template',
+      pickDay: 'Uses this day for the event',
+      openWhen: 'Opens the date and time',
+      openWhere: 'Opens the place',
+      openPhotos: 'Opens the photos',
+      resumeDraft: 'Opens your unfinished event',
+      pickTime: 'Opens the time picker',
+      resizeField: 'Changes how much of the text is shown',
+      jumpToField: 'Moves to this field',
+      setDate: 'Uses this date for the draft',
+      clearField: 'Clears this field',
+      useAddress: 'Fills in this address',
+      changePostal: 'Lets you choose another postal code',
+      selectOption: 'Selects or deselects this option',
+      searchAsYouType: 'The results update as you type',
+      openMonthPicker: 'Opens the month and year picker',
+      goToToday: 'Returns to today',
+      goToNextEvent: 'Goes to the next day with events',
+      previousMonth: 'Shows the previous month',
+      nextMonth: 'Shows the next month',
+      previousYear: 'Shows the previous year',
+      nextYear: 'Shows the next year',
+      selectMonth: 'Shows this month',
+      selectDay: 'Shows the events of this day',
+      removeImage: 'Removes this image',
+      moveImage: 'Changes the order of the images',
+      switchView: 'Switches to this view',
+      resetFilters: 'Clears all filters',
+      openTemplateMenu: 'Opens the actions for this template',
+      createTemplate: 'Starts a new template',
+      applyTemplateAction: 'Applies this action to the template',
+      addLocation: 'Opens the editor to add the location',
+      repeatOnDay: 'Repeats the event on this day',
+      createEvent: 'Starts a new event',
     },
   },
 };

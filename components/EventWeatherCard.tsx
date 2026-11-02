@@ -92,12 +92,7 @@ export function EventWeatherCard({
       ]}
       testID="event-weather-card"
     >
-      <View
-        style={styles.header}
-        accessible
-        accessibilityRole="summary"
-        accessibilityLabel={summaryLabel}
-      >
+      <View style={styles.header} accessible accessibilityRole="summary" aria-label={summaryLabel}>
         <View
           style={[
             styles.iconTile,
@@ -146,7 +141,7 @@ export function EventWeatherCard({
               key={tip.key}
               style={[styles.tipRow, tip.serious && { backgroundColor: themeColors.warningBg }]}
               accessible
-              accessibilityLabel={text}
+              aria-label={text}
               testID={`weather-tip-${tip.key}`}
             >
               <IconSymbol
@@ -172,6 +167,7 @@ export function EventWeatherCard({
           }}
           accessibilityRole="link"
           accessibilityLabel={t('weather.attributionLinkA11y')}
+          accessibilityHint={t('a11y.hints.openExternalLink')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <ThemedText style={[styles.attribution, { color: themeColors.subtleText }]}>

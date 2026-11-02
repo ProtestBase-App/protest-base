@@ -13,6 +13,15 @@ export const DROPDOWN_HEADROOM = 240;
 export const DROPDOWN_LABEL_ROOM = Spacing['3xl'];
 
 /**
+ * The bar's offset: up by what the keyboard (negative height) reaches past it, never down,
+ * since a floating keyboard is open at zero height.
+ */
+export function getFooterLift(keyboardHeight: number, gapBelow: number): number {
+  'worklet';
+  return Math.min(0, keyboardHeight + gapBelow);
+}
+
+/**
  * Scroll offset that brings the band [bandTop, bandBottom] (content
  * coordinates) into a viewport of `viewportHeight` currently at `scrollY`,
  * moving as little as possible. A band taller than the viewport is aligned to

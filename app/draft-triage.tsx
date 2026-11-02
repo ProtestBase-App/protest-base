@@ -25,7 +25,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { API_LIMITS } from '@/constants/ApiConfig';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
-import { DynamicRoutes, Routes } from '@/constants/Routes';
+import { DynamicRoutes } from '@/constants/Routes';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
@@ -417,6 +417,7 @@ export default function DraftTriageScreen() {
               onPress={exitTriage}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              accessibilityHint={t('a11y.hints.closeScreen')}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               testID="triage-close"
             >
@@ -512,10 +513,11 @@ export default function DraftTriageScreen() {
                   onPress={exitTriage}
                   accessibilityRole="button"
                   accessibilityLabel={t('drafts.backToDrafts')}
+                  accessibilityHint={t('a11y.hints.backToDrafts')}
                   testID="triage-back-to-drafts"
                   style={({ pressed }) => [
                     styles.receiptCta,
-                    { backgroundColor: themeColors.tint, opacity: pressed ? 0.8 : 1 },
+                    { backgroundColor: themeColors.cta, opacity: pressed ? 0.8 : 1 },
                   ]}
                 >
                   <ThemedText style={styles.receiptCtaLabel}>{t('drafts.backToDrafts')}</ThemedText>
@@ -606,6 +608,7 @@ export default function DraftTriageScreen() {
                   disabled={busy}
                   accessibilityRole="button"
                   accessibilityLabel={t('drafts.delete')}
+                  accessibilityHint={t('a11y.hints.deleteDraft')}
                   testID="triage-delete"
                   style={({ pressed }) => [
                     styles.circleButton,
@@ -624,6 +627,7 @@ export default function DraftTriageScreen() {
                   disabled={busy}
                   accessibilityRole="button"
                   accessibilityLabel={t('drafts.triageSkipHint')}
+                  accessibilityHint={t('a11y.hints.skipDraft')}
                   testID="triage-skip"
                   style={styles.skipColumn}
                 >
@@ -638,6 +642,7 @@ export default function DraftTriageScreen() {
                   disabled={busy}
                   accessibilityRole="button"
                   accessibilityLabel={t('drafts.publish')}
+                  accessibilityHint={t('a11y.hints.publishDraft')}
                   testID="triage-publish"
                   style={({ pressed }) => [
                     styles.circleButton,
@@ -674,7 +679,11 @@ export default function DraftTriageScreen() {
             helper={t('drafts.deletedToastHelper')}
             icon="trash"
             iconColor={themeColors.destructive}
-            action={{ label: t('drafts.undo'), onPress: handleUndoDelete }}
+            action={{
+              label: t('drafts.undo'),
+              hint: t('a11y.hints.undoDelete'),
+              onPress: handleUndoDelete,
+            }}
             durationMs={UNDO_WINDOW_MS}
             onTimeout={flushPendingDelete}
             testID="triage-undo-toast"

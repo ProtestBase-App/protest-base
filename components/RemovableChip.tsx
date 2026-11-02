@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Spacing, BorderRadius, Typography } from '@/constants/DesignTokens';
+import { t } from '@/utils/i18n';
 
 interface RemovableChipProps {
   /** Display label for the chip */
@@ -65,6 +66,7 @@ const RemovableChipComponent: React.FC<RemovableChipProps> = ({
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={`Remove ${label} from ${accessibilityContext || 'selection'}`}
+      accessibilityHint={t('a11y.hints.removeSelection')}
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
     >
       <ThemedText style={styles.label} numberOfLines={1}>

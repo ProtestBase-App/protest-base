@@ -28,6 +28,8 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
   return {
     tint: c.tint,
+    // Fills with white text. `tint` stays for accent text and icons.
+    cta: c.cta,
 
     // Semantic colors (consistent across themes).
     success: Colors.semantic.success,
@@ -75,6 +77,9 @@ export const getThemeColors = (colorScheme: 'light' | 'dark') => {
 
     link: c.link,
     destructive: c.destructive,
+    // Validation text and borders. `error` misses 4.5:1 on light backgrounds at this size.
+    errorText: c.errorText,
+    errorBg: c.errorBg,
 
     buttonSecondaryBackground: c.buttonSecondaryBackground,
     buttonSecondaryBorder: c.buttonSecondaryBorder,

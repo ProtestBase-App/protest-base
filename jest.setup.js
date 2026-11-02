@@ -15,6 +15,20 @@ delete global.ReadableStream;
 require('@testing-library/jest-native/extend-expect');
 
 // ============================================================================
+// Async utility timeout
+// ============================================================================
+// waitFor/findBy give up after 1s, and a worker busy loading a module stalls for longer:
+// PostalCodes_FR.ts is 1.5 MB and loads inside a waitFor, which failed unrelated tests at
+// random on a cold cache. Configured in a factory rather than with a plain require so a
+// suite that never uses RNTL does not load it, and a suite that mocks react-native still
+// loads it after its own mock.
+jest.mock('@testing-library/react-native', () => {
+  const actual = jest.requireActual('@testing-library/react-native');
+  actual.configure({ asyncUtilTimeout: 5000 });
+  return actual;
+});
+
+// ============================================================================
 // Expo module mocks
 // ============================================================================
 jest.mock('expo-font');
@@ -266,6 +280,7 @@ jest.mock('react-native-reanimated', () => {
     FadeOutDown: { duration: jest.fn().mockReturnThis() },
     SlideInRight: { duration: jest.fn().mockReturnThis() },
     SlideOutLeft: { duration: jest.fn().mockReturnThis() },
+    SlideOutRight: { duration: jest.fn().mockReturnThis() },
     SlideInDown: (() => {
       const builder = {};
       builder.duration = jest.fn(() => builder);
@@ -286,6 +301,15 @@ jest.mock('react-native-reanimated', () => {
     createAnimatedComponent: animatedComponent,
   };
 });
+
+// ============================================================================
+// expo-file-system mock
+// ============================================================================
+jest.mock('expo-file-system', () => ({
+  File: class {
+    exists = true;
+  },
+}));
 
 // ============================================================================
 // react-native-keyboard-controller mock
@@ -367,6 +391,10 @@ jest.mock('@maplibre/maplibre-react-native', () => {
       setAccessToken: jest.fn(),
     },
     MapView: mockMapView,
+    // What components/MapComponents.tsx imports from this package's current API.
+    Map: mockMapView,
+    Marker: ({ children, ...props }) =>
+      React.createElement(View, { testID: 'map-marker', ...props }, children),
     Camera: mockCamera,
     PointAnnotation: ({ children, ...props }) =>
       React.createElement(View, { testID: 'map-point-annotation', ...props }, children),

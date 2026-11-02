@@ -14,6 +14,15 @@ describe('CustomButton', () => {
     isLoading: false,
   };
 
+  // On Android a busy state with no label becomes the control's whole name.
+  it('reads as disabled while loading, never as busy', () => {
+    render(<CustomButton {...defaultProps} isLoading testID="button" />);
+
+    const state = screen.getByTestId('button').props.accessibilityState;
+    expect(state.disabled).toBe(true);
+    expect(state.busy).toBeFalsy();
+  });
+
   afterEach(() => jest.clearAllMocks());
 
   describe('Rendering', () => {

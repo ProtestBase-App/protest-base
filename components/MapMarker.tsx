@@ -43,6 +43,7 @@ export const MapMarker: React.FC<MapMarkerProps> = ({
       <View style={styles.markerContainer}>
         <View style={{ width: markerWidth, height: markerHeight }}>
           <Image
+            accessibilityIgnoresInvertColors
             source={require('../assets/images/icon-protest-base.png')}
             style={styles.markerImage}
             resizeMode="contain"

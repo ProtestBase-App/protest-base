@@ -1,20 +1,33 @@
-import { StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import { useState } from 'react';
+import {
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  type TextInputProps,
+  type TextInstance,
+} from 'react-native';
+import { useState, type Ref } from 'react';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { FormErrorText } from '@/components/ui/FormErrorText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { getThemeColors } from '@/utils/themeColors';
 import { Typography } from '@/constants/DesignTokens';
+import { inputAccessibilityLabel } from '@/utils/fieldAccessibility';
+import { t } from '@/utils/i18n';
 
-interface FormFieldProps {
+interface FormFieldProps extends TextInputProps {
   title: string | null;
   value: string;
   placeholder: string;
   handleChangeText: (text: string) => void;
   maxLength?: number;
   hasError?: boolean;
+  /** What is wrong, shown under the field. Marks the field too. */
+  errorText?: string;
+  /** 'title' is the large, boxless field at the top of the event form. */
+  variant?: 'boxed' | 'title';
   disabled?: boolean;
   otherStyles?: object;
   /**
@@ -38,7 +51,8 @@ interface FormFieldProps {
   blurOnSubmit?: boolean;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
-  [key: string]: any;
+  /** For a screen reader to land on the label. */
+  labelRef?: Ref<TextInstance>;
 }
 
 export default function FormField({
@@ -48,10 +62,14 @@ export default function FormField({
   handleChangeText,
   maxLength,
   hasError = false,
+  errorText,
+  variant = 'boxed',
   disabled = false,
   otherStyles,
   isPassword,
   testID,
+  labelRef,
+  accessibilityHint,
   ...props
 }: FormFieldProps) {
   const colorScheme = useColorScheme();
@@ -64,20 +82,32 @@ export default function FormField({
   // 1. Explicit isPassword prop takes precedence
   // 2. Fall back to legacy string matching for backward compatibility (will be removed in future)
   const isPasswordField = isPassword ?? (title === 'Password' || title === 'New password');
+  const isTitle = variant === 'title';
 
   return (
-    <ThemedView style={[styles.themedview1, otherStyles]}>
-      <ThemedText style={styles.themedtext1}>{title}</ThemedText>
+    <ThemedView style={[!isTitle && styles.themedview1, otherStyles]}>
+      <ThemedText
+        ref={labelRef}
+        style={
+          isTitle ? [styles.titleLabel, { color: themeColors.secondaryText }] : styles.themedtext1
+        }
+      >
+        {title}
+      </ThemedText>
       <ThemedView
-        style={[
-          styles.themedview2,
-          {
-            backgroundColor: themeColors.cardBackground,
-            borderColor: themeColors.inputBorder,
-          },
-          isFocused && styles.focused,
-          hasError && styles.errorField,
-        ]}
+        style={
+          isTitle
+            ? styles.titleBox
+            : [
+                styles.themedview2,
+                {
+                  backgroundColor: themeColors.cardBackground,
+                  borderColor: themeColors.inputBorder,
+                },
+                isFocused && styles.focused,
+                (hasError || !!errorText) && { borderColor: themeColors.errorText },
+              ]
+        }
       >
         <TextInput
           testID={testID}
@@ -85,6 +115,7 @@ export default function FormField({
             styles.textInput,
             isDark ? styles.textInputDark : styles.textInputLight,
             { fontFamily: value ? Typography.families.semiBold : Typography.families.regular },
+            isTitle && styles.titleInput,
           ]}
           value={value}
           placeholder={placeholder}
@@ -95,6 +126,12 @@ export default function FormField({
           onBlur={() => setIsFocused(false)}
           maxLength={maxLength}
           editable={!disabled}
+          multiline={isTitle}
+          scrollEnabled={!isTitle}
+          submitBehavior={isTitle ? 'blurAndSubmit' : undefined}
+          returnKeyType={isTitle ? 'done' : undefined}
+          accessibilityLabel={inputAccessibilityLabel(title, errorText)}
+          accessibilityHint={accessibilityHint}
           {...props}
         />
 
@@ -103,6 +140,7 @@ export default function FormField({
             onPress={() => setShowPassword(!showPassword)}
             accessibilityRole="button"
             accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityHint={t('a11y.hints.togglePassword')}
           >
             <IconSymbol
               size={28}
@@ -112,6 +150,7 @@ export default function FormField({
           </TouchableOpacity>
         )}
       </ThemedView>
+      {errorText ? <FormErrorText message={errorText} /> : null}
     </ThemedView>
   );
 }
@@ -137,13 +176,24 @@ const styles = StyleSheet.create({
   focused: {
     borderColor: '#F5A4B1',
   },
-  errorField: {
-    borderColor: 'red',
-    borderWidth: 1,
-  },
   textInput: {
     flex: 1,
     fontSize: Typography.sizes.sm,
+  },
+  titleLabel: {
+    fontSize: 13,
+    fontFamily: Typography.families.semiBold,
+  },
+  titleBox: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  titleInput: {
+    flex: 0,
+    padding: 0,
+    textAlignVertical: 'center',
+    fontSize: Typography.sizes.xl,
+    fontFamily: Typography.families.bold,
   },
   textInputLight: {
     color: Colors.light.text,

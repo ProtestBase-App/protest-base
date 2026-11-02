@@ -265,6 +265,7 @@ export default function ExploreTab() {
         // this flag, and it is the only thing that says the times are a
         // date-only storage convention rather than a real 00:00 → 23:59 range.
         all_day: item.all_day,
+        series_id: item.series_id,
         categories: item.categories,
         organizer_name: item.organizer_name || '',
         organization_id: item.organization_id,
@@ -310,7 +311,7 @@ export default function ExploreTab() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ThemedView style={styles.container}>
         <ThemedView style={styles.logoContainer}>
-          <Image source={logo} style={styles.logo} />
+          <Image accessibilityIgnoresInvertColors source={logo} style={styles.logo} />
         </ThemedView>
 
         <ThemedView style={styles.searchContainer}>
@@ -329,6 +330,7 @@ export default function ExploreTab() {
                 ? `${t('filters.title')} (${activeFilterCount})`
                 : t('filters.title')
             }
+            accessibilityHint={t('a11y.hints.openFilters')}
           >
             <ThemedView
               style={[
@@ -344,7 +346,7 @@ export default function ExploreTab() {
                   style={[
                     styles.filterBadge,
                     {
-                      backgroundColor: themeColors.tint,
+                      backgroundColor: themeColors.cta,
                       borderColor: themeColors.background,
                     },
                   ]}
@@ -363,6 +365,7 @@ export default function ExploreTab() {
               testID="explore-my-area-chip"
               label={t('homeArea.scopeChip')}
               accessibilityLabel={t('homeArea.scopeChip')}
+              accessibilityHint={t('a11y.hints.showHomeArea')}
               onPress={applyMyArea}
               leading={<IconSymbol name="mappin.and.ellipse" size={11} color={themeColors.tint} />}
             />
@@ -392,8 +395,9 @@ export default function ExploreTab() {
                 {t('explore.refreshFailedMessage')}
               </ThemedText>
               <TouchableOpacity
+                accessibilityRole="button"
                 testID="explore-retry"
-                style={[styles.retryButton, { backgroundColor: themeColors.tint }]}
+                style={[styles.retryButton, { backgroundColor: themeColors.cta }]}
                 onPress={handleRefresh}
               >
                 <ThemedText style={styles.retryButtonText}>{t('common.retry')}</ThemedText>

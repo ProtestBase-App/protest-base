@@ -31,7 +31,7 @@ jest.mock('@/components/FormDateField', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: ({ title, value, placeholder, handleChangeText, hasError, ...rest }: any) => {
+    default: ({ title, value, placeholder, handleChangeText, errorText }: any) => {
       // Store the callback keyed by title/placeholder for test access
       if (handleChangeText) {
         mockFormDateFieldCallbacks[placeholder || title] = handleChangeText;
@@ -44,7 +44,8 @@ jest.mock('@/components/FormDateField', () => {
           value: value || '',
           placeholder: placeholder || '',
           editable: false,
-        })
+        }),
+        errorText ? React.createElement('Text', null, errorText) : null
       );
     },
   };
@@ -161,7 +162,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react-native';
 import EventForm from '@/components/EventForm';
-import type { FormState, EmptyFieldsState } from '@/types/eventForm.types';
+import type { FormState, EventFormMode } from '@/types/eventForm.types';
 import * as ImagePicker from 'expo-image-picker';
 import { searchAddress } from '@/services/address.service';
 
@@ -190,13 +191,6 @@ const mockForm: FormState = {
   geocod_lng: null,
 };
 
-const mockEmptyFields: EmptyFieldsState = {
-  title: false,
-  start_time: false,
-  description: false,
-  help_description: false,
-};
-
 // Helper to flush promises and state updates
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -204,77 +198,37 @@ describe('EventForm', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('renders the title field with current value', () => {
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByDisplayValue('Climate March')).toBeTruthy();
   });
 
   it('renders the description field', () => {
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByDisplayValue('A march for the climate')).toBeTruthy();
   });
 
   it('renders in template mode (hides date/time fields)', () => {
     render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-        mode="create-template"
-      />
+      <EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" mode="create-template" />
     );
     expect(screen.getByDisplayValue('Climate March')).toBeTruthy();
   });
 
   it('renders in edit-template mode', () => {
     render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-        mode="edit-template"
-      />
+      <EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" mode="edit-template" />
     );
     expect(screen.getByDisplayValue('Climate March')).toBeTruthy();
   });
 
   it('renders in create-event mode by default', () => {
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.toJSON()).toBeTruthy();
   });
 
   it('shows help description field when help_needed is true', () => {
     const helpForm = { ...mockForm, help_needed: true, help_description: 'Volunteers needed' };
-    render(
-      <EventForm
-        form={helpForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={helpForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByDisplayValue('Volunteers needed')).toBeTruthy();
   });
 });
@@ -284,28 +238,14 @@ describe('EventForm — field value changes', () => {
 
   it('calls setForm when title text changes', () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByDisplayValue('Climate March'), 'New Title');
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ title: 'New Title' }));
   });
 
   it('calls setForm when description text changes', () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByDisplayValue('A march for the climate'), 'New Description');
     expect(setForm).toHaveBeenCalledWith(
       expect.objectContaining({ description: 'New Description' })
@@ -315,14 +255,7 @@ describe('EventForm — field value changes', () => {
   it('calls setForm when website URL text changes', () => {
     const setForm = jest.fn();
     const formWithUrl = { ...mockForm, website_url: 'https://example.com' };
-    render(
-      <EventForm
-        form={formWithUrl}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithUrl} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByDisplayValue('https://example.com'), 'https://new-url.com');
     expect(setForm).toHaveBeenCalledWith(
       expect.objectContaining({ website_url: 'https://new-url.com' })
@@ -332,14 +265,7 @@ describe('EventForm — field value changes', () => {
   it('calls setForm when disclaimer text changes', () => {
     const setForm = jest.fn();
     const formWithDisclaimer = { ...mockForm, disclaimer: 'Be safe' };
-    render(
-      <EventForm
-        form={formWithDisclaimer}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithDisclaimer} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByDisplayValue('Be safe'), 'Stay safe and peaceful');
     expect(setForm).toHaveBeenCalledWith(
       expect.objectContaining({ disclaimer: 'Stay safe and peaceful' })
@@ -352,14 +278,7 @@ describe('EventForm — category selection', () => {
 
   it('calls setForm when a category chip is pressed', async () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
     const categoryChip = screen.getByTestId('category-chip-Protest');
     await act(async () => {
       fireEvent.press(categoryChip);
@@ -369,14 +288,7 @@ describe('EventForm — category selection', () => {
 
   it('renders the selected category as an active chip', () => {
     const formWithCategory = { ...mockForm, categories: 'Protest' };
-    render(
-      <EventForm
-        form={formWithCategory}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCategory} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByTestId('category-chip-Protest')).toBeTruthy();
   });
 });
@@ -386,14 +298,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('loads Belgium postal codes in EN', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -402,14 +307,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('loads Belgium postal codes in NL', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="nl"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="nl" />);
     await act(async () => {
       await flushPromises();
     });
@@ -418,14 +316,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('loads Belgium postal codes in FR', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="fr"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="fr" />);
     await act(async () => {
       await flushPromises();
     });
@@ -434,14 +325,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('loads Belgium postal codes with unknown language (fallback to EN)', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="de"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="de" />);
     await act(async () => {
       await flushPromises();
     });
@@ -450,14 +334,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('loads Netherlands postal codes', async () => {
     const formWithCountry = { ...mockForm, country: 'netherlands' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -466,14 +343,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('clears postal codes data when no country is set', async () => {
     const formNoCountry = { ...mockForm, country: '' };
-    render(
-      <EventForm
-        form={formNoCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formNoCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -482,14 +352,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('renders postal code section when country is selected', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -498,14 +361,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('renders with existing postal code value', async () => {
     const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithPostalCode} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -517,12 +373,7 @@ describe('EventForm — country and postal code loading', () => {
     const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
 
     const { rerender } = render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+      <EventForm form={formWithPostalCode} setForm={setForm} userLanguage="en" />
     );
     await act(async () => {
       await flushPromises();
@@ -530,14 +381,7 @@ describe('EventForm — country and postal code loading', () => {
 
     // Change country to netherlands
     const updatedForm = { ...formWithPostalCode, country: 'netherlands' };
-    rerender(
-      <EventForm
-        form={updatedForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    rerender(<EventForm form={updatedForm} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -548,14 +392,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('renders postal code placeholder when value not found in loaded data', async () => {
     const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '9999' };
-    render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithPostalCode} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -564,14 +401,7 @@ describe('EventForm — country and postal code loading', () => {
 
   it('calls setForm when a country chip is pressed', async () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
     const belgiumChip = screen.getByTestId('country-chip-belgium');
     await act(async () => {
       fireEvent.press(belgiumChip);
@@ -597,14 +427,7 @@ describe('EventForm — street address autocomplete', () => {
   it('seeds the field with the existing street address and does not auto-search', async () => {
     const setForm = jest.fn();
     const formWithCountry = { ...mockForm, country: 'belgium', street_address: 'Legacy Street 7' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -623,14 +446,7 @@ describe('EventForm — street address autocomplete', () => {
       postal_code: '1000',
     };
     mockSearchAddress.mockResolvedValue([]);
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -657,14 +473,7 @@ describe('EventForm — street address autocomplete', () => {
       postal_code: '1000',
     };
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={setForm} userLanguage="en" />);
     const streetInput = screen.getByTestId('input-event-street-address');
     fireEvent.changeText(streetInput, 'rue de la loi');
 
@@ -711,14 +520,7 @@ describe('EventForm — street address autocomplete', () => {
       label: 'Grote Markt',
     };
     mockSearchAddress.mockResolvedValue([POI]);
-    render(
-      <EventForm
-        form={formWithLocation}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithLocation} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'grote markt');
     const row = await screen.findByTestId('address-suggestion-0');
     await act(async () => {
@@ -751,14 +553,7 @@ describe('EventForm — street address autocomplete', () => {
       street_address: '',
     };
     mockSearchAddress.mockResolvedValue([SUGGESTION]);
-    render(
-      <EventForm
-        form={formWithPostal}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithPostal} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'avenue des casernes');
     await screen.findByTestId('address-suggestion-0');
 
@@ -780,14 +575,7 @@ describe('EventForm — street address autocomplete', () => {
       postal_code: null,
       street_address: '',
     };
-    render(
-      <EventForm
-        form={formNoPostal}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formNoPostal} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -799,14 +587,7 @@ describe('EventForm — street address autocomplete', () => {
   it('does not render the street field until a country is selected', async () => {
     const setForm = jest.fn();
     const formNoCountry = { ...mockForm, country: '', postal_code: null, street_address: '' };
-    render(
-      <EventForm
-        form={formNoCountry}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formNoCountry} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -823,14 +604,7 @@ describe('EventForm — street address autocomplete', () => {
       postal_code: null,
       street_address: 'Old Street 9',
     };
-    render(
-      <EventForm
-        form={legacyForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={legacyForm} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -884,9 +658,7 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
   };
 
   async function pickFirstSuggestion(setForm: jest.Mock, form: FormState) {
-    render(
-      <EventForm form={form} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
-    );
+    render(<EventForm form={form} setForm={setForm} userLanguage="en" />);
     fireEvent.changeText(screen.getByTestId('input-event-street-address'), 'rue de la loi');
     const row = await screen.findByTestId('address-suggestion-0');
     await act(async () => {
@@ -895,14 +667,7 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
   }
 
   it('shows the filled value as a confirmation card (no search input) instead of the picker', async () => {
-    render(
-      <EventForm
-        form={baseForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={baseForm} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -922,7 +687,6 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
       <EventForm
         form={{ ...mockForm, country: 'belgium', postal_code: null }}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
       />
     );
@@ -1010,14 +774,7 @@ describe('EventForm — postal confirmation card & suggestion coordinates', () =
 
   it('reveals the manual picker via "Change" and returns to the confirmation after a manual pick', async () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={baseForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={baseForm} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1057,14 +814,7 @@ describe('EventForm — country-change location clearing', () => {
     // the real country + address arrive in a later setForm (unbatched re-render).
     const setForm = jest.fn();
     const emptyForm = { ...mockForm, country: '', street_address: '', postal_code: null };
-    const { rerender } = render(
-      <EventForm
-        form={emptyForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    const { rerender } = render(<EventForm form={emptyForm} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1077,14 +827,7 @@ describe('EventForm — country-change location clearing', () => {
       postal_code: '1000',
     };
     await act(async () => {
-      rerender(
-        <EventForm
-          form={loadedForm}
-          setForm={setForm}
-          emptyFields={mockEmptyFields}
-          userLanguage="en"
-        />
-      );
+      rerender(<EventForm form={loadedForm} setForm={setForm} userLanguage="en" />);
       await flushPromises();
     });
 
@@ -1101,23 +844,14 @@ describe('EventForm — country-change location clearing', () => {
       region: 'BC',
       postal_code: '1000',
     };
-    const { rerender } = render(
-      <EventForm form={beForm} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
-    );
+    const { rerender } = render(<EventForm form={beForm} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
 
     const nlForm = { ...beForm, country: 'netherlands' };
     await act(async () => {
-      rerender(
-        <EventForm
-          form={nlForm}
-          setForm={setForm}
-          emptyFields={mockEmptyFields}
-          userLanguage="en"
-        />
-      );
+      rerender(<EventForm form={nlForm} setForm={setForm} userLanguage="en" />);
       await flushPromises();
     });
 
@@ -1137,16 +871,9 @@ describe('EventForm — image picking', () => {
       assets: [{ uri: 'file:///test-image.jpg', type: 'image' }],
     });
 
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -1178,17 +905,10 @@ describe('EventForm — image picking', () => {
       ],
     });
 
-    render(
-      <EventForm
-        form={formWithImage}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithImage} setForm={setForm} userLanguage="en" />);
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      fireEvent.press(screen.getByLabelText(/add.*(image|photo)/i));
       await flushPromises();
     });
 
@@ -1219,17 +939,10 @@ describe('EventForm — image picking', () => {
       ],
     });
 
-    render(
-      <EventForm
-        form={fourImages}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={fourImages} setForm={setForm} userLanguage="en" />);
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(/add.*image/i));
+      fireEvent.press(screen.getByLabelText(/add.*(image|photo)/i));
       await flushPromises();
     });
 
@@ -1247,16 +960,9 @@ describe('EventForm — image picking', () => {
       new Error('Gallery unavailable')
     );
 
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -1273,16 +979,9 @@ describe('EventForm — image picking', () => {
       assets: [],
     });
 
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
 
-    const imageButton = screen.getByLabelText(/add.*image/i);
+    const imageButton = screen.getByLabelText(/add.*(image|photo)/i);
     await act(async () => {
       fireEvent.press(imageButton);
       await flushPromises();
@@ -1297,29 +996,15 @@ describe('EventForm — image picking', () => {
       ...mockForm,
       images: [{ uri: 'file:///test-image.jpg' }],
     };
-    render(
-      <EventForm
-        form={formWithImage}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithImage} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByLabelText(/remove.*image/i)).toBeTruthy();
     // The add tile stays visible while under the 5-image cap.
-    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/add.*(image|photo)/i)).toBeTruthy();
   });
 
   it('renders a thumbnail with a remove button when form has an image URL string', () => {
     const formWithImage: FormState = { ...mockForm, images: ['https://example.com/image.jpg'] };
-    render(
-      <EventForm
-        form={formWithImage}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithImage} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByLabelText(/remove.*image/i)).toBeTruthy();
   });
 
@@ -1329,14 +1014,7 @@ describe('EventForm — image picking', () => {
       ...mockForm,
       images: ['https://example.com/first.jpg', 'https://example.com/second.jpg'],
     };
-    render(
-      <EventForm
-        form={formWithImages}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithImages} setForm={setForm} userLanguage="en" />);
     const removeButtons = screen.getAllByLabelText(/remove.*image/i);
     fireEvent.press(removeButtons[0]);
     const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
@@ -1349,14 +1027,7 @@ describe('EventForm — image picking', () => {
       ...mockForm,
       images: ['https://example.com/first.jpg', 'https://example.com/second.jpg'],
     };
-    render(
-      <EventForm
-        form={formWithImages}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithImages} setForm={setForm} userLanguage="en" />);
     const moveRightButtons = screen.getAllByLabelText(/move image later/i);
     fireEvent.press(moveRightButtons[0]);
     const updater = setForm.mock.calls[setForm.mock.calls.length - 1][0];
@@ -1371,15 +1042,8 @@ describe('EventForm — image picking', () => {
       ...mockForm,
       images: ['https://1.jpg', 'https://2.jpg', 'https://3.jpg', 'https://4.jpg', 'https://5.jpg'],
     };
-    render(
-      <EventForm
-        form={fullForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-    expect(screen.queryByLabelText(/add.*image/i)).toBeNull();
+    render(<EventForm form={fullForm} setForm={jest.fn()} userLanguage="en" />);
+    expect(screen.queryByLabelText(/add.*(image|photo)/i)).toBeNull();
   });
 });
 
@@ -1392,29 +1056,16 @@ describe('EventForm — date and time fields', () => {
       start_time: '2025-06-15T14:00:00.000Z',
       end_time: '2025-06-15T16:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithTimes}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithTimes} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.toJSON()).toBeTruthy();
   });
 
   it('hides date fields but shows the image picker in template mode', () => {
     render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-        mode="create-template"
-      />
+      <EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" mode="create-template" />
     );
     expect(screen.queryByTestId('form-date-field-Pick start date/time')).toBeNull();
-    expect(screen.getByLabelText(/add.*image/i)).toBeTruthy();
+    expect(screen.getByLabelText(/add.*(image|photo)/i)).toBeTruthy();
   });
 });
 
@@ -1423,14 +1074,7 @@ describe('EventForm — co-organizers', () => {
 
   it('renders co-organizer chips when co_organizers are selected', () => {
     const formWithCoOrgs = { ...mockForm, co_organizers: ['org-a'] };
-    render(
-      <EventForm
-        form={formWithCoOrgs}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCoOrgs} setForm={jest.fn()} userLanguage="en" />);
     // The RemovableChip for Org A should show its label
     // (orgLookup maps 'org-a' -> 'Org A' from the mocked useOrganizations)
     // Multiple elements may exist (in dropdown and chip), so use getAllByText
@@ -1439,14 +1083,7 @@ describe('EventForm — co-organizers', () => {
 
   it('renders chip with raw value when org lookup fails', async () => {
     const formWithUnknownOrg = { ...mockForm, co_organizers: ['unknown-org'] };
-    render(
-      <EventForm
-        form={formWithUnknownOrg}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithUnknownOrg} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1456,14 +1093,7 @@ describe('EventForm — co-organizers', () => {
   it('removes a co-organizer when chip remove is pressed', async () => {
     const setForm = jest.fn();
     const formWithCoOrgs = { ...mockForm, co_organizers: ['org-a', 'org-b'] };
-    render(
-      <EventForm
-        form={formWithCoOrgs}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCoOrgs} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1476,14 +1106,7 @@ describe('EventForm — co-organizers', () => {
   it('removes a single co-organizer when its chip is pressed', async () => {
     const setForm = jest.fn();
     const formWithCoOrgs = { ...mockForm, co_organizers: ['org-a', 'org-b'] };
-    render(
-      <EventForm
-        form={formWithCoOrgs}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCoOrgs} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1500,43 +1123,28 @@ describe('EventForm — help needed toggle', () => {
     // Test that the form renders the help_needed toggle and that when toggled to true,
     // the help description field appears
     const helpForm = { ...mockForm, help_needed: true, help_description: 'Test help' };
-    render(
-      <EventForm
-        form={helpForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={helpForm} setForm={setForm} userLanguage="en" />);
     // Verify help description field shows when help_needed is true
     expect(screen.getByDisplayValue('Test help')).toBeTruthy();
   });
 
   it('renders the help checkbox unchecked when help_needed is false', () => {
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
     // When help_needed is false, the help description field should not be visible
     expect(screen.queryByDisplayValue('Test help')).toBeNull();
   });
 
-  it('shows help_description error when emptyFields.help_description is true', () => {
+  it('shows what is wrong with the volunteer text', () => {
     const helpForm = { ...mockForm, help_needed: true, help_description: '' };
-    const emptyFieldsWithError = { ...mockEmptyFields, help_description: true };
     render(
       <EventForm
         form={helpForm}
         setForm={jest.fn()}
-        emptyFields={emptyFieldsWithError}
+        errors={{ help_description: 'Say how people can help' }}
         userLanguage="en"
       />
     );
-    expect(screen.toJSON()).toBeTruthy();
+    expect(screen.getByText('Say how people can help')).toBeTruthy();
   });
 });
 
@@ -1545,26 +1153,20 @@ describe('EventForm — progress bar', () => {
 
   it('shows 0% progress when no required fields are filled', () => {
     const emptyForm = { ...mockForm, title: '', description: '', start_time: '' };
-    render(
-      <EventForm
-        form={emptyForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={emptyForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.getByText('0%')).toBeTruthy();
   });
 
-  it('shows 33% progress when 1 of 3 required fields is filled', () => {
+  it('shows 25% progress when 1 of 4 required fields is filled', () => {
+    const partialForm = { ...mockForm, title: 'Test', description: '', start_time: '' };
+    render(<EventForm form={partialForm} setForm={jest.fn()} userLanguage="en" />);
+    expect(screen.getByText('25%')).toBeTruthy();
+  });
+
+  it('leaves the category out when editing a live event, where it is not required', () => {
     const partialForm = { ...mockForm, title: 'Test', description: '', start_time: '' };
     render(
-      <EventForm
-        form={partialForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+      <EventForm form={partialForm} setForm={jest.fn()} userLanguage="en" mode="edit-event" />
     );
     expect(screen.getByText('33%')).toBeTruthy();
   });
@@ -1575,27 +1177,58 @@ describe('EventForm — progress bar', () => {
       title: 'Test',
       description: 'Desc',
       start_time: '2025-06-15T14:00:00.000Z',
+      categories: 'Protest',
     };
+    render(<EventForm form={fullForm} setForm={jest.fn()} userLanguage="en" />);
+    expect(screen.getByText('100%')).toBeTruthy();
+  });
+
+  it('names everything still needed', () => {
     render(
       <EventForm
-        form={fullForm}
+        form={{ ...mockForm, title: '', description: '', categories: '', start_time: '' }}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
       />
     );
-    expect(screen.getByText('100%')).toBeTruthy();
+
+    expect(screen.getByText('Still needed: title, category, date, description')).toBeTruthy();
+  });
+
+  it('asks an edit for no category: an older event may have none', () => {
+    render(
+      <EventForm
+        form={{ ...mockForm, categories: '', start_time: '' }}
+        setForm={jest.fn()}
+        userLanguage="en"
+        mode="edit-event"
+      />
+    );
+
+    expect(screen.getByText('Still needed: date')).toBeTruthy();
+  });
+
+  it('says when nothing is left', () => {
+    render(
+      <EventForm
+        form={{
+          ...mockForm,
+          title: 'Rally',
+          description: 'For housing',
+          categories: 'protest',
+          start_time: '2099-01-02T10:00:00.000Z',
+        }}
+        setForm={jest.fn()}
+        userLanguage="en"
+      />
+    );
+
+    expect(screen.getByText('All required fields are filled')).toBeTruthy();
   });
 
   it('does not show progress bar in template mode', () => {
     render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-        mode="create-template"
-      />
+      <EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" mode="create-template" />
     );
     expect(screen.queryByText('0%')).toBeNull();
   });
@@ -1604,31 +1237,29 @@ describe('EventForm — progress bar', () => {
 describe('EventForm — error states', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('renders title with error state when emptyFields.title is true', () => {
-    const emptyFieldsWithTitleError = { ...mockEmptyFields, title: true };
-    const formEmpty = { ...mockForm, title: '' };
-    render(
-      <EventForm
-        form={formEmpty}
-        setForm={jest.fn()}
-        emptyFields={emptyFieldsWithTitleError}
-        userLanguage="en"
-      />
-    );
-    expect(screen.toJSON()).toBeTruthy();
-  });
-
-  it('renders start_time with error state when emptyFields.start_time is true', () => {
-    const emptyFieldsWithTimeError = { ...mockEmptyFields, start_time: true };
+  it.each([
+    ['title', 'title'],
+    ['description', 'description'],
+    ['categories', 'categories'],
+    ['start_time', 'start_time'],
+    ['end_time', 'end_time'],
+    ['website_url', 'website_url'],
+    ['disclaimer', 'disclaimer'],
+  ] as const)('shows the %s error under its field', (_name, field) => {
     render(
       <EventForm
         form={mockForm}
         setForm={jest.fn()}
-        emptyFields={emptyFieldsWithTimeError}
+        errors={{ [field]: 'This needs fixing' }}
         userLanguage="en"
       />
     );
-    expect(screen.toJSON()).toBeTruthy();
+    expect(screen.getByText('This needs fixing')).toBeTruthy();
+  });
+
+  it('shows no error text without errors', () => {
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
+    expect(screen.queryByText('This needs fixing')).toBeNull();
   });
 });
 
@@ -1642,7 +1273,6 @@ describe('EventForm — disclaimer focus callback', () => {
       <EventForm
         form={mockForm}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
         scrollViewRef={scrollViewRef as any}
       />
@@ -1662,14 +1292,7 @@ describe('EventForm — organizations loading state', () => {
       ensureOrganizations: jest.fn().mockResolvedValue(undefined),
     });
 
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={jest.fn()} userLanguage="en" />);
     expect(screen.toJSON()).toBeTruthy();
   });
 });
@@ -1679,14 +1302,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
 
   it('renders postal code section for Netherlands with postal code selected', async () => {
     const formWithCountry = { ...mockForm, country: 'netherlands', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1696,14 +1312,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
 
   it('renders postal code section for Belgium in EN', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1712,14 +1321,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
 
   it('renders postal code section for Belgium in NL', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="nl"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="nl" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1728,14 +1330,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
 
   it('renders postal code section for Belgium in FR', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="fr"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="fr" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1744,14 +1339,7 @@ describe('EventForm — postal code mapping (listPostalCodes)', () => {
 
   it('renders postal code section for Belgium with unknown language', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="de"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="de" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1764,14 +1352,7 @@ describe('EventForm — filteredPostalCodes branches', () => {
 
   it('shows selected postal code item when it exists in loaded data', async () => {
     const formWithPostalCode = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithPostalCode} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1789,14 +1370,7 @@ describe('EventForm — filteredPostalCodes branches', () => {
       postal_code: '9999',
       city: 'Mystery Town',
     };
-    render(
-      <EventForm
-        form={formWithUncoveredCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithUncoveredCode} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1810,14 +1384,7 @@ describe('EventForm — filteredPostalCodes branches', () => {
       postal_code: '9999',
       city: '',
     };
-    render(
-      <EventForm
-        form={formWithUncoveredCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithUncoveredCode} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -1828,20 +1395,57 @@ describe('EventForm — filteredPostalCodes branches', () => {
 describe('EventForm — category chip toggle', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('clears the selected category when its active chip is tapped again', () => {
-    const setForm = jest.fn();
-    const formWithCategory = { ...mockForm, categories: 'Protest' };
+  const renderWithCategory = (mode: EventFormMode, setForm: jest.Mock) =>
     render(
       <EventForm
-        form={formWithCategory}
+        form={{ ...mockForm, categories: 'Protest' }}
         setForm={setForm}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
+        mode={mode}
       />
     );
-    // The chip is active; tapping it again toggles the category back off.
-    fireEvent.press(screen.getByTestId('category-chip-Protest'));
-    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: '' }));
+
+  it.each<EventFormMode>(['create-event', 'edit-event'])(
+    'keeps the category when its active chip is tapped again in %s',
+    (mode) => {
+      const setForm = jest.fn();
+      renderWithCategory(mode, setForm);
+
+      fireEvent.press(screen.getByTestId('category-chip-Protest'));
+
+      expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: 'Protest' }));
+    }
+  );
+
+  it.each<EventFormMode>(['create-template', 'edit-template'])(
+    'clears the category when its active chip is tapped again in %s',
+    (mode) => {
+      const setForm = jest.fn();
+      renderWithCategory(mode, setForm);
+
+      fireEvent.press(screen.getByTestId('category-chip-Protest'));
+
+      expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: '' }));
+    }
+  );
+
+  it('moves between categories in every mode', () => {
+    const setForm = jest.fn();
+    renderWithCategory('edit-event', setForm);
+
+    fireEvent.press(screen.getByTestId('category-chip-Act'));
+
+    expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ categories: 'Act' }));
+  });
+
+  it.each<[EventFormMode, string]>([
+    ['create-event', 'Category *'],
+    ['edit-event', 'Category'],
+    ['create-template', 'Category (Optional)'],
+  ])('labels the category for %s', (mode, label) => {
+    renderWithCategory(mode, jest.fn());
+
+    expect(screen.getByText(label)).toBeTruthy();
   });
 });
 
@@ -1861,12 +1465,7 @@ describe('EventForm — postal code clearing', () => {
       region: 'Brussels-Capital',
     };
     const { rerender } = render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+      <EventForm form={formWithPostalCode} setForm={setForm} userLanguage="en" />
     );
     await act(async () => {
       await flushPromises();
@@ -1890,9 +1489,7 @@ describe('EventForm — postal code clearing', () => {
       })
     );
     // Once the parent commits the removal, the picker shows for a fresh search.
-    rerender(
-      <EventForm form={next} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
-    );
+    rerender(<EventForm form={next} setForm={setForm} userLanguage="en" />);
     expect(screen.getByTestId('dropdown-event-postal-code')).toBeTruthy();
     expect(screen.queryByTestId('postal-code-filled')).toBeNull();
   });
@@ -1916,12 +1513,7 @@ describe('EventForm — co-organizer search selection', () => {
 
   it('reveals organization options when the search field is focused', () => {
     render(
-      <EventForm
-        form={{ ...mockForm, co_organizers: [] }}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+      <EventForm form={{ ...mockForm, co_organizers: [] }} setForm={jest.fn()} userLanguage="en" />
     );
     const field = screen.getByTestId('dropdown-event-co-organizers');
     expect(field).toBeTruthy();
@@ -1934,12 +1526,7 @@ describe('EventForm — co-organizer search selection', () => {
   it('adds a co-organizer when an option is selected from the search', () => {
     const setForm = jest.fn();
     render(
-      <EventForm
-        form={{ ...mockForm, co_organizers: [] }}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
+      <EventForm form={{ ...mockForm, co_organizers: [] }} setForm={setForm} userLanguage="en" />
     );
     const field = screen.getByTestId('dropdown-event-co-organizers');
     fireEvent(within(field).getByDisplayValue(''), 'focus');
@@ -1971,7 +1558,6 @@ describe('EventForm — co-organizer cap', () => {
       <EventForm
         form={{ ...mockForm, co_organizers: tenSelected }}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
       />
     );
@@ -1989,16 +1575,9 @@ describe('EventForm — help_needed checkbox toggle', () => {
 
   it('toggles help_needed to true when checkbox is pressed', () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-    // The checkbox label is "I need help in this event"
-    const checkboxText = screen.getByText('I need help in this event');
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
+    // The checkbox label is "We need volunteers"
+    const checkboxText = screen.getByText('We need volunteers');
     // Press the parent TouchableOpacity
     fireEvent.press(checkboxText);
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ help_needed: true }));
@@ -2007,15 +1586,8 @@ describe('EventForm — help_needed checkbox toggle', () => {
   it('toggles help_needed to false when checkbox is pressed again', () => {
     const setForm = jest.fn();
     const helpForm = { ...mockForm, help_needed: true, help_description: 'Some help' };
-    render(
-      <EventForm
-        form={helpForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-    const checkboxText = screen.getByText('I need help in this event');
+    render(<EventForm form={helpForm} setForm={setForm} userLanguage="en" />);
+    const checkboxText = screen.getByText('We need volunteers');
     fireEvent.press(checkboxText);
     expect(setForm).toHaveBeenCalledWith(expect.objectContaining({ help_needed: false }));
   });
@@ -2023,14 +1595,7 @@ describe('EventForm — help_needed checkbox toggle', () => {
   it('updates help_description when help_needed is true', () => {
     const setForm = jest.fn();
     const helpForm = { ...mockForm, help_needed: true, help_description: 'Need volunteers' };
-    render(
-      <EventForm
-        form={helpForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={helpForm} setForm={setForm} userLanguage="en" />);
     const helpInput = screen.getByDisplayValue('Need volunteers');
     fireEvent.changeText(helpInput, 'Updated help description');
     expect(setForm).toHaveBeenCalledWith(
@@ -2052,14 +1617,7 @@ describe('EventForm — handleStartTimeChange with end_time adjustment', () => {
       start_time: '2025-06-15T14:00:00.000Z',
       end_time: '2025-06-15T16:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithTimes}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithTimes} setForm={setForm} userLanguage="en" />);
     // The FormDateField mock captures handleChangeText callbacks
     // The start time callback should be captured with the placeholder key
     const startTimeCallback = mockFormDateFieldCallbacks['Pick start date/time'];
@@ -2087,14 +1645,7 @@ describe('EventForm — handleStartTimeChange with end_time adjustment', () => {
       start_time: '2025-06-15T14:00:00.000Z',
       end_time: '2025-06-15T20:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithTimes}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithTimes} setForm={setForm} userLanguage="en" />);
     const startTimeCallback = mockFormDateFieldCallbacks['Pick start date/time'];
     expect(startTimeCallback).toBeTruthy();
 
@@ -2116,14 +1667,7 @@ describe('EventForm — handleStartTimeChange with end_time adjustment', () => {
 
   it('sets start_time when no end_time is set', () => {
     const setForm = jest.fn();
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={mockForm} setForm={setForm} userLanguage="en" />);
     const startTimeCallback = mockFormDateFieldCallbacks['Pick start date/time'];
     expect(startTimeCallback).toBeTruthy();
 
@@ -2144,14 +1688,7 @@ describe('EventForm — handleStartTimeChange with end_time adjustment', () => {
       ...mockForm,
       start_time: '2025-06-15T14:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithStartTime}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithStartTime} setForm={setForm} userLanguage="en" />);
     const endTimeCallback = mockFormDateFieldCallbacks['Pick end date/time'];
     expect(endTimeCallback).toBeTruthy();
 
@@ -2178,7 +1715,6 @@ describe('EventForm — disclaimer focus with scrollViewRef', () => {
       <EventForm
         form={mockForm}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
         scrollViewRef={scrollViewRef as any}
       />
@@ -2200,7 +1736,6 @@ describe('EventForm — disclaimer focus with scrollViewRef', () => {
       <EventForm
         form={mockForm}
         setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
         userLanguage="en"
         scrollViewRef={scrollViewRef as any}
       />
@@ -2222,14 +1757,7 @@ describe('EventForm — date field interactions', () => {
       start_time: '2025-06-15T14:00:00.000Z',
       end_time: '2025-06-15T16:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithTimes}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithTimes} setForm={jest.fn()} userLanguage="en" />);
     // Both date fields should be visible (not in template mode)
     const dateInputs = screen.getAllByPlaceholderText(/pick.*date/i);
     expect(dateInputs.length).toBe(2); // start time and end time
@@ -2242,27 +1770,7 @@ describe('EventForm — date field interactions', () => {
       start_time: '2025-06-15T14:00:00.000Z',
       end_time: '2025-06-15T16:00:00.000Z',
     };
-    render(
-      <EventForm
-        form={formWithTimes}
-        setForm={setForm}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
-    expect(screen.toJSON()).toBeTruthy();
-  });
-
-  it('shows error state for start_time when emptyFields.start_time is true', () => {
-    const emptyFieldsWithTimeError = { ...mockEmptyFields, start_time: true };
-    render(
-      <EventForm
-        form={mockForm}
-        setForm={jest.fn()}
-        emptyFields={emptyFieldsWithTimeError}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithTimes} setForm={setForm} userLanguage="en" />);
     expect(screen.toJSON()).toBeTruthy();
   });
 });
@@ -2272,14 +1780,7 @@ describe('EventForm — postal code selection', () => {
 
   it('renders the selected postal code as a chip after loading', async () => {
     const formWithCountry = { ...mockForm, country: 'belgium', postal_code: '1000' };
-    render(
-      <EventForm
-        form={formWithCountry}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithCountry} setForm={jest.fn()} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });
@@ -2291,14 +1792,7 @@ describe('EventForm — postal code selection', () => {
     // postal_code=9999 doesn't exist in mock data, AND data hasn't loaded
     // This tests the branch where listPostalCodes.length === 0
     const formWithPostalCode = { ...mockForm, country: '', postal_code: '9999' };
-    render(
-      <EventForm
-        form={formWithPostalCode}
-        setForm={jest.fn()}
-        emptyFields={mockEmptyFields}
-        userLanguage="en"
-      />
-    );
+    render(<EventForm form={formWithPostalCode} setForm={jest.fn()} userLanguage="en" />);
     // Without a country, postal code section won't show, but the form should render
     expect(screen.toJSON()).toBeTruthy();
   });
@@ -2326,9 +1820,7 @@ describe('EventForm — Luxembourg', () => {
   };
 
   const renderForm = async (form: FormState, setForm = jest.fn()) => {
-    render(
-      <EventForm form={form} setForm={setForm} emptyFields={mockEmptyFields} userLanguage="en" />
-    );
+    render(<EventForm form={form} setForm={setForm} userLanguage="en" />);
     await act(async () => {
       await flushPromises();
     });

@@ -20,6 +20,7 @@ import DraftListControls, {
 } from '@/components/DraftListControls';
 import DraftListRow from '@/components/DraftListRow';
 import DuplicateEventModal from '@/components/DuplicateEventModal';
+import SeriesScopeDialog from '@/components/SeriesScopeDialog';
 import TriageEntryCard from '@/components/TriageEntryCard';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -35,18 +36,22 @@ import { STORAGE_KEYS } from '@/constants/StorageConfig';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BATCH_PUBLISH_CAP, useBatchDelete, useBatchPublish } from '@/hooks/useBatchPublish';
 import { useDuplicatePrompt } from '@/hooks/useDuplicatePrompt';
 import { usePaginatedEvents } from '@/hooks/usePaginatedEvents';
 import {
   deleteEvent,
+  deleteSeriesOccurrences,
+  getSeries,
   EventIncompleteError,
   EventNotDraftError,
   getDraftEventsForOrganizations,
   publishDraft,
 } from '@/services/event.service';
 import { DuplicateWarningReport, Event } from '@/types/event.types';
+import type { SeriesScope } from '@/types/eventSeries.types';
 import {
   DEFAULT_SORT_DIRECTION,
   DraftStatus,
@@ -59,6 +64,7 @@ import { getPublishIssues, publishFieldToMessageKey } from '@/utils/eventPublish
 import { t } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { isDraftsOnlyScope, seriesErrorMessage, upcomingOccurrences } from '@/utils/recurrence';
 import { getThemeColors } from '@/utils/themeColors';
 
 export default function DraftEventsScreen() {
@@ -71,6 +77,7 @@ export default function DraftEventsScreen() {
   } = useGlobalContext();
   const { userOrganizations } = useUserOrganizations();
   const { isOffline } = useConnectivity();
+  const recurringEnabled = useRecurringEventsEnabled();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
@@ -79,6 +86,13 @@ export default function DraftEventsScreen() {
   // meanwhile. The ref twin guards Alert callbacks, whose closures capture
   // the state from when the dialog opened.
   const [busyId, setBusyId] = useState<string | null>(null);
+  // A delete on one date of a series, waiting for "only this" or "this and following".
+  // `followingIds` is empty when the wider choice cannot be offered.
+  const [deleteScope, setDeleteScope] = useState<{
+    event: Event;
+    seriesId: string;
+    followingIds: string[];
+  } | null>(null);
   const mutationBusyRef = useRef(false);
   // Blocks a second trash tap from queueing another confirm dialog.
   const confirmOpenRef = useRef(false);
@@ -333,11 +347,83 @@ export default function DraftEventsScreen() {
     [runPublish, isOffline]
   );
 
+  /** Send a delete the organizer already confirmed. */
+  const sendDelete = useCallback(
+    async (event: Event, removed: string[], send: () => Promise<string>) => {
+      if (mutationBusyRef.current) return;
+      mutationBusyRef.current = true;
+      setBusyId(event.$id);
+      try {
+        const notice = await send();
+        setRemovedIds((prev) => {
+          const next = new Set(prev);
+          removed.forEach((id) => next.add(id));
+          return next;
+        });
+        refreshCountsAndCache(false);
+        refreshAll();
+        setNotice(notice);
+      } catch (err) {
+        Alert.alert(t('common.error'), seriesErrorMessage(err, userLanguage));
+      } finally {
+        mutationBusyRef.current = false;
+        setBusyId(null);
+      }
+    },
+    [refreshCountsAndCache, refreshAll, userLanguage]
+  );
+
+  /**
+   * One date of a series. The scope dialog needs the whole series first: a series
+   * delete takes published dates too, so "this and following" is only offered when
+   * every date it would touch is a draft. Without the series, only this draft is.
+   */
+  const promptSeriesDelete = useCallback(async (event: Event, id: string) => {
+    let followingIds: string[] = [];
+    try {
+      const series = await getSeries(id);
+      if (isDraftsOnlyScope(series, event.$id)) {
+        const upcoming = upcomingOccurrences(series).map((occurrence) => occurrence.$id);
+        followingIds = upcoming.slice(upcoming.indexOf(event.$id));
+      }
+    } catch (err) {
+      logger.warn('[Drafts] Could not load the series of a draft', {
+        seriesId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    setDeleteScope({ event, seriesId: id, followingIds });
+  }, []);
+
+  const handleDeleteScopeConfirm = (scope: SeriesScope) => {
+    const prompt = deleteScope;
+    confirmOpenRef.current = false;
+    setDeleteScope(null);
+    if (!prompt) return;
+    if (scope === 'following') {
+      sendDelete(prompt.event, prompt.followingIds, async () => {
+        const result = await deleteSeriesOccurrences(prompt.seriesId, {
+          fromEventId: prompt.event.$id,
+        });
+        return t('series.messages.deleted', { count: result.deleted });
+      });
+    } else {
+      sendDelete(prompt.event, [prompt.event.$id], async () => {
+        await deleteEvent(prompt.event.$id);
+        return t('drafts.deleted');
+      });
+    }
+  };
+
   const handleDelete = useCallback(
     (event: Event) => {
       if (!assertOnlineOrAlert(isOffline)) return;
       if (mutationBusyRef.current || confirmOpenRef.current) return;
       confirmOpenRef.current = true;
+      if (recurringEnabled && event.series_id) {
+        promptSeriesDelete(event, event.series_id);
+        return;
+      }
       Alert.alert(
         t('drafts.deleteConfirmTitle'),
         t('drafts.deleteConfirmMessage'),
@@ -352,23 +438,12 @@ export default function DraftEventsScreen() {
           {
             text: t('drafts.delete'),
             style: 'destructive',
-            onPress: async () => {
+            onPress: () => {
               confirmOpenRef.current = false;
-              if (mutationBusyRef.current) return;
-              mutationBusyRef.current = true;
-              setBusyId(event.$id);
-              try {
+              sendDelete(event, [event.$id], async () => {
                 await deleteEvent(event.$id);
-                setRemovedIds((prev) => new Set(prev).add(event.$id));
-                refreshCountsAndCache(false);
-                refreshAll();
-                setNotice(t('drafts.deleted'));
-              } catch (err) {
-                Alert.alert(t('common.error'), (err as Error).message);
-              } finally {
-                mutationBusyRef.current = false;
-                setBusyId(null);
-              }
+                return t('drafts.deleted');
+              });
             },
           },
         ],
@@ -380,7 +455,7 @@ export default function DraftEventsScreen() {
         }
       );
     },
-    [refreshCountsAndCache, refreshAll, isOffline]
+    [sendDelete, promptSeriesDelete, recurringEnabled, isOffline]
   );
 
   // --- Batch publish -------------------------------------------------------
@@ -794,6 +869,26 @@ export default function DraftEventsScreen() {
             mode="publish"
             locale={userLanguage}
             {...duplicatePrompt.modalProps((eventId) => runPublish(eventId, true))}
+          />
+
+          <SeriesScopeDialog
+            visible={deleteScope !== null}
+            title={t('series.dialogs.deleteScopeTitle')}
+            message={t('series.dialogs.deleteScopeBody')}
+            followingDisabledReason={
+              deleteScope?.followingIds.length
+                ? undefined
+                : t('series.dialogs.deleteFollowingLocked')
+            }
+            dismissLabel={t('common.cancel')}
+            onDismiss={() => {
+              confirmOpenRef.current = false;
+              setDeleteScope(null);
+            }}
+            confirmLabel={t('drafts.delete')}
+            onConfirm={handleDeleteScopeConfirm}
+            destructive
+            testID="series-delete-scope"
           />
         </ThemedView>
       </SafeAreaView>

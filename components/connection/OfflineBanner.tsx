@@ -40,7 +40,7 @@ export function OfflineBanner(): React.ReactElement | null {
       style={[styles.container, { paddingTop: insets.top, backgroundColor: themeColors.warningBg }]}
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      accessibilityLabel={t('connectivity.banner')}
+      aria-label={t('connectivity.banner')}
     >
       <View style={styles.row}>
         <Ionicons name="cloud-offline-outline" size={16} color={themeColors.warning} />

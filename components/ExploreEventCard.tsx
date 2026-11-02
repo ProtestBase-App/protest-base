@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { SeriesBadge, useShowsSeriesBadge } from '@/components/SeriesBadge';
 import { Colors } from '@/constants/Colors';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
 import { Spacing, BorderRadius, Shadows } from '@/constants/DesignTokens';
@@ -80,6 +81,7 @@ function ExploreEventCard({
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
 
   const hasCategories = Boolean(event.categories && event.categories.length > 0);
+  const inSeries = useShowsSeriesBadge(event);
 
   const handleCardPress = () => {
     router.push(`/event/${event.$id}` as any);
@@ -91,6 +93,7 @@ function ExploreEventCard({
       onPress={handleCardPress}
       accessibilityRole="button"
       accessibilityLabel={`Event: ${event.title}, ${formatEventDateTimeLabel(event, userLanguage)}`}
+      accessibilityHint={t('a11y.hints.openEvent')}
     >
       <ThemedView style={[styles.card, { borderColor: themeColors.cardBorder }]}>
         <Image
@@ -103,7 +106,7 @@ function ExploreEventCard({
         />
 
         <ThemedView style={styles.content}>
-          {(inProgress || hasCategories) && (
+          {(inProgress || hasCategories || inSeries) && (
             <ThemedView style={styles.badgeContainer}>
               {inProgress && (
                 <ThemedView
@@ -128,13 +131,14 @@ function ExploreEventCard({
                       type="categoryBadge"
                       style={{ color: categoryColors.color }}
                       accessibilityRole="text"
-                      accessibilityLabel={`Category: ${formatCategoryLabel(category)}`}
+                      aria-label={`Category: ${formatCategoryLabel(category)}`}
                     >
                       {formatCategoryLabel(category)}
                     </ThemedText>
                   </ThemedView>
                 );
               })}
+              <SeriesBadge event={event} testID={testID ? `${testID}-series` : undefined} />
             </ThemedView>
           )}
 
@@ -189,6 +193,7 @@ function ExploreEventCard({
               }}
               accessibilityRole="button"
               accessibilityLabel={isSaved ? t('events.unsave') : t('events.save')}
+              accessibilityHint={t('a11y.hints.toggleSave')}
               accessibilityState={{ selected: isSaved }}
             >
               <IconSymbol
@@ -214,6 +219,7 @@ function ExploreEventCard({
             }}
             accessibilityRole="button"
             accessibilityLabel={t('events.share')}
+            accessibilityHint={t('a11y.hints.shareEvent')}
           >
             <IconSymbol name="square.and.arrow.up" size={20} color={colors.icon} />
             <ThemedText type="toolbarButton" style={{ color: colors.text, marginLeft: 8 }}>
@@ -312,6 +318,7 @@ export default memo(ExploreEventCard, (prevProps, nextProps) => {
     prevProps.event.$id === nextProps.event.$id &&
     prevProps.event.start_time === nextProps.event.start_time &&
     prevProps.event.end_time === nextProps.event.end_time &&
+    prevProps.event.series_id === nextProps.event.series_id &&
     prevProps.todayKey === nextProps.todayKey &&
     prevProps.isSaved === nextProps.isSaved &&
     prevProps.userLanguage === nextProps.userLanguage &&

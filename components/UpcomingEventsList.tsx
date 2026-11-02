@@ -58,6 +58,7 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
 
     return (
       <TouchableOpacity
+        accessibilityRole="button"
         onPress={() => {
           const newPath = `/event/${item.id}`;
           router.push(`${newPath}` as any);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
-import { useNetworkState } from 'expo-network';
+import { getNetworkStateAsync, useNetworkState, type NetworkState } from 'expo-network';
 
 /**
  * ConnectivityProvider
@@ -16,6 +16,11 @@ import { useNetworkState } from 'expo-network';
 
 /** Ride out brief handoffs (cell↔wifi, tunnels) before declaring offline. */
 const OFFLINE_DEBOUNCE_MS = 1800;
+
+// Policy: treat null/undefined (unknown) as ONLINE so there's no false
+// offline flash at cold start. Strict `=== false` — never `!isConnected`.
+const reportsOffline = ({ isConnected, isInternetReachable }: NetworkState) =>
+  isConnected === false || isInternetReachable === false;
 
 interface ConnectivityContextType {
   /** Debounced offline state — true only after the device has been offline for
@@ -37,9 +42,7 @@ export function ConnectivityProvider({ children }: ConnectivityProviderProps) {
   const networkState = useNetworkState();
   const { isConnected, isInternetReachable } = networkState;
 
-  // Policy: treat null/undefined (unknown) as ONLINE so there's no false
-  // offline flash at cold start. Strict `=== false` — never `!isConnected`.
-  const rawOffline = isConnected === false || isInternetReachable === false;
+  const rawOffline = reportsOffline(networkState);
 
   const [isOffline, setIsOffline] = useState(false);
 
@@ -51,9 +54,18 @@ export function ConnectivityProvider({ children }: ConnectivityProviderProps) {
     }
     // Going offline: debounce. If connectivity recovers before the timer
     // fires, the cleanup clears it and the next effect run sets online.
-    const timer = setTimeout(() => setIsOffline(true), OFFLINE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [rawOffline]);
+    // Android can send a lost network on return from the background and nothing
+    // after it, so the current state decides.
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const current = await getNetworkStateAsync().catch(() => networkState);
+      if (!cancelled) setIsOffline(reportsOffline(current));
+    }, OFFLINE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [rawOffline, networkState]);
 
   const value = useMemo<ConnectivityContextType>(
     () => ({ isOffline, isConnected, isInternetReachable }),

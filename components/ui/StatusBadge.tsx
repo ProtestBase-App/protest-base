@@ -25,7 +25,7 @@ export function StatusBadge({
         style,
       ]}
       accessibilityRole="text"
-      accessibilityLabel={`Status: ${active ? activeText : inactiveText}`}
+      aria-label={`Status: ${active ? activeText : inactiveText}`}
     >
       <ThemedText style={styles.badgeText}>{active ? activeText : inactiveText}</ThemedText>
     </View>

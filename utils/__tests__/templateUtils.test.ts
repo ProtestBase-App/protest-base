@@ -1,4 +1,9 @@
-import { extractTemplateData, formatPastEventDate } from '../templateUtils';
+import {
+  extractTemplateData,
+  formatPastEventDate,
+  TEMPLATE_PARTS,
+  templateFromEvent,
+} from '../templateUtils';
 import { Event } from '@/types/event.types';
 import { TemplateEventData } from '@/types/template.types';
 
@@ -551,6 +556,10 @@ describe('templateUtils', () => {
   });
 
   describe('formatPastEventDate', () => {
+    it('uses the language it is given', () => {
+      expect(formatPastEventDate('2025-10-26T14:00:00Z', 'nl')).toMatch(/okt/i);
+    });
+
     describe('Valid ISO date formatting', () => {
       it('should format ISO date string with Z suffix correctly', () => {
         const result = formatPastEventDate('2025-10-26T14:00:00Z');
@@ -812,7 +821,7 @@ describe('templateUtils', () => {
           '2025-12-15T10:00:00Z',
         ];
 
-        const results = dates.map(formatPastEventDate);
+        const results = dates.map((date) => formatPastEventDate(date));
 
         results.forEach((result) => {
           // Should match pattern: "Mmm DD, YYYY" (3-letter month, space, day, comma, space, year)
@@ -836,5 +845,42 @@ describe('templateUtils', () => {
         expect(result).toMatch(/\d{4}$/);
       });
     });
+  });
+});
+
+describe('templateFromEvent', () => {
+  const event = {
+    title: 'Rally',
+    description: 'For housing',
+    organization_id: 'org-1',
+    start_time: '2099-01-02T10:00:00.000Z',
+    website_url: 'example.com',
+    categories: ['protest'],
+    city: 'Ghent',
+    images: ['https://example.com/a.jpg'],
+  } as unknown as Event;
+
+  it('keeps every part ticked, and never the dates', () => {
+    const template = templateFromEvent(event, TEMPLATE_PARTS);
+
+    expect(template.event_data).toMatchObject({
+      title: 'Rally',
+      website_url: 'example.com',
+      city: 'Ghent',
+    });
+    expect(template.event_data).not.toHaveProperty('start_time');
+    expect(template.image_urls).toEqual(['https://example.com/a.jpg']);
+  });
+
+  it('drops what is not ticked, but stays with the organization', () => {
+    const template = templateFromEvent(event, ['text']);
+
+    expect(template.organization_id).toBe('org-1');
+    expect(template.event_data).toEqual({
+      title: 'Rally',
+      description: 'For housing',
+      organization_id: 'org-1',
+    });
+    expect(template.image_urls).toEqual([]);
   });
 });

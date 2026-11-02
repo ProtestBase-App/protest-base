@@ -52,7 +52,10 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import DraftListRow from '@/components/DraftListRow';
+import { DynamicRoutes } from '@/constants/Routes';
 import { Event } from '@/types/event.types';
 import { DraftStatus } from '@/utils/draftStatusUtils';
 
@@ -219,6 +222,73 @@ describe('DraftListRow', () => {
     it('lists what is missing on an incomplete draft', () => {
       const { queryByText } = renderRow(MISSING);
       expect(queryByText('drafts.missingFields')).toBeTruthy();
+    });
+  });
+
+  describe('series badge', () => {
+    let flag: jest.SpyInstance;
+    let membership: jest.SpyInstance;
+    const setFlag = (enabled: boolean, isMember = true) => {
+      flag = jest
+        .spyOn(require('@/context/VersionCheckProvider'), 'useRecurringEventsEnabled')
+        .mockReturnValue(enabled);
+      membership = jest
+        .spyOn(require('@/context/UserOrganizationsProvider'), 'useIsOrganizationMember')
+        .mockReturnValue(isMember);
+    };
+
+    afterEach(() => {
+      flag?.mockRestore();
+      membership?.mockRestore();
+    });
+
+    it('marks a draft that is a date of a series while the feature is on', () => {
+      setFlag(true);
+
+      const { getByTestId, getByText } = renderRow(READY, makeEvent({ series_id: 'series-1' }));
+
+      expect(getByTestId('draft-series-draft-1')).toBeTruthy();
+      expect(getByText('series.badge.generic')).toBeTruthy();
+    });
+
+    it('shows nothing while the feature is off', () => {
+      setFlag(false);
+
+      const { queryByTestId, queryByText } = renderRow(READY, makeEvent({ series_id: 'series-1' }));
+
+      expect(queryByTestId('draft-series-draft-1')).toBeNull();
+      expect(queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('shows nothing for a draft that is not in a series', () => {
+      setFlag(true);
+
+      expect(
+        renderRow(READY, makeEvent({ series_id: null })).queryByTestId('draft-series-draft-1')
+      ).toBeNull();
+      expect(
+        renderRow(READY, makeEvent({ series_id: undefined })).queryByTestId('draft-series-draft-1')
+      ).toBeNull();
+    });
+
+    it('marks a draft in every state, since a whole series can be saved as drafts', () => {
+      setFlag(true);
+
+      for (const status of [READY, MISSING, PAST]) {
+        const { getByTestId, unmount } = renderRow(status, makeEvent({ series_id: 'series-1' }));
+        expect(getByTestId('draft-series-draft-1')).toBeTruthy();
+        unmount();
+      }
+    });
+
+    it('opens the series, not the draft editor, when it is pressed', () => {
+      setFlag(true);
+      const { getByTestId, onEdit } = renderRow(READY, makeEvent({ series_id: 'series-1' }));
+
+      fireEvent.press(getByTestId('draft-series-draft-1'), { stopPropagation: jest.fn() });
+
+      expect(router.push).toHaveBeenCalledWith(DynamicRoutes.series('series-1'));
+      expect(onEdit).not.toHaveBeenCalled();
     });
   });
 });

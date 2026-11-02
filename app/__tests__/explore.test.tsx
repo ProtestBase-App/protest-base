@@ -25,6 +25,7 @@ import ExploreTab from '@/app/(tabs)/(explore)/explore';
 import { getEventByIdBackend, getEventsForLocations } from '@/services/event.service';
 import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
+import { formatEventForList } from '@/utils/eventFormatters';
 
 describe('Explore Screen', () => {
   beforeEach(() => {
@@ -104,6 +105,70 @@ describe('Explore Screen', () => {
       // Filter button is a TouchableOpacity with IconSymbol
       const filterButtons = UNSAFE_getAllByType(require('react-native').TouchableOpacity);
       expect(filterButtons.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Recurring events', () => {
+    const seriesItem = formatEventForList(
+      createMockEvent({
+        $id: 'occurrence-1',
+        title: 'Weekly vigil',
+        series_id: 'series-1',
+        organization_id: 'org-1',
+      })
+    );
+
+    const mockPagination = (events: unknown[]) => {
+      (useExplorePagination as jest.Mock).mockReturnValue({
+        events,
+        loading: false,
+        refreshing: false,
+        loadingMore: false,
+        hasMore: false,
+        handleRefresh: jest.fn(),
+        handleEndReached: jest.fn(),
+      });
+    };
+
+    it('badges a date of a series for the organization that runs it, through the list formatting and the card rebuild', () => {
+      mockPagination([seriesItem]);
+
+      const { getByTestId } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          versionCheckContext: { features: { recurringEvents: true } },
+          userOrganizationsContext: { userOrganizations: [{ $id: 'org-1' }] as any },
+        },
+      });
+
+      expect(getByTestId('explore-card-0-series')).toBeTruthy();
+    });
+
+    it('shows a guest an ordinary event', () => {
+      mockPagination([seriesItem]);
+
+      const { getByText, queryByTestId } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          versionCheckContext: { features: { recurringEvents: true } },
+          userOrganizationsContext: { userOrganizations: [] },
+        },
+      });
+
+      expect(getByText('Weekly vigil')).toBeTruthy();
+      expect(queryByTestId('explore-card-0-series')).toBeNull();
+    });
+
+    it('shows no badge with the feature off', () => {
+      mockPagination([seriesItem]);
+
+      const { queryByTestId, getByText } = renderWithProviders(<ExploreTab />, {
+        providerOverrides: {
+          versionCheckContext: { features: { recurringEvents: false } },
+          userOrganizationsContext: { userOrganizations: [{ $id: 'org-1' }] as any },
+        },
+      });
+
+      expect(getByText('Weekly vigil')).toBeTruthy();
+      expect(queryByTestId('explore-card-0-series')).toBeNull();
     });
   });
 

@@ -4,31 +4,38 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
+import { FormIssueSummary } from '@/components/FormIssueSummary';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { getEventByIdBackend, updateEvent } from '@/services/event.service';
+import { editSeries, getEventByIdBackend, updateEvent } from '@/services/event.service';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
+import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import { allDaySubmitField, formatEventForDisplay, FormattedEvent } from '@/utils/eventFormatters';
 import EventForm from '@/components/EventForm';
+import SeriesScopeDialog from '@/components/SeriesScopeDialog';
 import type { FormState } from '@/types/eventForm.types';
+import type { SeriesEditRequest, SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
+import { createBlankForm } from '@/utils/eventFormData';
+import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { buildLocationUpdate, toPostalCodeString } from '@/utils/eventLocation';
-
-// Matches common URL patterns, with or without protocol/www.
-const URL_REGEX =
-  /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/;
+import { HelperText } from '@/utils/formHelpers';
+import { seriesErrorMessage, seriesTimesFromForm } from '@/utils/recurrence';
 
 export default function EditEvent() {
   const { user, isLogged, userLanguage, refetchEvents, refreshUserEventCounts } =
@@ -37,41 +44,23 @@ export default function EditEvent() {
   const { isOffline } = useConnectivity();
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const { id, isCreated } = useLocalSearchParams<{ id: string | string[]; isCreated?: string }>();
+  const { id, isCreated, allUpcoming } = useLocalSearchParams<{
+    id: string | string[];
+    isCreated?: string;
+    allUpcoming?: string;
+  }>();
   const eventId = Array.isArray(id) ? id[0] : id;
+  const recurringEnabled = useRecurringEventsEnabled();
 
   const [eventDetail, setEventDetail] = useState<FormattedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState<FormState>({
-    organization_id: '',
-    title: '',
-    description: '',
-    images: [],
-    street_address: '',
-    city: '',
-    region: '',
-    country: '',
-    start_time: '',
-    end_time: '',
-    organizer_name: user?.name || '',
-    website_url: '',
-    categories: '',
-    disclaimer: '',
-    postal_code: null,
-    co_organizers: [],
-    help_needed: false,
-    help_description: '',
-    geocod_lat: null,
-    geocod_lng: null,
-  });
+  const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(() =>
+    createBlankForm({ organizer_name: user?.name || '' })
+  );
 
-  const [emptyFields, setEmptyFields] = useState({
-    title: false,
-    start_time: false,
-    description: false,
-    help_description: false,
-  });
+  const validation = useEventFormValidation((intent) => validateEventForm(form, { intent }));
 
   const scrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   // Baseline snapshot of the freshly loaded form; drives the unsaved-changes
@@ -81,9 +70,10 @@ export default function EditEvent() {
   // changes after load, and the dirty check above stringifies the whole form.
   const wasAllDayRef = useRef(false);
 
-  const scrollToTop = useCallback(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-  }, []);
+  // One date of a series, while the feature is on. "Edit all upcoming" opens the form
+  // on the first date in scope, and then there is no choice left to offer.
+  const seriesId = recurringEnabled ? (eventDetail[0]?.series_id ?? null) : null;
+  const editsAllUpcoming = !!seriesId && allUpcoming === 'true';
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -181,6 +171,8 @@ export default function EditEvent() {
   // Intercept the Android hardware back so it honours the unsaved-changes guard
   // instead of silently discarding edits.
   useEffect(() => {
+    if (EVENT_FORM_SHELL.eventEdit) return;
+
     const onHardwareBack = () => {
       if (isDirty()) {
         handleBackPress();
@@ -194,92 +186,109 @@ export default function EditEvent() {
 
   const submit = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
-    const newEmptyFields = {
-      title: form.title === '',
-      start_time: form.start_time === '',
-      description: form.description === '',
-      help_description: form.help_needed && !form.help_description?.trim(),
+    if (!validation.check('saveEdit')) return;
+
+    if (editsAllUpcoming) {
+      await saveSeries();
+    } else if (seriesId) {
+      setScopeDialogOpen(true);
+    } else {
+      await saveEvent();
+    }
+  };
+
+  /** Everything but the schedule, shared by the one-event and the series save. */
+  const contentFields = (): SeriesEditRequest => {
+    // co_organizers holds org IDs (the dropdown values) — sent through as-is.
+    const finalCoOrganizers = form.co_organizers?.length ? form.co_organizers : undefined;
+    const locationUpdate = buildLocationUpdate(form, initialFormRef.current);
+
+    // organizer_name is intentionally not sent — it's tied to the creator.
+    return {
+      title: form.title,
+      description: form.description,
+      // Emptied fields go as '' (clear); untouched blank ones are omitted.
+      ...locationUpdate,
+      // Re-picking the street this session adopts the confirmed pin (healing a
+      // stale/wrong one); omitted when the street wasn't re-picked or is cleared.
+      ...(locationUpdate.street_address
+        ? { geocod_lat: form.geocod_lat ?? undefined, geocod_lng: form.geocod_lng ?? undefined }
+        : {}),
+      // Authoritative full ordered list (kept URLs + new files); an emptied
+      // list is an explicit removal of every image.
+      images: form.images.length ? form.images : null,
+      website_url: form.website_url || undefined,
+      categories: form.categories,
+      disclaimer: form.disclaimer || undefined,
+      co_organizers: finalCoOrganizers,
+      help_needed: form.help_needed,
+      help_description: form.help_needed ? form.help_description || undefined : undefined,
     };
+  };
 
-    setEmptyFields(newEmptyFields);
+  const finishSave = async (message: string) => {
+    await refetchEvents();
 
-    if (
-      newEmptyFields.title ||
-      newEmptyFields.start_time ||
-      newEmptyFields.description ||
-      newEmptyFields.help_description
-    ) {
-      const missingFields: string[] = [];
-      if (newEmptyFields.title) missingFields.push(t('createEvent.title'));
-      if (newEmptyFields.description) missingFields.push(t('createEvent.description'));
-      if (newEmptyFields.start_time) missingFields.push(t('createEvent.startTime'));
-      if (newEmptyFields.help_description) missingFields.push(t('createEvent.volunteerRoles'));
+    const orgIds = userOrganizations.map((org) => org.$id);
+    refreshUserEventCounts(orgIds);
 
-      const errorMessage = t('createEvent.missingFieldsError', {
-        fields: missingFields.join(', '),
-      });
-      Alert.alert(t('common.error'), errorMessage);
+    router.replace(DynamicRoutes.event(eventId, { isCreated: isCreated === 'true' }));
 
-      scrollToTop();
-      return;
-    }
+    Alert.alert(t('common.success'), message);
+  };
 
-    if (form.end_time && form.end_time < form.start_time) {
-      Alert.alert(t('common.error'), t('eventEdit.invalidTimeRangeError'));
-      return;
-    }
-
-    if (form.website_url && form.website_url.trim()) {
-      const urlValue = form.website_url.trim();
-      if (!URL_REGEX.test(urlValue)) {
-        Alert.alert(t('common.error'), t('createEvent.invalidUrlFormat'));
-        return;
-      }
-    }
-
+  const saveEvent = async () => {
     setSubmitting(true);
     try {
-      // co_organizers holds org IDs (the dropdown values) — sent through as-is.
-      const finalCoOrganizers = form.co_organizers?.length ? form.co_organizers : undefined;
-      const locationUpdate = buildLocationUpdate(form, initialFormRef.current);
-
-      // organizer_name is intentionally not sent — it's tied to the creator.
       await updateEvent(eventId, {
-        title: form.title,
-        description: form.description,
+        ...contentFields(),
         start_time: form.start_time,
         end_time: form.end_time || undefined,
-        // Emptied fields go as '' (clear); untouched blank ones are omitted.
-        ...locationUpdate,
-        // Re-picking the street this session adopts the confirmed pin (healing a
-        // stale/wrong one); omitted when the street wasn't re-picked or is cleared.
-        ...(locationUpdate.street_address
-          ? { geocod_lat: form.geocod_lat ?? undefined, geocod_lng: form.geocod_lng ?? undefined }
-          : {}),
-        // Authoritative full ordered list (kept URLs + new files); an emptied
-        // list is an explicit removal of every image.
-        images: form.images.length ? form.images : null,
-        website_url: form.website_url || undefined,
-        categories: form.categories,
-        disclaimer: form.disclaimer || undefined,
-        co_organizers: finalCoOrganizers,
-        help_needed: form.help_needed,
-        help_description: form.help_needed ? form.help_description || undefined : undefined,
         ...allDaySubmitField(wasAllDayRef.current, form.start_time),
       });
-
-      await refetchEvents();
-
-      const orgIds = userOrganizations.map((org) => org.$id);
-      refreshUserEventCounts(orgIds);
-
-      router.replace(DynamicRoutes.event(eventId, { isCreated: isCreated === 'true' }));
-
-      Alert.alert(t('common.success'), t('eventEdit.successMessage'));
+      await finishSave(t('eventEdit.successMessage'));
     } catch (error) {
       Alert.alert(t('common.error'), (error as Error).message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Null when the form asks for a schedule change, which a series cannot take.
+  const seriesTimes =
+    seriesId && initialFormRef.current
+      ? seriesTimesFromForm(form, initialFormRef.current.start_time)
+      : null;
+
+  /** Save this date and every later one, or with `allUpcoming` every upcoming date. */
+  const saveSeries = async () => {
+    if (!seriesId) return;
+    if (!seriesTimes) {
+      Alert.alert(t('common.error'), t('series.edit.dateLocked'));
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await editSeries(
+        seriesId,
+        // An all-day series has no wall-clock times to set.
+        { ...contentFields(), ...(wasAllDayRef.current ? {} : seriesTimes) },
+        editsAllUpcoming ? undefined : { fromEventId: eventId }
+      );
+      await finishSave(t('series.messages.updated', { count: result.updated }));
+    } catch (error) {
+      Alert.alert(t('common.error'), seriesErrorMessage(error, userLanguage));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleScopeConfirm = (scope: SeriesScope) => {
+    setScopeDialogOpen(false);
+    if (scope === 'following') {
+      saveSeries();
+    } else {
+      saveEvent();
     }
   };
 
@@ -295,6 +304,96 @@ export default function EditEvent() {
       <ThemedView style={styles.splashContainer}>
         <BrandLoader />
       </ThemedView>
+    );
+  }
+
+  const scopeDialog = (
+    <SeriesScopeDialog
+      visible={scopeDialogOpen}
+      title={t('series.edit.scopeTitle')}
+      onlyHint={t('series.edit.onlyNote')}
+      followingHint={t('series.edit.followingNote')}
+      followingDisabledReason={seriesTimes ? undefined : t('series.edit.dateLocked')}
+      dismissLabel={t('common.cancel')}
+      onDismiss={() => setScopeDialogOpen(false)}
+      confirmLabel={t('common.save')}
+      onConfirm={handleScopeConfirm}
+      testID="series-edit-scope"
+    />
+  );
+
+  const seriesNote = !!seriesId && (
+    <HelperText
+      text={
+        editsAllUpcoming
+          ? t('series.edit.allNote')
+          : `${t('series.edit.partOfSeries')} ${t('series.edit.onlyNote')}`
+      }
+      isDark={colorScheme === 'dark'}
+    />
+  );
+
+  if (EVENT_FORM_SHELL.eventEdit) {
+    const event = eventDetail[0];
+    return (
+      <>
+        <EventFormShell
+          kind="edit"
+          form={form}
+          setForm={setForm}
+          validation={validation}
+          userLanguage={userLanguage}
+          busy={isSubmitting}
+          isAllDay={wasAllDayRef.current}
+          savedPin={
+            event?.geocod_lat != null && event.geocod_lng != null
+              ? {
+                  latitude: event.geocod_lat,
+                  longitude: event.geocod_lng,
+                  street: event.street_address || '',
+                }
+              : null
+          }
+          scrollViewRef={scrollViewRef}
+          closeLabel={t('eventEdit.closeAccessibilityLabel')}
+          onBack={() => {
+            handleBackPress();
+            return true;
+          }}
+          heading={t('eventEdit.title')}
+          intro={seriesNote}
+          footer={
+            <>
+              <CustomButton
+                testID="button-cancel"
+                title={t('common.cancel')}
+                handlePress={() => handleBackPress()}
+                pill
+                containerStyles={[
+                  styles.buttonCancel,
+                  {
+                    backgroundColor: themeColors.buttonSecondaryBackground,
+                    borderColor: themeColors.buttonSecondaryBorder,
+                  },
+                ]}
+                textStyles={{ color: themeColors.text }}
+                isLoading={false}
+                disabled={isSubmitting}
+              />
+              <CustomButton
+                testID="button-save"
+                title={isSubmitting ? t('common.saving') : t('common.save')}
+                handlePress={submit}
+                pill
+                containerStyles={styles.buttonSave}
+                isLoading={isSubmitting}
+              />
+            </>
+          }
+        />
+        {scopeDialog}
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </>
     );
   }
 
@@ -341,6 +440,7 @@ export default function EditEvent() {
               style={[styles.closeButton, isSubmitting && styles.closeButtonDisabled]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityLabel={t('eventEdit.closeAccessibilityLabel')}
+              accessibilityHint={t('a11y.hints.closeScreen')}
               accessibilityRole="button"
               accessibilityState={{ disabled: isSubmitting }}
             >
@@ -348,10 +448,23 @@ export default function EditEvent() {
             </TouchableOpacity>
           </ThemedView>
 
+          <FormIssueSummary validation={validation} />
+
+          {!!seriesId && (
+            <HelperText
+              text={
+                editsAllUpcoming
+                  ? t('series.edit.allNote')
+                  : `${t('series.edit.partOfSeries')} ${t('series.edit.onlyNote')}`
+              }
+              isDark={colorScheme === 'dark'}
+            />
+          )}
+
           <EventForm
             form={form}
             setForm={setForm}
-            emptyFields={emptyFields}
+            errors={validation.errors}
             userLanguage={userLanguage}
             mode="edit-event"
             scrollViewRef={scrollViewRef}
@@ -359,6 +472,7 @@ export default function EditEvent() {
           />
         </ThemedView>
       </FormScreenScaffold>
+      {scopeDialog}
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );

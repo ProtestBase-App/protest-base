@@ -46,6 +46,11 @@ export interface Event {
   // cache can rehydrate objects written before this field existed.
   all_day?: boolean;
 
+  // The recurring series this event is one date of; null for a single event. The rule
+  // itself is only in GET /events/series/:id. Optional for the same reason as all_day:
+  // the persisted cache can rehydrate objects written before the field existed.
+  series_id?: string | null;
+
   organization_id?: string;
 
   // organizer_* fields are populated from the authenticated user who created the event.
@@ -268,6 +273,8 @@ export interface DuplicateSummary {
   strength: DuplicateStrength;
   /** Trigram similarity, present on `fuzzy` matches only. */
   similarity?: number;
+  /** Which of YOUR dates clashed, on a recurring series. Absent on a single event. */
+  occurrence_start_time?: string | null;
 }
 
 /**

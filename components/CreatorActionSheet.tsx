@@ -12,6 +12,7 @@ interface CreatorActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onEditDetails: () => void;
+  onSaveAsTemplate: () => void;
   /**
    * Invoked when the user taps "Cancel event". The parent is responsible for
    * showing the confirmation + reason prompt and calling the cancelEvent API.
@@ -26,6 +27,7 @@ export default function CreatorActionSheet({
   visible,
   onClose,
   onEditDetails,
+  onSaveAsTemplate,
   onCancelEvent,
   cancelDisabled = false,
 }: CreatorActionSheetProps) {
@@ -38,8 +40,20 @@ export default function CreatorActionSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose}>
-        <Pressable style={styles.sheetWrapper} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        // No close control here: VoiceOver leaves with the escape gesture.
+        accessible={false}
+        accessibilityRole="none"
+        onAccessibilityEscape={onClose}
+        style={styles.scrim}
+        onPress={onClose}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={styles.sheetWrapper}
+          onPress={(e) => e.stopPropagation()}
+        >
           <ThemedView style={[styles.sheet, { backgroundColor: themeColors.surfaceBackground }]}>
             <View style={[styles.handle, { backgroundColor: themeColors.separator }]} />
 
@@ -52,6 +66,20 @@ export default function CreatorActionSheet({
               onPress={() => {
                 onClose();
                 onEditDetails();
+              }}
+            />
+
+            <View style={[styles.separator, { backgroundColor: themeColors.separator }]} />
+
+            <ActionRow
+              testID="creator-action-template"
+              icon="doc.on.doc"
+              label={t('template.saveFromEventTitle')}
+              description={t('template.saveFromEventDesc')}
+              iconColor={themeColors.text}
+              onPress={() => {
+                onClose();
+                onSaveAsTemplate();
               }}
             />
 
@@ -106,7 +134,7 @@ export default function CreatorActionSheet({
 }
 
 interface ActionRowProps {
-  icon: 'pencil' | 'bell.badge' | 'eye' | 'xmark.circle';
+  icon: 'pencil' | 'doc.on.doc' | 'bell.badge' | 'eye' | 'xmark.circle';
   label: string;
   description: string;
   iconColor: string;
@@ -136,6 +164,7 @@ function ActionRow({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={description}
     >
       <View style={[styles.iconContainer, { backgroundColor: themeColors.badgeBg }]}>
         <IconSymbol name={icon} size={IconSizes.md} color={iconColor} />

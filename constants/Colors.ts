@@ -5,12 +5,14 @@
 
 const tintColorLight = '#F94460';
 const tintColorDark = '#F94460';
+const ctaColor = '#DC2A48';
 
 export const Colors = {
   light: {
     text: '#1A1A1A',
     background: '#FAFAFA',
     tint: tintColorLight,
+    cta: ctaColor,
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
@@ -28,6 +30,8 @@ export const Colors = {
     chevron: '#999999',
     link: '#306DD6',
     destructive: '#EF4444',
+    errorText: '#D12A1F',
+    errorBg: 'rgba(209, 42, 31, 0.08)',
     buttonSecondaryBackground: '#ECECEC',
     buttonSecondaryBorder: '#D0D0D0',
     highlightBackground: '#F8FCFD',
@@ -43,6 +47,7 @@ export const Colors = {
     text: '#FFFFFF',
     background: '#161622',
     tint: tintColorDark,
+    cta: ctaColor,
     icon: '#CDCDE0',
     tabIconDefault: '#CDCDE0',
     tabIconSelected: tintColorDark,
@@ -60,6 +65,8 @@ export const Colors = {
     chevron: '#999999',
     link: '#5B9BFF',
     destructive: '#EF4444',
+    errorText: '#FF6B62',
+    errorBg: 'rgba(255, 107, 98, 0.12)',
     buttonSecondaryBackground: '#1E1E2D',
     buttonSecondaryBorder: '#3A3A4A',
     highlightBackground: '#1A2530',

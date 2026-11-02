@@ -17,6 +17,8 @@ module.exports = {
     './node_modules/react-native-gesture-handler/jestSetup.js',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  // Must match jest.config.js: CI always starts on a cold transform cache.
+  testTimeout: 20000,
 
   testMatch: [
     // Utils - Pure logic tests (no mocks)

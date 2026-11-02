@@ -21,9 +21,7 @@ describe('LoadingState', () => {
   });
 
   it('custom accessibility label', () => {
-    const { getByLabelText } = renderWithProviders(
-      <LoadingState accessibilityLabel="Loading events" />
-    );
+    const { getByLabelText } = renderWithProviders(<LoadingState label="Loading events" />);
 
     expect(getByLabelText('Loading events')).toBeTruthy();
   });

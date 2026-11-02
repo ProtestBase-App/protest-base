@@ -69,6 +69,7 @@ export function ExploreActiveFilterChips({
             removable
             label={t('categories.' + filters.category.toLowerCase())}
             accessibilityLabel={`Remove ${t('categories.' + filters.category.toLowerCase())}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveCategory}
           />
         )}
@@ -79,6 +80,7 @@ export function ExploreActiveFilterChips({
             removable
             label={t('filters.' + filters.dateFilter)}
             accessibilityLabel={`Remove ${t('filters.' + filters.dateFilter)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveDate}
             leading={<IconSymbol name="calendar" size={11} color={themeColors.tint} />}
           />
@@ -90,6 +92,7 @@ export function ExploreActiveFilterChips({
             removable
             label={resolveCountryLabel(filters.country)}
             accessibilityLabel={`Remove ${resolveCountryLabel(filters.country)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={onRemoveCountry}
             leading={<IconSymbol name="globe.europe.africa" size={11} color={themeColors.tint} />}
           />
@@ -102,6 +105,7 @@ export function ExploreActiveFilterChips({
             removable
             label={resolveLocationLabel(token)}
             accessibilityLabel={`Remove ${resolveLocationLabel(token)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={() => onRemoveLocation(token)}
             leading={<IconSymbol name="mappin.and.ellipse" size={11} color={themeColors.tint} />}
           />
@@ -114,6 +118,7 @@ export function ExploreActiveFilterChips({
             removable
             label={resolveOrganizationLabel(id)}
             accessibilityLabel={`Remove ${resolveOrganizationLabel(id)}`}
+            accessibilityHint={t('a11y.hints.removeFilter')}
             onPress={() => onRemoveOrganization(id)}
             leading={<IconSymbol name="person" size={11} color={themeColors.tint} />}
           />

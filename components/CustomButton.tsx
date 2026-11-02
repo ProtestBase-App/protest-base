@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Typography } from '@/constants/DesignTokens';
+import { BorderRadius, Typography } from '@/constants/DesignTokens';
+import { getThemeColors } from '@/utils/themeColors';
 
 import { ThemedText } from '@/components/ThemedText';
 
@@ -12,6 +13,8 @@ interface CustomButtonProps {
   textStyles?: object;
   isLoading: boolean;
   disabled?: boolean;
+  /** The slimmer pill of the event forms. */
+  pill?: boolean;
   /** Test ID for E2E testing (Maestro, etc.) */
   testID?: string;
 }
@@ -23,10 +26,11 @@ export default function CustomButton({
   textStyles,
   isLoading,
   disabled = false,
+  pill = false,
   testID,
 }: CustomButtonProps) {
   const colorScheme = useColorScheme();
-  const backgroundColor = colorScheme === 'dark' ? '#F0405B' : '#FF4662';
+  const backgroundColor = getThemeColors(colorScheme).cta;
 
   // A loading button is also non-interactive; both states dim it.
   const isDimmed = isLoading || disabled;
@@ -34,12 +38,14 @@ export default function CustomButton({
   return (
     <>
       <TouchableOpacity
+        accessibilityRole="button"
         testID={testID}
         onPress={handlePress}
         activeOpacity={0.7}
         style={[
           styles.touchableOpacity,
           { backgroundColor },
+          pill && styles.pill,
           containerStyles,
           isDimmed && styles.opacity50,
         ]}
@@ -62,6 +68,10 @@ const styles = StyleSheet.create({
     minHeight: 62,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pill: {
+    minHeight: 48,
+    borderRadius: BorderRadius.full,
   },
   text: {
     fontSize: Typography.sizes.base,

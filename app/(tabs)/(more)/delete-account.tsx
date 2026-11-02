@@ -112,13 +112,14 @@ export default function DeleteAccountScreen() {
           bottomOffset={KEYBOARD_BOTTOM_OFFSET}
           keyboardShouldPersistTaps="handled"
         >
-          <Pressable onPress={Keyboard.dismiss}>
+          <Pressable accessible={false} accessibilityRole="none" onPress={Keyboard.dismiss}>
             <ThemedView
               style={[styles.container, { minHeight: Dimensions.get('window').height - 100 }]}
             >
               <ThemedView style={styles.titleContainer}>
                 <ThemedText style={styles.title}>{t('account.deleteTitle')}</ThemedText>
                 <TouchableOpacity
+                  accessibilityRole="button"
                   style={styles.closeButton}
                   onPress={() => {
                     router.back();

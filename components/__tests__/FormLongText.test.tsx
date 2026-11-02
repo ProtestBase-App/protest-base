@@ -13,6 +13,24 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import FormLongText from '@/components/FormLongText';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+describe('FormLongText counter limit', () => {
+  it('shows the limit, not the input cap, for older text over it', () => {
+    const { getByText } = render(
+      <FormLongText
+        title="Volunteers"
+        value={'x'.repeat(800)}
+        placeholder="Details"
+        handleChangeText={jest.fn()}
+        isLongText
+        maxLength={800}
+        counterLimit={500}
+      />
+    );
+
+    expect(getByText(`${(800).toLocaleString()} / ${(500).toLocaleString()}`)).toBeTruthy();
+  });
+});
+
 describe('FormLongText', () => {
   const defaultProps = {
     title: 'Description',
@@ -192,6 +210,31 @@ describe('FormLongText', () => {
     it('renders with error state without crashing', () => {
       render(<FormLongText {...defaultProps} hasError />);
       expect(screen.getByPlaceholderText('Enter description')).toBeTruthy();
+    });
+
+    it('says what is wrong under the field', () => {
+      render(<FormLongText {...defaultProps} errorText="Add a description" />);
+      expect(screen.getByText('Add a description')).toBeTruthy();
+    });
+  });
+
+  describe('Screen readers', () => {
+    it('names the input after its title', () => {
+      render(<FormLongText {...defaultProps} />);
+      expect(screen.getByLabelText('Description')).toBeTruthy();
+    });
+
+    it('reads what is wrong with the name', () => {
+      render(<FormLongText {...defaultProps} errorText="Add a description" />);
+      expect(screen.getByLabelText('Description: Add a description')).toBeTruthy();
+    });
+
+    it('names the resize button for what it does next', () => {
+      render(<FormLongText {...defaultProps} isLongText />);
+
+      fireEvent.press(screen.getByLabelText('Make this field taller'));
+
+      expect(screen.getByLabelText('Make this field shorter')).toBeTruthy();
     });
   });
 

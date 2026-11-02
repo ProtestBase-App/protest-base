@@ -11,26 +11,32 @@ import React, {
 } from 'react';
 import {
   Keyboard,
+  Platform,
   StyleSheet,
   TextInput,
   View,
   type LayoutChangeEvent,
+  type ScrollViewProps,
   type StyleProp,
   type ViewInstance,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
+import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import {
   KeyboardAwareScrollView,
-  KeyboardStickyView,
+  useReanimatedKeyboardAnimation,
   type KeyboardAwareScrollViewRef,
 } from 'react-native-keyboard-controller';
 
 import { ThemedView } from '@/components/ThemedView';
 import { Spacing } from '@/constants/DesignTokens';
-import { getDropdownHeadroom } from '@/utils/keyboardReveal';
+import { getDropdownHeadroom, getFooterLift } from '@/utils/keyboardReveal';
 
 const DEFAULT_EDGES: Edge[] = ['top', 'left', 'right'];
+// Space left above a field the form jumps to, so its label isn't against the edge.
+const FIELD_JUMP_HEADROOM = Spacing.xl;
 
 interface FormKeyboardContextValue {
   /** Reserve (or release) room for a dropdown below the focused input. */
@@ -46,6 +52,47 @@ export function useFormKeyboard(): FormKeyboardContextValue {
   return useContext(FormKeyboardContext);
 }
 
+interface FormFieldJumpContextValue {
+  registerField: (field: string, view: ViewInstance | null) => void;
+  /** Scroll the form to a field wrapped in a `FormFieldAnchor`. */
+  scrollToField: (field: string) => void;
+}
+
+// No-op default so a form rendered outside a scaffold doesn't throw.
+const FormFieldJumpContext = createContext<FormFieldJumpContextValue>({
+  registerField: () => {},
+  scrollToField: () => {},
+});
+
+export function useFormFieldJump(): FormFieldJumpContextValue {
+  return useContext(FormFieldJumpContext);
+}
+
+export interface FormFieldAnchorProps {
+  /** Several, when one row on the form stands for fields kept in a surface. */
+  field: string | readonly string[];
+  children: ReactNode;
+}
+
+/** Marks where a field sits, so a refused submit can jump to it. */
+export function FormFieldAnchor({ field, children }: FormFieldAnchorProps) {
+  const { registerField } = useFormFieldJump();
+  const anchorRef = useCallback(
+    (view: ViewInstance | null) => {
+      for (const name of typeof field === 'string' ? [field] : field) {
+        registerField(name, view);
+      }
+    },
+    [field, registerField]
+  );
+
+  return (
+    <View ref={anchorRef} collapsable={false}>
+      {children}
+    </View>
+  );
+}
+
 export interface FormScreenScaffoldProps {
   children: ReactNode;
   /** Optional sticky footer (e.g. Cancel/Save); rides above the keyboard. */
@@ -54,6 +101,30 @@ export interface FormScreenScaffoldProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   /** Safe-area edges to pad; drop 'top' on screens under a navigation header. */
   edges?: Edge[];
+  onScroll?: ScrollViewProps['onScroll'];
+  /** The route's `presentation` is 'modal': on iOS, a sheet where `SafeAreaView` reads no inset. */
+  inSheet?: boolean;
+}
+
+/** The tab bar's height when it stays under the form, clearing the inset. An iOS sheet covers it. */
+export function useTabBarBelowForm(inSheet: boolean): number {
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+  return inSheet && Platform.OS === 'ios' ? 0 : tabBarHeight;
+}
+
+/** Rests at the bottom of the screen, and rides the keyboard once it gets there. */
+function KeyboardFooter({ gapBelow, children }: { gapBelow: number; children: ReactNode }) {
+  const { height } = useReanimatedKeyboardAnimation();
+  const liftStyle = useAnimatedStyle(
+    () => ({ transform: [{ translateY: getFooterLift(height.value, gapBelow) }] }),
+    [gapBelow]
+  );
+
+  return (
+    <Animated.View style={[styles.footerWrapper, liftStyle]} testID="form-footer">
+      {children}
+    </Animated.View>
+  );
 }
 
 /**
@@ -67,10 +138,20 @@ export function FormScreenScaffold({
   scrollViewRef,
   contentContainerStyle,
   edges = DEFAULT_EDGES,
+  onScroll,
+  inSheet = false,
 }: FormScreenScaffoldProps) {
   const internalRef = useRef<KeyboardAwareScrollViewRef>(null);
   const scrollRef = scrollViewRef ?? internalRef;
+  const { bottom: bottomInset } = useSafeAreaInsets();
+  const iosSheetInset = inSheet && Platform.OS === 'ios' ? bottomInset : 0;
+  const tabBarBelow = useTabBarBelowForm(inSheet);
+  const aboveTabBar = tabBarBelow > 0;
   const viewportRef = useRef<ViewInstance>(null);
+  const contentRef = useRef<ViewInstance>(null);
+  const fieldsRef = useRef(new Map<string, ViewInstance>());
+  const viewportHeightRef = useRef(0);
+  const footerHeightRef = useRef(0);
 
   const [footerHeight, setFooterHeight] = useState(0);
   const [dropdownFocused, setDropdownFocused] = useState(false);
@@ -127,7 +208,12 @@ export function FormScreenScaffold({
   }, [dropdownHeadroom, scrollRef]);
 
   const handleFooterLayout = useCallback((event: LayoutChangeEvent) => {
+    footerHeightRef.current = event.nativeEvent.layout.height;
     setFooterHeight(event.nativeEvent.layout.height);
+  }, []);
+
+  const handleViewportLayout = useCallback((event: LayoutChangeEvent) => {
+    viewportHeightRef.current = event.nativeEvent.layout.height;
   }, []);
 
   const handleDropdownFocused = useCallback((focused: boolean) => {
@@ -140,6 +226,58 @@ export function FormScreenScaffold({
     [handleDropdownFocused]
   );
 
+  const registerField = useCallback((field: string, view: ViewInstance | null) => {
+    if (view) {
+      fieldsRef.current.set(field, view);
+    } else {
+      fieldsRef.current.delete(field);
+    }
+  }, []);
+
+  const scrollToField = useCallback(
+    (field: string) => {
+      const jump = () => {
+        const target = fieldsRef.current.get(field);
+        const content = contentRef.current;
+        if (!target || !content) return;
+
+        target.measureLayout(
+          content,
+          (_x, y, _width, height) => {
+            // A field that fits from the top stays there, with the form's summary in view.
+            const visibleHeight = viewportHeightRef.current - footerHeightRef.current;
+            const fitsFromTop = y + height + Spacing.md <= visibleHeight;
+            scrollRef.current?.scrollTo({
+              y: fitsFromTop ? 0 : Math.max(0, y - FIELD_JUMP_HEADROOM),
+              animated: true,
+            });
+          },
+          // The field left the form while the jump was on its way: nowhere to go.
+          () => {}
+        );
+      };
+
+      if (!Keyboard.isVisible()) {
+        jump();
+        return;
+      }
+
+      // As it hides, the keyboard takes back the scrolling it asked for, which would
+      // undo a jump made now.
+      const subscription = Keyboard.addListener('keyboardDidHide', () => {
+        subscription.remove();
+        jump();
+      });
+      Keyboard.dismiss();
+    },
+    [scrollRef]
+  );
+
+  const fieldJumpContext = useMemo<FormFieldJumpContextValue>(
+    () => ({ registerField, scrollToField }),
+    [registerField, scrollToField]
+  );
+
   return (
     <FormKeyboardContext.Provider value={keyboardContext}>
       {/* The scaffold must paint its own background: the scroll container's
@@ -150,7 +288,12 @@ export function FormScreenScaffold({
       <ThemedView style={styles.wrapper}>
         <SafeAreaView style={styles.safeArea} edges={edges}>
           {/* Measured to size the dropdown room: same frame as the scroll view. */}
-          <View ref={viewportRef} collapsable={false} style={styles.viewport}>
+          <View
+            ref={viewportRef}
+            collapsable={false}
+            style={styles.viewport}
+            onLayout={handleViewportLayout}
+          >
             <KeyboardAwareScrollView
               ref={scrollRef}
               bottomOffset={bottomOffset}
@@ -161,19 +304,28 @@ export function FormScreenScaffold({
               ]}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
+              onScroll={onScroll}
             >
-              {children}
+              {/* The frame field jumps measure against: it scrolls with the fields. */}
+              <View ref={contentRef} collapsable={false} style={styles.content}>
+                <FormFieldJumpContext.Provider value={fieldJumpContext}>
+                  {children}
+                </FormFieldJumpContext.Provider>
+              </View>
             </KeyboardAwareScrollView>
           </View>
 
           {footer ? (
-            // No `offset`: the default lands the bar flush on the keyboard. Adding
-            // the safe-area inset leaves a transparent gap the form shows through.
-            <KeyboardStickyView style={styles.footerWrapper}>
+            <KeyboardFooter gapBelow={aboveTabBar ? tabBarBelow : iosSheetInset}>
               <ThemedView onLayout={handleFooterLayout}>
-                <SafeAreaView edges={['bottom']}>{footer}</SafeAreaView>
+                <SafeAreaView
+                  edges={aboveTabBar ? [] : ['bottom']}
+                  style={{ marginBottom: iosSheetInset }}
+                >
+                  {footer}
+                </SafeAreaView>
               </ThemedView>
-            </KeyboardStickyView>
+            </KeyboardFooter>
           ) : null}
         </SafeAreaView>
       </ThemedView>
@@ -190,6 +342,9 @@ const styles = StyleSheet.create({
   },
   viewport: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
   },
   footerWrapper: {
     position: 'absolute',

@@ -42,13 +42,17 @@ export const DynamicRoutes = {
     pathname: '/event/[id]' as const,
     params: { id, ...(queryParams?.isCreated ? { isCreated: 'true' } : {}) },
   }),
-  eventEdit: (id: string, queryParams?: { isCreated?: boolean }) => ({
+  eventEdit: (id: string, queryParams?: { isCreated?: boolean; allUpcoming?: boolean }) => ({
     pathname: '/event-edit/[id]' as const,
-    params: { id, ...(queryParams?.isCreated ? { isCreated: 'true' } : {}) },
+    params: {
+      id,
+      ...(queryParams?.isCreated ? { isCreated: 'true' } : {}),
+      ...(queryParams?.allUpcoming ? { allUpcoming: 'true' } : {}),
+    },
   }),
-  draftEdit: (id: string) => ({
+  draftEdit: (id: string, queryParams?: { allUpcoming?: boolean }) => ({
     pathname: '/draft-edit/[id]' as const,
-    params: { id },
+    params: { id, ...(queryParams?.allUpcoming ? { allUpcoming: 'true' } : {}) },
   }),
   editTemplate: (id: string) => ({
     pathname: '/edit-template/[id]' as const,
@@ -58,6 +62,12 @@ export const DynamicRoutes = {
   organizer: (id: string) =>
     ({
       pathname: '/organizer/[id]' as '/event/[id]',
+      params: { id },
+    }) as const,
+  // Same cast as above.
+  series: (id: string) =>
+    ({
+      pathname: '/series/[id]' as '/event/[id]',
       params: { id },
     }) as const,
 };

@@ -101,6 +101,8 @@ const fr: LocaleData = {
   // Common - General UI elements
   // ============================================
   common: {
+    saving: 'Enregistrement…',
+    publishing: 'Publication…',
     ok: 'OK',
     cancel: 'Annuler',
     save: 'Enregistrer',
@@ -165,8 +167,7 @@ const fr: LocaleData = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Créer un modèle',
-    createFromEventTitle: "Créer un modèle à partir d'un événement",
+    createTitle: 'Nouveau modèle',
     editTitle: 'Modifier le modèle',
 
     // Subtitles and descriptions
@@ -181,7 +182,7 @@ const fr: LocaleData = {
     // Field labels
     nameLabel: 'Nom du modèle *',
     descriptionLabel: 'Description du modèle (Facultatif)',
-    namePlaceholder: 'Donnez un nom à votre modèle (ex: Réunion mensuelle)',
+    namePlaceholder: 'ex. : Veillée mensuelle pour le logement',
     descriptionPlaceholder: 'À quoi sert ce modèle ?',
 
     // Buttons
@@ -195,7 +196,17 @@ const fr: LocaleData = {
 
     // Error messages
     nameMissing: 'Veuillez entrer un nom de modèle.',
+    dataTooLong: 'Ce modèle est trop long pour être enregistré. Raccourcissez la description.',
     volunteerDescMissing: 'Veuillez décrire comment les bénévoles peuvent aider.',
+    saveFromEventTitle: 'Enregistrer comme modèle',
+    saveFromEventDesc: 'Réutiliser les détails de cet événement',
+    keepGroup: 'Garder',
+    datesNeverSaved: 'Les dates ne sont jamais enregistrées dans un modèle.',
+    partText: 'Titre et texte',
+    partLocation: 'Lieu',
+    nameHelp: 'Seule votre organisation voit ce nom.',
+    dateAsked: 'Date et heure',
+    dateAskedHint: 'Vous les choisissez en utilisant le modèle',
 
     // Delete confirmation
     deleteConfirmTitle: 'Supprimer le modèle',
@@ -210,12 +221,15 @@ const fr: LocaleData = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Commencer',
+    templatesGroup: 'Vos modèles',
+    resume: 'Reprendre',
+    unfinished: 'Inachevé',
+    untitled: 'Événement sans titre',
     blankTitle: 'Planifier une nouvelle action',
-    blankSubtitle: 'Créer un nouvel événement avec un formulaire vierge',
+    blankSubtitle: "Partir d'un événement vierge",
     templateTitle: 'Utiliser un modèle',
     templateSubtitle: "Pré-remplir avec les détails d'un événement enregistré",
-    footer:
-      'Les modèles font gagner du temps pour les événements récurrents aux détails similaires.',
   },
 
   // ============================================
@@ -572,17 +586,17 @@ const fr: LocaleData = {
     contactEmail: 'E-mail de contact',
     helpNeeded: 'Aide nécessaire',
     helpDescription: 'De quelle aide avez-vous besoin ?',
-    uploadImage: 'Télécharger une image',
+    uploadImage: 'Photos',
+    addCoverPhoto: 'Ajouter une photo de couverture',
     eventLink: "Lien de l'événement",
     coOrganizers: 'Co-organisateurs',
-    volunteering: 'Bénévolat',
-    volunteerRoles: 'Rôles et détails des bénévoles',
-    disclaimer: 'Avertissement',
+    volunteering: 'Bénévoles',
+    volunteerRoles: 'Comment aider ?',
+    disclaimer: 'Bon à savoir',
 
     // Placeholders
     titlePlaceholder: "Titre de l'événement",
-    descriptionPlaceholder:
-      "Décrivez votre événement - de quoi il s'agit, à quoi s'attendre, qui devrait y assister...",
+    descriptionPlaceholder: "De quoi s'agit-il, qui devrait venir ?",
     selectCategory: 'Sélectionnez une catégorie',
     categoryPlaceholder: 'Sélectionnez une catégorie',
     pickDateTime: 'Choisir date/heure',
@@ -640,7 +654,7 @@ const fr: LocaleData = {
       'Informations importantes que les participants doivent connaître (sécurité, accessibilité, exigences, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: "J'ai besoin d'aide pour cet événement",
+    needHelpCheckbox: 'Nous cherchons des bénévoles',
 
     // Labels
     selected: 'Sélectionné',
@@ -657,14 +671,58 @@ const fr: LocaleData = {
     organizerNameRequired: "Le nom de l'organisateur est obligatoire",
     contactEmailRequired: "L'e-mail de contact est obligatoire",
     contactEmailInvalid: 'Veuillez entrer une adresse e-mail valide',
-    endTimeBeforeStart: "L'heure de fin doit être après l'heure de début",
-    invalidUrlFormat: "L'URL du site doit commencer par www., http:// ou https://",
+    invalidUrlFormat: 'Saisissez un lien valide, comme example.com.',
+    disclaimerTooLong: 'Limitez ce texte à {{max}} caractères.',
+    volunteerTooLong: 'Limitez ce texte à {{max}} caractères.',
+    linkTooLong: 'Limitez le lien à {{max}} caractères.',
+    fromTemplate: 'Du modèle : {{name}}',
+    pickTheDate: "Choisissez la date et l'heure",
+    onlyThingLeft: 'Il ne reste que ça',
+    starts: 'Début',
+    ends: 'Fin',
+    noSetEnd: 'Sans heure de fin',
+    endsAnotherDay: 'Finit un autre jour',
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
+    hours: {
+      one: '1 h',
+      other: '{{count}} h',
+    },
+    publishCheckTitle: 'Publier cet événement ?',
+    publishCheckBody: 'Il devient public tout de suite sur Explorer, Carte et Calendrier.',
+    publishNow: 'Publier maintenant',
+    timePlaceholder: 'Heure',
+    brusselsTime: '{{time}}, heure de Bruxelles',
+    namePlaceholder: 'Nommez votre action',
+    byOrganization: 'par {{name}}',
+    addDateTime: "Ajouter la date et l'heure",
+    addPlace: 'Ajouter un lieu',
+    link: 'Lien',
+    where: 'Où',
+    when: 'Quand',
+    addMore: 'Ajouter',
+    whenRange: '{{start}} à {{end}}',
+    fixBeforePublishing: {
+      one: '1 point à corriger avant de publier',
+      other: '{{count}} points à corriger avant de publier',
+    },
+    fixBeforeSaving: {
+      one: "1 point à corriger avant d'enregistrer",
+      other: "{{count}} points à corriger avant d'enregistrer",
+    },
 
     // Progress & Actions
     progressText: 'Champs obligatoires complétés',
-    requiredFieldsProgress: 'Champs obligatoires complétés : {{completed}}/{{total}}',
-    saveAsDraft: 'Enregistrer comme brouillon',
-    publish: "Publier l'événement",
+    stillNeeded: 'Il manque : {{fields}}',
+    allRequiredFilled: 'Tous les champs obligatoires sont remplis',
+    neededFields: {
+      title: 'titre',
+      description: 'description',
+      category: 'catégorie',
+      date: 'date',
+    },
+    saveAsDraft: 'Brouillon',
+    publish: 'Publier',
     creating: "Création de l'événement...",
     updating: "Mise à jour de l'événement...",
 
@@ -690,7 +748,6 @@ const fr: LocaleData = {
     postalCodeLoadError: 'Échec du chargement des codes postaux. Veuillez réessayer.',
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
     maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
-    missingFieldsError: 'Veuillez remplir les champs obligatoires suivants : {{fields}}',
   },
 
   // ============================================
@@ -774,7 +831,6 @@ const fr: LocaleData = {
     reusePastEvent: 'Réutiliser un événement passé',
     orReusePastEvent: 'Ou réutilisez un événement passé',
     use: 'Utiliser',
-    using: 'En cours…',
     placeholderCard: 'Vos modèles enregistrés apparaîtront ici',
     hintDefault: 'Touchez un modèle pour créer un événement avec ses détails préremplis.',
     hintEmpty: 'Utiliser un événement passé crée automatiquement un modèle.',
@@ -1194,6 +1250,13 @@ const fr: LocaleData = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Remplacer votre événement inachevé ?',
+    replaceMessage:
+      'Vous avez un événement inachevé sur ce téléphone. En commencer un nouveau le supprime.',
+    replaceConfirm: 'Nouveau',
+    photosMissingTitle: 'Des photos ont disparu',
+    photosMissingMessage:
+      'Votre téléphone a effacé des photos de cet événement. Ajoutez-les à nouveau.',
     checkingDraft: 'Vérification du brouillon enregistré...',
     resumeTitle: 'Reprendre le brouillon ?',
     resumeMessage:
@@ -1203,7 +1266,7 @@ const fr: LocaleData = {
     closeTitle: 'Modifications non enregistrées',
     closeMessage: 'Vous avez des modifications non enregistrées. Que souhaitez-vous faire ?',
     discard: 'Supprimer',
-    saveDraft: 'Enregistrer le brouillon',
+    saveDraft: 'Garder et fermer',
     keepEditing: 'Continuer à modifier',
     saveWarningTitle: 'Problème de sauvegarde automatique',
     saveWarningMessage:
@@ -1388,7 +1451,221 @@ const fr: LocaleData = {
       one: 'À noter : cet événement ressemble à « {{title}} » et à {{count}} autre événement.',
       other: 'À noter : cet événement ressemble à « {{title}} » et à {{count}} autres événements.',
     },
+    yourDate: 'Votre date : {{date}}',
+    clashingDates: 'Dates concernées : {{dates}}',
     accessibilityOpen: 'Ouvrir « {{title}} »',
+  },
+
+  // ============================================
+  // Series - recurring events
+  // ============================================
+  series: {
+    repeat: {
+      label: 'Répétition',
+      once: 'Une seule fois',
+      weekly: 'Chaque semaine',
+      everyTwoWeeks: 'Toutes les 2 semaines',
+      monthly: 'Chaque mois',
+      weekday: 'Jour',
+      weekOfMonth: 'Lequel dans le mois',
+      startTime: 'Heure de début',
+      endTime: 'Heure de fin',
+      pickTime: "Choisir l'heure",
+      timeHint:
+        "Heure de Bruxelles. Une heure de fin antérieure à l'heure de début tombe le lendemain.",
+      startsOn: 'À partir du',
+      startsOnHint: 'La première date est le premier jour correspondant à partir de celle-ci.',
+      ends: 'Fin',
+      endsAfter: 'Après un nombre de fois',
+      endsOn: 'À une date',
+      countLabel: 'Nombre de fois',
+      countPlaceholder: '2 à 31',
+      untilLabel: 'Dernière date',
+      pickDate: 'Choisissez une date',
+      capHint: 'Une série dure au maximum 3 mois après sa première date.',
+      errors: {
+        startLocal: 'Choisissez une heure de début.',
+        endLocal: "L'heure de fin ne peut pas être identique à l'heure de début.",
+        startsOn: 'La date de début ne peut pas être dans le passé.',
+        until: 'Choisissez une date de fin égale ou postérieure à la date de début.',
+        count: 'Entrez un nombre de 2 à 31.',
+      },
+    },
+    rule: {
+      weekly: 'Chaque {{weekday}}',
+      everyTwoWeeks: 'Un {{weekday}} sur deux',
+      monthly: 'Le {{ordinal}} {{weekday}} du mois',
+      until: "jusqu'au {{date}}",
+    },
+    weekdays: {
+      monday: 'lundi',
+      tuesday: 'mardi',
+      wednesday: 'mercredi',
+      thursday: 'jeudi',
+      friday: 'vendredi',
+      saturday: 'samedi',
+      sunday: 'dimanche',
+    },
+    weekdaysShort: {
+      monday: 'lun',
+      tuesday: 'mar',
+      wednesday: 'mer',
+      thursday: 'jeu',
+      friday: 'ven',
+      saturday: 'sam',
+      sunday: 'dim',
+    },
+    ordinals: {
+      first: '1er',
+      second: '2e',
+      third: '3e',
+      fourth: '4e',
+      last: 'dernier',
+    },
+    preview: {
+      heading: 'Dates',
+      loading: 'Calcul des dates…',
+      creates: {
+        one: 'Cela crée 1 événement :',
+        other: 'Cela crée {{count}} événements :',
+      },
+      upTo: "Jusqu'à {{count}} événements, le dernier au plus tard le {{date}}.",
+      unavailable:
+        "Les dates ne peuvent pas être affichées pour le moment. Elles seront vérifiées à l'enregistrement.",
+    },
+    badge: {
+      weekly: 'Chaque semaine',
+      everyTwoWeeks: 'Toutes les 2 semaines',
+      monthly: 'Chaque mois',
+      count: {
+        one: '1 événement',
+        other: '{{count}} événements',
+      },
+      generic: 'Événement récurrent',
+      seeAll: 'Voir toutes les dates',
+    },
+    scope: {
+      only: 'Cet événement uniquement',
+      following: 'Cet événement et tous les suivants',
+    },
+    edit: {
+      partOfSeries: "Cet événement est une date d'une série récurrente.",
+      onlyNote:
+        'Enregistrer pour cette date seulement ? Une modification ultérieure de « cet événement et tous les suivants » écrasera ce changement.',
+      allNote:
+        "Vos modifications s'appliquent à toutes les dates à venir de cette série. Leurs dates restent inchangées ; seuls les horaires peuvent changer.",
+      scopeTitle: 'Appliquer vos modifications à',
+      followingNote:
+        'Chaque date suivante est remplacée par ce formulaire, même modifiée individuellement. Les dates restent inchangées ; seuls les horaires peuvent changer.',
+      dateLocked:
+        "Vous avez changé la date ou l'avez étendue sur plusieurs jours, ce qui ne fonctionne que pour cet événement : le calendrier d'une série ne peut pas changer.",
+    },
+    page: {
+      heading: 'Toutes les dates',
+      upcoming: 'À venir',
+      past: 'Passées',
+      noUpcoming: 'Aucune date à venir.',
+      status: {
+        draft: 'Brouillon',
+        active: 'Publié',
+        cancelled: 'Annulé',
+        past: 'Passé',
+      },
+      manageHeading: 'Gérer cette série',
+      manageNote:
+        'Ces boutons agissent sur toutes les dates à venir. Les dates passées ne sont jamais modifiées.',
+      editAll: 'Modifier toutes les dates à venir',
+      cancelAll: 'Annuler toutes les dates à venir',
+      deleteAll: 'Supprimer toutes les dates à venir',
+      publishAll: 'Tout publier',
+      addDates: 'Ajouter des dates',
+      addDatesLabel: 'Nombre de dates à ajouter',
+      windowNote: "Cette série peut durer jusqu'au {{date}} au plus tard.",
+      notFound: "Cette série n'existe plus.",
+      loadError: "La série n'a pas pu être chargée. Vérifiez votre connexion et réessayez.",
+    },
+    dialogs: {
+      cancelAllTitle: 'Annuler toutes les dates à venir ?',
+      cancelAllBody: {
+        one: '1 date concernée. Les dates publiées seront annulées et les brouillons supprimés. Cette action est irréversible.',
+        other:
+          '{{count}} dates concernées. Les dates publiées seront annulées et les brouillons supprimés. Cette action est irréversible.',
+      },
+      deleteAllTitle: 'Supprimer toutes les dates à venir ?',
+      deleteAllBody: {
+        one: '1 date concernée. Elle sera supprimée définitivement. Les dates passées restent.',
+        other:
+          '{{count}} dates concernées. Elles seront supprimées définitivement. Les dates passées restent.',
+      },
+      publishAllTitle: 'Publier tous les brouillons à venir ?',
+      publishAllBody: {
+        one: '1 brouillon à publier. Les brouillons passés restent des brouillons.',
+        other: '{{count}} brouillons à publier. Les brouillons passés restent des brouillons.',
+      },
+      addDatesTitle: 'Ajouter des dates',
+      addDatesConfirm: 'Ajouter les dates',
+      deleteScopeTitle: 'Supprimer quels brouillons ?',
+      deleteScopeBody: 'Ils seront supprimés définitivement. Cette action est irréversible.',
+      cancelFollowingHint:
+        'Toutes les dates suivantes sont aussi annulées ; les brouillons à venir sont supprimés.',
+      deleteFollowingLocked:
+        'Certaines dates suivantes sont déjà publiées : seul ce brouillon peut être supprimé ici.',
+    },
+    messages: {
+      created: {
+        one: '1 événement créé.',
+        other: '{{count}} événements créés.',
+      },
+      draftsCreated: {
+        one: '1 brouillon enregistré.',
+        other: '{{count}} brouillons enregistrés.',
+      },
+      updated: {
+        one: '1 date mise à jour.',
+        other: '{{count}} dates mises à jour.',
+      },
+      cancelled: {
+        one: '1 date annulée.',
+        other: '{{count}} dates annulées.',
+      },
+      deleted: {
+        one: '1 date supprimée.',
+        other: '{{count}} dates supprimées.',
+      },
+      published: {
+        one: '1 date publiée.',
+        other: '{{count}} dates publiées.',
+      },
+      datesAdded: {
+        one: '1 date ajoutée.',
+        other: '{{count}} dates ajoutées.',
+      },
+    },
+    errors: {
+      disabled: 'Les événements récurrents ne sont pas disponibles pour le moment.',
+      invalid:
+        'Ces réglages de répétition ne sont pas valides. Vérifiez le jour, les horaires et les dates.',
+      untilBeforeStart: 'La date de fin est antérieure à la première date de la série.',
+      tooFew:
+        'Une série compte au moins 2 dates. Choisissez une date de fin plus tardive ou plus de répétitions.',
+      tooMany:
+        'Une série peut compter au maximum {{max}} dates, la dernière au plus tard le {{date}}.',
+      lostRule:
+        "Les réglages de répétition ne sont pas arrivés au serveur : rien n'a été créé. Réessayez.",
+      notConfirmed:
+        "Le serveur n'a pas confirmé la série. Vérifiez vos événements avant de réessayer.",
+      notFound: "Cette série n'existe plus.",
+      nothingUpcoming: "Il n'y a plus de date à venir à modifier.",
+      scheduleImmutable:
+        "Le calendrier d'une série ne peut pas être modifié. Annulez ou supprimez les dates à retirer, ou créez une nouvelle série.",
+      ended:
+        'Toutes les dates de cette série sont annulées ou passées. Créez plutôt une nouvelle série.',
+      invalidFromEvent: 'Cette date ne fait plus partie de la série. Actualisez et réessayez.',
+      reasonTooLong: 'La raison est trop longue (1000 caractères maximum).',
+      conflict: "Quelqu'un vient d'ajouter ces dates. Actualisez pour les voir.",
+      notMember: "Seuls les membres de l'organisation peuvent modifier cette série.",
+      generic: "Une erreur s'est produite. Veuillez réessayer.",
+    },
   },
 
   // ============================================
@@ -1572,6 +1849,83 @@ const fr: LocaleData = {
       sunny_2: 'Temps parfait pour manifester : prends tes lunettes de soleil.',
       sunny_3: 'Temps parfait pour manifester : attention aux coups de soleil !',
       perfect: 'Temps parfait pour manifester : aucune excuse pour ne pas venir !',
+    },
+  },
+  a11y: {
+    required: 'obligatoire',
+    tabPosition: '{{title}}, onglet, {{position}} sur {{count}}',
+    expandField: 'Agrandir ce champ',
+    collapseField: 'Réduire ce champ',
+    hints: {
+      goBack: "Revient à l'écran précédent",
+      closeScreen: 'Ferme cet écran',
+      closeDialog: 'Ferme cette fenêtre',
+      closeMenu: 'Ferme le menu',
+      openEvent: "Ouvre le détail de l'événement",
+      openFilters: 'Ouvre les filtres',
+      toggleSave: 'Ajoute cet événement à vos événements sauvegardés, ou le retire',
+      toggleLike: "Ajoute votre j'aime, ou le retire",
+      shareEvent: 'Ouvre les options de partage',
+      viewImage: "Affiche l'image en plein écran",
+      removeFilter: 'Retire ce filtre',
+      removeSelection: 'Retire cette sélection',
+      openOrganizer: "Ouvre le profil de l'organisateur",
+      manageEvent: 'Ouvre les actions pour cet événement',
+      openSettings: "Ouvre les réglages de l'application sur votre appareil",
+      openExternalLink: "Ouvre le lien en dehors de l'application",
+      zoomInMap: 'Effectue un zoom avant sur la carte',
+      zoomOutMap: 'Effectue un zoom arrière sur la carte',
+      selectOnMap: 'Sélectionne cet événement sur la carte',
+      applyMapFilter: 'Filtre les événements affichés sur la carte',
+      showHomeArea: 'Filtre la liste sur votre zone',
+      resetPassword: 'Ouvre la réinitialisation du mot de passe',
+      togglePassword: 'Affiche ou masque le mot de passe',
+      openAccount: 'Ouvre votre compte',
+      deleteDraft: 'Supprime ce brouillon',
+      undoDelete: 'Annule la suppression de ce brouillon',
+      skipDraft: 'Garde ce brouillon pour plus tard',
+      publishDraft: 'Publie ce brouillon',
+      publishReady: 'Publie les brouillons prêts',
+      removePastDrafts: 'Supprime les brouillons dont la date est passée',
+      backToDrafts: 'Revient à vos brouillons',
+      startTriage: 'Commence le tri de vos brouillons, un par un',
+      openEditor: "Ouvre ce brouillon dans l'éditeur complet",
+      pickDate: 'Ouvre le sélecteur de date',
+      openRepeat: "Ouvre la fréquence de l'événement",
+      deleteTemplate: 'Supprime ce modèle',
+      pickDay: "Utilise ce jour pour l'événement",
+      openWhen: "Ouvre la date et l'heure",
+      openWhere: 'Ouvre le lieu',
+      openPhotos: 'Ouvre les photos',
+      resumeDraft: 'Ouvre votre événement inachevé',
+      pickTime: "Ouvre le sélecteur d'heure",
+      resizeField: 'Change la quantité de texte affichée',
+      jumpToField: 'Va à ce champ',
+      setDate: 'Utilise cette date pour le brouillon',
+      clearField: 'Efface ce champ',
+      useAddress: 'Remplit avec cette adresse',
+      changePostal: 'Permet de choisir un autre code postal',
+      selectOption: 'Sélectionne ou désélectionne cette option',
+      searchAsYouType: 'Les résultats se mettent à jour pendant la saisie',
+      openMonthPicker: "Ouvre le sélecteur de mois et d'année",
+      goToToday: "Revient à aujourd'hui",
+      goToNextEvent: 'Va au prochain jour avec des événements',
+      previousMonth: 'Affiche le mois précédent',
+      nextMonth: 'Affiche le mois suivant',
+      previousYear: "Affiche l'année précédente",
+      nextYear: "Affiche l'année suivante",
+      selectMonth: 'Affiche ce mois',
+      selectDay: 'Affiche les événements de ce jour',
+      removeImage: 'Retire cette image',
+      moveImage: "Change l'ordre des images",
+      switchView: 'Passe à cette vue',
+      resetFilters: 'Efface tous les filtres',
+      openTemplateMenu: 'Ouvre les actions pour ce modèle',
+      createTemplate: 'Commence un nouveau modèle',
+      applyTemplateAction: 'Applique cette action au modèle',
+      addLocation: "Ouvre l'éditeur pour ajouter le lieu",
+      repeatOnDay: "Répète l'événement ce jour-là",
+      createEvent: 'Commence un nouvel événement',
     },
   },
 };

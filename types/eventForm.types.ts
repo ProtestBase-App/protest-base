@@ -1,4 +1,6 @@
 import { PickedImage } from '@/types/event.types';
+import type { RepeatFormState } from '@/types/eventSeries.types';
+import type { RepeatField } from '@/utils/recurrence';
 
 export interface FormState {
   organization_id: string;
@@ -31,14 +33,42 @@ export interface FormState {
    */
   geocod_lat: number | null;
   geocod_lng: number | null;
+  /**
+   * The Repeat control, on the create screen only. Absent or `once` is a single event.
+   * Survives in a local autosave, so it only counts while the feature is on.
+   */
+  repeat?: RepeatFormState;
 }
 
-export interface EmptyFieldsState {
-  title: boolean;
-  start_time: boolean;
-  description: boolean;
-  help_description: boolean;
+/** Which form the shell is showing. */
+export type EventFormKind = 'create' | 'draft' | 'edit' | 'template';
+
+/** What a submit asks of the form. */
+export type EventFormIntent = 'publish' | 'saveEdit' | 'saveDraft' | 'saveTemplate';
+
+/** A control on the form that can carry an error. */
+export type EventFormField =
+  | 'organization'
+  | 'template_name'
+  | 'title'
+  | 'description'
+  | 'categories'
+  | 'start_time'
+  | 'end_time'
+  | RepeatField
+  | 'website_url'
+  | 'help_description'
+  | 'disclaimer';
+
+export interface EventFormIssue {
+  field: EventFormField;
+  /** The field's name, for the summary's jump link. */
+  label: string;
+  /** What to do about it, shown under the field. */
+  message: string;
 }
+
+export type EventFormErrors = Partial<Record<EventFormField, string>>;
 
 /**
  * Mode for the EventForm component
@@ -49,10 +79,18 @@ export interface EmptyFieldsState {
  */
 export type EventFormMode = 'create-event' | 'edit-event' | 'create-template' | 'edit-template';
 
+/** The pin of a saved event: forms only hold one picked this session. */
+export interface SavedPin {
+  latitude: number;
+  longitude: number;
+  street: string;
+}
+
 export interface EventFormProps {
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
-  emptyFields: EmptyFieldsState;
+  /** What is wrong with each field, shown under it. */
+  errors?: EventFormErrors;
   userLanguage: string;
   /** Mode determines which fields to show. Defaults to 'create-event' */
   mode?: EventFormMode;
@@ -65,4 +103,9 @@ export interface EventFormProps {
    * midnight; picking a real time is what converts the event back to timed.
    */
   isAllDay?: boolean;
+  /**
+   * Show the Repeat control. Only the create screen sets this, and only while the
+   * feature is on: the schedule of a series cannot be edited, so no edit form has it.
+   */
+  showRepeat?: boolean;
 }

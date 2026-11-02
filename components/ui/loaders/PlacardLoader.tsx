@@ -76,7 +76,7 @@ export function PlacardLoader({
       testID={testID}
       accessibilityRole="progressbar"
       accessibilityState={{ busy: true }}
-      accessibilityLabel={t('common.loadingCurrentWord', { word })}
+      aria-label={t('common.loadingCurrentWord', { word })}
     >
       <Animated.View style={[styles.sway, swayStyle]}>
         <View style={styles.stick} />

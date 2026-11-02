@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
+import { t } from '@/utils/i18n';
 
 export interface SheetSearchMultiSelectOption {
   value: string;
@@ -262,6 +263,7 @@ export function SheetSearchMultiSelect({
                 leading={<IconSymbol name={leadingIconName} size={11} color={themeColors.tint} />}
                 onPress={() => handleRemove(value)}
                 accessibilityLabel={`Remove ${label}`}
+                accessibilityHint={t('a11y.hints.removeSelection')}
               />
             );
           })}
@@ -293,6 +295,7 @@ export function SheetSearchMultiSelect({
           editable={!disabled}
           underlineColorAndroid="transparent"
           accessibilityLabel={placeholder}
+          accessibilityHint={t('a11y.hints.searchAsYouType')}
           accessibilityState={{ disabled }}
           testID={testID ? `${testID}-input` : undefined}
         />
@@ -302,6 +305,7 @@ export function SheetSearchMultiSelect({
               onPress={handleClearQuery}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
+              accessibilityHint={t('a11y.hints.clearField')}
               hitSlop={8}
             >
               <IconSymbol name="xmark" size={12} color={themeColors.placeholder} />
@@ -334,6 +338,7 @@ export function SheetSearchMultiSelect({
                 onPress={() => handleSelect(option.value)}
                 accessibilityRole="button"
                 accessibilityLabel={option.label}
+                accessibilityHint={t('a11y.hints.selectOption')}
               >
                 <IconSymbol name={leadingIconName} size={12} color={themeColors.secondaryText} />
                 <View style={styles.optionText}>

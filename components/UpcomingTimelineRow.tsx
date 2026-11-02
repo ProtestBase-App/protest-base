@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
+import { SeriesBadge, useShowsSeriesBadge } from '@/components/SeriesBadge';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { getCategoryColors } from '@/constants/CategoryColors';
@@ -44,12 +45,14 @@ function UpcomingTimelineRow({ event, ongoing, todayKey, userLanguage }: Upcomin
       : event.city || '';
 
   const dayProgress = ongoing ? getOngoingDayProgress(event, todayKey) : null;
+  const inSeries = useShowsSeriesBadge(event);
 
   return (
     <Pressable
       onPress={() => router.push(DynamicRoutes.event(event.$id))}
       accessibilityRole="button"
       accessibilityLabel={event.title}
+      accessibilityHint={t('a11y.hints.openEvent')}
       style={({ pressed }) => [
         styles.row,
         {
@@ -112,6 +115,12 @@ function UpcomingTimelineRow({ event, ongoing, todayKey, userLanguage }: Upcomin
             </ThemedText>
           </View>
         </View>
+
+        {inSeries && (
+          <View style={styles.seriesRow}>
+            <SeriesBadge event={event} testID={`upcoming-series-${event.$id}`} />
+          </View>
+        )}
       </View>
 
       <IconSymbol name="chevron.right" size={15} color={themeColors.subtleText} />
@@ -158,6 +167,9 @@ const styles = StyleSheet.create({
   middle: {
     flex: 1,
     minWidth: 0,
+  },
+  seriesRow: {
+    marginTop: Spacing.xs,
   },
   title: {
     fontSize: 14.5,

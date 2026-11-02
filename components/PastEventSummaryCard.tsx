@@ -29,6 +29,7 @@ export default function PastEventSummaryCard({ event, testID }: PastEventSummary
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
       testID={testID}
       onPress={() => router.push(`/event/${event.id}` as any)}
       activeOpacity={0.7}

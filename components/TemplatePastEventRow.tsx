@@ -13,23 +13,15 @@ import { getThemeColors } from '@/utils/themeColors';
 
 export interface TemplatePastEventRowProps {
   event: PastEventForTemplate;
-  /** "Use" — auto-creates a template from the event, then opens Create Event. */
+  /** "Use": opens Create Event filled in from this event. */
   onUse: () => void;
-  /** True while THIS row's template is being created. */
-  using?: boolean;
-  disabled?: boolean;
 }
 
 /**
  * Compact "reuse a past event" row: history-icon category tile, single-line
  * title, date · location meta, and a ghost Use pill.
  */
-export default function TemplatePastEventRow({
-  event,
-  onUse,
-  using = false,
-  disabled = false,
-}: TemplatePastEventRowProps) {
+export default function TemplatePastEventRow({ event, onUse }: TemplatePastEventRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const categoryColors = getCategoryColors(event.firstCategory);
@@ -63,9 +55,8 @@ export default function TemplatePastEventRow({
       </View>
 
       <ActionPill
-        label={using ? t('templates.using') : t('templates.use')}
+        label={t('templates.use')}
         onPress={onUse}
-        disabled={disabled || using}
         testID={`past-event-use-${event.$id}`}
       />
     </View>

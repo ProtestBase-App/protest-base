@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { Spacing, Typography } from '@/constants/DesignTokens';
@@ -10,18 +10,19 @@ export interface GroupLabelRowProps {
   label: string;
   /** Label color override (e.g. tint for "today"); defaults to secondaryText. */
   color?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
  * Uppercase group header with a trailing hairline rule, from the C2 design
  * system (upcoming timeline date groups, templates "reuse a past event").
  */
-export function GroupLabelRow({ label, color }: GroupLabelRowProps) {
+export function GroupLabelRow({ label, color, style }: GroupLabelRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, style]}>
       <ThemedText
         style={[styles.label, { color: color ?? themeColors.secondaryText }]}
         numberOfLines={1}

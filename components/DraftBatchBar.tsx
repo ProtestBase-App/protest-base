@@ -99,6 +99,7 @@ export default function DraftBatchBar({
               disabled={running}
               accessibilityRole="button"
               accessibilityLabel={t('drafts.batchPublishAll')}
+              accessibilityHint={t('a11y.hints.publishReady')}
               accessibilityState={{ disabled: running }}
               testID="draft-batch-publish"
               style={({ pressed }) => [
@@ -137,6 +138,7 @@ export default function DraftBatchBar({
               disabled={running}
               accessibilityRole="button"
               accessibilityLabel={t('drafts.batchRemovePast')}
+              accessibilityHint={t('a11y.hints.removePastDrafts')}
               accessibilityState={{ disabled: running }}
               testID="draft-batch-remove-past"
               style={({ pressed }) => [

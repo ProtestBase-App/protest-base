@@ -288,6 +288,7 @@ export default function MoreScreen() {
                     testID="btn-more-account"
                     accessibilityRole="button"
                     accessibilityLabel={t('more.account')}
+                    accessibilityHint={t('a11y.hints.openAccount')}
                     onPress={() => router.push(Routes.ACCOUNT)}
                     style={({ pressed }) => [
                       styles.identityCard,

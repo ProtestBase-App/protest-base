@@ -34,7 +34,12 @@ jest.mock('expo-constants', () => ({
 // Import after mocks
 // ============================================
 
-import { VersionCheckProvider, useVersionCheck } from '@/context/VersionCheckProvider';
+import {
+  VersionCheckProvider,
+  useRecurringEventsEnabled,
+  useTitleOnlyDraftsEnabled,
+  useVersionCheck,
+} from '@/context/VersionCheckProvider';
 import type { VersionCheckResult } from '@/types/appConfig.types';
 
 // ============================================
@@ -55,6 +60,7 @@ function makeResult(overrides: Partial<VersionCheckResult> = {}): VersionCheckRe
     maintenanceMessage: null,
     updateMessage: null,
     updateUrl: 'https://example.com/update',
+    features: { recurringEvents: false, titleOnlyDrafts: false },
     ...overrides,
   };
 }
@@ -262,5 +268,73 @@ describe('VersionCheckProvider', () => {
     expect(typeof result.current.dismissUpdatePrompt).toBe('function');
     expect(typeof result.current.openStore).toBe('function');
     expect(typeof result.current.retryCheck).toBe('function');
+  });
+
+  describe('recurring events flag', () => {
+    it('is off while the check is running', () => {
+      mockCheckAppVersion.mockReturnValue(new Promise(() => {}));
+
+      const { result } = renderHook(() => useRecurringEventsEnabled(), { wrapper });
+
+      expect(result.current).toBe(false);
+    });
+
+    it('follows the result of the check', async () => {
+      mockCheckAppVersion.mockResolvedValue(
+        makeResult({ features: { recurringEvents: true, titleOnlyDrafts: false } })
+      );
+
+      const { result } = renderHook(() => useRecurringEventsEnabled(), { wrapper });
+
+      await waitFor(() => expect(result.current).toBe(true));
+    });
+
+    it('is exposed on useVersionCheck too', async () => {
+      mockCheckAppVersion.mockResolvedValue(
+        makeResult({ features: { recurringEvents: true, titleOnlyDrafts: false } })
+      );
+
+      const { result } = renderHook(() => useVersionCheck(), { wrapper });
+
+      await waitFor(() => expect(result.current.features.recurringEvents).toBe(true));
+    });
+
+    it('goes back off when a retry says so', async () => {
+      mockCheckAppVersion.mockResolvedValueOnce(
+        makeResult({ features: { recurringEvents: true, titleOnlyDrafts: false } })
+      );
+      mockCheckAppVersion.mockResolvedValueOnce(makeResult());
+
+      const { result } = renderHook(() => useVersionCheck(), { wrapper });
+      await waitFor(() => expect(result.current.features.recurringEvents).toBe(true));
+
+      await act(async () => {
+        await result.current.retryCheck();
+      });
+
+      expect(result.current.features.recurringEvents).toBe(false);
+    });
+
+    it('reports title-only drafts from the result of the check', async () => {
+      mockCheckAppVersion.mockResolvedValue(
+        makeResult({ features: { recurringEvents: false, titleOnlyDrafts: true } })
+      );
+
+      const { result } = renderHook(() => useTitleOnlyDraftsEnabled(), { wrapper });
+
+      await waitFor(() => expect(result.current).toBe(true));
+    });
+
+    it('keeps title-only drafts off, without throwing, outside the provider', () => {
+      const { result } = renderHook(() => useTitleOnlyDraftsEnabled());
+
+      expect(result.current).toBe(false);
+    });
+
+    it('is off, and does not throw, outside the provider', () => {
+      const { result } = renderHook(() => useRecurringEventsEnabled());
+
+      expect(result.current).toBe(false);
+    });
   });
 });

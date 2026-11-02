@@ -72,7 +72,7 @@ jest.mock('@/components/EventWeatherCard', () => {
 });
 
 import React from 'react';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, Text } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import EventDetailed from '@/components/EventDetailed';
 import type { EventWeather } from '@/types/weather.types';
@@ -91,6 +91,7 @@ const mockEvent: FormattedEvent = {
   start_time: '14:00',
   end_time: '16:00',
   all_day: false,
+  series_id: null,
   isMultiDay: false,
   start_date: 'March 15, 2025',
   end_date: 'March 15, 2025',
@@ -1082,5 +1083,26 @@ describe('EventDetailed — weather card', () => {
 
     render(<EventDetailed {...defaultProps} weather={null} />);
     expect(screen.queryByTestId('event-weather-card')).toBeNull();
+  });
+
+  it('mounts the series badge it is given, above the calendar card', () => {
+    render(
+      <EventDetailed
+        {...defaultProps}
+        seriesBadge={<Text testID="series-badge-slot">Repeats weekly</Text>}
+      />
+    );
+
+    expect(screen.getByTestId('series-badge-slot')).toBeTruthy();
+    expect(screen.getByText('Repeats weekly')).toBeTruthy();
+  });
+
+  it('mounts no badge row without one', () => {
+    const { unmount } = render(<EventDetailed {...defaultProps} />);
+    expect(screen.queryByTestId('series-badge-slot')).toBeNull();
+    unmount();
+
+    render(<EventDetailed {...defaultProps} seriesBadge={undefined} />);
+    expect(screen.queryByTestId('series-badge-slot')).toBeNull();
   });
 });

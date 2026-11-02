@@ -20,14 +20,16 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { PillButton } from '@/components/ui/PillButton';
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { DynamicRoutes, Routes } from '@/constants/Routes';
+import { useGlobalContext } from '@/context/GlobalProvider';
 import { usePastEvents } from '@/context/PastEventsProvider';
 import { useTemplates } from '@/context/TemplatesProvider';
 import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ParsedEventTemplate, PastEventForTemplate } from '@/types/template.types';
 import { getEditedAgoParts, sortDraftsByLastEdited } from '@/utils/draftStatusUtils';
+import { confirmReplaceDraft } from '@/utils/eventDraftGuard';
 import { t } from '@/utils/i18n';
-import { extractTemplateData, formatPastEventDate } from '@/utils/templateUtils';
+import { toPastEventForTemplate } from '@/utils/templateUtils';
 import { getThemeColors } from '@/utils/themeColors';
 
 /** How many past events the reuse section offers (matches the old carousel). */
@@ -44,6 +46,7 @@ type GridItem =
   | { kind: 'template'; key: string; template: ParsedEventTemplate };
 
 export default function EventTemplatesScreen() {
+  const { userLanguage } = useGlobalContext();
   const {
     templates,
     loading: templatesLoading,
@@ -68,8 +71,6 @@ export default function EventTemplatesScreen() {
     template: ParsedEventTemplate;
     anchor: TemplateMenuAnchor;
   } | null>(null);
-  // One template/use mutation at a time; ref twin guards Alert callbacks.
-  const [usingEventId, setUsingEventId] = useState<string | null>(null);
   const mutationBusyRef = useRef(false);
   // Recency labels re-anchor whenever the screen refreshes.
   const [now, setNow] = useState(() => new Date());
@@ -120,26 +121,23 @@ export default function EventTemplatesScreen() {
     return items;
   }, [templates]);
 
-  const formattedPastEvents: PastEventForTemplate[] = useMemo(() => {
-    return pastEvents.slice(0, PAST_EVENTS_SHOWN).map((event) => ({
-      $id: event.$id,
-      title: event.title,
-      formattedDate: formatPastEventDate(event.start_time),
-      city: event.city,
-      firstCategory: event.categories?.[0],
-      organizationId: event.organization_id,
-      templateData: extractTemplateData(event),
-      images: event.images?.length ? event.images : undefined,
-    }));
-  }, [pastEvents]);
+  const formattedPastEvents = useMemo(
+    () =>
+      pastEvents
+        .slice(0, PAST_EVENTS_SHOWN)
+        .map((event) => toPastEventForTemplate(event, userLanguage)),
+    [pastEvents, userLanguage]
+  );
 
   const fallbackOrganizationId = userOrganizations[0]?.$id;
 
   const handleLaunchTemplate = useCallback((template: ParsedEventTemplate) => {
-    router.push({
-      pathname: Routes.CREATE_EVENT,
-      params: { templateId: template.$id, source: 'template' },
-    });
+    confirmReplaceDraft(() =>
+      router.push({
+        pathname: Routes.CREATE_EVENT,
+        params: { templateId: template.$id, source: 'template' },
+      })
+    );
   }, []);
 
   const handleCreateTemplate = useCallback(() => {
@@ -217,41 +215,14 @@ export default function EventTemplatesScreen() {
     ]);
   }, [menuFor, removeTemplate]);
 
-  // Design rule: using a past event creates a template from it automatically,
-  // then opens Create Event pre-filled from that template.
-  const handleUsePastEvent = useCallback(
-    async (event: PastEventForTemplate) => {
-      if (mutationBusyRef.current) return;
-      // Attribute the auto-created template to the source event's own org.
-      const organizationId =
-        event.organizationId ?? event.templateData.organization_id ?? fallbackOrganizationId;
-      if (!organizationId) {
-        Alert.alert(t('common.error'), t('templates.loadError'));
-        return;
-      }
-
-      mutationBusyRef.current = true;
-      setUsingEventId(event.$id);
-      try {
-        const created = await addTemplate({
-          organization_id: organizationId,
-          name: event.title,
-          event_data: event.templateData,
-          image_urls: event.images ?? [],
-        });
-        router.push({
-          pathname: Routes.CREATE_EVENT,
-          params: { templateId: created.$id, source: 'template' },
-        });
-      } catch (err) {
-        Alert.alert(t('common.error'), (err as Error).message);
-      } finally {
-        mutationBusyRef.current = false;
-        setUsingEventId(null);
-      }
-    },
-    [fallbackOrganizationId, addTemplate]
-  );
+  const handleUsePastEvent = useCallback((event: PastEventForTemplate) => {
+    confirmReplaceDraft(() =>
+      router.push({
+        pathname: Routes.CREATE_EVENT,
+        params: { fromEventId: event.$id, source: 'past' },
+      })
+    );
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: GridItem }) => {
@@ -270,13 +241,12 @@ export default function EventTemplatesScreen() {
               editedLabel={editedParts ? t(editedParts.key, { count: editedParts.count }) : ''}
               onLaunch={() => handleLaunchTemplate(item.template)}
               onOpenMenu={(anchor) => handleOpenMenu(item.template, anchor)}
-              disabled={usingEventId !== null}
             />
           );
         }
       }
     },
-    [handleCreateTemplate, handleLaunchTemplate, handleOpenMenu, now, usingEventId]
+    [handleCreateTemplate, handleLaunchTemplate, handleOpenMenu, now]
   );
 
   const renderFooter = useCallback(() => {
@@ -295,8 +265,6 @@ export default function EventTemplatesScreen() {
               key={event.$id}
               event={event}
               onUse={() => handleUsePastEvent(event)}
-              using={usingEventId === event.$id}
-              disabled={usingEventId !== null}
             />
           ))}
         {/* "Tap a template…" once templates exist; the past-event hint when
@@ -308,7 +276,7 @@ export default function EventTemplatesScreen() {
         )}
       </View>
     );
-  }, [templates.length, formattedPastEvents, usingEventId, handleUsePastEvent, themeColors]);
+  }, [templates.length, formattedPastEvents, handleUsePastEvent, themeColors]);
 
   const showLoading = templatesLoading && templates.length === 0;
   const showError = !showLoading && !!templatesError && templates.length === 0;
@@ -320,7 +288,7 @@ export default function EventTemplatesScreen() {
           <BrandHeader title={t('more.templates')} subtitle={t('templates.subtitle')} />
 
           {showLoading ? (
-            <LoadingState accessibilityLabel={t('templates.loadingTemplates')} />
+            <LoadingState label={t('templates.loadingTemplates')} />
           ) : showError ? (
             <View style={styles.errorContainer}>
               <ErrorState message={templatesError || t('templates.loadError')} />

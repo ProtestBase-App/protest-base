@@ -50,6 +50,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import ExploreEventCard from '@/components/ExploreEventCard';
+import { DynamicRoutes } from '@/constants/Routes';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import type { Event } from '@/types/event.types';
@@ -346,6 +347,131 @@ describe('ExploreEventCard', () => {
       const eventNoPostal = { ...mockEvent, postal_code: null as any };
       render(<ExploreEventCard {...defaultProps} event={eventNoPostal} cityLabel="" />);
       expect(screen.getByLabelText(/Event: Climate March/)).toBeTruthy();
+    });
+  });
+
+  describe('series badge', () => {
+    let flag: jest.SpyInstance;
+    let membership: jest.SpyInstance;
+    const setFlag = (enabled: boolean, isMember = true) => {
+      flag = jest
+        .spyOn(require('@/context/VersionCheckProvider'), 'useRecurringEventsEnabled')
+        .mockReturnValue(enabled);
+      membership = jest
+        .spyOn(require('@/context/UserOrganizationsProvider'), 'useIsOrganizationMember')
+        .mockReturnValue(isMember);
+    };
+    const seriesEvent = (overrides: Partial<Event> = {}): Event => ({
+      ...mockEvent,
+      series_id: 'series-1',
+      ...overrides,
+    });
+
+    afterEach(() => {
+      flag?.mockRestore();
+      membership?.mockRestore();
+    });
+
+    it('marks a date of a series while the feature is on', () => {
+      setFlag(true);
+
+      render(<ExploreEventCard {...defaultProps} event={seriesEvent()} testID="card" />);
+
+      expect(screen.getByTestId('card-series')).toBeTruthy();
+      expect(screen.getByText('series.badge.generic')).toBeTruthy();
+    });
+
+    it('shows nothing while the feature is off', () => {
+      setFlag(false);
+
+      render(<ExploreEventCard {...defaultProps} event={seriesEvent()} testID="card" />);
+
+      expect(screen.queryByTestId('card-series')).toBeNull();
+      expect(screen.queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('shows nothing to anyone outside the organization, guests included', () => {
+      setFlag(true, false);
+
+      render(<ExploreEventCard {...defaultProps} event={seriesEvent()} testID="card" />);
+
+      expect(screen.queryByTestId('card-series')).toBeNull();
+      expect(screen.queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('shows nothing for an event that is not in a series', () => {
+      setFlag(true);
+
+      render(
+        <ExploreEventCard
+          {...defaultProps}
+          event={seriesEvent({ series_id: null })}
+          testID="card"
+        />
+      );
+      expect(screen.queryByTestId('card-series')).toBeNull();
+      screen.unmount();
+
+      render(
+        <ExploreEventCard
+          {...defaultProps}
+          event={seriesEvent({ series_id: undefined })}
+          testID="card"
+        />
+      );
+      expect(screen.queryByTestId('card-series')).toBeNull();
+    });
+
+    // The row of badges is only there for a category, a live event or a series.
+    it.each([
+      ['an empty list', []],
+      ['no list at all', undefined],
+    ])('still shows the badge on an event with %s of categories', (_label, categories) => {
+      setFlag(true);
+
+      render(
+        <ExploreEventCard
+          {...defaultProps}
+          event={seriesEvent({ categories: categories as string[] | undefined })}
+          testID="card"
+        />
+      );
+
+      expect(screen.getByTestId('card-series')).toBeTruthy();
+    });
+
+    it('adds no badge row to an event with no categories and no series', () => {
+      setFlag(true);
+
+      render(
+        <ExploreEventCard
+          {...defaultProps}
+          event={{ ...mockEvent, categories: [] }}
+          testID="card"
+        />
+      );
+
+      expect(screen.queryByTestId('card-series')).toBeNull();
+      expect(screen.queryByText('series.badge.generic')).toBeNull();
+    });
+
+    it('sits next to the category badge', () => {
+      setFlag(true);
+
+      render(<ExploreEventCard {...defaultProps} event={seriesEvent()} testID="card" />);
+
+      expect(screen.getByText('Climate')).toBeTruthy();
+      expect(screen.getByTestId('card-series')).toBeTruthy();
+    });
+
+    it('opens the series, not the event, when it is pressed', () => {
+      setFlag(true);
+      render(<ExploreEventCard {...defaultProps} event={seriesEvent()} testID="card" />);
+
+      fireEvent.press(screen.getByTestId('card-series'), { stopPropagation: jest.fn() });
+
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith(DynamicRoutes.series('series-1'));
     });
   });
 });

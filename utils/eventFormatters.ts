@@ -54,7 +54,7 @@ function formatInBelgiumTimezone(
   return getDateFormatter(locale, { ...options, timeZone: EVENT_TIMEZONE }).format(date);
 }
 
-function getDatePartsInBelgium(date: Date): {
+export function getDatePartsInBelgium(date: Date): {
   year: number;
   month: number;
   day: number;
@@ -155,6 +155,9 @@ export interface FormattedEvent {
   // Date-only event: `start_time` above is the "All day" label, and `end_time` is
   // empty because an all-day event has no meaningful end clock time.
   all_day: boolean;
+
+  /** The recurring series this event is one date of, or null. */
+  series_id: string | null;
 
   /**
    * Whether the event spans more than one Brussels calendar day.
@@ -277,6 +280,7 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     endDateNoFormat,
     endDateFull: event.end_time ?? null,
     all_day: isAllDay,
+    series_id: event.series_id ?? null,
     isMultiDay,
     organization_id: event.organization_id ?? '',
     organizer_id: event.organizer_id ?? '',
@@ -321,6 +325,7 @@ export interface FormattedEventListItem {
   startDateFull: string; // Full ISO DateTime: "2025-10-26T14:30:00Z" (for ongoing checks)
   endDateFull: string | null; // Full ISO DateTime or null (for ongoing checks)
   all_day: boolean; // Carried so consumers rebuilding an Event keep the flag
+  series_id?: string | null; // Same: the card's badge reads it off the rebuilt Event
   categories: string[];
   country?: string;
   organization_id?: string;
@@ -370,6 +375,7 @@ export function formatEventForList(event: Event, locale: string = 'en'): Formatt
     startDateFull: event.start_time,
     endDateFull: event.end_time ?? null,
     all_day: isAllDay,
+    series_id: event.series_id ?? null,
     categories: event.categories || [],
     country: event.country,
     organization_id: event.organization_id,

@@ -73,10 +73,11 @@ export function ConnectionErrorScreen({ onRetry }: ConnectionErrorScreenProps): 
         <ThemedView style={styles.container}>
           {/* Logo */}
           <Image
+            accessibilityIgnoresInvertColors
             source={logoSource}
             style={styles.logo}
             resizeMode="contain"
-            accessibilityLabel="ProtestBase"
+            aria-label="ProtestBase"
           />
 
           {/* Cloud-offline icon with pulse animation */}
@@ -101,7 +102,7 @@ export function ConnectionErrorScreen({ onRetry }: ConnectionErrorScreenProps): 
           />
 
           {/* Pill badge */}
-          <ThemedView style={[styles.pill, { backgroundColor: themeColors.tint }]}>
+          <ThemedView style={[styles.pill, { backgroundColor: themeColors.cta }]}>
             <ThemedText style={styles.pillText}>{t('version.connectionError.badge')}</ThemedText>
           </ThemedView>
         </ThemedView>

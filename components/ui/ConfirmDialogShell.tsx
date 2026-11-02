@@ -13,6 +13,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { BorderRadius, Spacing, Typography } from '@/constants/DesignTokens';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
+import { t } from '@/utils/i18n';
 
 export interface ConfirmDialogShellProps {
   visible: boolean;
@@ -69,8 +70,18 @@ export default function ConfirmDialogShell({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
-      <Pressable style={styles.scrim} onPress={handleDismiss}>
-        <Pressable style={styles.cardWrapper} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        accessible={false}
+        accessibilityRole="none"
+        style={styles.scrim}
+        onPress={handleDismiss}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={styles.cardWrapper}
+          onPress={(e) => e.stopPropagation()}
+        >
           <ThemedView style={[styles.card, { backgroundColor: themeColors.surfaceBackground }]}>
             <ThemedText style={styles.title}>{title}</ThemedText>
             {!!message && (
@@ -95,6 +106,7 @@ export default function ConfirmDialogShell({
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={dismissLabel}
+                accessibilityHint={t('a11y.hints.closeDialog')}
               >
                 <ThemedText style={styles.secondaryButtonText}>{dismissLabel}</ThemedText>
               </TouchableOpacity>
@@ -110,6 +122,7 @@ export default function ConfirmDialogShell({
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel={confirmLabel}
+                  accessibilityHint={message}
                 >
                   {submitting ? (
                     <ActivityIndicator size="small" color="white" />

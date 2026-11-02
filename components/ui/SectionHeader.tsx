@@ -54,7 +54,7 @@ export function SectionHeader({
           )}
         </View>
         {actionLabel && onActionPress && (
-          <TouchableOpacity onPress={onActionPress} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" onPress={onActionPress} activeOpacity={0.7}>
             <ThemedText style={[styles.actionText, { color: actionColor }]}>
               {actionLabel}
             </ThemedText>

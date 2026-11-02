@@ -42,8 +42,19 @@ export default function MonthYearPicker({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.content, { backgroundColor: themeColors.cardBackground }]}>
+      <Pressable
+        // No close control here: VoiceOver leaves with the escape gesture.
+        accessible={false}
+        accessibilityRole="none"
+        onAccessibilityEscape={onClose}
+        style={styles.overlay}
+        onPress={onClose}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={[styles.content, { backgroundColor: themeColors.cardBackground }]}
+        >
           {/* Year navigation */}
           <View style={styles.yearRow}>
             <Pressable
@@ -56,6 +67,7 @@ export default function MonthYearPicker({
               ]}
               accessibilityRole="button"
               accessibilityLabel="Previous year"
+              accessibilityHint={t('a11y.hints.previousYear')}
             >
               <IconSymbol name="chevron.left" size={18} color={themeColors.text} />
             </Pressable>
@@ -65,6 +77,7 @@ export default function MonthYearPicker({
               style={({ pressed }) => [styles.yearArrow, pressed && { opacity: 0.5 }]}
               accessibilityRole="button"
               accessibilityLabel="Next year"
+              accessibilityHint={t('a11y.hints.nextYear')}
             >
               <IconSymbol name="chevron.right" size={18} color={themeColors.text} />
             </Pressable>
@@ -101,6 +114,7 @@ export default function MonthYearPicker({
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={getMonthName(m, userLanguage)}
+                    accessibilityHint={t('a11y.hints.selectMonth')}
                   >
                     <ThemedText
                       style={[
@@ -124,6 +138,7 @@ export default function MonthYearPicker({
 
           {/* Today shortcut */}
           <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.todayShortcut,
               { borderTopColor: themeColors.separator },

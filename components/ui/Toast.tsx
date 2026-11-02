@@ -18,6 +18,8 @@ import { getThemeColors } from '@/utils/themeColors';
 
 export interface ToastAction {
   label: string;
+  /** What pressing it does, when the label alone does not say. */
+  hint?: string;
   onPress: () => void;
 }
 
@@ -141,6 +143,7 @@ export function Toast({
             onPress={action.onPress}
             accessibilityRole="button"
             accessibilityLabel={action.label}
+            accessibilityHint={action.hint}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             testID={testID ? `${testID}-action` : undefined}
           >

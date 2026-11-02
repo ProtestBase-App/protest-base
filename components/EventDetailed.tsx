@@ -8,7 +8,6 @@ import {
   Alert,
   View,
   FlatList,
-  TurboModuleRegistry,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
@@ -20,7 +19,6 @@ import * as Calendar from 'expo-calendar/legacy';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { OrganizerAvatar } from '@/components/OrganizerAvatar';
 import { EventWeatherCard } from '@/components/EventWeatherCard';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
@@ -37,33 +35,8 @@ import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
+import { EventMapPreview } from '@/components/EventMapPreview';
 
-// Dynamically load MapLibre: v11 calls TurboModuleRegistry.getEnforcing at
-// import time, which throws when the native modules are missing (Expo Go,
-// Jest) — so probe non-throwingly first and require behind a guard.
-let MapLibreMap: any = null;
-let Camera: any = null;
-let MapMarker: any = null;
-let isMapAvailable = false;
-
-if (TurboModuleRegistry.get('MLRNMapViewModule')) {
-  try {
-    const MC = require('@/components/MapComponents');
-    MapLibreMap = MC.MapLibreMap;
-    Camera = MC.Camera;
-    MapMarker = MC.MapMarker;
-    isMapAvailable = !!(MapLibreMap && Camera && MapMarker);
-    logger.info('[EventDetailed] Map components loaded', { isMapAvailable });
-  } catch (error) {
-    logger.warn('[EventDetailed] MapLibre failed to load', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-} else {
-  logger.info('[EventDetailed] MapLibre native module not available — map hidden');
-}
-
-const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 const HERO_HEIGHT = 260;
 
 const isValidUrl = (url: string): boolean => {
@@ -110,6 +83,8 @@ export interface EventDetailedProps {
   onLike?: () => void;
   /** "Protest forecast" for this event; null or undefined hides the card. */
   weather?: EventWeather | null;
+  /** The badge of a date of a recurring series. Absent on a single event. */
+  seriesBadge?: React.ReactNode;
 }
 
 const EventDetailed: React.FC<EventDetailedProps> = ({
@@ -129,10 +104,10 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   isEventLiked = false,
   onLike,
   weather,
+  seriesBadge,
 }) => {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
-  const [mapLoaded, setMapLoaded] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -356,6 +331,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                   onPress={() => openViewerAt(index)}
                   accessibilityRole="imagebutton"
                   accessibilityLabel={t('events.viewImage')}
+                  accessibilityHint={t('a11y.hints.viewImage')}
                 >
                   <Image
                     source={item}
@@ -378,6 +354,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               disabled={heroImages.length === 0}
               accessibilityRole="imagebutton"
               accessibilityLabel={t('events.viewImage')}
+              accessibilityHint={t('a11y.hints.viewImage')}
             >
               <Image
                 source={heroImages[0] || require('@/assets/images/event-image-default.png')}
@@ -411,6 +388,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               onPress={onBack}
               accessibilityRole="button"
               accessibilityLabel={t('common.back')}
+              accessibilityHint={t('a11y.hints.goBack')}
             >
               <BlurView intensity={20} tint="dark" style={styles.navPill}>
                 <IconSymbol name="arrow.backward" size={IconSizes.md} color="white" />
@@ -425,6 +403,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 onPress={onShare}
                 accessibilityRole="button"
                 accessibilityLabel={t('events.share')}
+                accessibilityHint={t('a11y.hints.shareEvent')}
               >
                 <BlurView intensity={20} tint="dark" style={styles.navPill}>
                   <IconSymbol name="square.and.arrow.up" size={IconSizes.md} color="white" />
@@ -434,10 +413,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               {isCreator ? (
                 <TouchableOpacity
                   testID="event-creator-menu"
-                  style={[styles.creatorPill, { backgroundColor: themeColors.tint }]}
+                  style={[styles.creatorPill, { backgroundColor: themeColors.cta }]}
                   onPress={onOpenCreatorMenu}
                   accessibilityRole="button"
                   accessibilityLabel={t('events.modifyPill')}
+                  accessibilityHint={t('a11y.hints.manageEvent')}
                 >
                   <IconSymbol name="pencil" size={14} color="white" />
                   <ThemedText style={styles.creatorPillText}>{t('events.modifyPill')}</ThemedText>
@@ -452,6 +432,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       accessibilityLabel={
                         isEventLiked ? t('events.likedEvent') : t('events.likeEvent')
                       }
+                      accessibilityHint={t('a11y.hints.toggleLike')}
                     >
                       <BlurView
                         intensity={20}
@@ -476,6 +457,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                     accessibilityLabel={
                       isEventSaved ? t('events.savedEvent') : t('events.saveEvent')
                     }
+                    accessibilityHint={t('a11y.hints.toggleSave')}
                   >
                     <BlurView
                       intensity={20}
@@ -596,6 +578,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 onPress={() => Linking.openSettings()}
                 accessibilityRole="button"
                 accessibilityLabel={t('notifications.permissionNotice')}
+                accessibilityHint={t('a11y.hints.openSettings')}
               >
                 <IconSymbol name="bell.badge" size={IconSizes.md} color={themeColors.warning} />
                 <ThemedText style={[styles.notificationNoticeText, { color: themeColors.text }]}>
@@ -645,7 +628,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                       type="categoryBadge"
                       style={{ color: categoryColors.color }}
                       accessibilityRole="text"
-                      accessibilityLabel={`Category: ${formatCategoryLabel(category)}`}
+                      aria-label={`Category: ${formatCategoryLabel(category)}`}
                     >
                       {formatCategoryLabel(category)}
                     </ThemedText>
@@ -655,7 +638,10 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             </View>
           )}
 
+          {!!seriesBadge && <View style={styles.seriesBadgeRow}>{seriesBadge}</View>}
+
           <TouchableOpacity
+            accessibilityRole="button"
             testID="event-calendar-card"
             onPress={createEventCalendar}
             style={[
@@ -696,6 +682,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           {(hasAddress || hasMap) && (
             <TouchableOpacity
+              accessibilityRole="button"
               testID="event-location-card"
               onPress={
                 hasMap
@@ -835,6 +822,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
           {event.website_url && isValidUrl(event.website_url) && (
             <TouchableOpacity
+              accessibilityRole="button"
               onPress={() => safeOpenUrl(event.website_url!)}
               style={[
                 styles.websiteRow,
@@ -861,48 +849,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               <ThemedText style={styles.sectionTitle}>{t('events.location')}</ThemedText>
 
               <View style={[styles.mapContainer, { borderColor: themeColors.cardBorder }]}>
-                {isMapAvailable && MapLibreMap && Camera && MapMarker && (
-                  <>
-                    <MapLibreMap
-                      style={styles.map}
-                      mapStyle={OPENFREEMAP_STYLE}
-                      attribution={true}
-                      logo={false}
-                      dragPan={false}
-                      touchZoom={false}
-                      doubleTapZoom={false}
-                      doubleTapHoldZoom={false}
-                      touchRotate={false}
-                      touchPitch={false}
-                      onDidFinishLoadingMap={() => setMapLoaded(true)}
-                    >
-                      <Camera
-                        initialViewState={{
-                          center: [event.geocod_lng!, event.geocod_lat!],
-                          zoom: 13,
-                        }}
-                      />
-                      <MapMarker
-                        coordinate={[event.geocod_lng!, event.geocod_lat!]}
-                        markerWidth={40}
-                        markerHeight={22}
-                      />
-                    </MapLibreMap>
-                    {!mapLoaded && (
-                      <View
-                        style={[
-                          styles.mapLoadingOverlay,
-                          { backgroundColor: themeColors.cardBackground },
-                        ]}
-                      >
-                        <BrandLoader />
-                      </View>
-                    )}
-                  </>
-                )}
+                <EventMapPreview latitude={event.geocod_lat!} longitude={event.geocod_lng!} />
 
                 <TouchableOpacity
-                  style={[styles.floatingDirections, { backgroundColor: themeColors.tint }]}
+                  accessibilityRole="button"
+                  style={[styles.floatingDirections, { backgroundColor: themeColors.cta }]}
                   onPress={() => openMap(event.geocod_lat!, event.geocod_lng!, fullAddress)}
                   activeOpacity={0.85}
                 >
@@ -958,6 +909,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
               style={styles.viewerCloseButton}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              accessibilityHint={t('a11y.hints.closeScreen')}
               hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
             >
               <IconSymbol name="xmark" size={IconSizes.lg} color="white" />
@@ -1036,6 +988,7 @@ function OrganizerRow({
         activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={`${t('events.viewProfile')} ${name}`}
+        accessibilityHint={t('a11y.hints.openOrganizer')}
       >
         {rowContent}
       </TouchableOpacity>
@@ -1266,6 +1219,9 @@ const styles = StyleSheet.create({
     height: 24,
   },
 
+  seriesBadgeRow: {
+    marginBottom: Spacing.md,
+  },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

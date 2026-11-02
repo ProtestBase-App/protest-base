@@ -9,11 +9,14 @@ import { Alert } from 'react-native';
 import type { DuplicateSummary } from '@/types/event.types';
 import {
   alertWithDuplicateWarning,
+  countDistinctDuplicates,
   duplicateHref,
+  duplicateKey,
   duplicateTitle,
   duplicateWarningNote,
   formatDuplicateMeta,
   formatDuplicateWhen,
+  formatDuplicateYourDate,
   relationshipMessageKey,
   relationshipOpenLabelKey,
 } from '@/utils/duplicateEvents';
@@ -156,6 +159,186 @@ describe('duplicateEvents', () => {
       });
       expect(note).toContain('duplicates.warningNoteMany');
       expect(note).toContain('"count":2');
+    });
+  });
+
+  // On a recurring series one existing event can clash with several of the submitted
+  // dates, so the backend lists it once per date, each with the date it clashed on.
+  describe('series matches', () => {
+    const NOV_3 = '2026-11-03T18:00:00.000Z';
+    const NOV_10 = '2026-11-10T18:00:00.000Z';
+
+    describe('duplicateKey', () => {
+      it('keeps one existing event listed for two dates apart', () => {
+        const first = summary({ occurrence_start_time: NOV_3 });
+        const second = summary({ occurrence_start_time: NOV_10 });
+
+        expect(duplicateKey(first)).not.toBe(duplicateKey(second));
+        expect(new Set([first, second].map(duplicateKey)).size).toBe(2);
+      });
+
+      it('keeps two events apart on the same date', () => {
+        expect(duplicateKey(summary({ id: 'a', occurrence_start_time: NOV_3 }))).not.toBe(
+          duplicateKey(summary({ id: 'b', occurrence_start_time: NOV_3 }))
+        );
+      });
+
+      it('is the same for a missing and a null date, which is a single event', () => {
+        expect(duplicateKey(summary())).toBe('dup-1-');
+        expect(duplicateKey(summary({ occurrence_start_time: null }))).toBe('dup-1-');
+      });
+    });
+
+    describe('countDistinctDuplicates', () => {
+      it('counts events, not rows', () => {
+        expect(countDistinctDuplicates([])).toBe(0);
+        expect(
+          countDistinctDuplicates([
+            summary({ occurrence_start_time: NOV_3 }),
+            summary({ occurrence_start_time: NOV_10 }),
+          ])
+        ).toBe(1);
+        expect(countDistinctDuplicates([summary(), summary({ id: 'dup-2' })])).toBe(2);
+      });
+    });
+
+    describe('formatDuplicateYourDate', () => {
+      it('is null on a single event', () => {
+        expect(formatDuplicateYourDate(summary())).toBeNull();
+        expect(formatDuplicateYourDate(summary({ occurrence_start_time: null }))).toBeNull();
+        expect(formatDuplicateYourDate(summary({ occurrence_start_time: '' }))).toBeNull();
+      });
+
+      // Intl throws on an Invalid Date, and this runs inside the modal's render.
+      it('is null instead of throwing on an unparseable date', () => {
+        expect(
+          formatDuplicateYourDate(summary({ occurrence_start_time: 'not-a-date' }))
+        ).toBeNull();
+      });
+
+      it('names the date the submitted series clashed on', () => {
+        expect(formatDuplicateYourDate(summary({ occurrence_start_time: NOV_3 }))).toBe(
+          'duplicates.yourDate:{"date":"Tue 3 Nov"}'
+        );
+      });
+
+      it('reads the date in Brussels time, not UTC', () => {
+        // 23:30 UTC on the 3rd is already the 4th in Brussels.
+        expect(
+          formatDuplicateYourDate(summary({ occurrence_start_time: '2026-11-03T23:30:00.000Z' }))
+        ).toBe('duplicates.yourDate:{"date":"Wed 4 Nov"}');
+      });
+
+      it('writes the date in the given language', () => {
+        const duplicate = summary({ occurrence_start_time: NOV_3 });
+
+        expect(formatDuplicateYourDate(duplicate, 'fr')).toBe(
+          'duplicates.yourDate:{"date":"mar. 3 nov."}'
+        );
+        expect(formatDuplicateYourDate(duplicate, 'nl')).toBe(
+          'duplicates.yourDate:{"date":"di 3 nov"}'
+        );
+      });
+    });
+
+    describe('duplicateWarningNote', () => {
+      it('is unchanged on a single event: no dates line', () => {
+        expect(duplicateWarningNote({ possibleDuplicates: [summary()] })).toBe(
+          'duplicates.warningNote:{"title":"Climate March"}'
+        );
+        expect(
+          duplicateWarningNote({
+            possibleDuplicates: [summary(), summary({ id: 'dup-2', occurrence_start_time: null })],
+          })
+        ).toBe('duplicates.warningNoteMany:{"title":"Climate March","count":1}');
+      });
+
+      it('appends the clashing dates after the note, each once and in date order', () => {
+        const note = duplicateWarningNote({
+          possibleDuplicates: [
+            summary({ id: 'a', occurrence_start_time: NOV_10 }),
+            summary({ id: 'b', occurrence_start_time: NOV_3 }),
+            summary({ id: 'c', occurrence_start_time: NOV_10 }),
+          ],
+        });
+
+        expect(note).toBe(
+          'duplicates.warningNoteMany:{"title":"Climate March","count":2}\n' +
+            'duplicates.clashingDates:{"dates":"Tue 3 Nov, Tue 10 Nov"}'
+        );
+      });
+
+      it('counts one event listed for two dates once, and still lists both dates', () => {
+        const note = duplicateWarningNote({
+          possibleDuplicates: [
+            summary({ occurrence_start_time: NOV_3 }),
+            summary({ occurrence_start_time: NOV_10 }),
+          ],
+        });
+
+        expect(note).toBe(
+          'duplicates.warningNote:{"title":"Climate March"}\n' +
+            'duplicates.clashingDates:{"dates":"Tue 3 Nov, Tue 10 Nov"}'
+        );
+      });
+
+      it('lists only the matches that carry a usable date', () => {
+        const note = duplicateWarningNote({
+          possibleDuplicates: [
+            summary({ id: 'a', occurrence_start_time: 'garbage' }),
+            summary({ id: 'b', occurrence_start_time: null }),
+            summary({ id: 'c', occurrence_start_time: NOV_3 }),
+          ],
+        });
+
+        expect(note).toContain('duplicates.clashingDates:{"dates":"Tue 3 Nov"}');
+        expect(note).not.toContain('garbage');
+      });
+
+      it('adds no dates line when no date is usable', () => {
+        expect(
+          duplicateWarningNote({
+            possibleDuplicates: [summary({ occurrence_start_time: 'garbage' })],
+          })
+        ).toBe('duplicates.warningNote:{"title":"Climate March"}');
+      });
+
+      it('writes the dates in the given language', () => {
+        const report = { possibleDuplicates: [summary({ occurrence_start_time: NOV_3 })] };
+
+        expect(duplicateWarningNote(report, 'nl')).toContain(
+          'duplicates.clashingDates:{"dates":"di 3 nov"}'
+        );
+      });
+    });
+
+    describe('alertWithDuplicateWarning', () => {
+      it('puts the clashing dates in the alert, in the user language', () => {
+        const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+        alertWithDuplicateWarning(
+          'common.success',
+          'series.messages.created:{"count":3}',
+          { possibleDuplicates: [summary({ occurrence_start_time: NOV_3 })] },
+          jest.fn(),
+          undefined,
+          'fr'
+        );
+
+        const message = alertSpy.mock.calls[0][1] as string;
+        expect(message).toContain('series.messages.created:{"count":3}');
+        expect(message).toContain('duplicates.clashingDates:{"dates":"mar. 3 nov."}');
+        alertSpy.mockRestore();
+      });
+
+      it('shows the plain alert when nothing clashed, whatever the language', () => {
+        const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+        alertWithDuplicateWarning('common.success', 'message', {}, jest.fn(), undefined, 'fr');
+
+        expect(alertSpy).toHaveBeenCalledWith('common.success', 'message');
+        alertSpy.mockRestore();
+      });
     });
   });
 

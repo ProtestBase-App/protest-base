@@ -1,15 +1,19 @@
 import React from 'react';
 
+import SeriesScopeDialog from '@/components/SeriesScopeDialog';
 import ConfirmDialogShell from '@/components/ui/ConfirmDialogShell';
+import type { SeriesScope } from '@/types/eventSeries.types';
 import { t } from '@/utils/i18n';
 
 interface CancelEventModalProps {
   visible: boolean;
   onDismiss: () => void;
-  /** Confirm the cancellation. */
-  onConfirm: () => Promise<void> | void;
+  /** Confirm the cancellation, of this event alone unless the series was chosen. */
+  onConfirm: (scope: SeriesScope) => Promise<void> | void;
   /** When true, the confirm button shows a spinner and is disabled. */
   submitting?: boolean;
+  /** One date of a recurring series: offers "this and all following events" too. */
+  inSeries?: boolean;
 }
 
 /**
@@ -24,7 +28,26 @@ export default function CancelEventModal({
   onDismiss,
   onConfirm,
   submitting,
+  inSeries = false,
 }: CancelEventModalProps) {
+  if (inSeries) {
+    return (
+      <SeriesScopeDialog
+        visible={visible}
+        title={t('events.cancelConfirmTitle')}
+        message={t('events.cancelConfirmMessage')}
+        followingHint={t('series.dialogs.cancelFollowingHint')}
+        dismissLabel={t('events.keepActive')}
+        onDismiss={onDismiss}
+        confirmLabel={t('events.cancelAction')}
+        onConfirm={onConfirm}
+        destructive
+        submitting={submitting}
+        testID="cancel-event-dialog"
+      />
+    );
+  }
+
   return (
     <ConfirmDialogShell
       visible={visible}
@@ -34,7 +57,7 @@ export default function CancelEventModal({
       onDismiss={onDismiss}
       confirmLabel={t('events.cancelAction')}
       onConfirm={() => {
-        onConfirm();
+        onConfirm('only');
       }}
       destructive
       submitting={submitting}

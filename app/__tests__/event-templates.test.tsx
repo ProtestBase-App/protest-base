@@ -13,13 +13,19 @@ jest.mock('@/utils/i18n', () => ({
   }),
 }));
 
+jest.mock('@/services/localStorageService', () => ({
+  getEventDraft: jest.fn().mockResolvedValue(null),
+  clearEventDraft: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/utils/templateUtils', () => ({
-  extractTemplateData: jest.fn((event: any) => ({
-    organization_id: event.organization_id,
+  toPastEventForTemplate: jest.fn((event: any) => ({
+    $id: event.$id,
     title: event.title,
+    formattedDate: event.start_time,
     city: event.city,
+    firstCategory: event.categories?.[0],
   })),
-  formatPastEventDate: jest.fn((date: string) => date),
 }));
 
 jest.mock('@/utils/draftStatusUtils', () => ({
@@ -308,7 +314,7 @@ describe('EventTemplatesScreen', () => {
       expect(olderText.length).toBeGreaterThan(0);
     });
 
-    it('navigates to create-event with templateId and source=template when tile body is pressed', () => {
+    it('navigates to create-event with templateId and source=template when tile body is pressed', async () => {
       const template = makeTemplate({ $id: 'tmpl-abc' });
 
       const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
@@ -318,10 +324,12 @@ describe('EventTemplatesScreen', () => {
       });
 
       fireEvent.press(getByTestId('template-tile-tmpl-abc'));
-      expect(mockedRouter.push).toHaveBeenCalledWith({
-        pathname: '/create-event',
-        params: { templateId: 'tmpl-abc', source: 'template' },
-      });
+      await waitFor(() =>
+        expect(mockedRouter.push).toHaveBeenCalledWith({
+          pathname: '/create-event',
+          params: { templateId: 'tmpl-abc', source: 'template' },
+        })
+      );
     });
   });
 
@@ -366,113 +374,58 @@ describe('EventTemplatesScreen', () => {
       expect(getByTestId('past-event-use-past-2')).toBeTruthy();
     });
 
-    it('calls addTemplate with correct payload and navigates to create-event on Use press', async () => {
-      const createdTemplate = makeTemplate({ $id: 'created-tmpl-99' });
-      const mockAddTemplate = jest.fn().mockResolvedValue(createdTemplate);
-      const event = makePastEvent({
-        $id: 'past-3',
-        title: 'Past Rally',
-        organization_id: 'org-1',
-      });
+    it('opens create-event from the event, and creates no template', async () => {
+      const mockAddTemplate = jest.fn();
+      const event = makePastEvent({ $id: 'past-event-1' });
 
       const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
-          pastEventsContext: {
-            pastEvents: [event as any],
-            loading: false,
-          },
           templatesContext: {
             templates: [],
             loading: false,
             error: null,
             addTemplate: mockAddTemplate,
           },
-          userOrganizationsContext: {
-            userOrganizations: [{ $id: 'org-1' }] as any[],
-          },
+          pastEventsContext: { pastEvents: [event], loading: false },
         },
       });
 
-      fireEvent.press(getByTestId('past-event-use-past-3'));
+      fireEvent.press(getByTestId('past-event-use-past-event-1'));
 
-      await waitFor(() => {
-        expect(mockAddTemplate).toHaveBeenCalledWith(
-          expect.objectContaining({
-            organization_id: 'org-1',
-            name: 'Past Rally',
-          })
-        );
-      });
-
-      await waitFor(() => {
+      await waitFor(() =>
         expect(mockedRouter.push).toHaveBeenCalledWith({
           pathname: '/create-event',
-          params: { templateId: 'created-tmpl-99', source: 'template' },
-        });
-      });
+          params: { fromEventId: 'past-event-1', source: 'past' },
+        })
+      );
+      expect(mockAddTemplate).not.toHaveBeenCalled();
     });
 
-    it('calls Alert.alert with error message when addTemplate rejects on Use press', async () => {
-      const mockAddTemplate = jest.fn().mockRejectedValue(new Error('Server error'));
-      const event = makePastEvent({ $id: 'past-4', organization_id: 'org-1' });
+    it('asks before replacing an unfinished event', async () => {
+      const { getEventDraft } = require('@/services/localStorageService');
+      getEventDraft.mockResolvedValueOnce({ formData: {}, savedAt: Date.now() });
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const event = makePastEvent({ $id: 'past-event-1' });
 
       const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
         providerOverrides: {
-          pastEventsContext: {
-            pastEvents: [event as any],
-            loading: false,
-          },
-          templatesContext: {
-            templates: [],
-            loading: false,
-            error: null,
-            addTemplate: mockAddTemplate,
-          },
-          userOrganizationsContext: {
-            userOrganizations: [{ $id: 'org-1' }] as any[],
-          },
+          templatesContext: { templates: [], loading: false, error: null },
+          pastEventsContext: { pastEvents: [event], loading: false },
         },
       });
 
-      fireEvent.press(getByTestId('past-event-use-past-4'));
+      fireEvent.press(getByTestId('past-event-use-past-event-1'));
 
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('common.error', 'Server error');
-      });
-
-      // No navigation should happen
+      await waitFor(() =>
+        expect(alertSpy).toHaveBeenCalledWith(
+          'draft.replaceTitle',
+          'draft.replaceMessage',
+          expect.any(Array)
+        )
+      );
       expect(mockedRouter.push).not.toHaveBeenCalled();
-    });
 
-    it('does not navigate if addTemplate rejects', async () => {
-      const mockAddTemplate = jest.fn().mockRejectedValue(new Error('Oops'));
-      const event = makePastEvent({ $id: 'past-5', organization_id: 'org-1' });
-
-      const { getByTestId } = renderWithProviders(<EventTemplatesScreen />, {
-        providerOverrides: {
-          pastEventsContext: {
-            pastEvents: [event as any],
-            loading: false,
-          },
-          templatesContext: {
-            templates: [],
-            loading: false,
-            error: null,
-            addTemplate: mockAddTemplate,
-          },
-          userOrganizationsContext: {
-            userOrganizations: [{ $id: 'org-1' }] as any[],
-          },
-        },
-      });
-
-      fireEvent.press(getByTestId('past-event-use-past-5'));
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalled();
-      });
-
-      expect(mockedRouter.push).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
     });
   });
 

@@ -26,8 +26,18 @@ export default function HelpNeededModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        accessible={false}
+        accessibilityRole="none"
+        style={styles.overlay}
+        onPress={onClose}
+      >
+        <Pressable
+          accessible={false}
+          accessibilityRole="none"
+          style={styles.modalContainer}
+          onPress={(e) => e.stopPropagation()}
+        >
           <ThemedView style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Volunteer Icon */}
@@ -53,10 +63,11 @@ export default function HelpNeededModal({
 
               {/* Got It Button */}
               <Pressable
-                style={[styles.button, { backgroundColor: colors.tint }]}
+                style={[styles.button, { backgroundColor: colors.cta }]}
                 onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel={t('help.gotIt')}
+                accessibilityHint={t('a11y.hints.closeDialog')}
               >
                 <ThemedText style={styles.buttonText}>{t('help.gotIt')}</ThemedText>
               </Pressable>

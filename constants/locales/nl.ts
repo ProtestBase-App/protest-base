@@ -115,6 +115,8 @@ const nl = {
   // Common translations used across the app
   // ============================================
   common: {
+    saving: 'Opslaan…',
+    publishing: 'Publiceren…',
     ok: 'OK',
     cancel: 'Annuleren',
     save: 'Opslaan',
@@ -179,8 +181,7 @@ const nl = {
   // ============================================
   template: {
     // Titles
-    createTitle: 'Sjabloon aanmaken',
-    createFromEventTitle: 'Sjabloon aanmaken van evenement',
+    createTitle: 'Nieuw sjabloon',
     editTitle: 'Sjabloon bewerken',
 
     // Subtitles and descriptions
@@ -195,7 +196,7 @@ const nl = {
     // Field labels
     nameLabel: 'Sjabloonnaam *',
     descriptionLabel: 'Sjabloonbeschrijving (Optioneel)',
-    namePlaceholder: 'Geef je sjabloon een naam (bv. Maandelijkse bijeenkomst)',
+    namePlaceholder: 'bv. Maandelijkse wake voor wonen',
     descriptionPlaceholder: 'Waar is dit sjabloon voor?',
 
     // Buttons
@@ -209,7 +210,17 @@ const nl = {
 
     // Error messages
     nameMissing: 'Voer een sjabloonnaam in.',
+    dataTooLong: 'Deze sjabloon is te lang om op te slaan. Maak de beschrijving korter.',
     volunteerDescMissing: 'Beschrijf hoe vrijwilligers kunnen helpen.',
+    saveFromEventTitle: 'Opslaan als sjabloon',
+    saveFromEventDesc: 'De details van dit evenement hergebruiken',
+    keepGroup: 'Bewaren',
+    datesNeverSaved: 'Datums worden nooit in een sjabloon bewaard.',
+    partText: 'Titel en tekst',
+    partLocation: 'Locatie',
+    nameHelp: 'Alleen je organisatie ziet deze naam.',
+    dateAsked: 'Datum en tijd',
+    dateAskedHint: 'Die kies je wanneer je het sjabloon gebruikt',
 
     // Delete confirmation
     deleteConfirmTitle: 'Sjabloon verwijderen',
@@ -224,11 +235,15 @@ const nl = {
   // Create Event Options
   // ============================================
   createEventOptions: {
+    startGroup: 'Beginnen',
+    templatesGroup: 'Je sjablonen',
+    resume: 'Hervatten',
+    unfinished: 'Onafgewerkt',
+    untitled: 'Naamloos evenement',
     blankTitle: 'Plan een nieuwe actie',
-    blankSubtitle: 'Maak een nieuw evenement met een leeg formulier',
+    blankSubtitle: 'Begin met een leeg evenement',
     templateTitle: 'Gebruik een sjabloon',
     templateSubtitle: 'Vooraf invullen met opgeslagen evenementdetails',
-    footer: 'Sjablonen besparen tijd voor terugkerende evenementen met vergelijkbare details.',
   },
 
   // ============================================
@@ -608,21 +623,21 @@ const nl = {
     city: 'Stad',
     helpNeeded: 'Hulp nodig',
     eventImage: 'Evenementafbeelding',
-    uploadImage: 'Afbeelding uploaden',
+    uploadImage: "Foto's",
+    addCoverPhoto: 'Omslagfoto toevoegen',
     changeImage: 'Afbeelding wijzigen',
     removeImage: 'Afbeelding verwijderen',
     eventLink: 'Evenementlink',
     coOrganizers: 'Mede-organisatoren',
-    volunteering: 'Vrijwilligerswerk',
-    volunteerRoles: 'Vrijwilligersrollen en details',
+    volunteering: 'Vrijwilligers',
+    volunteerRoles: 'Hoe kunnen mensen helpen?',
     volunteerNeeded: 'Vrijwilligers nodig',
     volunteerDetails: 'Wat voor vrijwilligers heb je nodig?',
-    disclaimer: 'Disclaimer',
+    disclaimer: 'Goed om te weten',
 
     // Placeholders
     titlePlaceholder: 'Titel van het evenement',
-    descriptionPlaceholder:
-      'Beschrijf je evenement - waar het over gaat, wat te verwachten, wie er moet komen...',
+    descriptionPlaceholder: 'Waar gaat het over, wie moet er komen?',
     selectCategory: 'Selecteer een categorie',
     categoryPlaceholder: 'Selecteer een categorie',
     pickDateTime: 'Kies datum/tijd',
@@ -675,14 +690,21 @@ const nl = {
       'Belangrijke informatie die deelnemers moeten weten (veiligheid, toegankelijkheid, vereisten, etc.)',
 
     // Checkbox labels
-    needHelpCheckbox: 'Ik heb hulp nodig bij dit evenement',
+    needHelpCheckbox: 'We zoeken vrijwilligers',
 
     // Labels
     selected: 'Geselecteerd',
     mainImageBadge: 'Hoofd',
 
     // Progress & Actions
-    requiredFieldsProgress: 'Verplichte velden ingevuld: {{completed}}/{{total}}',
+    stillNeeded: 'Nog nodig: {{fields}}',
+    allRequiredFilled: 'Alle verplichte velden zijn ingevuld',
+    neededFields: {
+      title: 'titel',
+      description: 'beschrijving',
+      category: 'categorie',
+      date: 'datum',
+    },
     createButton: 'Evenement aanmaken',
     updateButton: 'Evenement bijwerken',
     cancelButton: 'Annuleren',
@@ -716,7 +738,47 @@ const nl = {
     // Additional validation
     fillMandatoryFields: 'Vul alle verplichte velden in.',
     organizationsLoading: 'Wacht tot de organisaties zijn geladen voordat je indient.',
-    invalidUrlFormat: 'Website URL moet beginnen met www., http:// of https://',
+    invalidUrlFormat: 'Voer een geldige link in, zoals example.com.',
+    disclaimerTooLong: 'Houd dit op maximaal {{max}} tekens.',
+    volunteerTooLong: 'Houd dit op maximaal {{max}} tekens.',
+    saveAsDraft: 'Concept',
+    publish: 'Publiceren',
+    linkTooLong: 'Houd de link op maximaal {{max}} tekens.',
+    fromTemplate: 'Uit sjabloon: {{name}}',
+    pickTheDate: 'Kies de datum en tijd',
+    onlyThingLeft: 'Het enige wat nog ontbreekt',
+    starts: 'Begint',
+    ends: 'Eindigt',
+    noSetEnd: 'Geen vast einde',
+    endsAnotherDay: 'Eindigt op een andere dag',
+    previousMonth: 'Vorige maand',
+    nextMonth: 'Volgende maand',
+    hours: {
+      one: '1 u',
+      other: '{{count}} u',
+    },
+    publishCheckTitle: 'Dit evenement publiceren?',
+    publishCheckBody: 'Het is meteen openbaar op Verkennen, Kaart en Kalender.',
+    publishNow: 'Nu publiceren',
+    timePlaceholder: 'Tijd',
+    brusselsTime: '{{time}}, Brusselse tijd',
+    namePlaceholder: 'Geef je actie een naam',
+    byOrganization: 'door {{name}}',
+    addDateTime: 'Datum en tijd toevoegen',
+    addPlace: 'Een plaats toevoegen',
+    link: 'Link',
+    where: 'Waar',
+    when: 'Wanneer',
+    addMore: 'Meer toevoegen',
+    whenRange: '{{start}} tot {{end}}',
+    fixBeforePublishing: {
+      one: '1 punt om op te lossen voor je publiceert',
+      other: '{{count}} punten om op te lossen voor je publiceert',
+    },
+    fixBeforeSaving: {
+      one: '1 punt om op te lossen voor je opslaat',
+      other: '{{count}} punten om op te lossen voor je opslaat',
+    },
     // Accessibility
     closeAccessibilityLabel: 'Sluit evenement aanmaken scherm',
     progressAccessibilityLabel: 'Formuliervoortgang: {{percentage}}% voltooid',
@@ -732,7 +794,6 @@ const nl = {
     postalCodeLoadError: 'Kon postcodes niet laden. Probeer het opnieuw.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
     maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen toevoegen.',
-    missingFieldsError: 'Vul de volgende verplichte velden in: {{fields}}',
   },
 
   // ============================================
@@ -834,7 +895,6 @@ const nl = {
     reusePastEvent: 'Een eerder evenement hergebruiken',
     orReusePastEvent: 'Of hergebruik een eerder evenement',
     use: 'Gebruiken',
-    using: 'Bezig…',
     placeholderCard: 'Je opgeslagen sjablonen verschijnen hier',
     hintDefault: 'Tik op een sjabloon om een evenement met vooraf ingevulde details aan te maken.',
     hintEmpty: 'Een eerder evenement gebruiken maakt er automatisch een sjabloon van.',
@@ -1478,6 +1538,12 @@ const nl = {
   // Draft - Event draft management
   // ============================================
   draft: {
+    replaceTitle: 'Je onafgewerkte evenement vervangen?',
+    replaceMessage:
+      'Je hebt een onafgewerkt evenement op deze telefoon. Een nieuw beginnen verwijdert het.',
+    replaceConfirm: 'Nieuw beginnen',
+    photosMissingTitle: "Sommige foto's zijn weg",
+    photosMissingMessage: "Je telefoon heeft foto's van dit evenement gewist. Voeg ze opnieuw toe.",
     checkingDraft: 'Controleren op opgeslagen concept...',
     resumeTitle: 'Concept hervatten?',
     resumeMessage:
@@ -1487,7 +1553,7 @@ const nl = {
     closeTitle: 'Niet-opgeslagen wijzigingen',
     closeMessage: 'Je hebt niet-opgeslagen wijzigingen. Wat wil je doen?',
     discard: 'Verwijderen',
-    saveDraft: 'Concept opslaan',
+    saveDraft: 'Bewaren en sluiten',
     keepEditing: 'Blijven bewerken',
     saveWarningTitle: 'Probleem met automatisch opslaan',
     saveWarningMessage:
@@ -1664,7 +1730,218 @@ const nl = {
       one: 'Let op: dit lijkt op “{{title}}” en {{count}} ander evenement.',
       other: 'Let op: dit lijkt op “{{title}}” en {{count}} andere evenementen.',
     },
+    yourDate: 'Jouw datum: {{date}}',
+    clashingDates: 'Betrokken data: {{dates}}',
     accessibilityOpen: 'Open “{{title}}”',
+  },
+
+  // ============================================
+  // Series - recurring events
+  // ============================================
+  series: {
+    repeat: {
+      label: 'Herhalen',
+      once: 'Eenmalig',
+      weekly: 'Wekelijks',
+      everyTwoWeeks: 'Om de 2 weken',
+      monthly: 'Maandelijks',
+      weekday: 'Dag',
+      weekOfMonth: 'Welke van de maand',
+      startTime: 'Starttijd',
+      endTime: 'Eindtijd',
+      pickTime: 'Kies een tijd',
+      timeHint: 'Brusselse tijd. Een eindtijd vóór de starttijd valt op de volgende dag.',
+      startsOn: 'Vanaf',
+      startsOnHint: 'De eerste datum is de eerste passende dag vanaf deze datum.',
+      ends: 'Eindigt',
+      endsAfter: 'Na een aantal keer',
+      endsOn: 'Op een datum',
+      countLabel: 'Aantal keer',
+      countPlaceholder: '2 tot 31',
+      untilLabel: 'Laatste datum',
+      pickDate: 'Kies een datum',
+      capHint: 'Een reeks loopt hoogstens 3 maanden na haar eerste datum.',
+      errors: {
+        startLocal: 'Kies een starttijd.',
+        endLocal: 'De eindtijd mag niet gelijk zijn aan de starttijd.',
+        startsOn: 'De startdatum mag niet in het verleden liggen.',
+        until: 'Kies een einddatum op of na de startdatum.',
+        count: 'Vul een getal van 2 tot 31 in.',
+      },
+    },
+    rule: {
+      weekly: 'Elke {{weekday}}',
+      everyTwoWeeks: 'Om de twee weken op {{weekday}}',
+      monthly: 'Elke {{ordinal}} {{weekday}} van de maand',
+      until: 'tot {{date}}',
+    },
+    weekdays: {
+      monday: 'maandag',
+      tuesday: 'dinsdag',
+      wednesday: 'woensdag',
+      thursday: 'donderdag',
+      friday: 'vrijdag',
+      saturday: 'zaterdag',
+      sunday: 'zondag',
+    },
+    weekdaysShort: {
+      monday: 'ma',
+      tuesday: 'di',
+      wednesday: 'wo',
+      thursday: 'do',
+      friday: 'vr',
+      saturday: 'za',
+      sunday: 'zo',
+    },
+    ordinals: {
+      first: 'eerste',
+      second: 'tweede',
+      third: 'derde',
+      fourth: 'vierde',
+      last: 'laatste',
+    },
+    preview: {
+      heading: 'Data',
+      loading: 'Data berekenen…',
+      creates: {
+        one: 'Dit maakt 1 evenement aan:',
+        other: 'Dit maakt {{count}} evenementen aan:',
+      },
+      upTo: 'Tot {{count}} evenementen, de laatste ten laatste op {{date}}.',
+      unavailable:
+        'De data kunnen nu niet worden getoond. Ze worden gecontroleerd bij het opslaan.',
+    },
+    badge: {
+      weekly: 'Elke week',
+      everyTwoWeeks: 'Om de 2 weken',
+      monthly: 'Elke maand',
+      count: {
+        one: '1 evenement',
+        other: '{{count}} evenementen',
+      },
+      generic: 'Terugkerend evenement',
+      seeAll: 'Alle data bekijken',
+    },
+    scope: {
+      only: 'Alleen dit evenement',
+      following: 'Dit en alle volgende evenementen',
+    },
+    edit: {
+      partOfSeries: 'Dit evenement is één datum van een terugkerende reeks.',
+      onlyNote:
+        'Alleen voor deze datum opslaan? Een latere bewerking van ‘dit en alle volgende evenementen’ overschrijft dit.',
+      allNote:
+        'Je wijzigingen gelden voor alle komende data van deze reeks. Hun data blijven zoals gepland; alleen de tijden kunnen veranderen.',
+      scopeTitle: 'Je wijzigingen toepassen op',
+      followingNote:
+        'Elke latere datum wordt overschreven met dit formulier, ook als die apart bewerkt is. De data blijven zoals gepland; alleen de tijden kunnen veranderen.',
+      dateLocked:
+        'Je hebt de datum gewijzigd of het evenement meerdere dagen laten duren. Dat kan alleen voor dit evenement: de planning van een reeks kan niet veranderen.',
+    },
+    page: {
+      heading: 'Alle data',
+      upcoming: 'Komend',
+      past: 'Voorbij',
+      noUpcoming: 'Geen komende data.',
+      status: {
+        draft: 'Concept',
+        active: 'Gepubliceerd',
+        cancelled: 'Geannuleerd',
+        past: 'Voorbij',
+      },
+      manageHeading: 'Deze reeks beheren',
+      manageNote:
+        'Deze knoppen gelden voor alle komende data. Voorbije data worden nooit gewijzigd.',
+      editAll: 'Alle komende data bewerken',
+      cancelAll: 'Alle komende data annuleren',
+      deleteAll: 'Alle komende data verwijderen',
+      publishAll: 'Alles publiceren',
+      addDates: 'Data toevoegen',
+      addDatesLabel: 'Aantal data om toe te voegen',
+      windowNote: 'Deze reeks kan hoogstens tot {{date}} lopen.',
+      notFound: 'Deze reeks bestaat niet meer.',
+      loadError:
+        'De reeks kon niet worden geladen. Controleer je verbinding en probeer het opnieuw.',
+    },
+    dialogs: {
+      cancelAllTitle: 'Alle komende data annuleren?',
+      cancelAllBody: {
+        one: '1 betrokken datum. Gepubliceerde data worden geannuleerd en concepten verwijderd. Dit kan niet ongedaan worden gemaakt.',
+        other:
+          '{{count}} betrokken data. Gepubliceerde data worden geannuleerd en concepten verwijderd. Dit kan niet ongedaan worden gemaakt.',
+      },
+      deleteAllTitle: 'Alle komende data verwijderen?',
+      deleteAllBody: {
+        one: '1 betrokken datum. Die wordt definitief verwijderd. Voorbije data blijven staan.',
+        other:
+          '{{count}} betrokken data. Ze worden definitief verwijderd. Voorbije data blijven staan.',
+      },
+      publishAllTitle: 'Alle komende concepten publiceren?',
+      publishAllBody: {
+        one: '1 concept om te publiceren. Voorbije concepten blijven concepten.',
+        other: '{{count}} concepten om te publiceren. Voorbije concepten blijven concepten.',
+      },
+      addDatesTitle: 'Data toevoegen',
+      addDatesConfirm: 'Data toevoegen',
+      deleteScopeTitle: 'Welke concepten verwijderen?',
+      deleteScopeBody: 'Ze worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.',
+      cancelFollowingHint:
+        'Alle latere data worden ook geannuleerd; komende concepten worden verwijderd.',
+      deleteFollowingLocked:
+        'Sommige latere data zijn al gepubliceerd, dus hier kan alleen dit concept worden verwijderd.',
+    },
+    messages: {
+      created: {
+        one: '1 evenement aangemaakt.',
+        other: '{{count}} evenementen aangemaakt.',
+      },
+      draftsCreated: {
+        one: '1 concept opgeslagen.',
+        other: '{{count}} concepten opgeslagen.',
+      },
+      updated: {
+        one: '1 datum bijgewerkt.',
+        other: '{{count}} data bijgewerkt.',
+      },
+      cancelled: {
+        one: '1 datum geannuleerd.',
+        other: '{{count}} data geannuleerd.',
+      },
+      deleted: {
+        one: '1 datum verwijderd.',
+        other: '{{count}} data verwijderd.',
+      },
+      published: {
+        one: '1 datum gepubliceerd.',
+        other: '{{count}} data gepubliceerd.',
+      },
+      datesAdded: {
+        one: '1 datum toegevoegd.',
+        other: '{{count}} data toegevoegd.',
+      },
+    },
+    errors: {
+      disabled: 'Terugkerende evenementen zijn momenteel niet beschikbaar.',
+      invalid:
+        'Deze herhaalinstellingen zijn niet geldig. Controleer de dag, de tijden en de data.',
+      untilBeforeStart: 'De einddatum ligt vóór de eerste datum van de reeks.',
+      tooFew: 'Een reeks heeft minstens 2 data nodig. Kies een latere einddatum of meer keren.',
+      tooMany: 'Een reeks kan hoogstens {{max}} data hebben, de laatste ten laatste op {{date}}.',
+      lostRule:
+        'De herhaalinstellingen hebben de server niet bereikt, dus er is niets aangemaakt. Probeer het opnieuw.',
+      notConfirmed:
+        'De server heeft de reeks niet bevestigd. Kijk bij je evenementen voor je het opnieuw probeert.',
+      notFound: 'Deze reeks bestaat niet meer.',
+      nothingUpcoming: 'Er is geen komende datum meer om te wijzigen.',
+      scheduleImmutable:
+        'De planning van een reeks kan niet worden gewijzigd. Annuleer of verwijder de data die weg moeten, of maak een nieuwe reeks.',
+      ended: 'Alle data van deze reeks zijn geannuleerd of voorbij. Maak liever een nieuwe reeks.',
+      invalidFromEvent: 'Deze datum hoort niet meer bij de reeks. Vernieuw en probeer het opnieuw.',
+      reasonTooLong: 'De reden is te lang (hoogstens 1000 tekens).',
+      conflict: 'Iemand heeft deze data net toegevoegd. Vernieuw om ze te zien.',
+      notMember: 'Alleen leden van de organisatie kunnen deze reeks wijzigen.',
+      generic: 'Er ging iets mis. Probeer het opnieuw.',
+    },
   },
 
   // ============================================
@@ -1836,6 +2113,83 @@ const nl = {
       sunny_2: 'Perfect protestweer: neem je zonnebril mee.',
       sunny_3: 'Perfect protestweer: zorg dat je niet verbrandt!',
       perfect: 'Perfect protestweer: geen excuses om niet te komen!',
+    },
+  },
+  a11y: {
+    required: 'verplicht',
+    tabPosition: '{{title}}, tabblad, {{position}} van {{count}}',
+    expandField: 'Dit veld groter maken',
+    collapseField: 'Dit veld kleiner maken',
+    hints: {
+      goBack: 'Gaat terug naar het vorige scherm',
+      closeScreen: 'Sluit dit scherm',
+      closeDialog: 'Sluit dit venster',
+      closeMenu: 'Sluit het menu',
+      openEvent: 'Opent de details van het evenement',
+      openFilters: 'Opent de filters',
+      toggleSave: 'Voegt dit evenement toe aan je opgeslagen evenementen, of haalt het eruit',
+      toggleLike: 'Voegt je like toe, of haalt hem weg',
+      shareEvent: 'Opent de deelopties',
+      viewImage: 'Toont de afbeelding op volledig scherm',
+      removeFilter: 'Verwijdert deze filter',
+      removeSelection: 'Verwijdert deze selectie',
+      openOrganizer: 'Opent het profiel van de organisator',
+      manageEvent: 'Opent de acties voor dit evenement',
+      openSettings: 'Opent de instellingen van de app op je toestel',
+      openExternalLink: 'Opent de link buiten de app',
+      zoomInMap: 'Zoomt in op de kaart',
+      zoomOutMap: 'Zoomt uit op de kaart',
+      selectOnMap: 'Selecteert dit evenement op de kaart',
+      applyMapFilter: 'Filtert de evenementen op de kaart',
+      showHomeArea: 'Filtert de lijst op je gebied',
+      resetPassword: 'Opent het herstellen van je wachtwoord',
+      togglePassword: 'Toont of verbergt het wachtwoord',
+      openAccount: 'Opent je account',
+      deleteDraft: 'Verwijdert dit concept',
+      undoDelete: 'Maakt het verwijderen van dit concept ongedaan',
+      skipDraft: 'Bewaart dit concept voor later',
+      publishDraft: 'Publiceert dit concept',
+      publishReady: 'Publiceert de concepten die klaar zijn',
+      removePastDrafts: 'Verwijdert de concepten waarvan de datum voorbij is',
+      backToDrafts: 'Gaat terug naar je concepten',
+      startTriage: 'Start het nakijken van je concepten, één voor één',
+      openEditor: 'Opent dit concept in de volledige editor',
+      pickDate: 'Opent de datumkiezer',
+      openRepeat: 'Opent hoe vaak het evenement terugkomt',
+      deleteTemplate: 'Verwijdert dit sjabloon',
+      pickDay: 'Gebruikt deze dag voor het evenement',
+      openWhen: 'Opent de datum en tijd',
+      openWhere: 'Opent de plaats',
+      openPhotos: "Opent de foto's",
+      resumeDraft: 'Opent je onafgewerkte evenement',
+      pickTime: 'Opent de tijdkiezer',
+      resizeField: 'Wijzigt hoeveel tekst zichtbaar is',
+      jumpToField: 'Gaat naar dit veld',
+      setDate: 'Gebruikt deze datum voor het concept',
+      clearField: 'Maakt dit veld leeg',
+      useAddress: 'Vult dit adres in',
+      changePostal: 'Laat je een andere postcode kiezen',
+      selectOption: 'Selecteert of deselecteert deze optie',
+      searchAsYouType: 'De resultaten worden bijgewerkt terwijl je typt',
+      openMonthPicker: 'Opent de maand- en jaarkiezer',
+      goToToday: 'Gaat terug naar vandaag',
+      goToNextEvent: 'Gaat naar de volgende dag met evenementen',
+      previousMonth: 'Toont de vorige maand',
+      nextMonth: 'Toont de volgende maand',
+      previousYear: 'Toont het vorige jaar',
+      nextYear: 'Toont het volgende jaar',
+      selectMonth: 'Toont deze maand',
+      selectDay: 'Toont de evenementen van deze dag',
+      removeImage: 'Verwijdert deze afbeelding',
+      moveImage: 'Wijzigt de volgorde van de afbeeldingen',
+      switchView: 'Schakelt over naar deze weergave',
+      resetFilters: 'Wist alle filters',
+      openTemplateMenu: 'Opent de acties voor dit sjabloon',
+      createTemplate: 'Start een nieuw sjabloon',
+      applyTemplateAction: 'Past deze actie toe op het sjabloon',
+      addLocation: 'Opent de editor om de locatie toe te voegen',
+      repeatOnDay: 'Herhaalt het evenement op deze dag',
+      createEvent: 'Start een nieuw evenement',
     },
   },
 };

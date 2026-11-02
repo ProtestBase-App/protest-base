@@ -24,6 +24,7 @@ import {
   type AddressCountryCode,
   type AddressLang,
 } from '@/services/address.service';
+import { t } from '@/utils/i18n';
 
 /** Minimum characters before the endpoint is called (matches the backend's ≥3 rule). */
 const MIN_QUERY_LENGTH = 3;
@@ -252,6 +253,7 @@ export default function AddressAutocompleteField({
       >
         <IconSymbol name="magnifyingglass" size={18} color={themeColors.placeholder} />
         <TextInput
+          accessibilityRole="search"
           testID={testID}
           style={[
             styles.textInput,
@@ -281,6 +283,7 @@ export default function AddressAutocompleteField({
             onPress={handleClear}
             style={styles.trailingIcon}
             accessibilityLabel={clearAccessibilityLabel}
+            accessibilityHint={t('a11y.hints.clearField')}
             accessibilityRole="button"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -319,6 +322,7 @@ export default function AddressAutocompleteField({
                 onPress={() => handleSelect(suggestion)}
                 accessibilityRole="button"
                 accessibilityLabel={suggestion.label}
+                accessibilityHint={t('a11y.hints.useAddress')}
               >
                 <IconSymbol name="location.fill" size={16} color={themeColors.tint} />
                 <ThemedText style={styles.resultText} numberOfLines={2}>

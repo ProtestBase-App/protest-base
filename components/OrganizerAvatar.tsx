@@ -50,7 +50,7 @@ export const OrganizerAvatar: React.FC<OrganizerAvatarProps> = ({ avatarUrl, nam
           width: size,
           height: size,
           borderRadius: BorderRadius.full,
-          backgroundColor: themeColors.tint,
+          backgroundColor: themeColors.cta,
         },
       ]}
     >

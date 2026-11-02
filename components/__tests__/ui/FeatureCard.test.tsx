@@ -50,7 +50,7 @@ describe('FeatureCard', () => {
     expect(getByRole('button')).toBeTruthy();
   });
 
-  it('has correct accessibility label with description', () => {
+  it('labels the card with its title and hints the description', () => {
     const { getByLabelText } = renderWithProviders(
       <FeatureCard
         title="My Feature"
@@ -60,7 +60,7 @@ describe('FeatureCard', () => {
       />
     );
 
-    expect(getByLabelText('My Feature: Feature details')).toBeTruthy();
+    expect(getByLabelText('My Feature').props.accessibilityHint).toBe('Feature details');
   });
 
   it('renders icon', () => {

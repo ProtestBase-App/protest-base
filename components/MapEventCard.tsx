@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { SeriesBadge } from '@/components/SeriesBadge';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { formatCategoryLabel, getCategoryColors } from '@/constants/CategoryColors';
@@ -71,6 +72,7 @@ function MapEventCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={event.title}
+      accessibilityHint={t('a11y.hints.openEvent')}
       accessibilityState={{ selected: active }}
       style={[
         styles.card,
@@ -123,6 +125,7 @@ function MapEventCard({
               </ThemedText>
             </View>
           )}
+          <SeriesBadge event={event} testID={testID ? `${testID}-series` : undefined} />
         </View>
       </View>
 
@@ -132,6 +135,7 @@ function MapEventCard({
         hitSlop={12}
         accessibilityRole="button"
         accessibilityLabel={saved ? t('events.saved') : t('events.save')}
+        accessibilityHint={t('a11y.hints.toggleSave')}
         accessibilityState={{ selected: saved }}
         style={styles.saveButton}
       >
@@ -221,6 +225,7 @@ const styles = StyleSheet.create({
 export default memo(MapEventCard, (prev, next) => {
   return (
     prev.event.$id === next.event.$id &&
+    prev.event.series_id === next.event.series_id &&
     prev.active === next.active &&
     prev.saved === next.saved &&
     prev.userLanguage === next.userLanguage &&

@@ -36,9 +36,18 @@ export interface GroupRowProps {
   /** Suppresses the bottom separator; set on the last row of a GroupCard. */
   isLast?: boolean;
   testID?: string;
+  /** What pressing it does, when the label alone does not say. */
+  accessibilityHint?: string;
 }
 
-export function GroupRow({ label, icon, onPress, isLast = false, testID }: GroupRowProps) {
+export function GroupRow({
+  label,
+  icon,
+  onPress,
+  isLast = false,
+  testID,
+  accessibilityHint,
+}: GroupRowProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
@@ -48,6 +57,7 @@ export function GroupRow({ label, icon, onPress, isLast = false, testID }: Group
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.row,
         pressed && { backgroundColor: themeColors.surfaceAltBackground },

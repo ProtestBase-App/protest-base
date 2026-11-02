@@ -29,10 +29,8 @@ export function CTAButton({
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
-  // Primary variant uses brand primary color (tint: #F94460 pink/red)
-  // Secondary variant uses theme-aware background and borders
-  const backgroundColor = isPrimary ? themeColors.tint : themeColors.buttonSecondaryBackground;
-  const borderColor = isPrimary ? themeColors.tint : themeColors.buttonSecondaryBorder;
+  const backgroundColor = isPrimary ? themeColors.cta : themeColors.buttonSecondaryBackground;
+  const borderColor = isPrimary ? themeColors.cta : themeColors.buttonSecondaryBorder;
 
   // Primary: white text/icons for contrast on pink/red background
   // Secondary: uses theme text color

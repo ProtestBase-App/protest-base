@@ -103,6 +103,7 @@ export default function DraftListControls({
             placeholderTextColor={themeColors.placeholder}
             style={[styles.searchInput, { color: themeColors.text }]}
             accessibilityLabel={t('drafts.searchPlaceholder', { count: totalCount })}
+            accessibilityHint={t('a11y.hints.searchAsYouType')}
             returnKeyType="search"
             maxLength={200}
             testID="draft-search-input"
@@ -113,6 +114,7 @@ export default function DraftListControls({
           onPress={onOpenFilters}
           accessibilityRole="button"
           accessibilityLabel={t('filters.title')}
+          accessibilityHint={t('a11y.hints.openFilters')}
           testID="draft-filters-button"
           style={({ pressed }) => [
             styles.filterButton,
