@@ -37,7 +37,6 @@ import { AccessibilityInfo, Platform } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import FormDateField from '@/components/FormDateField';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { OVERLAY_FOCUS_DELAY_MS } from '@/hooks/useOverlayFocus';
 
 describe('FormDateField', () => {
   const minDate = new Date('2025-01-01');
@@ -221,7 +220,9 @@ describe('FormDateField', () => {
         const focus = jest
           .spyOn(AccessibilityInfo, 'sendAccessibilityEvent')
           .mockImplementation(() => {});
-        const { DateTimePickerAndroid } = require('@react-native-community/datetimepicker');
+        const { DateTimePickerAndroid } = jest.requireMock(
+          '@react-native-community/datetimepicker'
+        );
         DateTimePickerAndroid.open.mockImplementationOnce(({ onChange }: any) => {
           onChange({ type }, type === 'set' ? new Date('2025-07-14T14:30:00.000Z') : undefined);
         });
@@ -229,7 +230,7 @@ describe('FormDateField', () => {
         render(<FormDateField {...defaultProps} pickerMode="time" errorText={errorText} />);
         fireEvent.press(screen.getByPlaceholderText('Select date'));
         act(() => {
-          jest.advanceTimersByTime(OVERLAY_FOCUS_DELAY_MS);
+          jest.runOnlyPendingTimers();
         });
 
         expect(focus).toHaveBeenCalledTimes(focusCalls);

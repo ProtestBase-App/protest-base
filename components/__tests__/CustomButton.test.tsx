@@ -14,10 +14,13 @@ describe('CustomButton', () => {
     isLoading: false,
   };
 
-  it('tells a screen reader while it is busy', () => {
+  // On Android a busy state with no label becomes the control's whole name.
+  it('reads as disabled while loading, never as busy', () => {
     render(<CustomButton {...defaultProps} isLoading testID="button" />);
 
-    expect(screen.getByTestId('button').props.accessibilityState).toMatchObject({ busy: true });
+    const state = screen.getByTestId('button').props.accessibilityState;
+    expect(state.disabled).toBe(true);
+    expect(state.busy).toBeFalsy();
   });
 
   afterEach(() => jest.clearAllMocks());

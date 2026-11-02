@@ -6,11 +6,9 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   type TextInputInstance,
 } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -425,10 +423,7 @@ export default function SignIn() {
           animationType="fade"
           onRequestClose={handleCloseModal}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.flex1}
-          >
+          <KeyboardAvoidingView behavior="padding" style={styles.flex1}>
             <TouchableOpacity
               accessible={false}
               accessibilityRole="none"

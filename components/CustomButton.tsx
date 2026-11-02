@@ -39,7 +39,6 @@ export default function CustomButton({
     <>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityState={{ busy: isLoading }}
         testID={testID}
         onPress={handlePress}
         activeOpacity={0.7}
