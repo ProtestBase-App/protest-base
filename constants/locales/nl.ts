@@ -2117,6 +2117,7 @@ const nl = {
   },
   a11y: {
     required: 'verplicht',
+    tabPosition: '{{title}}, tabblad, {{position}} van {{count}}',
     expandField: 'Dit veld groter maken',
     collapseField: 'Dit veld kleiner maken',
     hints: {

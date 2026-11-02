@@ -1853,6 +1853,7 @@ const fr: LocaleData = {
   },
   a11y: {
     required: 'obligatoire',
+    tabPosition: '{{title}}, onglet, {{position}} sur {{count}}',
     expandField: 'Agrandir ce champ',
     collapseField: 'Réduire ce champ',
     hints: {

@@ -1798,6 +1798,7 @@ const en: LocaleData = {
   },
   a11y: {
     required: 'required',
+    tabPosition: '{{title}}, tab, {{position}} of {{count}}',
     expandField: 'Make this field taller',
     collapseField: 'Make this field shorter',
     hints: {
