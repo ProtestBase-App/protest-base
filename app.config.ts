@@ -231,9 +231,10 @@ export default (): ExpoConfig => {
         {
           android: {
             ...(appEnv !== 'production' && { usesCleartextTraffic: true }),
-            // SDK 58's template turns R8 on for release builds. Kept off (the SDK 57
-            // behavior) until a release build has been exercised with it enabled.
-            enableMinifyInReleaseBuilds: false,
+            // R8 shrinks, optimizes and obfuscates the release DEX. From February 2027
+            // Google Play requires at least 25% on each for apps over 10 MB of DEX; with
+            // R8 off, the Play Console scored obfuscation at 1%.
+            enableMinifyInReleaseBuilds: true,
           },
         },
       ],
