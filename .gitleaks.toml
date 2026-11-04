@@ -1,0 +1,20 @@
+# Secret scanning rules: gitleaks' default rule set plus patterns this project has
+# leaked before. Used by .githooks/pre-commit and the Secret Scanning workflow.
+# A real secret is never allowlisted: remove it, and rotate it if it was ever pushed.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "env-fallback-literal-secret"
+description = "Literal fallback for a secret-like environment variable, such as process.env.X_PASSWORD || '...'"
+regex = '''process\.env\.[A-Za-z0-9_]*(?i:password|passwd|secret|token|api_?key|private)[A-Za-z0-9_]*\s*(?:\|\||\?\?)\s*["'`]([^"'`\s]{6,})["'`]'''
+secretGroup = 1
+keywords = ["process.env"]
+
+[[rules]]
+id = "maestro-password-input-literal"
+description = "Literal Maestro inputText typed right after a password field"
+regex = '''(?i)password[^\n]*\n(?:[^\n]*\n){0,2}?[ \t]*-[ \t]*inputText:[ \t]*["']?([^"'$\n{}]{6,})["']?'''
+secretGroup = 1
+keywords = ["inputtext"]

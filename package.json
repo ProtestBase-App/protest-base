@@ -16,7 +16,9 @@
     "test:e2e": "maestro test .maestro",
     "test:e2e:organizer": "maestro test .maestro/organizer",
     "lint": "expo lint",
-    "check:lockfile": "node scripts/check-lockfile-emnapi.js"
+    "check:lockfile": "node scripts/check-lockfile-emnapi.js",
+    "scan:secrets": "gitleaks git . --log-opts=HEAD --config .gitleaks.toml --redact --no-banner",
+    "prepare": "node scripts/install-git-hooks.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
