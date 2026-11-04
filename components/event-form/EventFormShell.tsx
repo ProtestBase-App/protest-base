@@ -145,8 +145,11 @@ export function EventFormShell({
 
   return (
     <ThemedView style={styles.wrapper}>
+      {/* Fabric flattens this view whenever it is neither hidden nor busy, which moves the
+          whole form to another parent; doing that while a save navigates away blanks the screen. */}
       <View
         style={styles.wrapper}
+        collapsable={false}
         aria-hidden={surface !== null || publishCheckOpen}
         pointerEvents={busy ? 'none' : 'auto'}
       >
