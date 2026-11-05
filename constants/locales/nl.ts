@@ -290,6 +290,8 @@ const nl = {
     accountRequired: 'Je moet aangemeld zijn om deze functie te gebruiken',
     loginPrompt: 'Meld je aan om door te gaan',
     fillAllFields: 'Vul alle velden in',
+    accountDisabledMessage:
+      'Dit account is uitgeschakeld. Denk je dat dit een vergissing is? Neem dan contact op met ProtestBase.',
     resetPasswordTitle: 'Wachtwoord herstellen',
     resetPasswordDescription:
       'We sturen je een e-mail met instructies om je wachtwoord te herstellen',
@@ -1064,6 +1066,9 @@ const nl = {
     signedInElsewhere: 'Ingelogd op een ander apparaat',
     signedInElsewhereMessage:
       'Je account is ingelogd op een ander apparaat. Voor de veiligheid is slechts één actieve sessie tegelijk toegestaan.',
+    accountDisabled: 'Account uitgeschakeld',
+    accountDisabledMessage:
+      'Dit account is uitgeschakeld, daarom ben je afgemeld. Je kunt ProtestBase als gast blijven gebruiken. Denk je dat dit een vergissing is? Neem dan contact op met ProtestBase.',
   },
 
   // ============================================

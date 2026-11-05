@@ -11,6 +11,7 @@ jest.mock('@/services/api', () => ({
       response: { use: jest.fn() },
     },
   },
+  markSessionActive: jest.fn(),
 }));
 
 jest.mock('expo-secure-store', () => ({
@@ -19,8 +20,9 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-import api from '@/services/api';
+import api, { markSessionActive } from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
+import { AuthError } from '@/utils/authError';
 import {
   login,
   logout,
@@ -88,6 +90,49 @@ describe('auth.service', () => {
         'sess-1',
         expect.any(Object)
       );
+      // Re-arms the one-shot sign-out guard, so this session's own end is reported.
+      expect(markSessionActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the backend code and body, so the screen can tell a second step from a wrong password', async () => {
+      const mfa = { challengeId: 'challenge-1', methods: ['totp'], expiresIn: 300 };
+      mockApi.post.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: {
+            success: false,
+            error: 'A second verification step is required. Update the app to continue.',
+            code: 'MFA_REQUIRED',
+            statusCode: 403,
+            mfa,
+          },
+        },
+      });
+
+      const failure = login('user@example.com', 'password123');
+
+      await expect(failure).rejects.toBeInstanceOf(AuthError);
+      await expect(failure).rejects.toMatchObject({
+        message: 'A second verification step is required. Update the app to continue.',
+        code: 'MFA_REQUIRED',
+        status: 403,
+        details: expect.objectContaining({ mfa }),
+      });
+      expect(markSessionActive).not.toHaveBeenCalled();
+    });
+
+    it('keeps the ACCOUNT_DISABLED code from the login endpoint', async () => {
+      mockApi.post.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: { success: false, error: 'Account is disabled', code: 'ACCOUNT_DISABLED' },
+        },
+      });
+
+      await expect(login('user@example.com', 'password123')).rejects.toMatchObject({
+        code: 'ACCOUNT_DISABLED',
+        status: 403,
+      });
     });
 
     it('throws "Login failed" when accessToken is missing (internal error caught by outer catch)', async () => {

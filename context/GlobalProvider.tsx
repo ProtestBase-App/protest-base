@@ -19,7 +19,8 @@ import {
   CacheableEventsFetch,
 } from '@/services/eventsBootstrap';
 import * as SecureStore from 'expo-secure-store';
-import { setTokenExpirationCallback } from '@/services/api';
+import { setTokenExpirationCallback, type SessionEndReason } from '@/services/api';
+import { Routes } from '@/constants/Routes';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import { logger } from '@/utils/logger';
@@ -393,12 +394,20 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   useEffect(() => {
     validateUserSession();
 
-    const handleTokenExpiration = async (reason?: string): Promise<void> => {
+    const handleTokenExpiration = async (reason?: SessionEndReason): Promise<void> => {
       await clearAuthState();
+      // The session can end while the launch check awaits a request that will never settle,
+      // and app/index.tsx waits on `loading` before it routes anywhere.
+      setLoading(false);
 
       const navigateToSignIn = () => router.replace('/(auth)/sign-in');
 
-      if (reason === 'token_reuse') {
+      if (reason === 'account_disabled') {
+        // Signing in again can't work, so carry on as a guest.
+        Alert.alert(t('session.accountDisabled'), t('session.accountDisabledMessage'), [
+          { text: t('common.ok'), onPress: () => router.replace(Routes.EXPLORE) },
+        ]);
+      } else if (reason === 'token_reuse') {
         Alert.alert(t('session.securityAlert'), t('session.securityAlertMessage'), [
           { text: t('session.signInAgain'), onPress: navigateToSignIn },
         ]);

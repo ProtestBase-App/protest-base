@@ -275,6 +275,8 @@ const fr: LocaleData = {
     passwordRequired: 'Le mot de passe est obligatoire',
     invalidEmail: 'Veuillez entrer une adresse e-mail valide',
     fillAllFields: 'Veuillez remplir tous les champs',
+    accountDisabledMessage:
+      "Ce compte a été désactivé. Si vous pensez qu'il s'agit d'une erreur, contactez ProtestBase.",
     resetPasswordTitle: 'Réinitialiser le mot de passe',
     resetPasswordDescription:
       'Nous vous enverrons un e-mail avec les instructions pour réinitialiser votre mot de passe',
@@ -1003,6 +1005,9 @@ const fr: LocaleData = {
     signedInElsewhere: 'Connexion depuis un autre appareil',
     signedInElsewhereMessage:
       'Votre compte a été connecté depuis un autre appareil. Par sécurité, une seule session active est autorisée à la fois.',
+    accountDisabled: 'Compte désactivé',
+    accountDisabledMessage:
+      "Ce compte a été désactivé, vous avez donc été déconnecté. Vous pouvez continuer à utiliser ProtestBase en tant qu'invité. Si vous pensez qu'il s'agit d'une erreur, contactez ProtestBase.",
   },
 
   // ============================================

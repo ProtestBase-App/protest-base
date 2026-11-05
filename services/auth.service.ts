@@ -1,4 +1,4 @@
-import api from '@/services/api';
+import api, { markSessionActive } from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import type {
   User,
@@ -10,6 +10,7 @@ import type {
 import { SECURE_STORE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
 import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
+import { toAuthError } from '@/utils/authError';
 
 export const login = async (email: string, password: string): Promise<User> => {
   try {
@@ -43,6 +44,7 @@ export const login = async (email: string, password: string): Promise<User> => {
       responseData.session.$id,
       SECURE_STORE_OPTIONS
     );
+    markSessionActive();
 
     return responseData.user;
   } catch (error: any) {
@@ -57,8 +59,9 @@ export const login = async (email: string, password: string): Promise<User> => {
     ) {
       throw error;
     }
-    const apiError = error.response?.data as ApiError;
-    throw new Error(apiError?.error || 'Login failed');
+    // Keeps the backend code and body: a second sign-in step or a disabled account is not
+    // a wrong password, and the screen has to tell them apart.
+    throw toAuthError(error, 'Login failed');
   }
 };
 

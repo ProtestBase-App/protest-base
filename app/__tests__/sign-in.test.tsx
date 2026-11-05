@@ -276,6 +276,32 @@ describe('SignIn Screen', () => {
         );
       });
     });
+
+    it('explains a disabled account without a cooldown or the reset-password nudge', async () => {
+      const disabledError = Object.assign(new Error('Account is disabled'), {
+        code: 'ACCOUNT_DISABLED',
+      });
+      (login as jest.Mock).mockRejectedValue(disabledError);
+
+      const { getByText, queryByText, getByPlaceholderText } = renderWithProviders(<SignIn />);
+      fireEvent.changeText(getByPlaceholderText('auth.emailPlaceholder'), 'test@example.com');
+      fireEvent.changeText(getByPlaceholderText('auth.passwordPlaceholder'), 'password123');
+      await waitForDebounce();
+
+      fireEvent.press(getByText('auth.signInButton'));
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'session.accountDisabled',
+          'auth.accountDisabledMessage'
+        );
+      });
+
+      // Not a wrong password: the button stays available and no nudge appears, even twice.
+      expect(queryByText('auth.tryAgainIn')).toBeNull();
+      fireEvent.press(getByText('auth.signInButton'));
+      await waitFor(() => expect(login).toHaveBeenCalledTimes(2));
+      expect(queryByText('auth.troubleSigningInBody')).toBeNull();
+    });
   });
 
   describe('Reset-password nudge', () => {

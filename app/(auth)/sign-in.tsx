@@ -170,11 +170,18 @@ export default function SignIn() {
         return;
       }
     } catch (error) {
+      const errorCode = (error as { code?: string })?.code;
+
+      // A disabled account is not a wrong password: no cooldown, no reset-password nudge.
+      if (errorCode === 'ACCOUNT_DISABLED') {
+        Alert.alert(t('session.accountDisabled'), t('auth.accountDisabledMessage'));
+        return;
+      }
+
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
       setCooldownEndTime(applyCooldown(newAttempts));
 
-      const errorCode = (error as { code?: string })?.code;
       const isRateLimitError =
         errorCode === 'RATE_LIMIT_EXCEEDED' ||
         (error as { isRateLimited?: boolean })?.isRateLimited;

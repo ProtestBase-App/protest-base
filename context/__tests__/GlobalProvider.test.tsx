@@ -907,6 +907,52 @@ describe('GlobalProvider', () => {
       expect(result.current.user).toBeNull();
       alertSpy.mockRestore();
     });
+
+    it('explains a disabled account and carries on to Explore as a guest', async () => {
+      const { router } = jest.requireMock('expo-router') as { router: { replace: jest.Mock } };
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      const expirationCallback = mockSetTokenExpirationCallback.mock.calls[0][0];
+
+      await act(async () => {
+        expirationCallback('account_disabled');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Account Disabled',
+        expect.stringContaining('This account has been disabled'),
+        [expect.objectContaining({ text: 'OK' })]
+      );
+      const [, , buttons] = alertSpy.mock.calls[0];
+      buttons?.[0]?.onPress?.();
+      // Signing in again can't work for a disabled account, so not the sign-in screen.
+      expect(router.replace).toHaveBeenCalledWith('/explore');
+      alertSpy.mockRestore();
+    });
+
+    it('stops loading when the session ends during a launch check that never settles', async () => {
+      // The interceptor answers a dying session with a promise that never settles, so the
+      // launch check's `finally` never runs; app/index.tsx would wait on `loading` forever.
+      mockSecureStore['access_token'] = 'access-token';
+      mockSecureStore['session_id'] = 'session-1';
+      mockGetCurrentUser.mockReturnValueOnce(new Promise(() => {}));
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      expect(result.current.loading).toBe(true);
+      const expirationCallback = mockSetTokenExpirationCallback.mock.calls[0][0];
+
+      await act(async () => {
+        expirationCallback('account_disabled');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isLogged).toBe(false);
+      alertSpy.mockRestore();
+    });
   });
 
   describe('userLanguage', () => {

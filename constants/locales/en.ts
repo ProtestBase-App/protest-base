@@ -270,6 +270,8 @@ const en: LocaleData = {
     passwordRequired: 'Password is required',
     invalidEmail: 'Please enter a valid email address',
     fillAllFields: 'Please fill in all fields',
+    accountDisabledMessage:
+      'This account has been disabled. If you think this is a mistake, contact ProtestBase.',
     resetPasswordTitle: 'Reset Password',
     resetPasswordDescription:
       'We will send you an email with the instructions to reset your password',
@@ -986,6 +988,9 @@ const en: LocaleData = {
     signedInElsewhere: 'Signed In on Another Device',
     signedInElsewhereMessage:
       'Your account was signed in on another device. For security, only one active session is allowed at a time.',
+    accountDisabled: 'Account Disabled',
+    accountDisabledMessage:
+      "This account has been disabled, so you've been signed out. You can keep using ProtestBase as a guest. If you think this is a mistake, contact ProtestBase.",
   },
 
   // ============================================
