@@ -313,6 +313,74 @@ const en: LocaleData = {
   },
 
   // ============================================
+  // Two-step verification: sign-in step, setup, step-up
+  // ============================================
+  mfa: {
+    challengeTitle: 'Two-step verification',
+    challengeIntro: 'Enter the 6-digit code from your authenticator app.',
+    recoveryIntro: 'Enter one of your recovery codes. Each code works once.',
+    passkeyOnly:
+      "This account signs in with a passkey, which this version of the app can't use yet. Enter one of your recovery codes instead.",
+    codeLabel: 'Code',
+    codePlaceholder: '123456',
+    recoveryCodeLabel: 'Recovery code',
+    recoveryCodePlaceholder: 'ABCDE-23456',
+    verify: 'Verify',
+    useRecoveryCode: 'Use a recovery code instead',
+    useAuthenticator: 'Use the code from your app instead',
+    backToSignIn: 'Back to sign in',
+    invalidCodeFormat: 'Enter the 6 digits shown in your authenticator app.',
+    invalidRecoveryFormat: 'A recovery code has 10 letters and numbers, like ABCDE-23456.',
+    wrongCode: 'That code is incorrect or has expired.',
+    attemptsLeft: {
+      one: '1 attempt left.',
+      other: '{{count}} attempts left.',
+    },
+    blocked: 'Too many incorrect codes. Try again later.',
+    lockedFor: {
+      one: 'Too many incorrect codes. Try again in 1 minute.',
+      other: 'Too many incorrect codes. Try again in {{count}} minutes.',
+    },
+    expiredTitle: 'Sign-in expired',
+    expiredMessage: 'This sign-in took too long. Sign in again.',
+    alreadyEnrolledMessage:
+      'Two-step verification is already set up for this account. Sign in again.',
+    recoveryCodesLowTitle: 'Few recovery codes left',
+    recoveryCodesLow: {
+      zero: "You've used your last recovery code. From now on, you can only sign in with your authenticator app.",
+      one: "You have 1 recovery code left. Once it's used, you can only sign in with your authenticator app.",
+      other:
+        "You have {{count}} recovery codes left. Once they're used, you can only sign in with your authenticator app.",
+    },
+    enrollTitle: 'Set up two-step verification',
+    enrollIntro:
+      'ProtestBase now asks for a code from an authenticator app when you sign in. Set it up once on this phone:',
+    stepAddTitle: '1. Add ProtestBase to your authenticator app',
+    openAuthenticator: 'Add to authenticator app',
+    openAuthenticatorHelp:
+      "This opens the app your phone uses for verification codes. If ProtestBase doesn't appear there, or you use another app, add it with the setup key below.",
+    noAuthenticatorTitle: 'No authenticator app found',
+    noAuthenticatorMessage:
+      'No app on this phone could open the setup link. Install an authenticator app, or add ProtestBase to yours with the setup key below.',
+    manualKeyLabel: 'Setup key',
+    manualKeyHelp:
+      'Press and hold the key to copy it, then paste it where your authenticator app lets you enter a key manually.',
+    stepCodeTitle: '2. Enter the 6-digit code your app shows',
+    confirm: 'Confirm',
+    setupFailed: "Couldn't start the setup. Check your connection and try again.",
+    recoveryCodesTitle: 'Save your recovery codes',
+    recoveryCodesIntro:
+      "If you lose your authenticator app, each code lets you sign in once. Keep them somewhere safe, such as a password manager: you won't see them again.",
+    shareRecoveryCodes: 'Share codes',
+    recoveryCodesShareTitle: 'ProtestBase recovery codes',
+    savedRecoveryCodes: "I've saved them",
+    reauthTitle: "Confirm it's you",
+    reauthIntro: 'To delete your account, enter the 6-digit code from your authenticator app.',
+    reauthRecoveryIntro: 'To delete your account, enter one of your recovery codes.',
+    reauthExpired: 'That took too long. Enter a new code.',
+  },
+
+  // ============================================
   // Home - Calendar/saved events screen
   // ============================================
   home: {
@@ -850,8 +918,21 @@ const en: LocaleData = {
     deleteWarningItems: {
       loginInfo: 'Delete your log in info',
       accountInfo: 'Delete your account info',
-      eventsData: 'Delete all your events data',
-      images: 'Delete all images/photos of your events',
+    },
+    // What happens to the user's organization; it follows the backend's deletion rules.
+    deleteImpact: {
+      checking: 'Checking your organization…',
+      ownContent: 'Delete the events and templates you created, with their photos',
+      orgDeleted:
+        "Delete {{name}}, with all its events, drafts included, their photos and its templates, because you're its last member",
+      orgKept:
+        'Keep {{name}} for its other members, with all its events, their photos and its templates, including the ones you created',
+      nameReplaced: 'Show {{name}} instead of your name on the events you created',
+      ownerTransfer: 'Make the longest-standing member of {{name}} its owner',
+      orgUnknown:
+        "Delete your organization, with all its events, their photos and its templates, if you're its last member. If it has other members, it stays with them, with everything in it, and its name replaces yours",
+      sharedHint:
+        "To take your upcoming events and drafts out of {{name}}, delete them before you delete your account. Past events can't be deleted: they stay under {{name}}.",
     },
     deleteConfirmation: 'Enter your email to confirm',
     deletePasswordConfirmation: 'Enter your password to confirm',
@@ -1807,6 +1888,12 @@ const en: LocaleData = {
     expandField: 'Make this field taller',
     collapseField: 'Make this field shorter',
     hints: {
+      useRecoveryCode: 'Asks for one of your recovery codes instead of the code from your app',
+      useAuthenticatorCode: 'Asks for the code from your authenticator app instead',
+      backToSignIn: 'Returns to the email and password step',
+      openAuthenticator: 'Opens an authenticator app on this phone to add your account',
+      shareRecoveryCodes: 'Opens the share sheet with your recovery codes',
+      cancelCodeStep: 'Returns to the password step',
       goBack: 'Returns to the previous screen',
       closeScreen: 'Closes this screen',
       closeDialog: 'Closes this dialog',

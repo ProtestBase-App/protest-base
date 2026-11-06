@@ -9,11 +9,14 @@ jest.mock('@/utils/logger', () => ({
 }));
 
 import { Linking } from 'react-native';
+import { logger } from '@/utils/logger';
 import {
   isSafeHttpUrl,
   isAllowedStoreUrl,
+  isTotpSetupUri,
   openExternalUrlSafely,
   openStoreUrlSafely,
+  openTotpSetupUri,
 } from '@/utils/urlSafety';
 
 const mockOpen = Linking.openURL as jest.Mock;
@@ -103,5 +106,46 @@ describe('openStoreUrlSafely', () => {
   it('refuses empty url', async () => {
     await expect(openStoreUrlSafely('')).resolves.toBe(false);
     expect(mockOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe('isTotpSetupUri', () => {
+  it('accepts an authenticator setup link', () => {
+    expect(isTotpSetupUri('otpauth://totp/ProtestBase:me%40example.org?secret=AAAABBBB')).toBe(
+      true
+    );
+    expect(isTotpSetupUri('OTPAUTH://TOTP/ProtestBase?secret=AAAABBBB')).toBe(true);
+  });
+
+  it('rejects every other link', () => {
+    expect(isTotpSetupUri('otpauth://hotp/ProtestBase?secret=AAAABBBB')).toBe(false);
+    expect(isTotpSetupUri('https://protestbase.be/totp')).toBe(false);
+    expect(isTotpSetupUri('intent://totp/#Intent;scheme=otpauth;end')).toBe(false);
+    expect(isTotpSetupUri('')).toBe(false);
+    expect(isTotpSetupUri(null)).toBe(false);
+  });
+});
+
+describe('openTotpSetupUri', () => {
+  const SETUP_URI = 'otpauth://totp/ProtestBase:me%40example.org?secret=AAAABBBBCCCCDDDD';
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('hands the link to the app that handles it', async () => {
+    await expect(openTotpSetupUri(SETUP_URI)).resolves.toBe(true);
+    expect(mockOpen).toHaveBeenCalledWith(SETUP_URI);
+  });
+
+  it('refuses another scheme without calling Linking', async () => {
+    await expect(openTotpSetupUri('tel:123')).resolves.toBe(false);
+    expect(mockOpen).not.toHaveBeenCalled();
+  });
+
+  it('reports no app without ever logging the secret', async () => {
+    mockOpen.mockRejectedValueOnce(new Error(`Could not open URL '${SETUP_URI}'`));
+
+    await expect(openTotpSetupUri(SETUP_URI)).resolves.toBe(false);
+    const logged = JSON.stringify((logger.warn as jest.Mock).mock.calls);
+    expect(logged).not.toContain('AAAABBBBCCCCDDDD');
   });
 });

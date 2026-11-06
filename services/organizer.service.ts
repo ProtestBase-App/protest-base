@@ -4,6 +4,7 @@ import {
   OrganizationDetail,
   OrganizationDropdownItem,
   GetMyOrganizationsResponse,
+  GetOrganizationMembersResponse,
 } from '@/types/organization.types';
 import { logger } from '@/utils/logger';
 
@@ -198,6 +199,28 @@ export async function getMyOrganizations(): Promise<{
   } catch (error: any) {
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to fetch user organizations'
+    );
+  }
+}
+
+/**
+ * How many members an organization has (GET /organizations/:id/members, members only).
+ * Account deletion keeps an organization that has other members, with all its content.
+ */
+export async function getOrganizationMemberCount(organizationId: string): Promise<number> {
+  try {
+    const response = await api.get<GetOrganizationMembersResponse>(
+      `/organizations/${organizationId}/members`
+    );
+
+    if (!response.data.success || !Array.isArray(response.data.data)) {
+      throw new Error('Failed to fetch organization members');
+    }
+
+    return response.data.data.length;
+  } catch (error: any) {
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to fetch organization members'
     );
   }
 }

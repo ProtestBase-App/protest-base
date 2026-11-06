@@ -22,6 +22,9 @@ export interface User {
  * | INVALID_MFA_CODE         | 401    | verify and reauth, with `attemptsRemaining`                   |
  * |                          | 400    | the enrolment `confirm` endpoints, with `attemptsRemaining`   |
  * | MFA_LOCKED               | 429    | too many wrong codes, with `retryAfter` (seconds)             |
+ * | MFA_ALREADY_ENROLLED     | 409    | enrolment: another sign-in finished it first                  |
+ * | MFA_METHOD_NOT_FOUND     | 404    | enrolment confirm: the authenticator being set up is gone     |
+ * | MFA_CODE_REQUIRED        | 400    | /auth/reauth without a code, for an account with a factor     |
  * | REAUTH_REQUIRED          | 403    | DELETE /auth/account and other step-up actions                |
  * | MFA_LAST_FACTOR_REQUIRED | 409    | removing the only factor while the policy requires one        |
  * | ACCOUNT_DISABLED         | 403    | login, token refresh, and every authenticated request         |
@@ -48,6 +51,9 @@ export type AuthErrorCode =
   | 'MFA_CHALLENGE_INVALID'
   | 'INVALID_MFA_CODE'
   | 'MFA_LOCKED'
+  | 'MFA_ALREADY_ENROLLED'
+  | 'MFA_METHOD_NOT_FOUND'
+  | 'MFA_CODE_REQUIRED'
   | 'REAUTH_REQUIRED'
   | 'MFA_LAST_FACTOR_REQUIRED'
   | 'ACCOUNT_DISABLED';

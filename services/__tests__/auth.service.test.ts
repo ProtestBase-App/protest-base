@@ -31,6 +31,7 @@ import {
   getCurrentUserSessions,
   forgotPassword,
   deleteAccount,
+  storeSession,
 } from '@/services/auth.service';
 import type { User } from '@/types/auth.types';
 
@@ -560,6 +561,71 @@ describe('auth.service', () => {
 
       await expect(deleteAccount('password123')).rejects.toBe(lockedError);
       expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+    it('sends the step-up proof when there is one', async () => {
+      mockApi.delete.mockResolvedValueOnce({ data: {} });
+
+      await deleteAccount('password123', 'proof-token');
+
+      expect(mockApi.delete).toHaveBeenCalledWith('/auth/account', {
+        data: { password: 'password123', reauthToken: 'proof-token' },
+      });
+    });
+
+    it('keeps REAUTH_REQUIRED so the screen can ask for a code', async () => {
+      mockApi.delete.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: { success: false, code: 'REAUTH_REQUIRED', error: 'Confirm your password first' },
+        },
+      });
+
+      const error = await deleteAccount('password123').catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AuthError);
+      expect(error).toMatchObject({ code: 'REAUTH_REQUIRED', status: 403 });
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================
+  // storeSession
+  // ============================================================
+  describe('storeSession', () => {
+    it('stores the tokens, re-arms the session-end alert and returns the user', async () => {
+      const user = await storeSession({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        session: { $id: 'session-1' },
+        user: mockUser,
+      });
+
+      expect(user).toBe(mockUser);
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'access',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'session_id',
+        'session-1',
+        expect.any(Object)
+      );
+      expect(markSessionActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores nothing from an incomplete answer', async () => {
+      await expect(
+        storeSession({ accessToken: 'access', refreshToken: 'refresh', user: mockUser })
+      ).rejects.toThrow('Invalid login response from server');
+      await expect(storeSession(undefined)).rejects.toThrow('Invalid login response from server');
+      expect(mockSecureStore.setItemAsync).not.toHaveBeenCalled();
+      expect(markSessionActive).not.toHaveBeenCalled();
     });
   });
 });

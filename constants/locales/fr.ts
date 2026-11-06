@@ -318,6 +318,78 @@ const fr: LocaleData = {
   },
 
   // ============================================
+  // Two-step verification: sign-in step, setup, step-up
+  // ============================================
+  mfa: {
+    challengeTitle: 'Validation en deux étapes',
+    challengeIntro: "Saisissez le code à 6 chiffres de votre application d'authentification.",
+    recoveryIntro:
+      "Saisissez un de vos codes de secours. Chaque code ne fonctionne qu'une seule fois.",
+    passkeyOnly:
+      "Ce compte se connecte avec une clé d'accès, que cette version de l'application ne prend pas encore en charge. Saisissez plutôt un de vos codes de secours.",
+    codeLabel: 'Code',
+    codePlaceholder: '123456',
+    recoveryCodeLabel: 'Code de secours',
+    recoveryCodePlaceholder: 'ABCDE-23456',
+    verify: 'Valider',
+    useRecoveryCode: 'Utiliser plutôt un code de secours',
+    useAuthenticator: "Utiliser plutôt le code de l'application",
+    backToSignIn: 'Retour à la connexion',
+    invalidCodeFormat:
+      "Saisissez les 6 chiffres affichés dans votre application d'authentification.",
+    invalidRecoveryFormat:
+      'Un code de secours compte 10 lettres et chiffres, par exemple ABCDE-23456.',
+    wrongCode: 'Ce code est incorrect ou a expiré.',
+    attemptsLeft: {
+      one: 'Il reste 1 essai.',
+      other: 'Il reste {{count}} essais.',
+    },
+    blocked: 'Trop de codes incorrects. Réessayez plus tard.',
+    lockedFor: {
+      one: 'Trop de codes incorrects. Réessayez dans 1 minute.',
+      other: 'Trop de codes incorrects. Réessayez dans {{count}} minutes.',
+    },
+    expiredTitle: 'Connexion expirée',
+    expiredMessage: 'Cette connexion a pris trop de temps. Reconnectez-vous.',
+    alreadyEnrolledMessage:
+      'La validation en deux étapes est déjà activée pour ce compte. Reconnectez-vous.',
+    recoveryCodesLowTitle: 'Peu de codes de secours',
+    recoveryCodesLow: {
+      zero: "Vous avez utilisé votre dernier code de secours. Désormais, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
+      one: "Il vous reste 1 code de secours. Une fois utilisé, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
+      other:
+        "Il vous reste {{count}} codes de secours. Une fois utilisés, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
+    },
+    enrollTitle: 'Activer la validation en deux étapes',
+    enrollIntro:
+      "ProtestBase demande désormais, à la connexion, un code fourni par une application d'authentification. À configurer une fois sur ce téléphone :",
+    stepAddTitle: "1. Ajoutez ProtestBase à votre application d'authentification",
+    openAuthenticator: "Ajouter à l'application d'authentification",
+    openAuthenticatorHelp:
+      "Ce bouton ouvre l'application que votre téléphone utilise pour les codes de vérification. Si ProtestBase n'y apparaît pas, ou si vous utilisez une autre application, ajoutez-le avec la clé de configuration ci-dessous.",
+    noAuthenticatorTitle: "Aucune application d'authentification",
+    noAuthenticatorMessage:
+      "Aucune application de ce téléphone n'a pu ouvrir le lien de configuration. Installez une application d'authentification, ou ajoutez-y ProtestBase avec la clé de configuration ci-dessous.",
+    manualKeyLabel: 'Clé de configuration',
+    manualKeyHelp:
+      "Appuyez longuement sur la clé pour la copier, puis collez-la là où votre application d'authentification permet de saisir une clé manuellement.",
+    stepCodeTitle: '2. Saisissez le code à 6 chiffres affiché par votre application',
+    confirm: 'Confirmer',
+    setupFailed: 'Impossible de lancer la configuration. Vérifiez votre connexion et réessayez.',
+    recoveryCodesTitle: 'Enregistrez vos codes de secours',
+    recoveryCodesIntro:
+      "Si vous perdez votre application d'authentification, chaque code vous permet de vous connecter une fois. Gardez-les en lieu sûr, par exemple dans un gestionnaire de mots de passe : ils ne seront plus affichés.",
+    shareRecoveryCodes: 'Partager les codes',
+    recoveryCodesShareTitle: 'Codes de secours ProtestBase',
+    savedRecoveryCodes: 'Je les ai enregistrés',
+    reauthTitle: "Confirmez qu'il s'agit bien de vous",
+    reauthIntro:
+      "Pour supprimer votre compte, saisissez le code à 6 chiffres de votre application d'authentification.",
+    reauthRecoveryIntro: 'Pour supprimer votre compte, saisissez un de vos codes de secours.',
+    reauthExpired: 'Le délai est dépassé. Saisissez un nouveau code.',
+  },
+
+  // ============================================
   // Home - Calendar/saved events screen
   // ============================================
   home: {
@@ -863,8 +935,21 @@ const fr: LocaleData = {
     deleteWarningItems: {
       loginInfo: 'La suppression de vos informations de connexion',
       accountInfo: 'La suppression des informations de votre compte',
-      eventsData: "La suppression de toutes vos données d'événements",
-      images: 'La suppression de toutes les images/photos de vos événements',
+    },
+    deleteImpact: {
+      checking: 'Vérification de votre organisation…',
+      ownContent: 'La suppression des événements et modèles que vous avez créés, avec leurs photos',
+      orgDeleted:
+        'La suppression de {{name}}, avec tous ses événements, brouillons compris, leurs photos et ses modèles, car vous en êtes le dernier membre',
+      orgKept:
+        'Le maintien de {{name}} pour ses autres membres, avec tous ses événements, leurs photos et ses modèles, y compris ceux que vous avez créés',
+      nameReplaced:
+        "L'affichage de {{name}} à la place de votre nom sur les événements que vous avez créés",
+      ownerTransfer: 'Le transfert de la propriété de {{name}} à son membre le plus ancien',
+      orgUnknown:
+        "La suppression de votre organisation, avec tous ses événements, leurs photos et ses modèles, si vous en êtes le dernier membre. Si elle a d'autres membres, elle leur reste, avec tout son contenu, et son nom remplace le vôtre",
+      sharedHint:
+        'Pour retirer de {{name}} vos événements à venir et vos brouillons, supprimez-les avant de supprimer votre compte. Les événements passés ne peuvent pas être supprimés : ils restent au nom de {{name}}.',
     },
     deleteConfirmation: 'Entrez votre e-mail pour confirmer',
     deletePasswordConfirmation: 'Entrez votre mot de passe pour confirmer',
@@ -1862,6 +1947,13 @@ const fr: LocaleData = {
     expandField: 'Agrandir ce champ',
     collapseField: 'Réduire ce champ',
     hints: {
+      useRecoveryCode: "Demande un de vos codes de secours au lieu du code de l'application",
+      useAuthenticatorCode: "Demande le code de votre application d'authentification",
+      backToSignIn: "Revient à l'étape de l'e-mail et du mot de passe",
+      openAuthenticator:
+        "Ouvre une application d'authentification de ce téléphone pour y ajouter votre compte",
+      shareRecoveryCodes: 'Ouvre le menu de partage avec vos codes de secours',
+      cancelCodeStep: "Revient à l'étape du mot de passe",
       goBack: "Revient à l'écran précédent",
       closeScreen: 'Ferme cet écran',
       closeDialog: 'Ferme cette fenêtre',

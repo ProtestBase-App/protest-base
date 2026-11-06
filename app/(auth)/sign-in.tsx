@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Image,
   Alert,
+  BackHandler,
   TouchableOpacity,
   Modal,
   TextInput,
@@ -12,14 +13,24 @@ import { KeyboardAvoidingView, KeyboardAwareScrollView } from 'react-native-keyb
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FormField from '@/components/FormField';
 import CustomButton from '@/components/CustomButton';
+import MfaChallengeStep from '@/components/auth/MfaChallengeStep';
+import MfaEnrollmentStep from '@/components/auth/MfaEnrollmentStep';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { forgotPassword, login } from '@/services/auth.service';
+import {
+  clearPendingEnrollment,
+  loadPendingEnrollment,
+  savePendingEnrollment,
+} from '@/services/mfa.service';
+import type { User } from '@/types/auth.types';
+import type { MfaSecondStep } from '@/types/mfa.types';
+import { secondStepFromError } from '@/utils/mfa';
 import { ExternalLink } from '@/components/ExternalLink';
 import { Colors } from '@/constants/Colors';
 import { Routes } from '@/constants/Routes';
@@ -44,9 +55,15 @@ const COOLDOWN_TICK_INTERVAL_MS = 1_000;
 // confused legitimate user is routed to recovery instead of retrying a forgotten
 // password.
 const NUDGE_AFTER_FAILURES = 2;
+// After a recovery code, warn when this few are left.
+const LOW_RECOVERY_CODES = 2;
 
 export default function SignIn() {
   const { setUser, setIsLogged } = useGlobalContext();
+  const navigation = useNavigation();
+  const [secondStep, setSecondStep] = useState<MfaSecondStep | null>(null);
+  // While new recovery codes are on screen, nothing may leave it.
+  const [leaveBlocked, setLeaveBlocked] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<'forgot' | 'firstTime'>('forgot');
   const colorScheme = useColorScheme();
@@ -137,6 +154,72 @@ export default function SignIn() {
     return Date.now() + COOLDOWN_SCHEDULE_MS[index];
   }, []);
 
+  const restartSignIn = useCallback(() => {
+    setSecondStep(null);
+    setLeaveBlocked(false);
+    void clearPendingEnrollment();
+  }, []);
+
+  // A setup the system interrupted (the app was closed while the user was in their
+  // authenticator app) picks up where it was, with the same key.
+  useEffect(() => {
+    let active = true;
+    loadPendingEnrollment().then((enrollment) => {
+      if (active && enrollment) {
+        setSecondStep((current) => current ?? { kind: 'enroll', enrollment });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Android back on a second step returns to the password, and does nothing over new recovery codes.
+  useEffect(() => {
+    if (!secondStep) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!leaveBlocked) restartSignIn();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [secondStep, leaveBlocked, restartSignIn]);
+
+  // The iOS swipe back belongs to the root stack's (auth) screen, one level up.
+  useEffect(() => {
+    if (!leaveBlocked) return;
+    const parent = navigation.getParent();
+    parent?.setOptions({ gestureEnabled: false });
+    return () => parent?.setOptions({ gestureEnabled: true });
+  }, [leaveBlocked, navigation]);
+
+  const completeSignIn = (user: User) => {
+    setFailedAttempts(0);
+    void clearPendingEnrollment();
+    setUser(user);
+    setIsLogged(true);
+
+    // Event counts are refreshed by UserOrganizationsProvider once the
+    // user's organizations finish loading.
+
+    router.replace(Routes.EXPLORE);
+  };
+
+  const handleSecondStepSignedIn = ({
+    user,
+    recoveryCodesRemaining,
+  }: {
+    user: User;
+    recoveryCodesRemaining?: number;
+  }) => {
+    completeSignIn(user);
+    if (recoveryCodesRemaining !== undefined && recoveryCodesRemaining <= LOW_RECOVERY_CODES) {
+      Alert.alert(
+        t('mfa.recoveryCodesLowTitle'),
+        t('mfa.recoveryCodesLow', { count: recoveryCodesRemaining })
+      );
+    }
+  };
+
   const submit = async () => {
     if (cooldownEndTime !== null && Date.now() < cooldownEndTime) return;
 
@@ -158,18 +241,22 @@ export default function SignIn() {
       const session = await login(form.email.trim(), form.password);
 
       if (session && session.$id) {
-        setFailedAttempts(0);
-        setUser(session);
-        setIsLogged(true);
-
-        // Event counts are refreshed by UserOrganizationsProvider once the
-        // user's organizations finish loading.
-
-        router.replace(Routes.EXPLORE);
+        completeSignIn(session);
       } else {
         return;
       }
     } catch (error) {
+      const step = secondStepFromError(error);
+      if (step) {
+        // The password was right: no cooldown, and the second step doesn't need it again.
+        setFailedAttempts(0);
+        setCooldownEndTime(null);
+        setForm((prev) => ({ ...prev, password: '' }));
+        if (step.kind === 'enroll') void savePendingEnrollment(step.enrollment);
+        setSecondStep(step);
+        return;
+      }
+
       const errorCode = (error as { code?: string })?.code;
 
       // A disabled account is not a wrong password: no cooldown, no reset-password nudge.
@@ -245,7 +332,7 @@ export default function SignIn() {
         errorMessage.toLowerCase().includes('network') ||
         errorMessage.toLowerCase().includes('timeout')
       ) {
-        setResetPasswordMessage(t('errors.networkError'));
+        setResetPasswordMessage(t('errors.network'));
       } else {
         setResetPasswordMessage(errorMessage);
       }
@@ -296,131 +383,156 @@ export default function SignIn() {
         >
           <ThemedView style={styles.container}>
             <ThemedView style={styles.logoContainer}>
-              <TouchableOpacity
-                onPress={handleBackPress}
-                style={styles.iconContainer}
-                accessibilityLabel="Go back"
-                accessibilityHint={t('a11y.hints.goBack')}
-                accessibilityRole="button"
-              >
-                <IconSymbol name="arrow.backward" size={24} color={themeColors.text} />
-              </TouchableOpacity>
+              {secondStep ? null : (
+                <TouchableOpacity
+                  onPress={handleBackPress}
+                  style={styles.iconContainer}
+                  accessibilityLabel="Go back"
+                  accessibilityHint={t('a11y.hints.goBack')}
+                  accessibilityRole="button"
+                >
+                  <IconSymbol name="arrow.backward" size={24} color={themeColors.text} />
+                </TouchableOpacity>
+              )}
               <Image accessibilityIgnoresInvertColors source={logoSource} style={styles.logo} />
             </ThemedView>
-            <ThemedText type="title" style={styles.text1}>
-              {t('auth.signIn')}
-            </ThemedText>
-            <FormField
-              title={t('auth.email')}
-              value={form.email}
-              placeholder={t('auth.emailPlaceholder')}
-              handleChangeText={handleLoginEmailChange}
-              otherStyles={styles.margintop}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              hasError={emptyFields.email}
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect={false}
-              testID="input-sign-in-email"
-            />
-            <FormField
-              title={t('auth.password')}
-              value={form.password}
-              placeholder={t('auth.passwordPlaceholder')}
-              handleChangeText={(e) => setForm({ ...form, password: e })}
-              otherStyles={styles.margintop}
-              textContentType="password"
-              hasError={emptyFields.password}
-              isPassword={true}
-              maxLength={128}
-              testID="input-sign-in-password"
-            />
-            <CustomButton
-              title={
-                cooldownRemaining > 0
-                  ? t('auth.tryAgainIn', { seconds: cooldownRemaining })
-                  : t('auth.signInButton')
-              }
-              handlePress={submit}
-              containerStyles={
-                canSubmit && cooldownRemaining === 0
-                  ? styles.margintop
-                  : { backgroundColor: 'rgba(128, 128, 128, 0.4)', marginTop: 24 }
-              }
-              isLoading={!canSubmit || isSubmitting || cooldownRemaining > 0}
-              testID="btn-sign-in-submit"
-            />
+            {secondStep?.kind === 'challenge' ? (
+              <MfaChallengeStep
+                key={secondStep.challenge.challengeId}
+                challenge={secondStep.challenge}
+                onSignedIn={handleSecondStepSignedIn}
+                onRestart={restartSignIn}
+              />
+            ) : secondStep?.kind === 'enroll' ? (
+              <MfaEnrollmentStep
+                key={secondStep.enrollment.enrollmentToken}
+                enrollment={secondStep.enrollment}
+                onSignedIn={completeSignIn}
+                onRestart={restartSignIn}
+                onCodesShownChange={setLeaveBlocked}
+              />
+            ) : (
+              <>
+                <ThemedText type="title" style={styles.text1}>
+                  {t('auth.signIn')}
+                </ThemedText>
+                <FormField
+                  title={t('auth.email')}
+                  value={form.email}
+                  placeholder={t('auth.emailPlaceholder')}
+                  handleChangeText={handleLoginEmailChange}
+                  otherStyles={styles.margintop}
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  hasError={emptyFields.email}
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect={false}
+                  testID="input-sign-in-email"
+                />
+                <FormField
+                  title={t('auth.password')}
+                  value={form.password}
+                  placeholder={t('auth.passwordPlaceholder')}
+                  handleChangeText={(e) => setForm({ ...form, password: e })}
+                  otherStyles={styles.margintop}
+                  textContentType="password"
+                  hasError={emptyFields.password}
+                  isPassword={true}
+                  maxLength={128}
+                  testID="input-sign-in-password"
+                />
+                <CustomButton
+                  title={
+                    cooldownRemaining > 0
+                      ? t('auth.tryAgainIn', { seconds: cooldownRemaining })
+                      : t('auth.signInButton')
+                  }
+                  handlePress={submit}
+                  containerStyles={
+                    canSubmit && cooldownRemaining === 0
+                      ? styles.margintop
+                      : { backgroundColor: 'rgba(128, 128, 128, 0.4)', marginTop: 24 }
+                  }
+                  isLoading={!canSubmit || isSubmitting || cooldownRemaining > 0}
+                  testID="btn-sign-in-submit"
+                />
 
-            {failedAttempts >= NUDGE_AFTER_FAILURES && (
-              <TouchableOpacity
-                style={[
-                  styles.nudgeBanner,
-                  {
-                    backgroundColor: themeColors.highlightBackground,
-                    borderColor: themeColors.highlightBorder,
-                  },
-                ]}
-                onPress={() => handleOpenModal('forgot')}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
-                accessibilityHint={t('a11y.hints.resetPassword')}
-                testID="nudge-reset-password"
-              >
-                <ThemedView
-                  style={[
-                    styles.nudgeIconWrap,
-                    { backgroundColor: themeColors.highlightIconBackground },
-                  ]}
+                {failedAttempts >= NUDGE_AFTER_FAILURES && (
+                  <TouchableOpacity
+                    style={[
+                      styles.nudgeBanner,
+                      {
+                        backgroundColor: themeColors.highlightBackground,
+                        borderColor: themeColors.highlightBorder,
+                      },
+                    ]}
+                    onPress={() => handleOpenModal('forgot')}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('auth.troubleSigningInTitle')} ${t('auth.resetPassword')}`}
+                    accessibilityHint={t('a11y.hints.resetPassword')}
+                    testID="nudge-reset-password"
+                  >
+                    <ThemedView
+                      style={[
+                        styles.nudgeIconWrap,
+                        { backgroundColor: themeColors.highlightIconBackground },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="questionmark.circle"
+                        size={IconSizes.md}
+                        color={themeColors.tint}
+                      />
+                    </ThemedView>
+                    <ThemedView style={styles.nudgeTextWrap}>
+                      <ThemedText style={styles.nudgeTitle}>
+                        {t('auth.troubleSigningInTitle')}
+                      </ThemedText>
+                      <ThemedText style={[styles.nudgeBody, { color: themeColors.secondaryText }]}>
+                        {t('auth.troubleSigningInBody')}
+                      </ThemedText>
+                    </ThemedView>
+                    <IconSymbol
+                      name="chevron.right"
+                      size={IconSizes.sm}
+                      color={themeColors.chevron}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.forgetPasswordButton}
+                  onPress={() => handleOpenModal('forgot')}
                 >
-                  <IconSymbol
-                    name="questionmark.circle"
-                    size={IconSizes.md}
-                    color={themeColors.tint}
-                  />
-                </ThemedView>
-                <ThemedView style={styles.nudgeTextWrap}>
-                  <ThemedText style={styles.nudgeTitle}>
-                    {t('auth.troubleSigningInTitle')}
+                  <ThemedText style={[styles.forgotPasswordText, { color: themeColors.tint }]}>
+                    {t('auth.forgotPassword')}
                   </ThemedText>
-                  <ThemedText style={[styles.nudgeBody, { color: themeColors.secondaryText }]}>
-                    {t('auth.troubleSigningInBody')}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.firstTimeButton}
+                  onPress={() => handleOpenModal('firstTime')}
+                >
+                  <ThemedText style={[styles.firstTimeText, { color: themeColors.tint }]}>
+                    {t('auth.firstTimeLogin')}
                   </ThemedText>
+                </TouchableOpacity>
+
+                <ThemedView style={styles.container2}>
+                  <ThemedText style={styles.text2}>{t('auth.noAccount')}</ThemedText>
+                  <ExternalLink
+                    href={onboardingFormUrl}
+                    style={[styles.link, { color: themeColors.tint }]}
+                  >
+                    {t('auth.requestAccess')}
+                  </ExternalLink>
                 </ThemedView>
-                <IconSymbol name="chevron.right" size={IconSizes.sm} color={themeColors.chevron} />
-              </TouchableOpacity>
+              </>
             )}
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.forgetPasswordButton}
-              onPress={() => handleOpenModal('forgot')}
-            >
-              <ThemedText style={[styles.forgotPasswordText, { color: themeColors.tint }]}>
-                {t('auth.forgotPassword')}
-              </ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.firstTimeButton}
-              onPress={() => handleOpenModal('firstTime')}
-            >
-              <ThemedText style={[styles.firstTimeText, { color: themeColors.tint }]}>
-                {t('auth.firstTimeLogin')}
-              </ThemedText>
-            </TouchableOpacity>
-
-            <ThemedView style={styles.container2}>
-              <ThemedText style={styles.text2}>{t('auth.noAccount')}</ThemedText>
-              <ExternalLink
-                href={onboardingFormUrl}
-                style={[styles.link, { color: themeColors.tint }]}
-              >
-                {t('auth.requestAccess')}
-              </ExternalLink>
-            </ThemedView>
           </ThemedView>
         </KeyboardAwareScrollView>
 

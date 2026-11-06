@@ -2,16 +2,35 @@ jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: jest.fn().mockRetur
 jest.mock('@/services/auth.service', () => ({
   login: jest.fn(),
   forgotPassword: jest.fn(),
+  storeSession: jest.fn(),
+}));
+jest.mock('@/services/mfa.service', () => ({
+  verifyMfaCode: jest.fn(),
+  startTotpEnrollment: jest.fn(),
+  confirmTotpEnrollment: jest.fn(),
+  savePendingEnrollment: jest.fn(() => Promise.resolve()),
+  loadPendingEnrollment: jest.fn(() => Promise.resolve(null)),
+  clearPendingEnrollment: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('@/utils/i18n', () => ({ t: jest.fn((key) => key) }));
 
 import React from 'react';
 import { Alert } from 'react-native';
 import { act } from '@testing-library/react-native';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { renderWithProviders, fireEvent, waitFor } from '@/test-utils/render';
+import { spyOnBackHandler } from '@/test-utils/backHandler';
 import SignIn from '@/app/(auth)/sign-in';
-import { login, forgotPassword } from '@/services/auth.service';
+import { login, forgotPassword, storeSession } from '@/services/auth.service';
+import {
+  clearPendingEnrollment,
+  confirmTotpEnrollment,
+  loadPendingEnrollment,
+  savePendingEnrollment,
+  startTotpEnrollment,
+  verifyMfaCode,
+} from '@/services/mfa.service';
+import { AuthError } from '@/utils/authError';
 
 // Helper: wait for email validation debounce (300ms) to complete
 const waitForDebounce = () =>
@@ -489,6 +508,224 @@ describe('SignIn Screen', () => {
 
       await waitFor(() => {
         expect(getByText('errors.rateLimit.forgotPasswordMessage')).toBeTruthy();
+      });
+    });
+  });
+
+  describe('Second step', () => {
+    const user = { $id: 'user-1', email: 'organizer@example.org' };
+
+    const secondStepError = (code: string, mfa: Record<string, unknown>) =>
+      new AuthError('A second verification step is required.', {
+        code,
+        status: 403,
+        details: { mfa },
+      });
+
+    const challengeError = () =>
+      secondStepError('MFA_REQUIRED', {
+        challengeId: 'c'.repeat(43),
+        methods: ['totp'],
+        expiresIn: 300,
+      });
+
+    function renderSignIn() {
+      const setUser = jest.fn();
+      const setIsLogged = jest.fn();
+      const utils = renderWithProviders(<SignIn />, {
+        providerOverrides: { globalContext: { setUser, setIsLogged } },
+      });
+      return { ...utils, setUser, setIsLogged };
+    }
+
+    async function submitPassword(utils: ReturnType<typeof renderSignIn>) {
+      fireEvent.changeText(
+        utils.getByPlaceholderText('auth.emailPlaceholder'),
+        'organizer@example.org'
+      );
+      fireEvent.changeText(utils.getByPlaceholderText('auth.passwordPlaceholder'), 'password123');
+      await waitForDebounce();
+      fireEvent.press(utils.getByText('auth.signInButton'));
+    }
+
+    it('asks for the code after a correct password and signs in with it', async () => {
+      (login as jest.Mock).mockRejectedValue(challengeError());
+      (verifyMfaCode as jest.Mock).mockResolvedValue({ user });
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+
+      expect(await utils.findByText('mfa.challengeTitle')).toBeTruthy();
+      expect(utils.queryByText('auth.signInButton')).toBeNull();
+      expect(utils.queryByLabelText('Go back')).toBeNull();
+
+      fireEvent.changeText(utils.getByTestId('mfa-challenge-input'), '123456');
+      fireEvent.press(utils.getByTestId('mfa-challenge-submit'));
+
+      await waitFor(() => expect(utils.setIsLogged).toHaveBeenCalledWith(true));
+      expect(utils.setUser).toHaveBeenCalledWith(user);
+      expect(router.replace).toHaveBeenCalled();
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    it('warns when few recovery codes are left', async () => {
+      (login as jest.Mock).mockRejectedValue(challengeError());
+      (verifyMfaCode as jest.Mock).mockResolvedValue({ user, recoveryCodesRemaining: 1 });
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+      fireEvent.press(await utils.findByTestId('mfa-challenge-switch'));
+      fireEvent.changeText(utils.getByTestId('mfa-challenge-input'), 'ABCDE-23456');
+      fireEvent.press(utils.getByTestId('mfa-challenge-submit'));
+
+      await waitFor(() =>
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'mfa.recoveryCodesLowTitle',
+          'mfa.recoveryCodesLow'
+        )
+      );
+      expect(utils.setIsLogged).toHaveBeenCalledWith(true);
+    });
+
+    it('goes back to an empty password with no cooldown or nudge', async () => {
+      (login as jest.Mock).mockRejectedValue(challengeError());
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+      await backToPassword(utils);
+
+      expect(utils.getByPlaceholderText('auth.passwordPlaceholder').props.value).toBe('');
+      expect(utils.queryByText('auth.tryAgainIn')).toBeNull();
+      expect(utils.queryByText('auth.troubleSigningInBody')).toBeNull();
+      expect(Alert.alert).not.toHaveBeenCalled();
+    });
+
+    async function backToPassword(utils: ReturnType<typeof renderSignIn>) {
+      fireEvent.press(await utils.findByTestId('mfa-back-to-sign-in'));
+      expect(utils.getByText('auth.signInButton')).toBeTruthy();
+    }
+
+    it('returns from the code to the password on Android back', async () => {
+      const backHandler = spyOnBackHandler();
+      (login as jest.Mock).mockRejectedValue(challengeError());
+      const utils = renderSignIn();
+
+      expect(backHandler.pressBack()).toBe(false);
+      await submitPassword(utils);
+      await utils.findByText('mfa.challengeTitle');
+
+      expect(backHandler.pressBack()).toBe(true);
+      expect(await utils.findByText('auth.signInButton')).toBeTruthy();
+      expect(backHandler.pressBack()).toBe(false);
+      backHandler.restore();
+    });
+
+    it('keeps the user on new recovery codes until they are saved, then signs in', async () => {
+      const parent = { setOptions: jest.fn() };
+      const navigation = jest.mocked(useNavigation);
+      const defaultNavigation = navigation.getMockImplementation();
+      navigation.mockReturnValue({ setOptions: jest.fn(), getParent: () => parent } as never);
+      const backHandler = spyOnBackHandler();
+      (login as jest.Mock).mockRejectedValue(
+        secondStepError('MFA_ENROLLMENT_REQUIRED', {
+          enrollmentToken: 'e'.repeat(43),
+          methods: ['totp'],
+          expiresIn: 900,
+        })
+      );
+      (startTotpEnrollment as jest.Mock).mockResolvedValue({
+        methodId: 'method-1',
+        otpauthUri: 'otpauth://totp/ProtestBase?secret=AAAABBBBCCCCDDDD',
+        qrDataUri: 'data:image/png;base64,AAAA',
+        manualKey: 'AAAABBBBCCCCDDDD',
+      });
+      const signIn = {
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        user,
+        session: { $id: 'session-1' },
+        secondFactor: 'totp',
+        recoveryCodes: ['ABCDE-23456'],
+      };
+      (confirmTotpEnrollment as jest.Mock).mockResolvedValue(signIn);
+      (storeSession as jest.Mock).mockResolvedValue(user);
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+      fireEvent.changeText(await utils.findByTestId('mfa-enroll-input'), '123456');
+      fireEvent.press(utils.getByTestId('mfa-enroll-submit'));
+
+      expect(await utils.findByText('ABCDE-23456')).toBeTruthy();
+      expect(parent.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+      expect(backHandler.pressBack()).toBe(true);
+      expect(utils.getByText('ABCDE-23456')).toBeTruthy();
+      expect(storeSession).not.toHaveBeenCalled();
+      expect(utils.setIsLogged).not.toHaveBeenCalled();
+
+      fireEvent.press(utils.getByTestId('mfa-recovery-codes-saved'));
+
+      await waitFor(() => expect(utils.setIsLogged).toHaveBeenCalledWith(true));
+      expect(storeSession).toHaveBeenCalledWith(signIn);
+      expect(utils.setUser).toHaveBeenCalledWith(user);
+      expect(parent.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+
+      backHandler.restore();
+      if (defaultNavigation) navigation.mockImplementation(defaultNavigation);
+    });
+
+    describe('setup interrupted by a restart', () => {
+      const enrollment = { enrollmentToken: 'e'.repeat(43), methods: ['totp'], expiresIn: 900 };
+      const resumed = { enrollmentToken: 'r'.repeat(43), methods: ['totp'], expiresIn: 600 };
+
+      beforeEach(() => {
+        (startTotpEnrollment as jest.Mock).mockResolvedValue({
+          methodId: 'method-1',
+          otpauthUri: 'otpauth://totp/ProtestBase?secret=AAAABBBBCCCCDDDD',
+          qrDataUri: 'data:image/png;base64,AAAA',
+          manualKey: 'AAAABBBBCCCCDDDD',
+        });
+      });
+
+      it('keeps the setup demanded at sign-in', async () => {
+        (login as jest.Mock).mockRejectedValue(
+          secondStepError('MFA_ENROLLMENT_REQUIRED', enrollment)
+        );
+        const utils = renderSignIn();
+
+        await submitPassword(utils);
+
+        expect(await utils.findByText('mfa.enrollTitle')).toBeTruthy();
+        expect(savePendingEnrollment).toHaveBeenCalledWith(enrollment);
+      });
+
+      it('does not keep a code step, whose key never changes', async () => {
+        (login as jest.Mock).mockRejectedValue(challengeError());
+        const utils = renderSignIn();
+
+        await submitPassword(utils);
+
+        expect(await utils.findByText('mfa.challengeTitle')).toBeTruthy();
+        expect(savePendingEnrollment).not.toHaveBeenCalled();
+      });
+
+      it('resumes a stored setup with its own token when the screen opens', async () => {
+        (loadPendingEnrollment as jest.Mock).mockResolvedValueOnce(resumed);
+        const utils = renderSignIn();
+
+        expect(await utils.findByText('AAAABBBBCCCCDDDD')).toBeTruthy();
+        expect(startTotpEnrollment).toHaveBeenCalledWith(resumed.enrollmentToken);
+        expect(utils.queryByText('auth.signInButton')).toBeNull();
+        expect(login).not.toHaveBeenCalled();
+      });
+
+      it('forgets the stored setup when the user goes back to the password', async () => {
+        (loadPendingEnrollment as jest.Mock).mockResolvedValueOnce(resumed);
+        const utils = renderSignIn();
+
+        fireEvent.press(await utils.findByTestId('mfa-back-to-sign-in'));
+
+        expect(await utils.findByText('auth.signInButton')).toBeTruthy();
+        expect(clearPendingEnrollment).toHaveBeenCalled();
       });
     });
   });
