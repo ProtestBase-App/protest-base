@@ -68,6 +68,9 @@ export const SECURE_STORE_KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   SESSION_ID: 'session_id',
+  // An authenticator setup demanded at sign-in, kept so it survives the app being closed while
+  // the user is in their authenticator app. The token it holds lives 15 minutes at most.
+  PENDING_MFA_ENROLLMENT: 'pending_mfa_enrollment',
 } as const;
 
 /**

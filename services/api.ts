@@ -30,7 +30,18 @@ const API_KEY = (
 interface RateLimitError extends Error {
   code: string;
   isRateLimited: boolean;
+  /** Seconds until the backend accepts the request again, when it says so. */
+  retryAfter?: number;
   originalError: unknown;
+}
+
+/** The parts of an axios error this module reads. */
+interface HttpErrorLike {
+  response?: {
+    status?: number;
+    data?: { code?: unknown; retryAfter?: unknown };
+    headers?: Record<string, unknown>;
+  };
 }
 
 // Host only — no /api path. The prefix is discovered at runtime via /app/config.
@@ -161,12 +172,141 @@ api.interceptors.request.use(
   }
 );
 
-// reason parameter allows distinguishing security events (e.g. 'token_reuse') from normal expiry
-let tokenExpirationCallback: ((reason?: string) => void) | null = null;
+/** Why a session ended, so the alert can say so. `undefined` means it simply expired. */
+export type SessionEndReason = 'token_reuse' | 'session_replaced' | 'account_disabled';
 
-export const setTokenExpirationCallback = (callback: (reason?: string) => void) => {
+let tokenExpirationCallback: ((reason?: SessionEndReason) => void) | null = null;
+
+export const setTokenExpirationCallback = (callback: (reason?: SessionEndReason) => void) => {
   tokenExpirationCallback = callback;
 };
+
+/**
+ * 401 codes that end the session whatever the request was. The login-security codes (MFA_*,
+ * REAUTH_REQUIRED, ACCOUNT_DISABLED, see types/auth.types.ts) must never join: screens explain
+ * those, and a force-logout would wipe local data and leave the sign-in screen waiting.
+ */
+export const FORCE_LOGOUT_CODES: readonly string[] = [
+  'INVALID_TOKEN',
+  'REFRESH_TOKEN_EXPIRED',
+  'TOKEN_REUSE_DETECTED',
+  'SESSION_INVALID',
+  'REFRESH_TOKEN_REVOKED',
+  'SESSION_EXPIRED',
+  'INVALID_REFRESH_TOKEN',
+  'SESSION_REPLACED',
+];
+
+function sessionEndReason(code: unknown): SessionEndReason | undefined {
+  switch (code) {
+    case 'TOKEN_REUSE_DETECTED':
+      return 'token_reuse';
+    case 'SESSION_REPLACED':
+      return 'session_replaced';
+    case 'ACCOUNT_DISABLED':
+      return 'account_disabled';
+    default:
+      return undefined;
+  }
+}
+
+// Several in-flight requests can fail together when a session dies; only the first may wipe
+// local data and raise the alert. A new session re-arms it (markSessionActive).
+let sessionEnded = false;
+
+/** Call once a new session's tokens are stored, so its own end is reported again. */
+export function markSessionActive(): void {
+  sessionEnded = false;
+}
+
+async function endSession(reason: SessionEndReason | undefined): Promise<void> {
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
+  if (sessionEnded) return;
+  sessionEnded = true;
+  tokenExpirationCallback?.(reason);
+}
+
+/** The access token a request was sent with, or null for an anonymous request. */
+function bearerToken(config: { headers?: Record<string, unknown> } | undefined): string | null {
+  const header = config?.headers?.Authorization ?? config?.headers?.authorization;
+  return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null;
+}
+
+// Rotation grace: the backend answers a replayed refresh token with the same new pair for
+// 30 s (REFRESH_TOKEN_GRACE_PERIOD_SECONDS); after that, a replay revokes every session the
+// user has. A refresh lost in transit is retried quickly, and never once that window may
+// have closed: worst case 8 + 1 + 8 + 2 + 8 = 27 s, with no retry sent after 25 s.
+const REFRESH_TIMEOUT_MS = 8_000;
+const REFRESH_RETRY_DELAYS_MS = [1_000, 2_000];
+const REFRESH_RETRY_DEADLINE_MS = 25_000;
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** No response, a timeout or a 5xx: the backend may or may not have rotated the token. */
+function isTransientRefreshFailure(error: unknown): boolean {
+  const status = (error as HttpErrorLike)?.response?.status;
+  return status === undefined || status >= 500;
+}
+
+// Posts the refresh with plain axios: the instance's interceptors would recurse if the
+// refresh itself failed, so the API key and app version are attached here.
+async function requestTokenRefresh(refreshToken: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const appVersion = getInstalledAppVersion();
+  if (appVersion) {
+    headers['X-App-Version'] = appVersion;
+  }
+  if (API_KEY) {
+    headers['x-api-key'] = API_KEY;
+  }
+
+  // Measured from the first send, not per attempt: iOS pauses timers in the background, so a
+  // one-second delay can fire minutes later, long after the grace window.
+  const startedAt = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await axios.post(
+        `${API_BASE_URL}${apiPrefix}/auth/token/refresh`,
+        { refreshToken },
+        { headers, timeout: REFRESH_TIMEOUT_MS }
+      );
+    } catch (error) {
+      const delay = REFRESH_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined || !isTransientRefreshFailure(error)) throw error;
+      await wait(delay);
+      if (Date.now() - startedAt > REFRESH_RETRY_DEADLINE_MS) throw error;
+      logger.warn('[API] Token refresh failed in transit, retrying', { attempt: attempt + 1 });
+    }
+  }
+}
+
+// ACCOUNT_LOCKED (sign-in) and MFA_LOCKED (second step) keep their own code, so the screen can
+// show the lockout and its wait instead of the generic rate-limit copy.
+const LOCKOUT_CODES: readonly string[] = ['ACCOUNT_LOCKED', 'MFA_LOCKED'];
+
+function retryAfterSeconds(error: HttpErrorLike): number | undefined {
+  const fromBody = Number(error.response?.data?.retryAfter);
+  if (Number.isFinite(fromBody) && fromBody > 0) return fromBody;
+  const fromHeader = Number(error.response?.headers?.['retry-after']);
+  return Number.isFinite(fromHeader) && fromHeader > 0 ? fromHeader : undefined;
+}
+
+// Rejected without `.response`: service catches must check `code` / `isRateLimited` first.
+function toRateLimitError(error: unknown): RateLimitError {
+  const httpError = (error ?? {}) as HttpErrorLike;
+  const backendCode = httpError.response?.data?.code;
+  return Object.assign(new Error('Too many requests. Please wait a moment and try again.'), {
+    code:
+      typeof backendCode === 'string' && LOCKOUT_CODES.includes(backendCode)
+        ? backendCode
+        : 'RATE_LIMIT_EXCEEDED',
+    isRateLimited: true,
+    retryAfter: retryAfterSeconds(httpError),
+    originalError: error,
+  });
+}
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -209,6 +349,18 @@ api.interceptors.response.use(
       // INVALID_API_KEY / INSTALL_TOKEN_MISSING are never replayed: the backend
       // counts each one toward an IP ban, so they fall through to the reject.
       if (errorCode === 'TOKEN_EXPIRED' && !originalRequest._retry) {
+        // Sent with an access token a refresh has already replaced: retry with the stored one
+        // instead of rotating again. With 15-minute tokens, requests often straddle the expiry.
+        const sentToken = bearerToken(originalRequest);
+        if (sentToken && !isRefreshing) {
+          const storedToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
+          if (storedToken && storedToken !== sentToken) {
+            originalRequest._retry = true;
+            originalRequest.headers.Authorization = `Bearer ${storedToken}`;
+            return api(originalRequest);
+          }
+        }
+
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -230,26 +382,9 @@ api.interceptors.response.use(
             throw new Error('No refresh token available');
           }
 
-          // Attach the API key manually since this call bypasses the request
-          // interceptor (to avoid recursion if refresh itself 401s).
-          const refreshHeaders: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          const refreshAppVersion = getInstalledAppVersion();
-          if (refreshAppVersion) {
-            refreshHeaders['X-App-Version'] = refreshAppVersion;
-          }
-          if (API_KEY) {
-            refreshHeaders['x-api-key'] = API_KEY;
-          }
+          const response = await requestTokenRefresh(refreshToken);
 
-          const response = await axios.post(
-            `${API_BASE_URL}${apiPrefix}/auth/token/refresh`,
-            { refreshToken },
-            { headers: refreshHeaders }
-          );
-
-          const responseData = response.data?.data;
+          const responseData = response?.data?.data;
           if (!responseData?.accessToken || !responseData?.refreshToken) {
             throw new Error('Invalid refresh token response');
           }
@@ -272,20 +407,19 @@ api.interceptors.response.use(
           processQueue(null, accessToken);
 
           return api(originalRequest);
-        } catch (refreshError: any) {
+        } catch (refreshError: unknown) {
+          // The backend rate-limits before it rotates, so the stored tokens are still good:
+          // keep the session and let the requests fail like any other 429.
+          if ((refreshError as HttpErrorLike)?.response?.status === 429) {
+            const rateLimitError = toRateLimitError(refreshError);
+            processQueue(rateLimitError);
+            return Promise.reject(rateLimitError);
+          }
+
           // Clear queued requests without rejecting — the global handler will navigate away
           failedQueue = [];
 
-          await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
-          await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
-          await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
-
-          if (tokenExpirationCallback) {
-            const refreshErrorCode = refreshError?.response?.data?.code;
-            tokenExpirationCallback(
-              refreshErrorCode === 'SESSION_REPLACED' ? 'session_replaced' : undefined
-            );
-          }
+          await endSession(sessionEndReason((refreshError as HttpErrorLike)?.response?.data?.code));
 
           // Return a never-settling promise to prevent error propagation to screens
           // The global handler navigates away, unmounting all callers
@@ -295,32 +429,8 @@ api.interceptors.response.use(
         }
       }
 
-      const forceLogoutCodes = [
-        'INVALID_TOKEN',
-        'REFRESH_TOKEN_EXPIRED',
-        'TOKEN_REUSE_DETECTED',
-        'SESSION_INVALID',
-        'REFRESH_TOKEN_REVOKED',
-        'SESSION_EXPIRED',
-        'INVALID_REFRESH_TOKEN',
-        'SESSION_REPLACED',
-      ];
-
-      if (forceLogoutCodes.includes(errorCode)) {
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.SESSION_ID);
-
-        if (tokenExpirationCallback) {
-          // Pass specific reason so GlobalProvider can show context-appropriate alerts
-          const reason =
-            errorCode === 'TOKEN_REUSE_DETECTED'
-              ? 'token_reuse'
-              : errorCode === 'SESSION_REPLACED'
-                ? 'session_replaced'
-                : undefined;
-          tokenExpirationCallback(reason);
-        }
+      if (FORCE_LOGOUT_CODES.includes(errorCode)) {
+        await endSession(sessionEndReason(errorCode));
 
         // Return a never-settling promise to prevent error propagation to screens
         // The global handler navigates away, unmounting all callers
@@ -328,24 +438,27 @@ api.interceptors.response.use(
       }
     }
 
-    // ACCOUNT_LOCKED is the account-lockout signal (backend ships it as 429, but
-    // it is registered as 403 — so key on the code, not only the status, to stay
-    // robust to either). Preserve the backend code so the sign-in screen can show
-    // the dedicated lockout message instead of the generic rate-limit copy.
+    // Every authenticated route refuses a disabled account (public routes browse it as a
+    // guest), so on a request made with the session's token the session is over. Without a
+    // token (sign-in, second step, enrolment) the screen that asked explains it instead.
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === 'ACCOUNT_DISABLED' &&
+      bearerToken(originalRequest)
+    ) {
+      await endSession('account_disabled');
+      return new Promise(() => {});
+    }
+
+    // Lockouts are keyed on the code as well as the status: ACCOUNT_LOCKED ships as 429 but is
+    // registered as 403, so stay robust to either.
     const backendCode = error.response?.data?.code;
     if (
       error.response?.status === 429 ||
       backendCode === 'RATE_LIMIT_EXCEEDED' ||
-      backendCode === 'ACCOUNT_LOCKED'
+      LOCKOUT_CODES.includes(backendCode)
     ) {
-      const rateLimitError: RateLimitError = Object.assign(
-        new Error('Too many requests. Please wait a moment and try again.'),
-        {
-          code: backendCode === 'ACCOUNT_LOCKED' ? 'ACCOUNT_LOCKED' : 'RATE_LIMIT_EXCEEDED',
-          isRateLimited: true,
-          originalError: error,
-        }
-      );
+      const rateLimitError = toRateLimitError(error);
 
       logger.warn('[API] Rate limit exceeded', {
         url: error.config?.url,

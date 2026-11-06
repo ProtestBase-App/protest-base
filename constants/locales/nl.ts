@@ -290,6 +290,8 @@ const nl = {
     accountRequired: 'Je moet aangemeld zijn om deze functie te gebruiken',
     loginPrompt: 'Meld je aan om door te gaan',
     fillAllFields: 'Vul alle velden in',
+    accountDisabledMessage:
+      'Dit account is uitgeschakeld. Denk je dat dit een vergissing is? Neem dan contact op met ProtestBase.',
     resetPasswordTitle: 'Wachtwoord herstellen',
     resetPasswordDescription:
       'We sturen je een e-mail met instructies om je wachtwoord te herstellen',
@@ -327,6 +329,75 @@ const nl = {
     migrationBannerMessage:
       'We hebben onlangs onze systemen gemigreerd om de beveiliging te verbeteren. Je vorige wachtwoord werkt niet meer.',
     migrationBannerAction: 'Wachtwoord herstellen',
+  },
+
+  // ============================================
+  // Two-step verification: sign-in step, setup, step-up
+  // ============================================
+  mfa: {
+    challengeTitle: 'Verificatie in twee stappen',
+    challengeIntro: 'Voer de 6-cijferige code uit je authenticator-app in.',
+    recoveryIntro: 'Voer een van je herstelcodes in. Elke code werkt maar één keer.',
+    passkeyOnly:
+      'Dit account meldt zich aan met een toegangssleutel, die deze versie van de app nog niet ondersteunt. Voer in plaats daarvan een van je herstelcodes in.',
+    codeLabel: 'Code',
+    codePlaceholder: '123456',
+    recoveryCodeLabel: 'Herstelcode',
+    recoveryCodePlaceholder: 'ABCDE-23456',
+    verify: 'Verifiëren',
+    useRecoveryCode: 'Liever een herstelcode gebruiken',
+    useAuthenticator: 'Liever de code uit je app gebruiken',
+    backToSignIn: 'Terug naar inloggen',
+    invalidCodeFormat: 'Voer de 6 cijfers uit je authenticator-app in.',
+    invalidRecoveryFormat: 'Een herstelcode heeft 10 letters en cijfers, zoals ABCDE-23456.',
+    wrongCode: 'Deze code is onjuist of verlopen.',
+    attemptsLeft: {
+      one: 'Nog 1 poging.',
+      other: 'Nog {{count}} pogingen.',
+    },
+    blocked: 'Te veel onjuiste codes. Probeer het later opnieuw.',
+    lockedFor: {
+      one: 'Te veel onjuiste codes. Probeer het over 1 minuut opnieuw.',
+      other: 'Te veel onjuiste codes. Probeer het over {{count}} minuten opnieuw.',
+    },
+    expiredTitle: 'Inloggen verlopen',
+    expiredMessage: 'Het inloggen duurde te lang. Log opnieuw in.',
+    alreadyEnrolledMessage:
+      'Verificatie in twee stappen is al ingesteld voor dit account. Log opnieuw in.',
+    recoveryCodesLowTitle: 'Weinig herstelcodes over',
+    recoveryCodesLow: {
+      zero: 'Je hebt je laatste herstelcode gebruikt. Vanaf nu kun je alleen inloggen met je authenticator-app.',
+      one: 'Je hebt nog 1 herstelcode. Als die gebruikt is, kun je alleen nog inloggen met je authenticator-app.',
+      other:
+        'Je hebt nog {{count}} herstelcodes. Als die gebruikt zijn, kun je alleen nog inloggen met je authenticator-app.',
+    },
+    enrollTitle: 'Verificatie in twee stappen instellen',
+    enrollIntro:
+      'ProtestBase vraagt nu bij het inloggen een code uit een authenticator-app. Stel dit één keer in op deze telefoon:',
+    stepAddTitle: '1. Voeg ProtestBase toe aan je authenticator-app',
+    openAuthenticator: 'Toevoegen aan authenticator-app',
+    openAuthenticatorHelp:
+      'Deze knop opent de app die je telefoon gebruikt voor verificatiecodes. Verschijnt ProtestBase daar niet, of gebruik je een andere app? Voeg het dan toe met de instelsleutel hieronder.',
+    noAuthenticatorTitle: 'Geen authenticator-app gevonden',
+    noAuthenticatorMessage:
+      'Geen enkele app op deze telefoon kon de instellink openen. Installeer een authenticator-app, of voeg ProtestBase aan je app toe met de instelsleutel hieronder.',
+    manualKeyLabel: 'Instelsleutel',
+    manualKeyHelp:
+      'Houd de sleutel ingedrukt om hem te kopiëren en plak hem waar je authenticator-app je een sleutel handmatig laat invoeren.',
+    stepCodeTitle: '2. Voer de 6-cijferige code in die je app toont',
+    confirm: 'Bevestigen',
+    setupFailed: 'Het instellen kon niet starten. Controleer je verbinding en probeer het opnieuw.',
+    recoveryCodesTitle: 'Bewaar je herstelcodes',
+    recoveryCodesIntro:
+      'Als je je authenticator-app kwijtraakt, kun je met elke code één keer inloggen. Bewaar ze op een veilige plek, zoals een wachtwoordbeheerder: je krijgt ze niet opnieuw te zien.',
+    shareRecoveryCodes: 'Codes delen',
+    recoveryCodesShareTitle: 'ProtestBase-herstelcodes',
+    savedRecoveryCodes: 'Ik heb ze bewaard',
+    reauthTitle: 'Bevestig dat jij het bent',
+    reauthIntro:
+      'Voer de 6-cijferige code uit je authenticator-app in om je account te verwijderen.',
+    reauthRecoveryIntro: 'Voer een van je herstelcodes in om je account te verwijderen.',
+    reauthExpired: 'Dat duurde te lang. Voer een nieuwe code in.',
   },
 
   // ============================================
@@ -932,8 +1003,20 @@ const nl = {
     deleteWarningItems: {
       loginInfo: 'Je inloggegevens verwijderen',
       accountInfo: 'Je accountgegevens verwijderen',
-      eventsData: 'Al je evenementgegevens verwijderen',
-      images: "Alle afbeeldingen/foto's van je evenementen verwijderen",
+    },
+    deleteImpact: {
+      checking: 'Je organisatie wordt gecontroleerd…',
+      ownContent: "De evenementen en sjablonen die je hebt gemaakt verwijderen, met hun foto's",
+      orgDeleted:
+        "{{name}} verwijderen, met alle evenementen, concepten inbegrepen, hun foto's en de sjablonen, omdat je het laatste lid bent",
+      orgKept:
+        "{{name}} behouden voor de andere leden, met alle evenementen, hun foto's en de sjablonen, ook die je zelf hebt gemaakt",
+      nameReplaced: '{{name}} tonen in plaats van je naam bij de evenementen die je hebt gemaakt',
+      ownerTransfer: 'Het langst aangesloten lid van {{name}} eigenaar maken',
+      orgUnknown:
+        "Je organisatie verwijderen, met alle evenementen, hun foto's en de sjablonen, als je het laatste lid bent. Heeft ze andere leden, dan blijft ze bij hen, met alles erin, en vervangt haar naam de jouwe",
+      sharedHint:
+        'Wil je je komende evenementen en concepten uit {{name}} halen? Verwijder ze dan voordat je je account verwijdert. Voorbije evenementen kunnen niet worden verwijderd: ze blijven staan onder {{name}}.',
     },
     deleteConfirmation: 'Voer je e-mail in om te bevestigen',
     deletePasswordConfirmation: 'Voer je wachtwoord in om te bevestigen',
@@ -966,6 +1049,7 @@ const nl = {
     forbidden: 'Toegang geweigerd',
     timeout: 'Verzoek verlopen. Probeer het opnieuw.',
     unknown: 'Onbekende fout',
+    unknownError: 'Er is een onbekende fout opgetreden.',
     organizationsLoadFailed: 'Kon organisaties niet laden. Probeer het opnieuw.',
     tryAgain: 'Probeer het opnieuw',
     contactSupport: 'Neem contact op met ondersteuning',
@@ -1064,6 +1148,9 @@ const nl = {
     signedInElsewhere: 'Ingelogd op een ander apparaat',
     signedInElsewhereMessage:
       'Je account is ingelogd op een ander apparaat. Voor de veiligheid is slechts één actieve sessie tegelijk toegestaan.',
+    accountDisabled: 'Account uitgeschakeld',
+    accountDisabledMessage:
+      'Dit account is uitgeschakeld, daarom ben je afgemeld. Je kunt ProtestBase als gast blijven gebruiken. Denk je dat dit een vergissing is? Neem dan contact op met ProtestBase.',
   },
 
   // ============================================
@@ -2121,6 +2208,12 @@ const nl = {
     expandField: 'Dit veld groter maken',
     collapseField: 'Dit veld kleiner maken',
     hints: {
+      useRecoveryCode: 'Vraagt om een van je herstelcodes in plaats van de code uit je app',
+      useAuthenticatorCode: 'Vraagt om de code uit je authenticator-app',
+      backToSignIn: 'Gaat terug naar de stap met e-mail en wachtwoord',
+      openAuthenticator: 'Opent een authenticator-app op deze telefoon om je account toe te voegen',
+      shareRecoveryCodes: 'Opent het deelmenu met je herstelcodes',
+      cancelCodeStep: 'Gaat terug naar de stap met het wachtwoord',
       goBack: 'Gaat terug naar het vorige scherm',
       closeScreen: 'Sluit dit scherm',
       closeDialog: 'Sluit dit venster',

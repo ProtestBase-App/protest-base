@@ -53,3 +53,9 @@ export interface GetMyOrganizationsResponse {
     organizations: UserOrganization[];
   };
 }
+
+/** GET /organizations/:id/members (members only). Only the count is read, so entries stay opaque. */
+export interface GetOrganizationMembersResponse {
+  success: boolean;
+  data: unknown[];
+}

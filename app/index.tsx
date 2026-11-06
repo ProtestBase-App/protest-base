@@ -8,16 +8,22 @@ import { ThemedView } from '@/components/ThemedView';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
 import { usePostalCodes } from '@/context/PostalCodeProvider';
+import { clearPendingEnrollment, loadPendingEnrollment } from '@/services/mfa.service';
 import { handleNotificationResponse } from '@/services/notifications.service';
 import { parseEventDeepLink } from '@/utils/deepLinkValidation';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { logger } from '@/utils/logger';
 
 export default function Index() {
-  const { loading } = useGlobalContext();
+  const { loading, isLogged } = useGlobalContext();
   const { loading: savedEventsLoading } = useSavedEvents();
   const { loading: postalCodesLoading } = usePostalCodes();
   const notificationHandledRef = useRef(false);
+  // Read when the redirect runs, so a later sign-in doesn't run the launch redirect again.
+  const isLoggedRef = useRef(isLogged);
+  useEffect(() => {
+    isLoggedRef.current = isLogged;
+  });
 
   // When the warm listener routes a tap by PUSHING over this splash, this
   // route stays mounted underneath with its redirect already consumed —
@@ -58,6 +64,23 @@ export default function Index() {
           url: initialUrl,
           error,
           timestamp: new Date().toISOString(),
+        });
+      }
+
+      // An authenticator setup the system interrupted resumes on the sign-in screen, opened over
+      // Explore so its back arrow has somewhere to go. This runs on every launch, so a failure
+      // here must still land on Explore.
+      try {
+        const pendingEnrollment = await loadPendingEnrollment();
+        if (pendingEnrollment && !isLoggedRef.current) {
+          router.replace(Routes.EXPLORE);
+          router.push(Routes.SIGN_IN);
+          return;
+        }
+        if (pendingEnrollment) void clearPendingEnrollment();
+      } catch (error) {
+        logger.warn('[Launch] Pending setup check failed', {
+          error: error instanceof Error ? error.name : typeof error,
         });
       }
 

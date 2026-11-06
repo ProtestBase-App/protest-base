@@ -28,6 +28,7 @@ import {
   getAllOrganizers,
   getMyOrganizations,
   getOrganizationById,
+  getOrganizationMemberCount,
   OrganizationNotFoundError,
 } from '@/services/organizer.service';
 import type { UserOrganization } from '@/types/organization.types';
@@ -386,6 +387,38 @@ describe('organizer.service', () => {
       mockApi.get.mockRejectedValueOnce({});
 
       await expect(getMyOrganizations()).rejects.toThrow('Failed to fetch user organizations');
+    });
+  });
+
+  describe('getOrganizationMemberCount', () => {
+    it('counts the members the backend lists', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: [{ $id: 'm1' }, { $id: 'm2' }] },
+      });
+
+      await expect(getOrganizationMemberCount('org-1')).resolves.toBe(2);
+      expect(mockApi.get).toHaveBeenCalledWith('/organizations/org-1/members');
+    });
+
+    it('rejects an answer that is not a list', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: { success: true, data: { members: [] } } });
+
+      await expect(getOrganizationMemberCount('org-1')).rejects.toThrow(
+        'Failed to fetch organization members'
+      );
+    });
+
+    it("keeps the backend's message when the request fails", async () => {
+      mockApi.get.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: { error: 'You can only view members of your organizations.' },
+        },
+      });
+
+      await expect(getOrganizationMemberCount('org-1')).rejects.toThrow(
+        'You can only view members of your organizations.'
+      );
     });
   });
 

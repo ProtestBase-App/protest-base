@@ -98,7 +98,7 @@ jest.mock('axios', () => {
 // Import modules AFTER all mocks are declared
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import { setTokenExpirationCallback } from '@/services/api';
+import { FORCE_LOGOUT_CODES, markSessionActive, setTokenExpirationCallback } from '@/services/api';
 
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockAxios = axios as jest.Mocked<typeof axios>;
@@ -121,6 +121,9 @@ describe('services/api.ts', () => {
     mockSecureStore.deleteItemAsync.mockResolvedValue(undefined);
     (mockAxios.post as jest.Mock).mockReset();
     getStore().retryFn?.mockReset();
+    // The one-shot sign-out guard is module state: re-arm it as a fresh login would.
+    markSessionActive();
+    jest.useRealTimers();
   });
 
   // ============================================================
@@ -281,7 +284,10 @@ describe('services/api.ts', () => {
   // ============================================================
   describe('Response interceptor (rejected handler) - TOKEN_EXPIRED', () => {
     it('attempts token refresh and retries the original request', async () => {
-      mockSecureStore.getItemAsync.mockResolvedValueOnce('old-refresh-token');
+      // The stored access token is the one the request carried, so nothing refreshed it yet.
+      mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+        key === 'refresh_token' ? 'old-refresh-token' : key === 'access_token' ? 'old-token' : null
+      );
       (mockAxios.post as jest.Mock).mockResolvedValueOnce({
         data: {
           data: {
@@ -318,6 +324,8 @@ describe('services/api.ts', () => {
             'x-api-key': 'test-api-key',
             'X-App-Version': '1.2.3',
           }),
+          // A stalled refresh must not hold every queued request.
+          timeout: 8000,
         })
       );
       expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -472,8 +480,8 @@ describe('services/api.ts', () => {
       // Start the request — this triggers the refresh flow
       getStore().responseRejected(error1);
 
-      // Fail the refresh
-      rejectRefresh(new Error('Refresh failed'));
+      // Fail the refresh with an answer from the backend (a lost response is retried instead)
+      rejectRefresh({ response: { status: 401, data: { code: 'INVALID_REFRESH_TOKEN' } } });
 
       // Wait for async side effects to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -485,6 +493,202 @@ describe('services/api.ts', () => {
       expect(tokenExpiredCallback).toHaveBeenCalled();
 
       setTokenExpirationCallback(() => {});
+    });
+  });
+
+  // ============================================================
+  // Refresh outcomes: 15-minute tokens, the 30 s rotation grace, disabled accounts
+  // ============================================================
+  describe('Response interceptor (rejected handler) - refresh outcomes', () => {
+    const expiredError = (headers: Record<string, string> = {}) => ({
+      config: { _retry: false, headers, method: 'get', url: '/protected' },
+      response: { status: 401, data: { code: 'TOKEN_EXPIRED' } },
+      message: 'Unauthorized',
+    });
+    const newTokens = {
+      data: { data: { accessToken: 'new-access-token', refreshToken: 'new-refresh-token' } },
+    };
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+    beforeEach(() => {
+      mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+        key === 'refresh_token' ? 'old-refresh-token' : null
+      );
+    });
+
+    afterEach(() => {
+      setTokenExpirationCallback(() => {});
+    });
+
+    it.each([
+      ['ACCOUNT_DISABLED', 403, 'account_disabled'],
+      ['TOKEN_REUSE_DETECTED', 401, 'token_reuse'],
+      ['SESSION_REPLACED', 401, 'session_replaced'],
+      ['REFRESH_TOKEN_EXPIRED', 401, undefined],
+    ])(
+      'signs out with the reason when the refresh is refused with %s',
+      async (code, status, reason) => {
+        const callback = jest.fn();
+        setTokenExpirationCallback(callback);
+        (mockAxios.post as jest.Mock).mockRejectedValueOnce({
+          response: { status, data: { code } },
+        });
+
+        getStore().responseRejected(expiredError());
+        await settle();
+
+        expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
+        expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
+        expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('session_id');
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith(reason);
+        // An answer from the backend is final: it is never retried.
+        expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('retries a refresh lost in transit inside the rotation grace window', async () => {
+      jest.useFakeTimers();
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock)
+        .mockRejectedValueOnce(new Error('Network Error'))
+        .mockResolvedValueOnce(newTokens);
+      getStore().retryFn.mockResolvedValueOnce({ data: { ok: true } });
+
+      const result = getStore().responseRejected(expiredError());
+      await jest.advanceTimersByTimeAsync(1000);
+
+      await expect(result).resolves.toEqual({ data: { ok: true } });
+      // The retry replays the same refresh token: within 30 s the backend answers with the
+      // pair it already issued.
+      expect(mockAxios.post).toHaveBeenCalledTimes(2);
+      expect((mockAxios.post as jest.Mock).mock.calls[1][1]).toEqual({
+        refreshToken: 'old-refresh-token',
+      });
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'new-access-token',
+        expect.any(Object)
+      );
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('signs out once the transit retries are spent', async () => {
+      jest.useFakeTimers();
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock).mockRejectedValue(new Error('Network Error'));
+
+      getStore().responseRejected(expiredError());
+      await jest.advanceTimersByTimeAsync(3000);
+
+      expect(mockAxios.post).toHaveBeenCalledTimes(3);
+      expect(callback).toHaveBeenCalledWith(undefined);
+    });
+
+    it('never replays the refresh token once the grace window may have closed', async () => {
+      jest.useFakeTimers();
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock).mockRejectedValue(new Error('Network Error'));
+
+      getStore().responseRejected(expiredError());
+      await jest.advanceTimersByTimeAsync(10);
+      // Backgrounded during the 1 s wait: iOS fires the timer half a minute later.
+      jest.setSystemTime(Date.now() + 30_000);
+      await jest.advanceTimersByTimeAsync(1000);
+
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(undefined);
+    });
+
+    it('keeps the session when the refresh is rate-limited, since nothing was rotated', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock).mockRejectedValueOnce({
+        response: { status: 429, data: { code: 'RATE_LIMIT_EXCEEDED' } },
+      });
+
+      await expect(getStore().responseRejected(expiredError())).rejects.toMatchObject({
+        code: 'RATE_LIMIT_EXCEEDED',
+        isRateLimited: true,
+      });
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries with the token a refresh already stored instead of rotating again', async () => {
+      mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+        key === 'access_token' ? 'fresh-access-token' : 'old-refresh-token'
+      );
+      getStore().retryFn.mockResolvedValueOnce({ data: { ok: true } });
+      const error = expiredError({ Authorization: 'Bearer stale-access-token' });
+
+      await expect(getStore().responseRejected(error)).resolves.toEqual({ data: { ok: true } });
+      expect(mockAxios.post).not.toHaveBeenCalled();
+      expect(error.config.headers.Authorization).toBe('Bearer fresh-access-token');
+    });
+  });
+
+  // ============================================================
+  // Response interceptor - disabled account (403 ACCOUNT_DISABLED)
+  // ============================================================
+  describe('Response interceptor (rejected handler) - disabled account', () => {
+    const disabledError = (headers: Record<string, string>) => ({
+      config: { method: 'get', url: '/auth/user/info', headers },
+      response: { status: 403, data: { code: 'ACCOUNT_DISABLED', error: 'Account is disabled' } },
+      message: 'Forbidden',
+    });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+    afterEach(() => {
+      setTokenExpirationCallback(() => {});
+    });
+
+    it('ends the session when an authenticated request finds the account disabled', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+
+      getStore().responseRejected(disabledError({ Authorization: 'Bearer access-token' }));
+      await settle();
+
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('access_token');
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('refresh_token');
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('session_id');
+      expect(callback).toHaveBeenCalledWith('account_disabled');
+    });
+
+    it('leaves a request without a token, such as the sign-in, to its own screen', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      const error = disabledError({});
+
+      await expect(getStore().responseRejected(error)).rejects.toBe(error);
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('reports a dying session once, however many requests fail together', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+
+      getStore().responseRejected(disabledError({ Authorization: 'Bearer access-token' }));
+      getStore().responseRejected(disabledError({ Authorization: 'Bearer access-token' }));
+      getStore().responseRejected({
+        config: { method: 'get', url: '/organizations/my', headers: {} },
+        response: { status: 401, data: { code: 'SESSION_INVALID' } },
+        message: 'Unauthorized',
+      });
+      await settle();
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      // The next session's end is reported again.
+      markSessionActive();
+      getStore().responseRejected(disabledError({ Authorization: 'Bearer access-token' }));
+      await settle();
+      expect(callback).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -525,6 +729,38 @@ describe('services/api.ts', () => {
         setTokenExpirationCallback(() => {});
       });
     });
+
+    it.each([
+      'MFA_REQUIRED',
+      'MFA_ENROLLMENT_REQUIRED',
+      'MFA_CHALLENGE_INVALID',
+      'INVALID_MFA_CODE',
+      'MFA_LOCKED',
+      'REAUTH_REQUIRED',
+      'MFA_LAST_FACTOR_REQUIRED',
+      'ACCOUNT_DISABLED',
+    ])('never lists the login-security code %s', (code) => {
+      expect(FORCE_LOGOUT_CODES).not.toContain(code);
+    });
+
+    it.each(['INVALID_MFA_CODE', 'MFA_CHALLENGE_INVALID'])(
+      'passes a 401 %s through to the second-step screen',
+      async (code) => {
+        const tokenExpiredCallback = jest.fn();
+        setTokenExpirationCallback(tokenExpiredCallback);
+        const error = {
+          config: { method: 'post', url: '/auth/mfa/verify', headers: {} },
+          response: { status: 401, data: { code, attemptsRemaining: 3 } },
+          message: 'Unauthorized',
+        };
+
+        await expect(getStore().responseRejected(error)).rejects.toBe(error);
+        expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+        expect(tokenExpiredCallback).not.toHaveBeenCalled();
+
+        setTokenExpirationCallback(() => {});
+      }
+    );
 
     it('does NOT clear tokens for an unknown 401 error code', async () => {
       const tokenExpiredCallback = jest.fn();
@@ -638,6 +874,33 @@ describe('services/api.ts', () => {
       await expect(getStore().responseRejected(error)).rejects.toMatchObject({
         code: 'ACCOUNT_LOCKED',
         isRateLimited: true,
+      });
+    });
+
+    it('keeps MFA_LOCKED and the wait the backend sends with it', async () => {
+      const error = {
+        config: { method: 'post', url: '/auth/mfa/verify', headers: {} },
+        response: { status: 429, data: { code: 'MFA_LOCKED', retryAfter: 900 } },
+        message: 'Too Many Requests',
+      };
+
+      await expect(getStore().responseRejected(error)).rejects.toMatchObject({
+        code: 'MFA_LOCKED',
+        isRateLimited: true,
+        retryAfter: 900,
+      });
+    });
+
+    it('reads the wait from the Retry-After header when the body has none', async () => {
+      const error = {
+        config: { method: 'get', url: '/events', headers: {} },
+        response: { status: 429, data: {}, headers: { 'retry-after': '120' } },
+        message: 'Too Many Requests',
+      };
+
+      await expect(getStore().responseRejected(error)).rejects.toMatchObject({
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: 120,
       });
     });
 

@@ -6,7 +6,7 @@ import { EventFormShell } from '@/components/event-form/EventFormShell';
 import { useEventFormValidation } from '@/hooks/useEventFormValidation';
 import { OVERLAY_FOCUS_DELAY_MS } from '@/hooks/useOverlayFocus';
 import { spyOnBackHandler } from '@/test-utils/backHandler';
-import { act, fireEvent, renderWithProviders } from '@/test-utils/render';
+import { act, fireEvent, renderWithProviders, within } from '@/test-utils/render';
 import type { EventFormKind, FormState } from '@/types/eventForm.types';
 import { getTodayDateKeyInBelgium } from '@/utils/calendarUtils';
 import { createBlankForm } from '@/utils/eventFormData';
@@ -16,11 +16,13 @@ function Harness({
   initial = {},
   onBack = () => true,
   publishOpen = false,
+  busy = false,
 }: {
   kind?: EventFormKind;
   initial?: Partial<FormState>;
   onBack?: () => boolean;
   publishOpen?: boolean;
+  busy?: boolean;
 }) {
   const [form, setForm] = useState(() => createBlankForm(initial));
   const validation = useEventFormValidation(() => []);
@@ -35,6 +37,7 @@ function Harness({
       closeLabel="Close"
       closeTestID="btn-close"
       onBack={onBack}
+      busy={busy}
       publishCheck={{ open: publishOpen, onConfirm: () => {}, onClose: () => {} }}
       footer={<Text>Footer</Text>}
     />
@@ -77,6 +80,27 @@ describe('EventFormShell', () => {
     expect(getByTestId('surface-where')).toBeTruthy();
     expect(queryByTestId('row-event-when', { includeHiddenElements: false })).toBeNull();
     expect(queryByTestId('row-event-when', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('keeps the form under one native view whether busy, idle or behind a surface', () => {
+    // Guards the prop only: the race it prevents, a save re-parenting the form while the
+    // screen navigates away, happens in Fabric's native mounting, not in Jest.
+    const utils = renderWithProviders(<Harness busy />);
+    const pageWrappers = (pointerEvents: 'none' | 'auto') =>
+      utils
+        .UNSAFE_getAllByProps({ collapsable: false, pointerEvents })
+        .filter((node) =>
+          within(node).queryByTestId('input-event-title', { includeHiddenElements: true })
+        );
+
+    expect(pageWrappers('none').length).toBeGreaterThan(0);
+
+    utils.rerender(<Harness />);
+    expect(pageWrappers('auto').length).toBeGreaterThan(0);
+
+    fireEvent.press(utils.getByTestId('row-event-where'));
+    expect(utils.getByTestId('surface-where')).toBeTruthy();
+    expect(pageWrappers('auto').length).toBeGreaterThan(0);
   });
 
   it('hides the page from screen readers behind the publish check', () => {

@@ -11,6 +11,7 @@ jest.mock('@/services/api', () => ({
       response: { use: jest.fn() },
     },
   },
+  markSessionActive: jest.fn(),
 }));
 
 jest.mock('expo-secure-store', () => ({
@@ -19,8 +20,9 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-import api from '@/services/api';
+import api, { markSessionActive } from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
+import { AuthError } from '@/utils/authError';
 import {
   login,
   logout,
@@ -29,6 +31,7 @@ import {
   getCurrentUserSessions,
   forgotPassword,
   deleteAccount,
+  storeSession,
 } from '@/services/auth.service';
 import type { User } from '@/types/auth.types';
 
@@ -88,6 +91,49 @@ describe('auth.service', () => {
         'sess-1',
         expect.any(Object)
       );
+      // Re-arms the one-shot sign-out guard, so this session's own end is reported.
+      expect(markSessionActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the backend code and body, so the screen can tell a second step from a wrong password', async () => {
+      const mfa = { challengeId: 'challenge-1', methods: ['totp'], expiresIn: 300 };
+      mockApi.post.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: {
+            success: false,
+            error: 'A second verification step is required. Update the app to continue.',
+            code: 'MFA_REQUIRED',
+            statusCode: 403,
+            mfa,
+          },
+        },
+      });
+
+      const failure = login('user@example.com', 'password123');
+
+      await expect(failure).rejects.toBeInstanceOf(AuthError);
+      await expect(failure).rejects.toMatchObject({
+        message: 'A second verification step is required. Update the app to continue.',
+        code: 'MFA_REQUIRED',
+        status: 403,
+        details: expect.objectContaining({ mfa }),
+      });
+      expect(markSessionActive).not.toHaveBeenCalled();
+    });
+
+    it('keeps the ACCOUNT_DISABLED code from the login endpoint', async () => {
+      mockApi.post.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: { success: false, error: 'Account is disabled', code: 'ACCOUNT_DISABLED' },
+        },
+      });
+
+      await expect(login('user@example.com', 'password123')).rejects.toMatchObject({
+        code: 'ACCOUNT_DISABLED',
+        status: 403,
+      });
     });
 
     it('throws "Login failed" when accessToken is missing (internal error caught by outer catch)', async () => {
@@ -515,6 +561,71 @@ describe('auth.service', () => {
 
       await expect(deleteAccount('password123')).rejects.toBe(lockedError);
       expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+    it('sends the step-up proof when there is one', async () => {
+      mockApi.delete.mockResolvedValueOnce({ data: {} });
+
+      await deleteAccount('password123', 'proof-token');
+
+      expect(mockApi.delete).toHaveBeenCalledWith('/auth/account', {
+        data: { password: 'password123', reauthToken: 'proof-token' },
+      });
+    });
+
+    it('keeps REAUTH_REQUIRED so the screen can ask for a code', async () => {
+      mockApi.delete.mockRejectedValueOnce({
+        response: {
+          status: 403,
+          data: { success: false, code: 'REAUTH_REQUIRED', error: 'Confirm your password first' },
+        },
+      });
+
+      const error = await deleteAccount('password123').catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AuthError);
+      expect(error).toMatchObject({ code: 'REAUTH_REQUIRED', status: 403 });
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================
+  // storeSession
+  // ============================================================
+  describe('storeSession', () => {
+    it('stores the tokens, re-arms the session-end alert and returns the user', async () => {
+      const user = await storeSession({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        session: { $id: 'session-1' },
+        user: mockUser,
+      });
+
+      expect(user).toBe(mockUser);
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'access_token',
+        'access',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh',
+        expect.any(Object)
+      );
+      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'session_id',
+        'session-1',
+        expect.any(Object)
+      );
+      expect(markSessionActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores nothing from an incomplete answer', async () => {
+      await expect(
+        storeSession({ accessToken: 'access', refreshToken: 'refresh', user: mockUser })
+      ).rejects.toThrow('Invalid login response from server');
+      await expect(storeSession(undefined)).rejects.toThrow('Invalid login response from server');
+      expect(mockSecureStore.setItemAsync).not.toHaveBeenCalled();
+      expect(markSessionActive).not.toHaveBeenCalled();
     });
   });
 });

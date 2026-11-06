@@ -1,0 +1,67 @@
+#!/bin/sh
+# Refuses a commit that would add a secret. Enabled by `npm install` (scripts/install-git-hooks.js).
+# Only for a false positive: git commit --no-verify. A real secret must be removed, and rotated if
+# it was ever pushed.
+
+fail() {
+  printf 'pre-commit: %s\n' "$1" >&2
+  exit 1
+}
+
+cd "$(git rev-parse --show-toplevel)" || fail 'cannot find the repository root'
+
+# 1. Files that hold credentials or test accounts, even when force-added past .gitignore.
+#    The Secret Scanning workflow runs the same pattern against every tracked file.
+blocked=$(git diff --cached --name-only --diff-filter=ACMR |
+  grep -E '(^|/)(\.env[^/]*|credentials\.json)$|(^|/)credentials/|\.(p12|jks|key|pem)$|(^|/)\.maestro/' |
+  grep -v -E '\.(example|sample)$')
+if [ -n "$blocked" ]; then
+  printf '%s\n' "$blocked" | sed 's/^/  /' >&2
+  fail 'these files must stay out of git'
+fi
+
+# 2. Known secret patterns in the staged changes, printed redacted.
+GITLEAKS=$(command -v gitleaks 2>/dev/null)
+for candidate in /opt/homebrew/bin/gitleaks /usr/local/bin/gitleaks; do
+  [ -z "$GITLEAKS" ] && [ -x "$candidate" ] && GITLEAKS=$candidate
+done
+[ -n "$GITLEAKS" ] || fail 'gitleaks is not installed, so the commit cannot be scanned. Install it: brew install gitleaks'
+"$GITLEAKS" git --pre-commit --staged --redact --verbose --no-banner --log-level warn --config .gitleaks.toml ||
+  fail 'gitleaks found a possible secret in the staged changes (redacted above)'
+
+# 3. Values from this machine's env files and credentials.json copied into the code. Values that
+#    are already in tracked files are public by design (the EAS project id in app.config.ts).
+#    Never prints a value: only the variable, where it came from and which staged files hold it.
+local_values() {
+  for file in .env .env.* credentials.json; do
+    [ -f "$file" ] || continue
+    case "$file" in *.example | *.sample) continue ;; esac
+    if [ "$file" = credentials.json ]; then
+      sed -n -E 's/.*"([A-Za-z0-9_]*([Pp]assword|[Ss]ecret|[Tt]oken)[A-Za-z0-9_]*)"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1=\3/p' "$file"
+    else
+      grep -E '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=' "$file" |
+        sed -E 's/^[[:space:]]*(export[[:space:]]+)?//'
+    fi | sed "s|^|$file:|"
+  done
+}
+
+added=$(git diff --cached -U0 --no-color --diff-filter=ACMR | grep '^+' | grep -v '^+++')
+if [ -n "$added" ]; then
+  report=$(local_values | while IFS= read -r line; do
+    source_file=${line%%:*}
+    pair=${line#*:}
+    name=${pair%%=*}
+    value=$(printf '%s' "${pair#*=}" | sed -E "s/^[[:space:]]*[\"']?//; s/[\"']?[[:space:]]*$//")
+    [ "${#value}" -ge 8 ] || continue
+    printf '%s\n' "$added" | grep -F -q -e "$value" || continue
+    git grep -F -q -e "$value" HEAD -- 2>/dev/null && continue
+    files=$(git diff --cached --name-only --diff-filter=ACMR -S"$value" | tr '\n' ' ')
+    printf '  %s from %s is in: %s\n' "$name" "$source_file" "${files:-the staged changes}"
+  done)
+  if [ -n "$report" ]; then
+    printf '%s\n' "$report" >&2
+    fail 'staged changes contain values from local env files; read them from the environment instead'
+  fi
+fi
+
+exit 0

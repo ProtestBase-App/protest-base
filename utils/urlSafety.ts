@@ -128,3 +128,34 @@ export async function openStoreUrlSafely(
     return false;
   }
 }
+
+/**
+ * True only for an authenticator setup link (`otpauth://totp/…`), the one non-web scheme the
+ * app hands to another app on purpose.
+ */
+export function isTotpSetupUri(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const parsed = parseUrl(url);
+  return parsed?.protocol.toLowerCase() === 'otpauth:' && parsed.host.toLowerCase() === 'totp';
+}
+
+/**
+ * Opens an authenticator setup link in whichever app handles it. Returns false when it isn't one
+ * or no app opened it, so the screen can point to the setup key instead. Never logs the link: it
+ * holds the secret.
+ */
+export async function openTotpSetupUri(url: string | null | undefined): Promise<boolean> {
+  if (!isTotpSetupUri(url)) {
+    logger.warn('[urlSafety] Refused to open an authenticator link that is not otpauth://totp');
+    return false;
+  }
+  try {
+    await Linking.openURL(url as string);
+    return true;
+  } catch (error) {
+    logger.warn('[urlSafety] No app opened the authenticator link', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    return false;
+  }
+}
