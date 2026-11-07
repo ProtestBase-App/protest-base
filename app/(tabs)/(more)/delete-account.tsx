@@ -131,7 +131,8 @@ export default function DeleteAccountScreen() {
       return;
     }
 
-    if (form.email !== user?.email) {
+    // Sign-in ignores the email's case, so this confirmation does too.
+    if (form.email.trim().toLowerCase() !== (user?.email ?? '').trim().toLowerCase()) {
       Alert.alert(t('common.error'), t('account.incorrectEmail'));
       return;
     }

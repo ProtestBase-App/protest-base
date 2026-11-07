@@ -274,6 +274,27 @@ describe('Delete Account Screen', () => {
       });
     });
 
+    it('accepts the email in another case and with surrounding spaces', async () => {
+      // Sign-in ignores case, so "Test@…" must confirm an account stored as "test@…".
+      const mockUser = createMockUser({ email: 'test@example.com' });
+      (deleteAccount as jest.Mock).mockResolvedValue(undefined);
+
+      const { getByText, getByPlaceholderText } = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: mockUser },
+        },
+      });
+
+      fireEvent.changeText(getByPlaceholderText('account.email'), ' Test@Example.COM ');
+      fireEvent.changeText(getByPlaceholderText('auth.password'), 'mypassword123');
+      fireEvent.press(getByText('account.confirmButton'));
+
+      await waitFor(() => {
+        expect(deleteAccount).toHaveBeenCalledWith('mypassword123');
+      });
+      expect(Alert.alert).not.toHaveBeenCalledWith('common.error', 'account.incorrectEmail');
+    });
+
     it('clears auth state after account deletion', async () => {
       const mockUser = createMockUser({ email: 'test@example.com' });
       const mockClearAuthState = jest.fn().mockResolvedValue(undefined);
