@@ -14,6 +14,7 @@ jest.mock('@/services/organizer.service', () => ({
 import React from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { isHiddenFromAccessibility } from '@testing-library/react-native';
 import { renderWithProviders, fireEvent, waitFor, createMockUser } from '@/test-utils/render';
 import DeleteAccountScreen from '@/app/(tabs)/(more)/delete-account';
 import { deleteAccount } from '@/services/auth.service';
@@ -64,6 +65,22 @@ describe('Delete Account Screen', () => {
       expect(getByText(/account.deleteWarningItems.loginInfo/)).toBeTruthy();
       expect(getByText(/account.deleteWarningItems.accountInfo/)).toBeTruthy();
       expect(await findByText(/account.deleteImpact.ownContent/)).toBeTruthy();
+    });
+
+    it('sets each bullet glyph apart from its text, hidden from screen readers', () => {
+      const mockUser = createMockUser();
+      const { getByText, getAllByText } = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: mockUser },
+        },
+      });
+
+      // Its own element, so wrapped lines align under the text, not the glyph.
+      const text = getByText('account.deleteWarningItems.loginInfo');
+      expect(isHiddenFromAccessibility(text)).toBe(false);
+      const glyphs = getAllByText('•', { includeHiddenElements: true });
+      expect(glyphs.length).toBeGreaterThanOrEqual(2);
+      glyphs.forEach((glyph) => expect(isHiddenFromAccessibility(glyph)).toBe(true));
     });
 
     it('renders the email confirmation field', () => {

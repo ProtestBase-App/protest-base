@@ -97,6 +97,47 @@ describe('FiltersSheetShell', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the pinned footer current without remounting it', () => {
+    // gorhom memoizes the footer container: a new footerComponent per render
+    // would remount the footer (dropping screen-reader focus on Reset), and a
+    // stable one that ignores new props would keep showing the old count.
+    const mounts = jest.fn();
+    function FooterProbe({ label }: { label: string }) {
+      React.useEffect(() => {
+        mounts();
+      }, []);
+      return <Text>{label}</Text>;
+    }
+    const renderShell = (label: string) => (
+      <FiltersSheetShell {...defaultProps} footer={<FooterProbe label={label} />}>
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+    const { getByText, queryByText, rerender } = renderWithProviders(renderShell('See 3'));
+
+    expect(getByText('See 3')).toBeTruthy();
+
+    rerender(renderShell('See 5'));
+
+    expect(getByText('See 5')).toBeTruthy();
+    expect(queryByText('See 3')).toBeNull();
+    expect(mounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on the screen-reader escape gesture from the body and from the footer', () => {
+    const onClose = jest.fn();
+    const { getByText } = renderWithProviders(
+      <FiltersSheetShell {...defaultProps} onClose={onClose} footer={<Text>Footer</Text>}>
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    fireEvent(getByText('Sheet body'), 'accessibilityEscape');
+    fireEvent(getByText('Footer'), 'accessibilityEscape');
+
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('FiltersSheetSectionLabel', () => {

@@ -79,6 +79,18 @@ export default function DraftFiltersSheet({
       onClose={onClose}
       title={t('filters.title')}
       testID="draft-filters-sheet"
+      footer={
+        <FiltersSheetFooter
+          onReset={() => setDraft(DEFAULT_DRAFT_FILTERS)}
+          resetDisabled={isDefault}
+          onApply={() => {
+            onApply(draft);
+            onClose();
+          }}
+          applyDisabled={false}
+          applyLabel={t('filters.confirmFilters')}
+        />
+      }
     >
       <FiltersSheetSectionLabel label={t('filters.category')} />
       <View style={styles.chipRow}>
@@ -131,17 +143,6 @@ export default function DraftFiltersSheet({
           ))}
         </View>
       </View>
-
-      <FiltersSheetFooter
-        onReset={() => setDraft(DEFAULT_DRAFT_FILTERS)}
-        resetDisabled={isDefault}
-        onApply={() => {
-          onApply(draft);
-          onClose();
-        }}
-        applyDisabled={false}
-        applyLabel={t('filters.confirmFilters')}
-      />
     </FiltersSheetShell>
   );
 }

@@ -159,7 +159,24 @@ export function MapFiltersSheet({
   };
 
   return (
-    <FiltersSheetShell visible={visible} onClose={onClose} title={t('filters.title')}>
+    <FiltersSheetShell
+      visible={visible}
+      onClose={onClose}
+      title={t('filters.title')}
+      footer={
+        <FiltersSheetFooter
+          onReset={() => setDraft(DEFAULT_MAP_FILTERS)}
+          resetDisabled={draftIsDefault}
+          onApply={handleApply}
+          applyDisabled={false}
+          applyLabel={
+            matchCount === 0
+              ? t('maps.filterApplyNone')
+              : t('maps.filterApplyCount', { count: matchCount })
+          }
+        />
+      }
+    >
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('maps.actionType')} />
         <View style={styles.chipRow}>
@@ -257,18 +274,6 @@ export function MapFiltersSheet({
           />
         </View>
       </View>
-
-      <FiltersSheetFooter
-        onReset={() => setDraft(DEFAULT_MAP_FILTERS)}
-        resetDisabled={draftIsDefault}
-        onApply={handleApply}
-        applyDisabled={false}
-        applyLabel={
-          matchCount === 0
-            ? t('maps.filterApplyNone')
-            : t('maps.filterApplyCount', { count: matchCount })
-        }
-      />
     </FiltersSheetShell>
   );
 }

@@ -328,9 +328,16 @@ jest.mock('react-native-keyboard-controller', () =>
 // ref. dismiss()/close()/forceClose() fire onDismiss, matching how swipe-down /
 // backdrop-tap / hardware-back funnel through onClose at runtime. The scrollable
 // and text input map to their RN equivalents; provider/backdrop pass through.
+// The footer container is memoized like gorhom's, so a footerComponent that
+// does not re-render itself shows stale content here too.
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = require('react');
   const { View, ScrollView, TextInput } = require('react-native');
+
+  const animatedFooterPosition = { value: 0, get: () => 0 };
+  const BottomSheetFooterContainer = React.memo(({ footerComponent: FooterComponent }) =>
+    React.createElement(FooterComponent, { animatedFooterPosition })
+  );
 
   const BottomSheetModal = React.forwardRef((props, ref) => {
     const [shown, setShown] = React.useState(false);
@@ -353,11 +360,25 @@ jest.mock('@gorhom/bottom-sheet', () => {
         if (props.onDismiss) props.onDismiss();
       },
     }));
-    return shown ? React.createElement(View, { testID: props.testID }, props.children) : null;
+    return shown
+      ? React.createElement(
+          View,
+          { testID: props.testID },
+          props.children,
+          props.footerComponent
+            ? React.createElement(BottomSheetFooterContainer, {
+                footerComponent: props.footerComponent,
+              })
+            : null
+        )
+      : null;
   });
 
-  const BottomSheetScrollView = React.forwardRef((props, ref) =>
-    React.createElement(ScrollView, { ...props, ref })
+  const BottomSheetFooter = ({ children, animatedFooterPosition: _position, ...props }) =>
+    React.createElement(View, props, children);
+  const BottomSheetScrollView = React.forwardRef(
+    ({ enableFooterMarginAdjustment: _adjust, ...props }, ref) =>
+      React.createElement(ScrollView, { ...props, ref })
   );
   const BottomSheetTextInput = React.forwardRef((props, ref) =>
     React.createElement(TextInput, { ...props, ref })
@@ -371,6 +392,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
     default: BottomSheetModal,
     BottomSheetModal,
     BottomSheetModalProvider,
+    BottomSheetFooter,
     BottomSheetScrollView,
     BottomSheetTextInput,
     BottomSheetView,

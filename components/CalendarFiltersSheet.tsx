@@ -125,7 +125,24 @@ export function CalendarFiltersSheet({
   };
 
   return (
-    <FiltersSheetShell visible={visible} onClose={onClose} title={t('filters.title')}>
+    <FiltersSheetShell
+      visible={visible}
+      onClose={onClose}
+      title={t('filters.title')}
+      footer={
+        <FiltersSheetFooter
+          onReset={() => setDraft(DEFAULT_CALENDAR_FILTERS)}
+          resetDisabled={draftIsDefault}
+          onApply={handleApply}
+          applyDisabled={tooBroad}
+          applyLabel={
+            matchCount === 0
+              ? t('home.filterApplyNone')
+              : t('home.filterApplyCount', { count: matchCount })
+          }
+        />
+      }
+    >
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.category')} />
         <View style={styles.chipRow}>
@@ -219,18 +236,6 @@ export function CalendarFiltersSheet({
           />
         </View>
       </View>
-
-      <FiltersSheetFooter
-        onReset={() => setDraft(DEFAULT_CALENDAR_FILTERS)}
-        resetDisabled={draftIsDefault}
-        onApply={handleApply}
-        applyDisabled={tooBroad}
-        applyLabel={
-          matchCount === 0
-            ? t('home.filterApplyNone')
-            : t('home.filterApplyCount', { count: matchCount })
-        }
-      />
     </FiltersSheetShell>
   );
 }

@@ -286,8 +286,16 @@ export default function DeleteAccountScreen() {
   );
 }
 
+// The glyph sits in its own column so wrapped lines align under the text.
 function Bullet({ text }: { text: string }) {
-  return <ThemedText style={styles.bullets}> • {text}</ThemedText>;
+  return (
+    <ThemedView style={styles.bulletRow}>
+      <ThemedText style={styles.bullets} aria-hidden>
+        •
+      </ThemedText>
+      <ThemedText style={[styles.bullets, styles.bulletText]}>{text}</ThemedText>
+    </ThemedView>
+  );
 }
 
 // What happens to the user's organizations. It must never promise more than the backend
@@ -375,6 +383,15 @@ const styles = StyleSheet.create({
   },
   bullets: {
     fontSize: Typography.sizes.sm,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    gap: Spacing.sm,
+    paddingLeft: Spacing.xs,
+  },
+  bulletText: {
+    flexShrink: 1,
   },
   impactLoader: {
     alignSelf: 'flex-start',

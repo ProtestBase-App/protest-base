@@ -23,7 +23,13 @@ jest.mock('@gorhom/bottom-sheet', () => {
   const BottomSheetModal = React.forwardRef((props: any, ref: any) => {
     mockModalRender(props);
     React.useImperativeHandle(ref, () => ({ present: mockPresent, dismiss: mockDismiss }));
-    return React.createElement(View, null, props.children);
+    const Footer = props.footerComponent;
+    return React.createElement(
+      View,
+      null,
+      props.children,
+      Footer ? React.createElement(Footer, { animatedFooterPosition: { value: 0 } }) : null
+    );
   });
   const BottomSheetScrollView = React.forwardRef(({ children, ...props }: any, ref: any) => {
     React.useImperativeHandle(ref, () => ({
@@ -41,6 +47,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
     BottomSheetModal,
     BottomSheetScrollView,
     BottomSheetBackdrop: (props: any) => React.createElement(View, props),
+    BottomSheetFooter: ({ children }: any) => React.createElement(View, null, children),
   };
 });
 
@@ -97,6 +104,34 @@ describe('FiltersSheetShell keyboard handling', () => {
       android_keyboardInputMode: 'adjustPan',
       topInset: 44,
     });
+  });
+
+  it('leaves the sheet content open to screen readers', () => {
+    renderWithProviders(
+      <FiltersSheetShell visible onClose={jest.fn()} title="Sheet Title">
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    // gorhom's default (true) makes the sheet one element, hiding every chip
+    // and button in it from VoiceOver.
+    expect(latestModalProps().accessible).toBe(false);
+    expect(latestModalProps().footerComponent).toBeUndefined();
+  });
+
+  it('pins a footer only when one is passed', () => {
+    renderWithProviders(
+      <FiltersSheetShell
+        visible
+        onClose={jest.fn()}
+        title="Sheet Title"
+        footer={<Text>Footer</Text>}
+      >
+        <Text>Sheet body</Text>
+      </FiltersSheetShell>
+    );
+
+    expect(latestModalProps().footerComponent).toEqual(expect.any(Function));
   });
 
   it('reopens after the sheet dismissed itself (swipe-down, backdrop)', () => {
@@ -157,6 +192,35 @@ describe('FiltersSheetShell keyboard handling', () => {
 
       expect(mockScrollTo).toHaveBeenCalledWith({
         y: 600 + 20 + Spacing.md + DROPDOWN_HEADROOM - 400,
+        animated: true,
+      });
+    });
+
+    it('keeps the dropdown room above the pinned footer', () => {
+      focusInputAt(600, 20);
+      const { getByTestId } = renderWithProviders(
+        <FiltersSheetShell
+          visible
+          onClose={jest.fn()}
+          title="Sheet Title"
+          testID="sheet-scroll"
+          footer={<Text>Footer</Text>}
+        >
+          <RevealProbe />
+        </FiltersSheetShell>
+      );
+      fireEvent(getByTestId('filters-sheet-footer'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 80 } },
+      });
+      fireEvent(getByTestId('sheet-scroll'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 400 } },
+      });
+
+      fireEvent.press(getByTestId('reveal-probe'));
+
+      // The footer covers the bottom 80 of the 400-high viewport.
+      expect(mockScrollTo).toHaveBeenCalledWith({
+        y: 600 + 20 + Spacing.md + DROPDOWN_HEADROOM - (400 - 80),
         animated: true,
       });
     });

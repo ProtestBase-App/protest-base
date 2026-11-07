@@ -229,7 +229,20 @@ export function ExploreFiltersSheet({
   };
 
   return (
-    <FiltersSheetShell visible={visible} onClose={onClose} title={t('filters.title')}>
+    <FiltersSheetShell
+      visible={visible}
+      onClose={onClose}
+      title={t('filters.title')}
+      footer={
+        <FiltersSheetFooter
+          onReset={() => setDraft(DEFAULT_EXPLORE_FILTERS)}
+          resetDisabled={draftIsDefault}
+          onApply={handleApply}
+          applyDisabled={tooBroad}
+          applyLabel={applyLabel}
+        />
+      }
+    >
       <View style={styles.section}>
         <FiltersSheetSectionLabel label={t('filters.category')} />
         <View style={styles.chipRow}>
@@ -313,14 +326,6 @@ export function ExploreFiltersSheet({
           loadingText={t('filters.loadingOrganizations')}
         />
       </View>
-
-      <FiltersSheetFooter
-        onReset={() => setDraft(DEFAULT_EXPLORE_FILTERS)}
-        resetDisabled={draftIsDefault}
-        onApply={handleApply}
-        applyDisabled={tooBroad}
-        applyLabel={applyLabel}
-      />
     </FiltersSheetShell>
   );
 }
