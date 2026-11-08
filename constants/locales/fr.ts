@@ -821,6 +821,11 @@ const fr: LocaleData = {
     // Error messages for data loading
     postalCodeLoadError: 'Échec du chargement des codes postaux. Veuillez réessayer.',
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
+    imageProcessingError: {
+      one: "Nous n'avons pas pu traiter une photo, elle n'a donc pas été ajoutée. Essayez-en une autre.",
+      other:
+        "Nous n'avons pas pu traiter {{count}} photos, elles n'ont donc pas été ajoutées. Essayez-en d'autres.",
+    },
     maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
   },
 
