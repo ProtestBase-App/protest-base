@@ -2,8 +2,7 @@
  * France area data: the app's copy of the backend's datasets, and the tokens it
  * builds from them. For France the backend is the source, so these tests pin the
  * copies by sha256 and check that every France token the app can send, save or
- * match on the device is the backend's token with the backend's members
- * (backend-protest-base docs/plans/HANDOFF_mobile_france_2026-10-19.md §1.5–§1.6).
+ * match on the device is the backend's token with the backend's members.
  */
 import fs from 'fs';
 import path from 'path';
