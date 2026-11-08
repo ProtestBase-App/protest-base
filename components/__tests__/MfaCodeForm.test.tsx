@@ -132,6 +132,28 @@ describe('MfaCodeForm', () => {
     expect(onSubmit).toHaveBeenCalledWith('totp', '123456');
   });
 
+  // Switching clears the failure, which would take the lock text away and enable Verify, while
+  // the backend refuses every code until the lock ends.
+  it('hides the switch to the other kind of code while the account is locked', () => {
+    jest.useFakeTimers({ now: 1_000_000 });
+    renderForm({ failure: { kind: 'locked', until: 1_000_000 + 60_000 } });
+    act(() => {
+      jest.advanceTimersByTime(0);
+    });
+    expect(screen.queryByTestId('form-switch')).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByTestId('form-switch')).toBeTruthy();
+  });
+
+  it('hides the switch once no attempt is left', () => {
+    renderForm({ failure: { kind: 'wrongCode', attemptsRemaining: 0 } });
+
+    expect(screen.queryByTestId('form-switch')).toBeNull();
+  });
+
   it('says "later" for a lock of unknown length', () => {
     renderForm({ failure: { kind: 'locked', until: null } });
 

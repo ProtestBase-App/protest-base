@@ -47,6 +47,13 @@ jest.mock('@/utils/appVersion', () => ({
   getInstalledAppVersion: jest.fn(() => '1.2.3'),
 }));
 
+// The app language, which api.ts reads on every request for Accept-Language.
+const mockGetCurrentLocale = jest.fn(() => 'en');
+jest.mock('@/utils/i18n', () => ({
+  __esModule: true,
+  getCurrentLocale: () => mockGetCurrentLocale(),
+}));
+
 jest.mock('axios', () => {
   // Initialize global store inside factory (runs before interceptors are registered)
   (global as any).__apiTestStore__ = {
@@ -124,6 +131,8 @@ describe('services/api.ts', () => {
     // The one-shot sign-out guard is module state: re-arm it as a fresh login would.
     markSessionActive();
     jest.useRealTimers();
+    mockGetCurrentLocale.mockReset();
+    mockGetCurrentLocale.mockReturnValue('en');
   });
 
   // ============================================================
@@ -246,6 +255,56 @@ describe('services/api.ts', () => {
       }
     });
 
+    it('attaches Accept-Language with the app language, read on every request', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+      mockGetCurrentLocale.mockReturnValue('fr');
+
+      const login = await getStore().requestFulfilled({
+        headers: {},
+        method: 'post',
+        url: '/auth/login',
+      });
+      expect(login.headers['Accept-Language']).toBe('fr');
+
+      // A language change applies to the very next request.
+      mockGetCurrentLocale.mockReturnValue('nl');
+      const next = await getStore().requestFulfilled({
+        headers: {},
+        method: 'get',
+        url: '/events',
+      });
+      expect(next.headers['Accept-Language']).toBe('nl');
+    });
+
+    it('keeps an Accept-Language the caller set', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
+      mockGetCurrentLocale.mockReturnValue('nl');
+
+      const result = await getStore().requestFulfilled({
+        headers: { 'Accept-Language': 'en' },
+        method: 'get',
+        url: '/events',
+      });
+
+      expect(result.headers['Accept-Language']).toBe('en');
+    });
+
+    it('still sends the request, without Accept-Language, when the language cannot be read', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
+      mockGetCurrentLocale.mockImplementationOnce(() => {
+        throw new Error('i18n not ready');
+      });
+
+      const result = await getStore().requestFulfilled({
+        headers: {},
+        method: 'get',
+        url: '/events',
+      });
+
+      expect(result.headers['Accept-Language']).toBeUndefined();
+      expect(result.headers['X-App-Version']).toBe('1.2.3');
+    });
+
     it('omits X-App-Version when getInstalledAppVersion returns null', async () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getInstalledAppVersion } = require('@/utils/appVersion');
@@ -315,7 +374,7 @@ describe('services/api.ts', () => {
 
       expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('refresh_token');
       // The raw refresh call bypasses the request interceptor, so it must carry
-      // the API key itself.
+      // the API key and the app language itself.
       expect(mockAxios.post).toHaveBeenCalledWith(
         'https://api.example.com/auth/token/refresh',
         { refreshToken: 'old-refresh-token' },
@@ -323,6 +382,7 @@ describe('services/api.ts', () => {
           headers: expect.objectContaining({
             'x-api-key': 'test-api-key',
             'X-App-Version': '1.2.3',
+            'Accept-Language': 'en',
           }),
           // A stalled refresh must not hold every queued request.
           timeout: 8000,
@@ -574,7 +634,9 @@ describe('services/api.ts', () => {
       expect(callback).not.toHaveBeenCalled();
     });
 
-    it('signs out once the transit retries are spent', async () => {
+    // The backend never answered, so nothing says the account changed: the session ends (the
+    // token may have been rotated) but as 'unreachable', which keeps the user's data on the phone.
+    it('signs out as unreachable once the transit retries are spent', async () => {
       jest.useFakeTimers();
       const callback = jest.fn();
       setTokenExpirationCallback(callback);
@@ -584,7 +646,66 @@ describe('services/api.ts', () => {
       await jest.advanceTimersByTimeAsync(3000);
 
       expect(mockAxios.post).toHaveBeenCalledTimes(3);
+      expect(callback).toHaveBeenCalledWith('unreachable');
+    });
+
+    it('signs out as unreachable when the refresh keeps getting a 5xx', async () => {
+      jest.useFakeTimers();
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock).mockRejectedValue({
+        response: { status: 503, data: {} },
+      });
+
+      getStore().responseRejected(expiredError());
+      await jest.advanceTimersByTimeAsync(3000);
+
+      expect(callback).toHaveBeenCalledWith('unreachable');
+    });
+
+    it('ends the session as expired, not unreachable, when no refresh token is stored', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      getStore().responseRejected(expiredError());
+      await settle();
+
+      expect(mockAxios.post).not.toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(undefined);
+    });
+
+    it('stores the new refresh token before the new access token', async () => {
+      (mockAxios.post as jest.Mock).mockResolvedValueOnce(newTokens);
+      getStore().retryFn.mockResolvedValueOnce({ data: { ok: true } });
+
+      await getStore().responseRejected(expiredError());
+
+      const keys = mockSecureStore.setItemAsync.mock.calls.map((call: unknown[]) => call[0]);
+      expect(keys.indexOf('refresh_token')).toBeGreaterThanOrEqual(0);
+      expect(keys.indexOf('refresh_token')).toBeLessThan(keys.indexOf('access_token'));
+    });
+
+    it('leaves a newer session alone when a stale refresh fails', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      let stored = 'old-refresh-token';
+      mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+        key === 'refresh_token' ? stored : null
+      );
+      const refreshFailure = { response: { status: 401, data: { code: 'INVALID_REFRESH_TOKEN' } } };
+      (mockAxios.post as jest.Mock).mockImplementationOnce(async () => {
+        // The user signed in again while this refresh was on its way.
+        stored = 'new-session-refresh-token';
+        throw refreshFailure;
+      });
+
+      // The old session's request fails rather than hanging, and isn't retried with new tokens.
+      await expect(getStore().responseRejected(expiredError())).rejects.toBe(refreshFailure);
+
+      expect(getStore().retryFn).not.toHaveBeenCalled();
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it('never replays the refresh token once the grace window may have closed', async () => {
@@ -600,7 +721,7 @@ describe('services/api.ts', () => {
       await jest.advanceTimersByTimeAsync(1000);
 
       expect(mockAxios.post).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(undefined);
+      expect(callback).toHaveBeenCalledWith('unreachable');
     });
 
     it('keeps the session when the refresh is rate-limited, since nothing was rotated', async () => {

@@ -8,7 +8,7 @@ jest.mock('@/services/mfa.service', () => ({ verifyMfaCode: jest.fn() }));
 
 import React from 'react';
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MfaChallengeStep from '@/components/auth/MfaChallengeStep';
 import { verifyMfaCode } from '@/services/mfa.service';
 import type { MfaChallenge } from '@/types/mfa.types';
@@ -22,14 +22,16 @@ const user = { $id: 'user-1', email: 'organizer@example.org' };
 function renderStep(overrides: Partial<MfaChallenge> = {}) {
   const onSignedIn = jest.fn();
   const onRestart = jest.fn();
+  const onBusyChange = jest.fn();
   render(
     <MfaChallengeStep
       challenge={{ ...challenge, ...overrides }}
       onSignedIn={onSignedIn}
       onRestart={onRestart}
+      onBusyChange={onBusyChange}
     />
   );
-  return { onSignedIn, onRestart };
+  return { onSignedIn, onRestart, onBusyChange };
 }
 
 function enterCode(code: string) {
@@ -55,6 +57,20 @@ describe('MfaChallengeStep', () => {
     const { onSignedIn } = renderStep();
 
     expect(screen.getByText('mfa.challengeTitle')).toBeTruthy();
+    enterCode('123456');
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith({ user }));
+    expect(mockVerify).toHaveBeenCalledWith(challenge.challengeId, 'totp', '123456');
+  });
+
+  it('offers the authenticator as with ["totp"] when the backend also lists passkeys', async () => {
+    mockVerify.mockResolvedValueOnce({ user });
+    const { onSignedIn } = renderStep({ methods: ['totp', 'webauthn'] });
+
+    expect(screen.getByText('mfa.challengeTitle')).toBeTruthy();
+    expect(screen.queryByText('mfa.passkeyOnly')).toBeNull();
+    // Recovery codes stay one tap away, as with ["totp"].
+    expect(screen.getByTestId('mfa-challenge-switch')).toBeTruthy();
     enterCode('123456');
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith({ user }));
@@ -123,6 +139,43 @@ describe('MfaChallengeStep', () => {
     expect(screen.queryByTestId('mfa-challenge-switch')).toBeNull();
   });
 
+  // methods: [] is a passkey-only account on a backend that can't run the passkey ceremony.
+  it('goes straight to a recovery code when the backend lists no method', async () => {
+    mockVerify.mockResolvedValueOnce({ user, recoveryCodesRemaining: 7 });
+    const { onSignedIn } = renderStep({ methods: [] });
+
+    expect(screen.getByText('mfa.recoveryCodeLabel')).toBeTruthy();
+    expect(screen.queryByText('mfa.codeLabel')).toBeNull();
+    expect(screen.queryByText('mfa.challengeIntro')).toBeNull();
+    expect(screen.queryByTestId('mfa-challenge-switch')).toBeNull();
+    enterCode('ABCDE-23456');
+
+    await waitFor(() =>
+      expect(onSignedIn).toHaveBeenCalledWith({ user, recoveryCodesRemaining: 7 })
+    );
+    expect(mockVerify).toHaveBeenCalledWith(challenge.challengeId, 'recovery', 'ABCDE23456');
+  });
+
+  // On a shared account the lock may come from someone else's codes; this person's code is fine.
+  it('says how long the account is locked and sends nothing more meanwhile', async () => {
+    mockVerify.mockRejectedValueOnce(
+      Object.assign(new Error('Too many requests.'), {
+        code: 'MFA_LOCKED',
+        isRateLimited: true,
+        retryAfter: 900,
+      })
+    );
+    const { onRestart, onSignedIn } = renderStep();
+
+    enterCode('123456');
+
+    expect(await screen.findByText('mfa.lockedFor:15')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('mfa-challenge-submit'));
+    expect(mockVerify).toHaveBeenCalledTimes(1);
+    expect(onRestart).not.toHaveBeenCalled();
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+
   it('goes back to the password on request', () => {
     const { onRestart } = renderStep();
 
@@ -130,5 +183,36 @@ describe('MfaChallengeStep', () => {
 
     expect(onRestart).toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the way back closed while a code is being checked', async () => {
+    let answer: (value: { user: typeof user }) => void = () => {};
+    mockVerify.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const { onRestart, onSignedIn, onBusyChange } = renderStep();
+
+    enterCode('123456');
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    fireEvent.press(screen.getByTestId('mfa-back-to-sign-in'));
+    expect(onRestart).not.toHaveBeenCalled();
+
+    await act(async () => answer({ user }));
+
+    expect(onSignedIn).toHaveBeenCalledWith({ user });
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  // The second step carries no session, so the global sign-out never sees this answer.
+  it('says the account is disabled and goes back to the password', async () => {
+    mockVerify.mockRejectedValueOnce(
+      new AuthError('Account is disabled', { code: 'ACCOUNT_DISABLED', status: 403 })
+    );
+    const { onRestart } = renderStep();
+
+    enterCode('123456');
+
+    await waitFor(() => expect(onRestart).toHaveBeenCalled());
+    expect(alertSpy).toHaveBeenCalledWith('session.accountDisabled', 'auth.accountDisabledMessage');
+    expect(screen.queryByText('Account is disabled')).toBeNull();
   });
 });

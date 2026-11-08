@@ -22,4 +22,14 @@ export const ExternalLinks = {
    * is CC BY 4.0, which requires the attribution to link here.
    */
   OPEN_METEO: 'https://open-meteo.com/',
+
+  /**
+   * The privacy policy on the website, one page per app language. French is the
+   * site's default language, so its page has no language prefix.
+   */
+  PRIVACY_POLICY: {
+    fr: 'https://protestbase.be/privacy/',
+    en: 'https://protestbase.be/en/privacy/',
+    nl: 'https://protestbase.be/nl/privacy/',
+  },
 } as const;

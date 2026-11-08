@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { StyleSheet, TurboModuleRegistry, View } from 'react-native';
 
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
+import { MAP_STYLE_URLS } from '@/constants/MapStyles';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { logger } from '@/utils/logger';
 import { getThemeColors } from '@/utils/themeColors';
-
-const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 
 // MapLibre throws at import when its native modules are missing (Expo Go, Jest).
 function loadMapComponents() {
@@ -46,7 +45,7 @@ export function EventMapPreview({ latitude, longitude }: EventMapPreviewProps) {
     <View aria-hidden style={styles.map}>
       <MapLibreMap
         style={styles.map}
-        mapStyle={OPENFREEMAP_STYLE}
+        mapStyle={MAP_STYLE_URLS[colorScheme]}
         attribution={true}
         logo={false}
         dragPan={false}

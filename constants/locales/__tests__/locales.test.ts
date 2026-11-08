@@ -536,4 +536,50 @@ describe('Locales', () => {
       }
     });
   });
+  // The terms must agree with the website's privacy policy (8 November 2026).
+  describe('Terms and Conditions', () => {
+    const locales = { en, fr, nl };
+
+    it('has the same keys in every language', () => {
+      const keys = (locale: Record<string, any>) => getAllKeys(locale.termsAndConditions);
+      expect(keys(fr)).toEqual(keys(en));
+      expect(keys(nl)).toEqual(keys(en));
+    });
+
+    it.each([
+      ['en', 'Last Updated: 8 November 2026'],
+      ['fr', 'Dernière mise à jour : 8 novembre 2026'],
+      ['nl', 'Laatst bijgewerkt: 8 november 2026'],
+    ] as const)('dates the %s version unambiguously', (locale, lastUpdated) => {
+      expect(locales[locale].termsAndConditions.lastUpdated).toBe(lastUpdated);
+    });
+
+    // Our servers see guests' IP addresses, and the app talks to Expo's update service and to
+    // OpenFreeMap: "no personal data" is no longer true.
+    it.each([
+      ['en', /do not collect any personal data/i],
+      ['fr', /ne collectons aucune donnée/i],
+      ['nl', /verzamelen geen persoonlijke gegevens/i],
+    ] as const)('no longer says in %s that guests share no personal data', (locale, claim) => {
+      expect(JSON.stringify(locales[locale].termsAndConditions)).not.toMatch(claim);
+    });
+
+    // The in-app report screen isn't built yet: reports go by e-mail.
+    it.each([
+      ['en', /directly through the App/i],
+      ['fr', /directement via l'Application/i],
+      ['nl', /direct via de App/i],
+    ] as const)('no longer promises in-app reporting in %s', (locale, claim) => {
+      expect(locales[locale].termsAndConditions.section3_2Bullet1).not.toMatch(claim);
+    });
+
+    it.each(['fr', 'nl'] as const)('translates the privacy link and its hints in %s', (locale) => {
+      const data = locales[locale];
+      expect(data.termsAndConditions.privacyPolicyLink).not.toBe(
+        en.termsAndConditions.privacyPolicyLink
+      );
+      expect(data.a11y.hints.openPrivacyPolicy).not.toBe(en.a11y.hints.openPrivacyPolicy);
+      expect(data.a11y.hints.sendEmail).not.toBe(en.a11y.hints.sendEmail);
+    });
+  });
 });

@@ -32,6 +32,11 @@ jest.mock('@/utils/logger', () => ({
   logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
+let mockLocalDataGeneration = 0;
+jest.mock('@/context/GlobalProvider', () => ({
+  useGlobalContext: () => ({ localDataGeneration: mockLocalDataGeneration }),
+}));
+
 // ============================================
 // Imports after mocks
 // ============================================
@@ -51,6 +56,7 @@ async function renderProvider(initialIds: string[] = []) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLocalDataGeneration = 0;
   mockFetchFollowedOrgIds.mockResolvedValue([]);
   mockWriteFollowedOrgIds.mockResolvedValue(undefined);
   mockFollowOnServer.mockResolvedValue(1);
@@ -64,6 +70,19 @@ describe('FollowedOrgsProvider', () => {
     expect(result.current.followedOrgIds).toEqual(['org-1', 'org-2']);
     expect(result.current.isFollowing('org-1')).toBe(true);
     expect(result.current.isFollowing('org-3')).toBe(false);
+  });
+
+  // The provider never remounts: without the reload, a sign-out's wipe left the previous
+  // person's follows on screen, and the next follow wrote them back to storage.
+  it('reloads the follows from storage after the device user data is wiped', async () => {
+    const view = await renderProvider(['org-1', 'org-2']);
+
+    mockFetchFollowedOrgIds.mockResolvedValue([]);
+    mockLocalDataGeneration = 1;
+    view.rerender({});
+
+    await waitFor(() => expect(view.result.current.followedOrgIds).toEqual([]));
+    expect(mockWriteFollowedOrgIds).not.toHaveBeenCalled();
   });
 
   it('optimistically adds a follow and persists it', async () => {

@@ -201,13 +201,22 @@ describe('eventFormatters', () => {
       expect(result.postal_code).toBe('1000');
     });
 
+    // The event page shows it; formatEventForDisplay copies fields one by one, so a missing
+    // line here would put the creating member's own name back on the page.
+    it("carries the organization's name, or null without one", () => {
+      const withOrganization = {
+        ...mockEvent,
+        organization_id: 'org-1',
+        organization_name: 'Climate Org',
+      };
+      expect(formatEventForDisplay(withOrganization, 'en').organization_name).toBe('Climate Org');
+      expect(formatEventForDisplay(mockEvent, 'en').organization_name).toBeNull();
+    });
+
     it('should format start date correctly in English', () => {
       const result = formatEventForDisplay(mockEvent, 'en');
 
-      // Should contain day of week and month (localized)
-      expect(result.start_date).toContain('Monday');
-      expect(result.start_date).toContain('July');
-      expect(result.start_date).toContain('14');
+      expect(result.start_date).toBe('Monday, July 14');
     });
 
     it('should format start time in 12-hour format for English', () => {
@@ -220,9 +229,8 @@ describe('eventFormatters', () => {
     it('should format event with French locale', () => {
       const result = formatEventForDisplay(mockEvent, 'fr');
 
-      // French formatting
-      expect(result.start_date).toContain('Lundi'); // Monday in French
-      expect(result.start_date).toContain('Juillet'); // July in French
+      // Day before a lowercase month, not "Lundi, Juillet 14"
+      expect(result.start_date).toBe('Lundi 14 juillet');
     });
 
     it('should format time in 24-hour format for French', () => {
@@ -237,9 +245,7 @@ describe('eventFormatters', () => {
     it('should format event with Dutch locale', () => {
       const result = formatEventForDisplay(mockEvent, 'nl');
 
-      // Dutch formatting
-      expect(result.start_date).toContain('Maandag'); // Monday in Dutch
-      expect(result.start_date).toContain('Juli'); // July in Dutch
+      expect(result.start_date).toBe('Maandag 14 juli');
     });
 
     it('should default to English for unsupported locale', () => {
@@ -329,8 +335,8 @@ describe('eventFormatters', () => {
 
       const result = formatEventForDisplay(multiDayEvent, 'fr');
 
-      expect(result.start_date).toContain('Juillet');
-      expect(result.end_date).toContain('Juillet');
+      expect(result.start_date).toBe('Mardi 15 juillet');
+      expect(result.end_date).toBe('17 juillet');
       // Time should be in 24-hour format
       expect(result.start_time).toMatch(/^\d{2}:\d{2}$/);
       expect(result.end_time).toMatch(/^\d{2}:\d{2}$/);
@@ -345,8 +351,8 @@ describe('eventFormatters', () => {
 
       const result = formatEventForDisplay(multiDayEvent, 'nl');
 
-      expect(result.start_date).toContain('Maart'); // March in Dutch
-      expect(result.end_date).toContain('Maart');
+      expect(result.start_date).toBe('Maandag 10 maart');
+      expect(result.end_date).toBe('12 maart');
     });
 
     it('should correctly format start and end dates on same day', () => {
@@ -627,36 +633,19 @@ describe('eventFormatters', () => {
     it('should format date and time in English', () => {
       const result = formatEventDateTime(testDateTime, 'en');
 
-      expect(result).toContain('Monday');
-      expect(result).toContain('July');
-      expect(result).toContain('14');
-      expect(result).toContain('at');
-      // Should have AM/PM format
-      expect(result).toMatch(/\d{1,2}:\d{2}\s?(AM|PM)/i);
+      expect(result).toBe('Monday July 14 at 4:30 PM');
     });
 
     it('should format date and time in French', () => {
       const result = formatEventDateTime(testDateTime, 'fr');
 
-      // French locale returns lowercase for day/month names
-      expect(result.toLowerCase()).toContain('lundi'); // Monday in French
-      expect(result.toLowerCase()).toContain('juillet'); // July in French
-      expect(result).toContain('14');
-      expect(result).toContain('à'); // "at" in French
-      // Should be 24-hour format
-      expect(result).toMatch(/\d{2}:\d{2}/);
+      expect(result).toBe('Lundi 14 juillet à 16:30');
     });
 
     it('should format date and time in Dutch', () => {
       const result = formatEventDateTime(testDateTime, 'nl');
 
-      // Dutch locale returns lowercase for day/month names
-      expect(result.toLowerCase()).toContain('maandag'); // Monday in Dutch
-      expect(result.toLowerCase()).toContain('juli'); // July in Dutch
-      expect(result).toContain('14');
-      expect(result).toContain('om'); // "at" in Dutch
-      // Should be 24-hour format
-      expect(result).toMatch(/\d{2}:\d{2}/);
+      expect(result).toBe('Maandag 14 juli om 16:30');
     });
 
     it('should default to English for unsupported locale', () => {
@@ -816,22 +805,22 @@ describe('eventFormatters', () => {
       expect(nl).toContain('om');
     });
 
-    it('should capitalize day and month in all locales', () => {
+    it('should capitalize the weekday in all locales and the month only in English', () => {
       const testDate = '2025-07-14T14:30:00Z';
 
       const en = formatEventDateTime(testDate, 'en');
       const fr = formatEventDateTime(testDate, 'fr');
       const nl = formatEventDateTime(testDate, 'nl');
 
-      // All should start with capital letter (day of week)
       expect(en.charAt(0)).toMatch(/[A-Z]/);
       expect(fr.charAt(0)).toMatch(/[A-Z]/);
       expect(nl.charAt(0)).toMatch(/[A-Z]/);
 
-      // All should have capitalized month
       expect(en).toContain('July');
-      expect(fr.toLowerCase()).toContain('juillet');
-      expect(nl.toLowerCase()).toContain('juli');
+      expect(fr).toContain('juillet');
+      expect(fr).not.toContain('Juillet');
+      expect(nl).toContain('juli');
+      expect(nl).not.toContain('Juli');
     });
 
     it('should use default locale (en) when called without locale parameter', () => {
@@ -1114,10 +1103,10 @@ describe('eventFormatters', () => {
       const frResult = formatEventDateTime(testDate, 'fr');
       const nlResult = formatEventDateTime(testDate, 'nl');
 
-      // All should have day of week, month, and day number
-      expect(enResult).toMatch(/\w+ \w+ \d{1,2}/);
-      expect(frResult).toMatch(/\w+ \w+ \d{1,2}/);
-      expect(nlResult).toMatch(/\w+ \w+ \d{1,2}/);
+      // Weekday, then month and day in each language's order
+      expect(enResult).toMatch(/^\w+ \w+ \d{1,2} /);
+      expect(frResult).toMatch(/^\w+ \d{1,2} \w+ /);
+      expect(nlResult).toMatch(/^\w+ \d{1,2} \w+ /);
 
       // All should have time component
       expect(enResult).toMatch(/\d{1,2}:\d{2}/);
@@ -1220,6 +1209,12 @@ describe('eventFormatters', () => {
       expect(multiDay.isMultiDay).toBe(true);
       expect(multiDay.start_time).toBe('All day');
       expect(multiDay.end_date).toBe('July 24');
+
+      const frMultiDay = formatEventForDisplay(
+        { ...allDayEvent, end_time: '2026-07-24T21:59:59.999Z' },
+        'fr'
+      );
+      expect(frMultiDay.end_date).toBe('24 juillet');
     });
 
     it('translates the label in all three locales', () => {
@@ -1253,6 +1248,14 @@ describe('eventFormatters', () => {
         expect(label).toContain('All day');
         expect(label).not.toContain('AM');
         expect(formatEventDateTimeLabel(midnightTimedEvent, 'en')).toContain('12:00 AM');
+      });
+
+      it('formatEventDateTimeLabel puts the day first in French and Dutch', () => {
+        expect(formatEventDateTimeLabel(allDayEvent, 'en')).toBe('Wednesday July 22 · All day');
+        expect(formatEventDateTimeLabel(allDayEvent, 'fr')).toBe(
+          'Mercredi 22 juillet · Toute la journée'
+        );
+        expect(formatEventDateTimeLabel(allDayEvent, 'nl')).toBe('Woensdag 22 juli · Hele dag');
       });
     });
 

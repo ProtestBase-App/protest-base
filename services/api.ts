@@ -17,6 +17,7 @@ import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { isNetworkError } from '@/utils/networkError';
 import { getInstalledAppVersion } from '@/utils/appVersion';
+import { getCurrentLocale } from '@/utils/i18n';
 
 // Mobile API key, sent as `x-api-key` on every request except the /app/config
 // bootstrap. Trimmed so a stray newline in the EAS env var can't 401 every
@@ -123,6 +124,22 @@ const api = axios.create({
   timeout: 10000,
 });
 
+/**
+ * The app's language (en, fr or nl), for the backend's notices and reset mail. Read per
+ * request so a language change applies at once. The header is optional, so failing to read
+ * it must never stop a request.
+ */
+export function appLanguage(): string | undefined {
+  try {
+    return getCurrentLocale();
+  } catch (error) {
+    logger.warn('[API] Could not read the app language', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 function isBootstrapPath(url: string | undefined): boolean {
   return (url ?? '').split('?')[0] === BOOTSTRAP_PATH;
 }
@@ -157,6 +174,12 @@ api.interceptors.request.use(
       config.headers['X-App-Version'] = appVersion;
     }
 
+    // Without it the backend writes its sign-in notices and reset mail in French.
+    const language = appLanguage();
+    if (language && !config.headers['Accept-Language']) {
+      config.headers['Accept-Language'] = language;
+    }
+
     // /app/config is served without a credential, so the version gate and
     // maintenance mode keep working even if a build ships a bad key.
     if (API_KEY && !isBootstrapPath(config.url)) {
@@ -172,8 +195,14 @@ api.interceptors.request.use(
   }
 );
 
-/** Why a session ended, so the alert can say so. `undefined` means it simply expired. */
-export type SessionEndReason = 'token_reuse' | 'session_replaced' | 'account_disabled';
+/**
+ * Why a session ended, so the alert can say so. `undefined` means it simply expired.
+ * `unreachable`: the refresh never got an answer (no response, a timeout or a 5xx, after its
+ * retries). The session still ends, since the backend may have rotated the token, but nothing
+ * says the user's data should go, so the device keeps it.
+ */
+export type SessionEndReason =
+  'token_reuse' | 'session_replaced' | 'account_disabled' | 'unreachable';
 
 let tokenExpirationCallback: ((reason?: SessionEndReason) => void) | null = null;
 
@@ -251,12 +280,16 @@ function isTransientRefreshFailure(error: unknown): boolean {
 }
 
 // Posts the refresh with plain axios: the instance's interceptors would recurse if the
-// refresh itself failed, so the API key and app version are attached here.
+// refresh itself failed, so the API key, app version and language are attached here.
 async function requestTokenRefresh(refreshToken: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const appVersion = getInstalledAppVersion();
   if (appVersion) {
     headers['X-App-Version'] = appVersion;
+  }
+  const language = appLanguage();
+  if (language) {
+    headers['Accept-Language'] = language;
   }
   if (API_KEY) {
     headers['x-api-key'] = API_KEY;
@@ -334,11 +367,13 @@ api.interceptors.response.use(
     // HTTP error responses from the server (4xx/5xx) get error-level logging
     // because they typically indicate something the client needs to investigate.
     const logAtLevel = isNetworkError(error) ? logger.warn : logger.error;
+    // The code only, never the body: a second-step answer carries a challenge id or a setup
+    // token, which is enough to finish someone's sign-in.
     logAtLevel(
       `[API] Response Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
       {
         status: error.response?.status,
-        data: error.response?.data,
+        code: error.response?.data?.code,
         message: error.message,
       }
     );
@@ -375,14 +410,20 @@ api.interceptors.response.use(
         originalRequest._retry = true;
         isRefreshing = true;
 
+        let refreshToken: string | null = null;
+        // Only a failure of the refresh request itself can be the network's.
+        let refreshRequestFailed = false;
         try {
-          const refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
+          refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
 
           if (!refreshToken) {
             throw new Error('No refresh token available');
           }
 
-          const response = await requestTokenRefresh(refreshToken);
+          const response = await requestTokenRefresh(refreshToken).catch((error: unknown) => {
+            refreshRequestFailed = true;
+            throw error;
+          });
 
           const responseData = response?.data?.data;
           if (!responseData?.accessToken || !responseData?.refreshToken) {
@@ -391,14 +432,17 @@ api.interceptors.response.use(
 
           const { accessToken, refreshToken: newRefreshToken } = responseData;
 
-          await SecureStore.setItemAsync(
-            SECURE_STORE_KEYS.ACCESS_TOKEN,
-            accessToken,
-            SECURE_STORE_OPTIONS
-          );
+          // The refresh token first: if the app dies between the two writes, the next refresh
+          // uses the new one. With the old one it would be a replay, and once the 30 s grace
+          // has passed the backend ends every session of the account.
           await SecureStore.setItemAsync(
             SECURE_STORE_KEYS.REFRESH_TOKEN,
             newRefreshToken,
+            SECURE_STORE_OPTIONS
+          );
+          await SecureStore.setItemAsync(
+            SECURE_STORE_KEYS.ACCESS_TOKEN,
+            accessToken,
             SECURE_STORE_OPTIONS
           );
 
@@ -416,10 +460,25 @@ api.interceptors.response.use(
             return Promise.reject(rateLimitError);
           }
 
+          // Signed in again while this refresh was failing: the stored session is a newer one,
+          // and ending it would sign that out too. These requests belong to the old session, so
+          // they fail instead of being retried with the new one's tokens.
+          const storedRefreshToken = await SecureStore.getItemAsync(
+            SECURE_STORE_KEYS.REFRESH_TOKEN
+          );
+          if (storedRefreshToken && storedRefreshToken !== refreshToken) {
+            processQueue(refreshError);
+            return Promise.reject(refreshError);
+          }
+
           // Clear queued requests without rejecting — the global handler will navigate away
           failedQueue = [];
 
-          await endSession(sessionEndReason((refreshError as HttpErrorLike)?.response?.data?.code));
+          await endSession(
+            refreshRequestFailed && isTransientRefreshFailure(refreshError)
+              ? 'unreachable'
+              : sessionEndReason((refreshError as HttpErrorLike)?.response?.data?.code)
+          );
 
           // Return a never-settling promise to prevent error propagation to screens
           // The global handler navigates away, unmounting all callers

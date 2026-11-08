@@ -1,4 +1,14 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   Keyboard,
   Platform,
@@ -14,8 +24,10 @@ import {
 import {
   BottomSheetBackdrop,
   BottomSheetBackdropProps,
+  BottomSheetFooter,
   BottomSheetModal,
   BottomSheetScrollView,
+  type BottomSheetFooterProps,
   type BottomSheetScrollViewMethods,
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,12 +51,44 @@ export interface FiltersSheetShellProps {
   title: string;
   /** Body content, rendered inside the keyboard-aware ScrollView. */
   children: React.ReactNode;
+  /** Pinned to the bottom of the sheet, above the home indicator, e.g. FiltersSheetFooter. */
+  footer?: React.ReactNode;
   testID?: string;
 }
 
 // gorhom resizes the sheet over several frames once the keyboard is up; the
 // settled reveal waits until the sheet layout has been still this long.
 const REVEAL_SETTLE_MS = 120;
+
+interface PinnedFooterState {
+  footer: React.ReactNode;
+  onClose: () => void;
+  bottomInset: number;
+}
+
+interface PinnedFooterStore {
+  get: () => PinnedFooterState;
+  set: (next: PinnedFooterState) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+function createPinnedFooterStore(initial: PinnedFooterState): PinnedFooterStore {
+  let state = initial;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set: (next) => {
+      state = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
 
 interface FiltersSheetKeyboardContextValue {
   /** Scroll the focused input, plus room for its dropdown, into the visible area. */
@@ -72,18 +116,43 @@ export function useFiltersSheetKeyboard(): FiltersSheetKeyboardContextValue {
  *
  * Keyboard: the sheet rides up above the soft keyboard and the body keeps the
  * focused input, plus room for its dropdown, inside the visible area.
+ *
+ * The footer is pinned: it stays on screen, above the home indicator or the
+ * keyboard, however long the body is.
  */
 export function FiltersSheetShell({
   visible,
   onClose,
   title,
   children,
+  footer,
   testID,
 }: FiltersSheetShellProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const hasFooter = footer !== undefined;
+  const footerBottomInset = Math.max(insets.bottom, Spacing.lg);
+
+  // gorhom memoizes its footer container: a footerComponent with a new identity
+  // would remount the footer, and drop screen-reader focus, on every chip tap.
+  // The component stays stable and reads the latest footer from this store.
+  const [footerStore] = useState(() =>
+    createPinnedFooterStore({ footer, onClose, bottomInset: footerBottomInset })
+  );
+  useLayoutEffect(() => {
+    footerStore.set({ footer, onClose, bottomInset: footerBottomInset });
+  }, [footerStore, footer, onClose, footerBottomInset]);
+
+  // The pinned footer covers the bottom of the scroll viewport.
+  const footerHeightRef = useRef(0);
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <FiltersSheetPinnedFooter {...props} store={footerStore} heightRef={footerHeightRef} />
+    ),
+    [footerStore]
+  );
 
   const sheetRef = useRef<BottomSheetModal>(null);
   // Only dismiss a sheet that was actually presented, so the first mount with
@@ -115,6 +184,11 @@ export function FiltersSheetShell({
         appearsOnIndex={0}
         disappearsOnIndex={-1}
         pressBehavior="close"
+        // VoiceOver activates an element by tapping its centre, which lands on
+        // the sheet once it covers the middle of the screen. Close and the
+        // escape gesture leave the sheet instead.
+        accessible={Platform.OS !== 'ios'}
+        accessibilityRole={Platform.OS === 'ios' ? 'none' : undefined}
       />
     ),
     []
@@ -124,6 +198,9 @@ export function FiltersSheetShell({
     <BottomSheetModal
       ref={sheetRef}
       onDismiss={handleDismiss}
+      // gorhom makes the whole sheet one accessible element by default, which on
+      // iOS hides every chip and button in it from VoiceOver.
+      accessible={false}
       enableDynamicSizing
       // Preserve the old 78% max-height clamp; the sheet shrinks to its content
       // below that and the inner ScrollView scrolls once it hits the cap.
@@ -145,23 +222,83 @@ export function FiltersSheetShell({
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustPan"
       topInset={insets.top}
+      footerComponent={hasFooter ? renderFooter : undefined}
     >
-      <FiltersSheetBody title={title} onClose={onClose} testID={testID}>
+      <FiltersSheetBody
+        title={title}
+        onClose={onClose}
+        hasFooter={hasFooter}
+        footerHeightRef={footerHeightRef}
+        testID={testID}
+      >
         {children}
       </FiltersSheetBody>
     </BottomSheetModal>
   );
 }
 
+interface FiltersSheetPinnedFooterProps extends BottomSheetFooterProps {
+  store: PinnedFooterStore;
+  heightRef: React.RefObject<number>;
+}
+
+/** The footer, on the sheet's bottom edge or on top of the keyboard. */
+function FiltersSheetPinnedFooter({
+  animatedFooterPosition,
+  store,
+  heightRef,
+}: FiltersSheetPinnedFooterProps) {
+  const colorScheme = useColorScheme();
+  const themeColors = getThemeColors(colorScheme);
+  const { footer, onClose, bottomInset } = useSyncExternalStore(store.subscribe, store.get);
+
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      heightRef.current = event.nativeEvent.layout.height;
+    },
+    [heightRef]
+  );
+
+  return (
+    <BottomSheetFooter animatedFooterPosition={animatedFooterPosition}>
+      <View
+        testID="filters-sheet-footer"
+        onLayout={handleLayout}
+        // Outside the body, so focus on Reset or Apply needs its own escape.
+        onAccessibilityEscape={onClose}
+        style={[
+          styles.pinnedFooter,
+          {
+            backgroundColor: themeColors.cardBackground,
+            borderTopColor: themeColors.separator,
+            paddingBottom: bottomInset,
+          },
+        ]}
+      >
+        {footer}
+      </View>
+    </BottomSheetFooter>
+  );
+}
+
 interface FiltersSheetBodyProps {
   title: string;
   onClose: () => void;
+  hasFooter: boolean;
+  footerHeightRef: React.RefObject<number>;
   children: React.ReactNode;
   testID?: string;
 }
 
 /** Scrollable sheet content; gorhom mounts it per presentation. */
-function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBodyProps) {
+function FiltersSheetBody({
+  title,
+  onClose,
+  hasFooter,
+  footerHeightRef,
+  children,
+  testID,
+}: FiltersSheetBodyProps) {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
 
@@ -176,7 +313,7 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
     const input = TextInput.State.currentlyFocusedInput();
     const content = contentRef.current;
     const viewport = scrollRef.current?.getNativeScrollRef?.();
-    const viewportHeight = viewportHeightRef.current;
+    const viewportHeight = viewportHeightRef.current - (hasFooter ? footerHeightRef.current : 0);
     if (!input || !content || !viewport || viewportHeight <= 0) return;
 
     input.measureLayout(
@@ -204,7 +341,7 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
       // The focused input lives outside this sheet: nothing to reveal.
       () => {}
     );
-  }, []);
+  }, [hasFooter, footerHeightRef]);
 
   const scheduleReveal = useCallback(() => {
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
@@ -254,10 +391,18 @@ function FiltersSheetBody({ title, onClose, children, testID }: FiltersSheetBody
         onContentSizeChange={scheduleReveal}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        // Pads the content by the footer's height, so its end scrolls clear of
+        // the footer and the dynamic size counts the footer in.
+        enableFooterMarginAdjustment={hasFooter}
       >
         {/* Inputs are measured against this view: plain layout, unaffected by
             the sheet's animated position or the scroll offset. */}
-        <View ref={contentRef} collapsable={false} style={styles.content}>
+        <View
+          ref={contentRef}
+          collapsable={false}
+          onAccessibilityEscape={onClose}
+          style={[styles.content, hasFooter && styles.contentAboveFooter]}
+        >
           <View style={styles.headerRow}>
             <ThemedText style={styles.title}>{title}</ThemedText>
             <Pressable
@@ -388,6 +533,14 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: Spacing['2xl'],
   },
+  contentAboveFooter: {
+    paddingBottom: Spacing.sm,
+  },
+  pinnedFooter: {
+    paddingHorizontal: 20,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   flex: {
     flex: 1,
   },
@@ -457,7 +610,6 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginTop: Spacing.lg,
   },
   resetButton: {
     flex: 1,

@@ -33,6 +33,7 @@ import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
+import { calendarNeedsPermission } from '@/utils/permissionHelpers';
 import { useNotificationPermissionStatus } from '@/hooks/useNotificationPermissionStatus';
 import { resolveEventCityLabel } from '@/utils/eventLocation';
 import { EventMapPreview } from '@/components/EventMapPreview';
@@ -153,7 +154,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   const org = event.organization_id
     ? organizations.find((o) => o.$id === event.organization_id)
     : null;
-  const primaryOrgName = org?.Name || event.organizer_name;
+  // organizer_name is the creating member's own account name, so it only stands in for an
+  // event with no organization. The organization list is often not loaded on this screen.
+  const primaryOrgName = event.organization_id
+    ? event.organization_name || org?.Name || ''
+    : event.organizer_name;
 
   // Tail of the calendar card's time line. An all-day event has no end clock
   // time, so it keeps only the date range when it spans several days — and
@@ -182,43 +187,47 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     allDay: boolean
   ) => {
     try {
-      const { status } = await Calendar.requestCalendarPermissionsAsync();
-      if (status === 'granted') {
-        const startDateObj = parseAsUTC(startDate);
-        if (isNaN(startDateObj.getTime())) {
-          Alert.alert(t('common.error'), t('common.invalidDateError'));
+      // Only iOS 16 needs calendar access for the add-event screen. Asking anywhere else
+      // would request access the app never uses (see calendarNeedsPermission).
+      if (calendarNeedsPermission()) {
+        const { status } = await Calendar.requestCalendarPermissionsAsync();
+        if (status !== 'granted') {
+          alert(`${t('calendar.permissionsNotGranted')}. ${t('calendar.permissionsMessage')}`);
           return;
         }
-        let endDateObj: Date;
-        if (!endDate) {
-          endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
-        } else {
-          endDateObj = parseAsUTC(endDate);
-          if (isNaN(endDateObj.getTime())) {
-            // An all-day event always carries a real end (23:59:59.999 of its
-            // last day), so this invented 2h window is unreachable for one.
-            endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
-          }
-        }
-        const result = await Calendar.createEventInCalendarAsync({
-          title,
-          startDate: startDateObj,
-          endDate: endDateObj,
-          timeZone,
-          // Without this an all-day event exports as a 00:00–23:59 busy bar
-          // instead of the day-header entry the OS has for exactly this case.
-          allDay,
-          location: [address, postalCode, city, countryLabel].filter(Boolean).join(', '),
-          notes,
-        });
-        if (
-          result.action === Calendar.CalendarDialogResultActions.saved ||
-          result.action === Calendar.CalendarDialogResultActions.done
-        ) {
-          alert(t('calendar.eventSaved'));
-        }
+      }
+      const startDateObj = parseAsUTC(startDate);
+      if (isNaN(startDateObj.getTime())) {
+        Alert.alert(t('common.error'), t('common.invalidDateError'));
+        return;
+      }
+      let endDateObj: Date;
+      if (!endDate) {
+        endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
       } else {
-        alert(`${t('calendar.permissionsNotGranted')}. ${t('calendar.permissionsMessage')}`);
+        endDateObj = parseAsUTC(endDate);
+        if (isNaN(endDateObj.getTime())) {
+          // An all-day event always carries a real end (23:59:59.999 of its
+          // last day), so this invented 2h window is unreachable for one.
+          endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
+        }
+      }
+      const result = await Calendar.createEventInCalendarAsync({
+        title,
+        startDate: startDateObj,
+        endDate: endDateObj,
+        timeZone,
+        // Without this an all-day event exports as a 00:00–23:59 busy bar
+        // instead of the day-header entry the OS has for exactly this case.
+        allDay,
+        location: [address, postalCode, city, countryLabel].filter(Boolean).join(', '),
+        notes,
+      });
+      if (
+        result.action === Calendar.CalendarDialogResultActions.saved ||
+        result.action === Calendar.CalendarDialogResultActions.done
+      ) {
+        alert(t('calendar.eventSaved'));
       }
     } catch {
       alert(t('calendar.openError'));
@@ -229,8 +238,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     if (isAddingToCalendar) return;
     setIsAddingToCalendar(true);
     try {
-      const currentPermission = await Calendar.getCalendarPermissionsAsync();
-      if (currentPermission.status === 'undetermined') {
+      // The explanation before the system prompt only applies where there is a prompt.
+      const currentPermission = calendarNeedsPermission()
+        ? await Calendar.getCalendarPermissionsAsync()
+        : null;
+      if (currentPermission?.status === 'undetermined') {
         Alert.alert(
           t('permissions.calendarPreTitle'),
           t('permissions.calendarPreMessage'),

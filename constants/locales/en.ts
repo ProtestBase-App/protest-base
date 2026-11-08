@@ -336,15 +336,22 @@ const en: LocaleData = {
       one: '1 attempt left.',
       other: '{{count}} attempts left.',
     },
-    blocked: 'Too many incorrect codes. Try again later.',
+    // The lock is on the account, so on a shared account someone else's codes can cause it.
+    blocked:
+      'This account is temporarily locked after too many incorrect codes, which may have come from someone else who uses it. Try again later.',
     lockedFor: {
-      one: 'Too many incorrect codes. Try again in 1 minute.',
-      other: 'Too many incorrect codes. Try again in {{count}} minutes.',
+      one: 'This account is locked after too many incorrect codes, which may have come from someone else who uses it. Try again in 1 minute.',
+      other:
+        'This account is locked after too many incorrect codes, which may have come from someone else who uses it. Try again in {{count}} minutes.',
     },
     expiredTitle: 'Sign-in expired',
     expiredMessage: 'This sign-in took too long. Sign in again.',
+    setupExpiredMessage:
+      "This setup took too long. Sign in again to start over. If you added ProtestBase to your authenticator app, delete that entry: its codes won't work.",
+    alreadyEnrolledTitle: 'Already set up',
+    // Codes from an entry that was never confirmed count as wrong, and enough of them lock the account.
     alreadyEnrolledMessage:
-      'Two-step verification is already set up for this account. Sign in again.',
+      "Two-step verification was just set up for this account, perhaps by someone else who uses it. Sign in again with a code from the authenticator app used for that setup, or with a recovery code. If you added ProtestBase to your app here, delete that entry: its codes won't work.",
     recoveryCodesLowTitle: 'Few recovery codes left',
     recoveryCodesLow: {
       zero: "You've used your last recovery code. From now on, you can only sign in with your authenticator app.",
@@ -352,9 +359,16 @@ const en: LocaleData = {
       other:
         "You have {{count}} recovery codes left. Once they're used, you can only sign in with your authenticator app.",
     },
+    // For an account whose only other method is a passkey, which the app can't use.
+    recoveryCodesLowPasskey: {
+      zero: "You've used your last recovery code, and this app can't use your passkey yet. To sign in here again, create new recovery codes on the ProtestBase website.",
+      one: "You have 1 recovery code left, and this app can't use your passkey yet. Create new recovery codes on the ProtestBase website before you use it.",
+      other:
+        "You have {{count}} recovery codes left, and this app can't use your passkey yet. Create new recovery codes on the ProtestBase website before they run out.",
+    },
     enrollTitle: 'Set up two-step verification',
     enrollIntro:
-      'ProtestBase now asks for a code from an authenticator app when you sign in. Set it up once on this phone:',
+      "ProtestBase now asks for a code from an authenticator app when you sign in. Set it up once on this phone. If your app already has a ProtestBase entry for this account from an earlier setup, delete it: its codes won't work.",
     stepAddTitle: '1. Add ProtestBase to your authenticator app',
     openAuthenticator: 'Add to authenticator app',
     openAuthenticatorHelp:
@@ -810,6 +824,10 @@ const en: LocaleData = {
     // Error messages for data loading
     postalCodeLoadError: 'Failed to load postal codes. Please try again.',
     imagePickerError: 'Failed to select image. Please try again.',
+    imageProcessingError: {
+      one: "We couldn't process one photo, so it wasn't added. Please try another one.",
+      other: "We couldn't process {{count}} photos, so they weren't added. Please try other ones.",
+    },
     maxImagesReached: 'You can add up to {{max}} images.',
   },
 
@@ -1064,6 +1082,9 @@ const en: LocaleData = {
     expired: 'Session Expired',
     expiredMessage: 'Your session has expired. Please sign in again to continue.',
     signInAgain: 'Sign In Again',
+    unreachable: 'Signed Out',
+    unreachableMessage:
+      "ProtestBase couldn't be reached to keep you signed in. Your drafts and saved events are still on this phone. Sign in again when you're back online.",
     securityAlert: 'Security Alert',
     securityAlertMessage: 'Your session was terminated for security reasons. Please sign in again.',
     signedInElsewhere: 'Signed In on Another Device',
@@ -1179,7 +1200,7 @@ const en: LocaleData = {
   // ============================================
   termsAndConditions: {
     title: 'Terms and Conditions for ProtestBase',
-    lastUpdated: 'Last Updated: 21/04/2025',
+    lastUpdated: 'Last Updated: 8 November 2026',
 
     // Introduction
     intro1:
@@ -1214,12 +1235,13 @@ const en: LocaleData = {
       "If you're using ProtestBase as a guest (without logging in), here's what you need to know:",
     section3_1Title: '3.1. Data Privacy',
     section3_1Bullet1:
-      'We respect your privacy. We do not collect any personal data from users who do not log in.',
+      "We respect your privacy. You don't need an account, and we don't ask for your name, e-mail address or location to browse events.",
     section3_1Bullet2:
-      'Any protests you save or interact with will only be stored locally on your device.',
+      'The protests you save, like or follow are stored on your device. Our Privacy Policy explains exactly what reaches our servers and why.',
+    privacyPolicyLink: 'Read our Privacy Policy',
     section3_2Title: '3.2. Reporting Events or Organisations',
     section3_2Bullet1:
-      'If you come across an event or organisation that violates local laws or organises unsafe events, you can report it directly through the App.',
+      'If you come across an event or organisation that violates local laws or organises unsafe events, you can report it to us by e-mail at:',
     section3_2Bullet2:
       'We will review all reports and take appropriate action, which may include removing the event or organisation from the App.',
     section3_3Title: '3.3. Your Responsibility',
@@ -1240,7 +1262,7 @@ const en: LocaleData = {
       'We may request additional information to verify that your organisation is legitimate.',
     section4_2Title: '4.2. Data Privacy for Organisations',
     section4_2Bullet1:
-      'Unlike guest users, organisations do not have the same level of privacy because we need to verify your identity and ensure the legitimacy of your organisation.',
+      'To check that your organisation is legitimate, we need some information about you and your organisation. Our Privacy Policy explains what we keep, for how long, and how to delete your account.',
     section4_2Bullet2:
       'By creating an account, you agree to provide accurate and up-to-date information about your organisation.',
     section4_3Title: '4.3. Responsibility for Content',
@@ -1910,6 +1932,8 @@ const en: LocaleData = {
       manageEvent: 'Opens the actions for this event',
       openSettings: 'Opens the app settings on your device',
       openExternalLink: 'Opens the link outside the app',
+      openPrivacyPolicy: 'Opens the privacy policy in a browser',
+      sendEmail: 'Opens your e-mail app to write to us',
       zoomInMap: 'Zooms in on the map',
       zoomOutMap: 'Zooms out on the map',
       selectOnMap: 'Selects this event on the map',

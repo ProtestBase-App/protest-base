@@ -1,7 +1,7 @@
 {
   "name": "protest-base",
   "main": "expo-router/entry",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "scripts": {
     "start": "expo start",
     "start:mcp": "EXPO_UNSTABLE_MCP_SERVER=1 expo start",
@@ -23,7 +23,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "5.2.14",
-    "@maplibre/maplibre-react-native": "11.3.10",
+    "@maplibre/maplibre-react-native": "11.5.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",
     "axios": "^1.16.0",

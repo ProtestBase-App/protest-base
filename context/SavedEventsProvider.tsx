@@ -75,8 +75,14 @@ interface SavedEventsContextType {
 const SavedEventsContext = createContext<SavedEventsContextType | undefined>(undefined);
 
 export function SavedEventsProvider({ children }: { children: ReactNode }) {
-  const { eventsCache, eventsLoading, upsertEventInCache, userLanguage, isLogged } =
-    useGlobalContext();
+  const {
+    eventsCache,
+    eventsLoading,
+    upsertEventInCache,
+    userLanguage,
+    isLogged,
+    localDataGeneration,
+  } = useGlobalContext();
   const [savedEventIds, setSavedEventIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -198,6 +204,24 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
   // re-schedule the previous user's reminders. clearAuthState wipes storage
   // BEFORE flipping isLogged, so re-reading here yields the post-wipe truth.
   // Guests (never logged in) see no true→false transition and are unaffected.
+  // The same reload when another account's data is wiped at sign-in (claimLocalData), which
+  // happens while signed in, so no isLogged change marks it.
+  const generationRef = useRef(localDataGeneration);
+  useEffect(() => {
+    if (generationRef.current === localDataGeneration) return;
+    generationRef.current = localDataGeneration;
+    fetchSavedEntriesLocally()
+      .then((entries) => {
+        if (!isMountedRef.current) return;
+        setSavedEventIds(entries.map((e) => e.id));
+      })
+      .catch((error) => {
+        logger.warn('[SavedEvents] reload after a wipe failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }, [localDataGeneration]);
+
   const wasLoggedRef = useRef(false);
   useEffect(() => {
     const wasLogged = wasLoggedRef.current;

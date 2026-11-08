@@ -34,6 +34,13 @@ jest.mock('expo-calendar/legacy', () => ({
   },
 }));
 
+// Only iOS 16 asks for calendar access before the add-event screen; each test says which case it is.
+const mockCalendarNeedsPermission = jest.fn(() => true);
+jest.mock('@/utils/permissionHelpers', () => ({
+  ...jest.requireActual('@/utils/permissionHelpers'),
+  calendarNeedsPermission: () => mockCalendarNeedsPermission(),
+}));
+
 jest.mock('@/context/PostalCodeProvider', () => ({
   usePostalCodes: jest.fn(() => ({
     getSubMunicipalityName: jest.fn(() => 'Brussels'),
@@ -311,7 +318,33 @@ describe('EventDetailed', () => {
   });
 });
 
-describe('EventDetailed — calendar integration', () => {
+describe('EventDetailed — calendar integration without a permission (Android, iOS 17+)', () => {
+  beforeEach(() => mockCalendarNeedsPermission.mockReturnValue(false));
+  afterEach(() => {
+    mockCalendarNeedsPermission.mockReturnValue(true);
+    jest.clearAllMocks();
+  });
+
+  it('opens the add-event screen without asking for calendar access', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    (Calendar.createEventInCalendarAsync as jest.Mock).mockResolvedValue({ action: 'saved' });
+
+    render(<EventDetailed {...defaultProps} />);
+    await act(async () => {
+      fireEvent.press(screen.getByText('March 15, 2025'));
+    });
+
+    expect(Calendar.getCalendarPermissionsAsync).not.toHaveBeenCalled();
+    expect(Calendar.requestCalendarPermissionsAsync).not.toHaveBeenCalled();
+    expect(Calendar.createEventInCalendarAsync).toHaveBeenCalledTimes(1);
+    // No explanation dialog either: there is no system prompt to explain.
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+});
+
+describe('EventDetailed — calendar integration (iOS 16, which asks for access)', () => {
+  beforeEach(() => mockCalendarNeedsPermission.mockReturnValue(true));
   afterEach(() => jest.clearAllMocks());
 
   it('opens pre-permission dialog when calendar permission is undetermined', async () => {
@@ -728,14 +761,37 @@ describe('EventDetailed — co-organizers rendering', () => {
     expect(screen.getByText('Climate Org')).toBeTruthy();
   });
 
-  it('falls back to organizer_name when no organization matches', () => {
-    const noOrgEvent = {
+  // organizer_name is the creating member's own account name. A guest on a fresh install has
+  // no organization list, so the event's organization_name is what names the organization.
+  it("shows the event's organization_name when the organization list doesn't have it", () => {
+    const orgEvent = {
       ...mockEvent,
       organization_id: 'unknown-org',
+      organization_name: 'Renamed Org',
       organizer_name: 'Personal Organizer',
     };
-    render(<EventDetailed {...defaultProps} event={noOrgEvent} />);
-    expect(screen.getByText('Personal Organizer')).toBeTruthy();
+    render(<EventDetailed {...defaultProps} event={orgEvent} />);
+    expect(screen.getByText('Renamed Org')).toBeTruthy();
+    expect(screen.queryByText('Personal Organizer')).toBeNull();
+  });
+
+  it('prefers organization_name over the organization list', () => {
+    const orgEvent = { ...mockEvent, organization_id: 'org-1', organization_name: 'Renamed Org' };
+    render(<EventDetailed {...defaultProps} event={orgEvent} />);
+    expect(screen.getByText('Renamed Org')).toBeTruthy();
+    expect(screen.queryByText('Climate Org')).toBeNull();
+  });
+
+  it("never shows the member's own name for an event that has an organization", () => {
+    const noOrgNameEvent = {
+      ...mockEvent,
+      organization_id: 'unknown-org',
+      organization_name: null,
+      organizer_name: 'Personal Organizer',
+    };
+    render(<EventDetailed {...defaultProps} event={noOrgNameEvent} />);
+    expect(screen.queryByText('Personal Organizer')).toBeNull();
+    expect(screen.queryByTestId('event-organizer-0')).toBeNull();
   });
 
   it('renders without organization_id', () => {

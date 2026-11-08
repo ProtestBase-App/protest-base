@@ -16,6 +16,7 @@ import {
   clearEventDraft,
   hasEventDraft,
   clearAllUserData,
+  claimLocalData,
   getHomeArea,
   setHomeArea,
   clearHomeArea,
@@ -271,6 +272,51 @@ describe('clearAllUserData', () => {
     expect(secureStoreMem.has(SECURE_LIST_KEYS.SAVED_EVENT_IDS)).toBe(false);
     expect(secureStoreMem.has(SECURE_LIST_KEYS.LIKED_EVENT_IDS)).toBe(false);
     expect(secureStoreMem.has(SECURE_LIST_KEYS.FOLLOWED_ORG_IDS)).toBe(false);
+  });
+
+  it('also forgets whose data it was, with the drafts', async () => {
+    await clearAllUserData();
+
+    const removedKeys = (AsyncStorage.multiRemove as jest.Mock).mock.calls[0][0] as string[];
+    expect(removedKeys).toEqual(
+      expect.arrayContaining([
+        STORAGE_KEYS.LOCAL_DATA_OWNER,
+        STORAGE_KEYS.EVENT_DRAFT,
+        STORAGE_KEYS.TEMPLATE_DRAFT,
+      ])
+    );
+  });
+});
+
+// A sign-out the network forced keeps the signed-in account's data on the phone; whoever signs
+// in next must not inherit it unless it is the same account.
+describe('claimLocalData', () => {
+  it('keeps a guest’s data, which becomes the account’s', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(claimLocalData('user-a')).resolves.toBe(false);
+
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(STORAGE_KEYS.LOCAL_DATA_OWNER, 'user-a');
+  });
+
+  it('keeps the data when the same account signs in again', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('user-a');
+
+    await expect(claimLocalData('user-a')).resolves.toBe(false);
+
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+  });
+
+  it('wipes another account’s data before taking it over', async () => {
+    secureStoreMem.set(SECURE_LIST_KEYS.SAVED_EVENT_IDS, JSON.stringify([{ id: 'a', endsAt: 1 }]));
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce('user-a');
+
+    await expect(claimLocalData('user-b')).resolves.toBe(true);
+
+    expect(AsyncStorage.multiRemove).toHaveBeenCalled();
+    expect(secureStoreMem.has(SECURE_LIST_KEYS.SAVED_EVENT_IDS)).toBe(false);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(STORAGE_KEYS.LOCAL_DATA_OWNER, 'user-b');
   });
 });
 

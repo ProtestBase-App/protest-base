@@ -37,6 +37,9 @@ export const STORAGE_KEYS = {
   TEMPLATES_CACHE: 'templatesCache',
   TEMPLATES_CACHE_TIMESTAMP: 'templatesCacheTimestamp',
   USER_EVENT_COUNTS: 'userEventCounts',
+  // The account the user data above belongs to. A sign-out the network forced keeps that data,
+  // so the next sign-in by someone else must clear it first (localStorageService.claimLocalData).
+  LOCAL_DATA_OWNER: 'localDataOwner',
   // Public events snapshot for stale-while-revalidate cold-start paint. Like
   // HOME_AREA below, it holds only public data (explore/maps/calendar work
   // logged-out), so it is deliberately NOT in USER_DATA_KEYS and survives logout.

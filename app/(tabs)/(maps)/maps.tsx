@@ -29,6 +29,7 @@ import { getCategoryColors, getDisplayCategory } from '@/constants/CategoryColor
 import { Spacing, Typography } from '@/constants/DesignTokens';
 import { eventCategories } from '@/constants/EventCategories';
 import { homeAreaZoomForToken } from '@/constants/HomeAreaCentroids';
+import { MAP_STYLE_URLS } from '@/constants/MapStyles';
 import { useGlobalContext } from '@/context/GlobalProvider';
 import { useHomeArea } from '@/context/HomeAreaProvider';
 import { useSavedEvents } from '@/context/SavedEventsProvider';
@@ -82,8 +83,6 @@ if (TurboModuleRegistry.get('MLRNMapViewModule')) {
 } else {
   logger.info('[MapsTab] MapLibre native module not available — map hidden');
 }
-
-const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 
 // Default camera: Brussels. The app never uses geolocation, so this is the
 // only recentering anchor (product constraint — no locate-me affordance).
@@ -437,7 +436,7 @@ export default function MapsScreen() {
       <MapLibreMap
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        mapStyle={OPENFREEMAP_STYLE}
+        mapStyle={MAP_STYLE_URLS[colorScheme]}
         logo={false}
         attribution={true}
         attributionPosition={{ top: insets.top + 104, right: 8 }}

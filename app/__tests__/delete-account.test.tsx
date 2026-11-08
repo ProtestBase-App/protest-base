@@ -14,7 +14,8 @@ jest.mock('@/services/organizer.service', () => ({
 import React from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import { renderWithProviders, fireEvent, waitFor, createMockUser } from '@/test-utils/render';
+import { isHiddenFromAccessibility } from '@testing-library/react-native';
+import { act, renderWithProviders, fireEvent, waitFor, createMockUser } from '@/test-utils/render';
 import DeleteAccountScreen from '@/app/(tabs)/(more)/delete-account';
 import { deleteAccount } from '@/services/auth.service';
 import { reauthenticate } from '@/services/mfa.service';
@@ -24,6 +25,9 @@ import { t } from '@/utils/i18n';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 
 const mockMemberCount = getOrganizationMemberCount as jest.Mock;
+// What axios rejects with when the request never reaches the server.
+const networkError = () =>
+  Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' });
 
 describe('Delete Account Screen', () => {
   beforeEach(() => {
@@ -64,6 +68,22 @@ describe('Delete Account Screen', () => {
       expect(getByText(/account.deleteWarningItems.loginInfo/)).toBeTruthy();
       expect(getByText(/account.deleteWarningItems.accountInfo/)).toBeTruthy();
       expect(await findByText(/account.deleteImpact.ownContent/)).toBeTruthy();
+    });
+
+    it('sets each bullet glyph apart from its text, hidden from screen readers', () => {
+      const mockUser = createMockUser();
+      const { getByText, getAllByText } = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: mockUser },
+        },
+      });
+
+      // Its own element, so wrapped lines align under the text, not the glyph.
+      const text = getByText('account.deleteWarningItems.loginInfo');
+      expect(isHiddenFromAccessibility(text)).toBe(false);
+      const glyphs = getAllByText('•', { includeHiddenElements: true });
+      expect(glyphs.length).toBeGreaterThanOrEqual(2);
+      glyphs.forEach((glyph) => expect(isHiddenFromAccessibility(glyph)).toBe(true));
     });
 
     it('renders the email confirmation field', () => {
@@ -191,7 +211,7 @@ describe('Delete Account Screen', () => {
       fireEvent.press(confirmButton);
 
       await waitFor(() => {
-        expect(deleteAccount).toHaveBeenCalledWith('testpassword');
+        expect(deleteAccount).toHaveBeenCalledWith('testpassword', undefined);
       });
     });
   });
@@ -253,8 +273,29 @@ describe('Delete Account Screen', () => {
       fireEvent.press(confirmButton);
 
       await waitFor(() => {
-        expect(deleteAccount).toHaveBeenCalledWith('mypassword123');
+        expect(deleteAccount).toHaveBeenCalledWith('mypassword123', undefined);
       });
+    });
+
+    it('accepts the email in another case and with surrounding spaces', async () => {
+      // Sign-in ignores case, so "Test@…" must confirm an account stored as "test@…".
+      const mockUser = createMockUser({ email: 'test@example.com' });
+      (deleteAccount as jest.Mock).mockResolvedValue(undefined);
+
+      const { getByText, getByPlaceholderText } = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: mockUser },
+        },
+      });
+
+      fireEvent.changeText(getByPlaceholderText('account.email'), ' Test@Example.COM ');
+      fireEvent.changeText(getByPlaceholderText('auth.password'), 'mypassword123');
+      fireEvent.press(getByText('account.confirmButton'));
+
+      await waitFor(() => {
+        expect(deleteAccount).toHaveBeenCalledWith('mypassword123', undefined);
+      });
+      expect(Alert.alert).not.toHaveBeenCalledWith('common.error', 'account.incorrectEmail');
     });
 
     it('clears auth state after account deletion', async () => {
@@ -414,6 +455,22 @@ describe('Delete Account Screen', () => {
         );
       });
     });
+
+    it("says the server wasn't reached when the deletion fails on the network", async () => {
+      (deleteAccount as jest.Mock).mockRejectedValueOnce(networkError());
+      const utils = renderWithProviders(<DeleteAccountScreen />, {
+        providerOverrides: {
+          globalContext: { user: createMockUser({ email: 'test@example.com' }) },
+        },
+      });
+      fireEvent.changeText(utils.getByPlaceholderText('account.email'), 'test@example.com');
+      fireEvent.changeText(utils.getByPlaceholderText('auth.password'), 'mypassword123');
+      fireEvent.press(utils.getByText('account.confirmButton'));
+
+      await waitFor(() =>
+        expect(Alert.alert).toHaveBeenCalledWith('common.error', 'errors.network')
+      );
+    });
   });
 
   describe('Second factor', () => {
@@ -463,6 +520,22 @@ describe('Delete Account Screen', () => {
         'account.deleteSuccess',
         expect.any(Array)
       );
+    });
+
+    // The backend takes a code from any app on the account; a recovery code is the other way.
+    it('deletes with a recovery code instead of an app code', async () => {
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock).mockResolvedValue('proof-token');
+      const utils = await reachCodeStep();
+
+      fireEvent.press(utils.getByTestId('mfa-reauth-switch'));
+      enterCode(utils, 'abcde-23456');
+
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
+      expect(reauthenticate).toHaveBeenCalledWith('mypassword123', 'recovery', 'ABCDE23456');
+      expect(deleteAccount).toHaveBeenLastCalledWith('mypassword123', 'proof-token');
     });
 
     it('shows a wrong code next to the field and deletes nothing', async () => {
@@ -519,6 +592,81 @@ describe('Delete Account Screen', () => {
 
       expect(utils.getByPlaceholderText('auth.password')).toBeTruthy();
       expect(reauthenticate).not.toHaveBeenCalled();
+    });
+
+    // The delete didn't use the proof up, and the same code typed again counts as a wrong one.
+    it('retries with the same proof after a network failure, without a new code', async () => {
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockRejectedValueOnce(networkError())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock).mockResolvedValue('proof-token');
+      const utils = await reachCodeStep();
+
+      enterCode(utils);
+      expect(await utils.findByText('errors.network')).toBeTruthy();
+      fireEvent.press(utils.getByTestId('mfa-reauth-submit'));
+
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
+      expect(reauthenticate).toHaveBeenCalledTimes(1);
+      expect(deleteAccount).toHaveBeenCalledTimes(3);
+      expect(deleteAccount).toHaveBeenLastCalledWith('mypassword123', 'proof-token');
+    });
+
+    it('keeps the proof for the password step after cancel', async () => {
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockRejectedValueOnce(networkError())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock).mockResolvedValue('proof-token');
+      const utils = await reachCodeStep();
+
+      enterCode(utils);
+      expect(await utils.findByText('errors.network')).toBeTruthy();
+      fireEvent.press(utils.getByTestId('mfa-reauth-cancel'));
+      fireEvent.press(utils.getByText('account.confirmButton'));
+
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
+      expect(reauthenticate).toHaveBeenCalledTimes(1);
+      expect(deleteAccount).toHaveBeenLastCalledWith('mypassword123', 'proof-token');
+    });
+
+    it('asks for a new code once the proof is used up', async () => {
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockRejectedValueOnce(reauthRequired())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock)
+        .mockResolvedValueOnce('proof-1')
+        .mockResolvedValueOnce('proof-2');
+      const utils = await reachCodeStep();
+
+      enterCode(utils);
+      expect(await utils.findByText('mfa.reauthExpired')).toBeTruthy();
+      enterCode(utils, '654321');
+
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
+      expect(reauthenticate).toHaveBeenLastCalledWith('mypassword123', 'totp', '654321');
+      expect(deleteAccount).toHaveBeenLastCalledWith('mypassword123', 'proof-2');
+    });
+
+    // Cancel can't stop a deletion already sent, so it would end in "Account deleted".
+    it('keeps Cancel closed while the code is being checked', async () => {
+      let answer: (token: string) => void = () => {};
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock).mockReturnValueOnce(
+        new Promise((resolve) => (answer = resolve))
+      );
+      const utils = await reachCodeStep();
+
+      enterCode(utils);
+      fireEvent.press(utils.getByTestId('mfa-reauth-cancel'));
+      expect(utils.queryByPlaceholderText('auth.password')).toBeNull();
+
+      await act(async () => answer('proof-token'));
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
     });
   });
 

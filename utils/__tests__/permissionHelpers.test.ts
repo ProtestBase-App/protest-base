@@ -35,6 +35,7 @@ const mockLogger = logger as jest.Mocked<typeof logger>;
 
 // Import after mocks
 import {
+  calendarNeedsPermission,
   getPhotoLibraryReadStatus,
   getCalendarStatus,
   getNotificationsStatus,
@@ -56,9 +57,46 @@ function mockNotificationPermission(
   } as Notifications.NotificationPermissionsStatus);
 }
 
+// Stands in for the device's platform and OS version; the returned function puts them back.
+function setPlatform(os: 'ios' | 'android', version: string | number): () => void {
+  const saved = (['OS', 'Version'] as const).map(
+    (key) => [key, Object.getOwnPropertyDescriptor(Platform, key)] as const
+  );
+  Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+  Object.defineProperty(Platform, 'Version', { value: version, configurable: true });
+  return () => {
+    saved.forEach(([key, descriptor]) => {
+      if (descriptor) Object.defineProperty(Platform, key, descriptor);
+    });
+  };
+}
+
 describe('permissionHelpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('calendarNeedsPermission', () => {
+    let restorePlatform: () => void = () => {};
+    afterEach(() => restorePlatform());
+
+    it('is true on iOS 16, where the add-event screen needs calendar access', () => {
+      restorePlatform = setPlatform('ios', '16.4');
+      expect(calendarNeedsPermission()).toBe(true);
+    });
+
+    it('is false on iOS 17 and later, where that screen runs outside the app', () => {
+      restorePlatform = setPlatform('ios', '17.0');
+      expect(calendarNeedsPermission()).toBe(false);
+      restorePlatform();
+      restorePlatform = setPlatform('ios', '26.1');
+      expect(calendarNeedsPermission()).toBe(false);
+    });
+
+    it('is false on Android, where the event goes through an ACTION_INSERT intent', () => {
+      restorePlatform = setPlatform('android', 35);
+      expect(calendarNeedsPermission()).toBe(false);
+    });
   });
 
   describe('getPhotoLibraryReadStatus', () => {
@@ -125,6 +163,23 @@ describe('permissionHelpers', () => {
   });
 
   describe('getCalendarStatus', () => {
+    // The permission is only real on iOS 16 (calendarNeedsPermission).
+    let restorePlatform: () => void = () => {};
+    beforeEach(() => {
+      restorePlatform = setPlatform('ios', '16.4');
+    });
+    afterEach(() => restorePlatform());
+
+    it('should return "notUsed" without reading the permission on iOS 17+ and Android', async () => {
+      restorePlatform();
+      restorePlatform = setPlatform('ios', '17.2');
+      expect(await getCalendarStatus()).toBe('notUsed');
+      restorePlatform();
+      restorePlatform = setPlatform('android', 35);
+      expect(await getCalendarStatus()).toBe('notUsed');
+      expect(mockCalendar.getCalendarPermissionsAsync).not.toHaveBeenCalled();
+    });
+
     it('should return "granted" when permission is granted', async () => {
       mockCalendar.getCalendarPermissionsAsync.mockResolvedValue({
         status: 'granted',
@@ -224,6 +279,13 @@ describe('permissionHelpers', () => {
   });
 
   describe('getAllPermissionStatuses', () => {
+    // iOS 16 reads all three; the Android case below overrides the platform.
+    let restorePlatform: () => void = () => {};
+    beforeEach(() => {
+      restorePlatform = setPlatform('ios', '16.4');
+    });
+    afterEach(() => restorePlatform());
+
     it('should return all permission statuses', async () => {
       mockImagePicker.getMediaLibraryPermissionsAsync.mockResolvedValue({
         status: 'granted',
@@ -295,10 +357,11 @@ describe('permissionHelpers', () => {
 
       expect(result).toEqual({
         photoLibraryRead: 'notUsed',
-        calendar: 'undetermined',
+        calendar: 'notUsed',
         notifications: 'undetermined',
       });
       expect(mockImagePicker.getMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+      expect(mockCalendar.getCalendarPermissionsAsync).not.toHaveBeenCalled();
 
       Object.defineProperty(Platform, 'OS', { value: originalOS, configurable: true });
     });

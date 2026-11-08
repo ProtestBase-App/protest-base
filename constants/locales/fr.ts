@@ -344,15 +344,20 @@ const fr: LocaleData = {
       one: 'Il reste 1 essai.',
       other: 'Il reste {{count}} essais.',
     },
-    blocked: 'Trop de codes incorrects. Réessayez plus tard.',
+    blocked:
+      "Ce compte est temporairement bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez plus tard.",
     lockedFor: {
-      one: 'Trop de codes incorrects. Réessayez dans 1 minute.',
-      other: 'Trop de codes incorrects. Réessayez dans {{count}} minutes.',
+      one: "Ce compte est bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez dans 1 minute.",
+      other:
+        "Ce compte est bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez dans {{count}} minutes.",
     },
     expiredTitle: 'Connexion expirée',
     expiredMessage: 'Cette connexion a pris trop de temps. Reconnectez-vous.',
+    setupExpiredMessage:
+      "Cette configuration a pris trop de temps. Reconnectez-vous pour recommencer. Si vous avez ajouté ProtestBase à votre application d'authentification, supprimez cette entrée : ses codes ne fonctionneront pas.",
+    alreadyEnrolledTitle: 'Déjà activée',
     alreadyEnrolledMessage:
-      'La validation en deux étapes est déjà activée pour ce compte. Reconnectez-vous.',
+      "La validation en deux étapes vient d'être activée pour ce compte, peut-être par une autre personne qui l'utilise. Reconnectez-vous avec un code de l'application d'authentification utilisée pour cette activation, ou avec un code de secours. Si vous avez ajouté ProtestBase à votre application ici, supprimez cette entrée : ses codes ne fonctionneront pas.",
     recoveryCodesLowTitle: 'Peu de codes de secours',
     recoveryCodesLow: {
       zero: "Vous avez utilisé votre dernier code de secours. Désormais, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
@@ -360,9 +365,15 @@ const fr: LocaleData = {
       other:
         "Il vous reste {{count}} codes de secours. Une fois utilisés, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
     },
+    recoveryCodesLowPasskey: {
+      zero: "Vous avez utilisé votre dernier code de secours, et cette application ne prend pas encore en charge votre clé d'accès. Pour vous reconnecter ici, créez de nouveaux codes de secours sur le site de ProtestBase.",
+      one: "Il vous reste 1 code de secours, et cette application ne prend pas encore en charge votre clé d'accès. Créez de nouveaux codes de secours sur le site de ProtestBase avant de l'utiliser.",
+      other:
+        "Il vous reste {{count}} codes de secours, et cette application ne prend pas encore en charge votre clé d'accès. Créez de nouveaux codes de secours sur le site de ProtestBase avant qu'ils ne soient épuisés.",
+    },
     enrollTitle: 'Activer la validation en deux étapes',
     enrollIntro:
-      "ProtestBase demande désormais, à la connexion, un code fourni par une application d'authentification. À configurer une fois sur ce téléphone :",
+      "ProtestBase demande désormais, à la connexion, un code fourni par une application d'authentification. À configurer une fois sur ce téléphone. Si votre application contient déjà une entrée ProtestBase pour ce compte, issue d'une configuration précédente, supprimez-la : ses codes ne fonctionneront pas.",
     stepAddTitle: "1. Ajoutez ProtestBase à votre application d'authentification",
     openAuthenticator: "Ajouter à l'application d'authentification",
     openAuthenticatorHelp:
@@ -821,6 +832,11 @@ const fr: LocaleData = {
     // Error messages for data loading
     postalCodeLoadError: 'Échec du chargement des codes postaux. Veuillez réessayer.',
     imagePickerError: "Échec de la sélection de l'image. Veuillez réessayer.",
+    imageProcessingError: {
+      one: "Nous n'avons pas pu traiter une photo, elle n'a donc pas été ajoutée. Essayez-en une autre.",
+      other:
+        "Nous n'avons pas pu traiter {{count}} photos, elles n'ont donc pas été ajoutées. Essayez-en d'autres.",
+    },
     maxImagesReached: "Vous pouvez ajouter jusqu'à {{max}} images.",
   },
 
@@ -1084,6 +1100,9 @@ const fr: LocaleData = {
     expired: 'Session expirée',
     expiredMessage: 'Votre session a expiré. Veuillez vous reconnecter pour continuer.',
     signInAgain: 'Se reconnecter',
+    unreachable: 'Déconnecté',
+    unreachableMessage:
+      'ProtestBase était injoignable pour garder votre session ouverte. Vos brouillons et vos événements enregistrés sont toujours sur ce téléphone. Reconnectez-vous une fois de retour en ligne.',
     securityAlert: 'Alerte de sécurité',
     securityAlertMessage:
       'Votre session a été interrompue pour des raisons de sécurité. Veuillez vous reconnecter.',
@@ -1205,7 +1224,7 @@ const fr: LocaleData = {
   // ============================================
   termsAndConditions: {
     title: 'Conditions générales de ProtestBase',
-    lastUpdated: 'Dernière mise à jour : 21/04/2025',
+    lastUpdated: 'Dernière mise à jour : 8 novembre 2026',
 
     // Introduction
     intro1:
@@ -1241,12 +1260,13 @@ const fr: LocaleData = {
       "Si vous utilisez ProtestBase en tant qu'invité (sans vous connecter), voici ce que vous devez savoir :",
     section3_1Title: '3.1. Confidentialité des données',
     section3_1Bullet1:
-      'Nous respectons votre vie privée. Nous ne collectons aucune donnée personnelle des utilisateurs qui ne se connectent pas.',
+      "Nous respectons votre vie privée. Vous n'avez pas besoin de compte, et nous ne vous demandons ni votre nom, ni votre adresse e-mail, ni votre localisation pour parcourir les événements.",
     section3_1Bullet2:
-      'Toutes les manifestations que vous enregistrez ou avec lesquelles vous interagissez seront uniquement stockées localement sur votre appareil.',
+      'Les manifestations que vous enregistrez, aimez ou suivez sont stockées sur votre appareil. Notre Politique de confidentialité explique précisément ce qui parvient à nos serveurs et pourquoi.',
+    privacyPolicyLink: 'Lire notre Politique de confidentialité',
     section3_2Title: "3.2. Signalement d'événements ou d'organisations",
     section3_2Bullet1:
-      "Si vous rencontrez un événement ou une organisation qui enfreint les lois locales ou organise des événements dangereux, vous pouvez le signaler directement via l'Application.",
+      'Si vous rencontrez un événement ou une organisation qui enfreint les lois locales ou organise des événements dangereux, vous pouvez nous le signaler par e-mail à :',
     section3_2Bullet2:
       "Nous examinerons tous les signalements et prendrons les mesures appropriées, ce qui peut inclure la suppression de l'événement ou de l'organisation de l'Application.",
     section3_3Title: '3.3. Votre responsabilité',
@@ -1268,7 +1288,7 @@ const fr: LocaleData = {
       'Nous pouvons demander des informations supplémentaires pour vérifier que votre organisation est légitime.',
     section4_2Title: '4.2. Confidentialité des données pour les organisations',
     section4_2Bullet1:
-      'Contrairement aux utilisateurs invités, les organisations ne bénéficient pas du même niveau de confidentialité car nous devons vérifier votre identité et garantir la légitimité de votre organisation.',
+      'Pour vérifier que votre organisation est légitime, nous avons besoin de certaines informations sur vous et sur votre organisation. Notre Politique de confidentialité explique ce que nous conservons, pendant combien de temps et comment supprimer votre compte.',
     section4_2Bullet2:
       'En créant un compte, vous acceptez de fournir des informations exactes et à jour sur votre organisation.',
     section4_3Title: '4.3. Responsabilité du contenu',
@@ -1970,6 +1990,8 @@ const fr: LocaleData = {
       manageEvent: 'Ouvre les actions pour cet événement',
       openSettings: "Ouvre les réglages de l'application sur votre appareil",
       openExternalLink: "Ouvre le lien en dehors de l'application",
+      openPrivacyPolicy: 'Ouvre la politique de confidentialité dans un navigateur',
+      sendEmail: 'Ouvre votre application de messagerie pour nous écrire',
       zoomInMap: 'Effectue un zoom avant sur la carte',
       zoomOutMap: 'Effectue un zoom arrière sur la carte',
       selectOnMap: 'Sélectionne cet événement sur la carte',

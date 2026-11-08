@@ -12,6 +12,7 @@ jest.mock('@/services/api', () => ({
     },
   },
   markSessionActive: jest.fn(),
+  appLanguage: jest.fn(() => 'nl'),
 }));
 
 jest.mock('expo-secure-store', () => ({
@@ -451,8 +452,10 @@ describe('auth.service', () => {
       const result = await forgotPassword('user@example.com');
 
       expect(result.success).toBe(true);
+      // The app's language travels with the request, so the reset mail is in it.
       expect(mockApi.post).toHaveBeenCalledWith('/auth/forgot-password', {
         email: 'user@example.com',
+        lang: 'nl',
       });
     });
 
@@ -584,6 +587,18 @@ describe('auth.service', () => {
 
       expect(error).toBeInstanceOf(AuthError);
       expect(error).toMatchObject({ code: 'REAUTH_REQUIRED', status: 403 });
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    });
+
+    // The screen tells the user the server wasn't reached and retries with the same proof.
+    it('passes a network failure through unchanged', async () => {
+      const offline = Object.assign(new Error('Network Error'), {
+        isAxiosError: true,
+        code: 'ERR_NETWORK',
+      });
+      mockApi.delete.mockRejectedValueOnce(offline);
+
+      await expect(deleteAccount('password123', 'proof-token')).rejects.toBe(offline);
       expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
   });

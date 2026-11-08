@@ -47,7 +47,7 @@ jest.mock('@/utils/i18n', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import ExploreEventCard from '@/components/ExploreEventCard';
 import { DynamicRoutes } from '@/constants/Routes';
@@ -287,6 +287,57 @@ describe('ExploreEventCard', () => {
       render(<ExploreEventCard {...defaultProps} />);
       const badgeText = screen.getByText('Climate');
       expect(StyleSheet.flatten(badgeText.props.style).color).toBe('#8E8E93');
+    });
+  });
+
+  describe('screen-reader actions', () => {
+    // iOS makes the card one element, so VoiceOver can't reach the buttons inside.
+    const realOS = Platform.OS;
+    const card = () => screen.getByLabelText(/Event: Climate March/);
+
+    afterEach(() => {
+      Platform.OS = realOS;
+    });
+
+    it('offers Save and Share as actions on iOS', () => {
+      Platform.OS = 'ios';
+      render(<ExploreEventCard {...defaultProps} />);
+      expect(card().props.accessibilityActions).toEqual([
+        { name: 'save', label: 'Save' },
+        { name: 'share', label: 'Share' },
+      ]);
+    });
+
+    it('names the save action Unsave once the event is saved', () => {
+      Platform.OS = 'ios';
+      render(<ExploreEventCard {...defaultProps} isSaved />);
+      expect(card().props.accessibilityActions[0]).toEqual({ name: 'save', label: 'Unsave' });
+    });
+
+    it('saves with the end time through the save action', () => {
+      Platform.OS = 'ios';
+      const onSave = jest.fn();
+      render(<ExploreEventCard {...defaultProps} onSave={onSave} />);
+      fireEvent(card(), 'accessibilityAction', { nativeEvent: { actionName: 'save' } });
+      expect(onSave).toHaveBeenCalledWith(
+        'event-123',
+        new Date(mockEvent.end_time as string).getTime()
+      );
+    });
+
+    it('shares through the share action without opening the event', () => {
+      Platform.OS = 'ios';
+      const onShare = jest.fn();
+      render(<ExploreEventCard {...defaultProps} onShare={onShare} />);
+      fireEvent(card(), 'accessibilityAction', { nativeEvent: { actionName: 'share' } });
+      expect(onShare).toHaveBeenCalledWith('event-123');
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('leaves the buttons themselves to TalkBack on Android', () => {
+      Platform.OS = 'android';
+      render(<ExploreEventCard {...defaultProps} />);
+      expect(card().props.accessibilityActions).toBeUndefined();
     });
   });
 

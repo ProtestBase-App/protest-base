@@ -73,7 +73,7 @@ export type MfaFailure =
   /** `until` is a timestamp in ms, or null when the backend didn't say how long. */
   | { kind: 'locked'; until: number | null }
   /** The step can't go on: start again from the password. */
-  | { kind: 'restart'; reason: 'expired' | 'alreadyEnrolled' }
+  | { kind: 'restart'; reason: 'expired' | 'alreadyEnrolled' | 'disabled' }
   | { kind: 'rateLimited' }
   | { kind: 'network' }
   | { kind: 'other'; message: string | null };
@@ -107,6 +107,9 @@ export function describeMfaFailure(error: unknown, now: number = Date.now()): Mf
       return { kind: 'restart', reason: 'expired' };
     case 'MFA_ALREADY_ENROLLED':
       return { kind: 'restart', reason: 'alreadyEnrolled' };
+    // The second step carries no session, so the global sign-out never sees this one.
+    case 'ACCOUNT_DISABLED':
+      return { kind: 'restart', reason: 'disabled' };
   }
 
   if (failure.isRateLimited === true || failure.code === 'RATE_LIMIT_EXCEEDED') {

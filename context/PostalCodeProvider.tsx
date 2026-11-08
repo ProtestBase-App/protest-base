@@ -15,6 +15,7 @@ import type { FranceAreas } from '@/constants/PostalCodes_FR';
 import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
 import { probeFranceSupport } from '@/services/event.service';
 import { logger } from '@/utils/logger';
+import { pickPostalCodePlace } from '@/utils/postalCodePlace';
 import {
   buildLocationFilterOptions,
   buildLocationMatch,
@@ -252,15 +253,9 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       const postalCodeNum = parseInt(postalCode, 10);
       if (isNaN(postalCodeNum)) return fallback;
 
-      const postalCodeData = codes.find((pc: any) => pc.post_code === postalCodeNum);
-      if (!postalCodeData) return fallback;
-
-      // Pick the locale-specific 'sub_municipality_name_*' field at runtime.
-      const subMunicipalityKey = Object.keys(postalCodeData).find((key) =>
-        key.startsWith('sub_municipality_name')
-      );
-
-      return subMunicipalityKey ? postalCodeData[subMunicipalityKey] : fallback;
+      // Every row, not the first: one code can cover several places (3000 is Heverlee and Leuven).
+      const rows = codes.filter((row: { post_code?: unknown }) => row.post_code === postalCodeNum);
+      return pickPostalCodePlace(rows, fallback);
     },
     [postalCodesCache]
   );

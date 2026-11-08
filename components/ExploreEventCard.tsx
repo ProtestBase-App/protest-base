@@ -1,5 +1,11 @@
 import React, { memo, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+  type AccessibilityActionEvent,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Animated, {
@@ -87,6 +93,24 @@ function ExploreEventCard({
     router.push(`/event/${event.$id}` as any);
   };
 
+  const handleSave = () => onSave(event.$id, getEffectiveEndTime(event).getTime());
+  const handleShare = () => onShare(event.$id);
+
+  // iOS makes the card one element, which hides its Save and Share buttons from
+  // VoiceOver, so they come back as actions. TalkBack focuses the buttons.
+  const accessibilityActions =
+    Platform.OS === 'ios'
+      ? [
+          { name: 'save', label: isSaved ? t('events.unsave') : t('events.save') },
+          { name: 'share', label: t('events.share') },
+        ]
+      : undefined;
+
+  const handleAccessibilityAction = (actionEvent: AccessibilityActionEvent) => {
+    if (actionEvent.nativeEvent.actionName === 'save') handleSave();
+    if (actionEvent.nativeEvent.actionName === 'share') handleShare();
+  };
+
   return (
     <TouchableOpacity
       testID={testID}
@@ -94,6 +118,8 @@ function ExploreEventCard({
       accessibilityRole="button"
       accessibilityLabel={`Event: ${event.title}, ${formatEventDateTimeLabel(event, userLanguage)}`}
       accessibilityHint={t('a11y.hints.openEvent')}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={handleAccessibilityAction}
     >
       <ThemedView style={[styles.card, { borderColor: themeColors.cardBorder }]}>
         <Image
@@ -189,7 +215,7 @@ function ExploreEventCard({
               testID={testID ? `${testID}-save` : undefined}
               onPress={(e) => {
                 e.stopPropagation();
-                onSave(event.$id, getEffectiveEndTime(event).getTime());
+                handleSave();
               }}
               accessibilityRole="button"
               accessibilityLabel={isSaved ? t('events.unsave') : t('events.save')}
@@ -215,7 +241,7 @@ function ExploreEventCard({
             testID={testID ? `${testID}-share` : undefined}
             onPress={(e) => {
               e.stopPropagation();
-              onShare(event.$id);
+              handleShare();
             }}
             accessibilityRole="button"
             accessibilityLabel={t('events.share')}

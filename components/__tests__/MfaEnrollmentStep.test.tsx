@@ -14,7 +14,7 @@ jest.mock('@/utils/urlSafety', () => ({ openTotpSetupUri: jest.fn() }));
 
 import React from 'react';
 import { Alert, Share } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MfaEnrollmentStep from '@/components/auth/MfaEnrollmentStep';
 import { storeSession } from '@/services/auth.service';
 import {
@@ -59,15 +59,17 @@ function renderStep() {
   const onSignedIn = jest.fn();
   const onRestart = jest.fn();
   const onCodesShownChange = jest.fn();
+  const onBusyChange = jest.fn();
   render(
     <MfaEnrollmentStep
       enrollment={enrollment}
       onSignedIn={onSignedIn}
       onRestart={onRestart}
       onCodesShownChange={onCodesShownChange}
+      onBusyChange={onBusyChange}
     />
   );
-  return { onSignedIn, onRestart, onCodesShownChange };
+  return { onSignedIn, onRestart, onCodesShownChange, onBusyChange };
 }
 
 async function confirmWithCode(code = '123456') {
@@ -239,7 +241,8 @@ describe('MfaEnrollmentStep', () => {
     const { onRestart } = renderStep();
 
     await waitFor(() => expect(onRestart).toHaveBeenCalled());
-    expect(alertSpy).toHaveBeenCalledWith('mfa.expiredTitle', 'mfa.alreadyEnrolledMessage');
+    // Nothing expired: someone else finished the setup, so the title says that, not "expired".
+    expect(alertSpy).toHaveBeenCalledWith('mfa.alreadyEnrolledTitle', 'mfa.alreadyEnrolledMessage');
   });
 
   it('goes back to the password without sending once the enrolment has run out', async () => {
@@ -251,7 +254,37 @@ describe('MfaEnrollmentStep', () => {
     await confirmWithCode();
 
     expect(mockConfirm).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledWith('mfa.expiredTitle', 'mfa.expiredMessage');
+    expect(alertSpy).toHaveBeenCalledWith('mfa.expiredTitle', 'mfa.setupExpiredMessage');
     nowSpy.mockRestore();
+  });
+
+  it('says the account is disabled and goes back to the password', async () => {
+    mockStart.mockRejectedValueOnce(
+      new AuthError('Account is disabled', { code: 'ACCOUNT_DISABLED', status: 403 })
+    );
+    const { onRestart } = renderStep();
+
+    await waitFor(() => expect(onRestart).toHaveBeenCalled());
+    expect(alertSpy).toHaveBeenCalledWith('session.accountDisabled', 'auth.accountDisabledMessage');
+  });
+
+  // Once confirmed, the backend has turned the factor on: leaving before the answer arrives
+  // would lose the recovery codes.
+  it('keeps the way back closed while the first code is being confirmed', async () => {
+    let answer: (value: typeof signIn) => void = () => {};
+    mockConfirm.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const { onRestart, onBusyChange, onCodesShownChange } = renderStep();
+
+    await confirmWithCode();
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    fireEvent.press(screen.getByTestId('mfa-back-to-sign-in'));
+    expect(onRestart).not.toHaveBeenCalled();
+
+    await act(async () => answer(signIn));
+
+    expect(await screen.findByText('ABCDE-23456')).toBeTruthy();
+    expect(onCodesShownChange).toHaveBeenLastCalledWith(true);
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
   });
 });

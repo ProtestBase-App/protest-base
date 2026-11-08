@@ -81,19 +81,41 @@ describe('ExternalLinks', () => {
     });
   });
 
+  describe('PRIVACY_POLICY', () => {
+    // French is the website's default language, so its page has no prefix; the trailing
+    // slash is part of each page's address.
+    it.each([
+      ['fr', 'https://protestbase.be/privacy/'],
+      ['en', 'https://protestbase.be/en/privacy/'],
+      ['nl', 'https://protestbase.be/nl/privacy/'],
+    ] as const)('links the %s page of the website', (locale, url) => {
+      expect(ExternalLinks.PRIVACY_POLICY[locale]).toBe(url);
+    });
+
+    it('has a page for every app language', () => {
+      expect(Object.keys(ExternalLinks.PRIVACY_POLICY).sort()).toEqual(['en', 'fr', 'nl']);
+    });
+  });
+
   describe('data integrity', () => {
-    it('should have exactly 3 external link constants', () => {
-      expect(Object.keys(ExternalLinks)).toHaveLength(3);
+    // Every URL, with the per-language pages flattened out.
+    const allUrls = (): string[] =>
+      Object.values(ExternalLinks).flatMap((value) =>
+        typeof value === 'string' ? [value] : Object.values(value)
+      );
+
+    it('should have exactly 4 external link constants', () => {
+      expect(Object.keys(ExternalLinks)).toHaveLength(4);
     });
 
     it('should have no duplicate URL values', () => {
-      const values = Object.values(ExternalLinks);
+      const values = allUrls();
       const uniqueValues = new Set(values);
       expect(uniqueValues.size).toBe(values.length);
     });
 
     it('should have all URLs starting with https://', () => {
-      for (const url of Object.values(ExternalLinks)) {
+      for (const url of allUrls()) {
         expect(url).toMatch(/^https:\/\//);
       }
     });

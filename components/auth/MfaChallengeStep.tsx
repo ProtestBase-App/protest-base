@@ -18,6 +18,8 @@ export interface MfaChallengeStepProps {
   onSignedIn: (result: { user: User; recoveryCodesRemaining?: number }) => void;
   /** Back to the password: the user chose to, or the challenge can't be answered any more. */
   onRestart: () => void;
+  /** True while a code is being checked, when leaving would drop an answer on its way. */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 /** The second step of a sign-in: a code from the authenticator app, or a recovery code. */
@@ -25,6 +27,7 @@ export default function MfaChallengeStep({
   challenge,
   onSignedIn,
   onRestart,
+  onBusyChange,
 }: MfaChallengeStepProps) {
   const themeColors = getThemeColors(useColorScheme());
   const headingRef = useOverlayFocus();
@@ -44,18 +47,23 @@ export default function MfaChallengeStep({
       return;
     }
     setSubmitting(true);
+    onBusyChange?.(true);
     setFailure(null);
     try {
       onSignedIn(await verifyMfaCode(challenge.challengeId, method, code));
     } catch (error) {
       const next = describeMfaFailure(error);
-      if (next.kind === 'restart') {
+      if (next.kind === 'restart' && next.reason === 'disabled') {
+        Alert.alert(t('session.accountDisabled'), t('auth.accountDisabledMessage'));
+        onRestart();
+      } else if (next.kind === 'restart') {
         expire();
       } else {
         setFailure(next);
       }
     } finally {
       setSubmitting(false);
+      onBusyChange?.(false);
     }
   };
 
@@ -87,7 +95,8 @@ export default function MfaChallengeStep({
         accessibilityRole="button"
         accessibilityHint={t('a11y.hints.backToSignIn')}
         onPress={onRestart}
-        style={styles.back}
+        disabled={submitting}
+        style={[styles.back, submitting && styles.disabled]}
         testID="mfa-back-to-sign-in"
       >
         <ThemedText style={[styles.backText, { color: themeColors.tint }]}>
@@ -121,5 +130,8 @@ const styles = StyleSheet.create({
   backText: {
     fontFamily: Typography.families.semiBold,
     fontSize: Typography.sizes.base,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

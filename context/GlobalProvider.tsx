@@ -29,7 +29,7 @@ import { Event } from '@/types/event.types';
 import { t } from '@/utils/i18n';
 import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { isNetworkError } from '@/utils/networkError';
-import { clearAllUserData } from '@/services/localStorageService';
+import { claimLocalData, clearAllUserData } from '@/services/localStorageService';
 import { parseAsUTC } from '@/utils/eventFormatters';
 
 /** Where the current eventsCache contents came from — see cacheSourceRef. */
@@ -101,6 +101,11 @@ export interface GlobalContextValue {
   refreshUserEventCounts: (organizationIds?: string[]) => Promise<void>;
 
   clearAuthState: () => Promise<void>;
+  /**
+   * Goes up each time the device's user data is wiped (sign-out, or another account's data
+   * cleared at sign-in). The saved, liked and followed lists never remount, so they reload on it.
+   */
+  localDataGeneration: number;
 
   connectionError: boolean;
   retryConnection: () => Promise<void>;
@@ -125,6 +130,7 @@ export const useGlobalContext = (): GlobalContextValue => {
 const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   const [isLogged, setIsLogged] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
+  const [localDataGeneration, setLocalDataGeneration] = useState(0);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Connection error: backend unreachable at startup
@@ -200,8 +206,25 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     } catch (error) {
       logger.error('Failed to clear user data from storage:', { error });
     }
+    setLocalDataGeneration((generation) => generation + 1);
     await resetAuthState();
   }, [resetAuthState]);
+
+  // The device's user data becomes this account's. Another account's, kept by a sign-out the
+  // network forced, is wiped first, so this person never sees it.
+  const userId = user?.$id;
+  useEffect(() => {
+    if (!userId) return;
+    claimLocalData(userId)
+      .then((wiped) => {
+        if (wiped) setLocalDataGeneration((generation) => generation + 1);
+      })
+      .catch((error) => {
+        logger.warn('[GlobalProvider] Claiming the local user data failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }, [userId]);
 
   const refreshUserEventCounts = useCallback(async (organizationIds?: string[]): Promise<void> => {
     // If no organizations, set counts to zero (not null) to exit loading state
@@ -395,7 +418,13 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     validateUserSession();
 
     const handleTokenExpiration = async (reason?: SessionEndReason): Promise<void> => {
-      await clearAuthState();
+      if (reason === 'unreachable') {
+        // The network failed, not the account: sign out, but keep what the user made on the
+        // phone (drafts, saved events, reminders). claimLocalData guards the next sign-in.
+        await resetAuthState();
+      } else {
+        await clearAuthState();
+      }
       // The session can end while the launch check awaits a request that will never settle,
       // and app/index.tsx waits on `loading` before it routes anywhere.
       setLoading(false);
@@ -403,9 +432,17 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
       const navigateToSignIn = () => router.replace('/(auth)/sign-in');
 
       if (reason === 'account_disabled') {
-        // Signing in again can't work, so carry on as a guest.
+        // Signing in again can't work, so carry on as a guest. A screen open over the tabs, such
+        // as Delete Account, waits on a request that never settles: close it first, since
+        // switching tabs leaves an iOS modal on top.
         Alert.alert(t('session.accountDisabled'), t('session.accountDisabledMessage'), [
-          { text: t('common.ok'), onPress: () => router.replace(Routes.EXPLORE) },
+          {
+            text: t('common.ok'),
+            onPress: () => {
+              if (router.canDismiss()) router.dismissAll();
+              router.replace(Routes.EXPLORE);
+            },
+          },
         ]);
       } else if (reason === 'token_reuse') {
         Alert.alert(t('session.securityAlert'), t('session.securityAlertMessage'), [
@@ -413,6 +450,10 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
         ]);
       } else if (reason === 'session_replaced') {
         Alert.alert(t('session.signedInElsewhere'), t('session.signedInElsewhereMessage'), [
+          { text: t('session.signInAgain'), onPress: navigateToSignIn },
+        ]);
+      } else if (reason === 'unreachable') {
+        Alert.alert(t('session.unreachable'), t('session.unreachableMessage'), [
           { text: t('session.signInAgain'), onPress: navigateToSignIn },
         ]);
       } else {
@@ -425,7 +466,7 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
     setTokenExpirationCallback(handleTokenExpiration);
 
     return () => {};
-  }, [validateUserSession, clearAuthState]);
+  }, [validateUserSession, clearAuthState, resetAuthState]);
 
   useEffect(() => {
     fetchInitialEvents();
@@ -500,10 +541,12 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
       userEventCountsLoading,
       refreshUserEventCounts,
       clearAuthState,
+      localDataGeneration,
       connectionError,
       retryConnection,
     }),
     [
+      localDataGeneration,
       isLogged,
       user,
       loading,

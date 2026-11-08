@@ -103,6 +103,50 @@ describe('secondStepFromError', () => {
   });
 });
 
+// With passkeys configured, the backend lists "webauthn" next to "totp" in both 403 answers. The
+// app only offers the authenticator, so the extra method must change nothing.
+describe('a backend that also offers passkeys', () => {
+  const loginError = (code: string, mfa: unknown) =>
+    new AuthError('A second verification step is required.', {
+      code,
+      status: 403,
+      details: { mfa } as never,
+    });
+
+  // The step's own fields, whichever kind it is.
+  const stepOf = (error: AuthError) => {
+    const step = secondStepFromError(error);
+    if (!step) return null;
+    return step.kind === 'challenge' ? step.challenge : step.enrollment;
+  };
+
+  it.each([
+    ['MFA_REQUIRED', { challengeId: CHALLENGE_ID, expiresIn: 300 }],
+    ['MFA_ENROLLMENT_REQUIRED', { enrollmentToken: ENROLLMENT_TOKEN, expiresIn: 900 }],
+  ])('reads %s with ["totp", "webauthn"] exactly like ["totp"]', (code, fields) => {
+    const totpOnly = loginError(code, { ...fields, methods: ['totp'] });
+    const withPasskeys = loginError(code, { ...fields, methods: ['totp', 'webauthn'] });
+
+    expect(secondStepFromError(withPasskeys)?.kind).toBe(secondStepFromError(totpOnly)?.kind);
+    expect({ ...stepOf(withPasskeys), methods: undefined }).toEqual({
+      ...stepOf(totpOnly),
+      methods: undefined,
+    });
+    expect(acceptsAuthenticatorCode(stepOf(withPasskeys)?.methods ?? [])).toBe(true);
+  });
+
+  it('ignores methods it does not know, without crashing', () => {
+    const error = loginError('MFA_ENROLLMENT_REQUIRED', {
+      enrollmentToken: ENROLLMENT_TOKEN,
+      methods: ['totp', 'webauthn', 'sms', 7, null, { kind: 'push' }],
+      expiresIn: 900,
+    });
+
+    expect(stepOf(error)?.methods).toEqual(['totp', 'webauthn', 'sms']);
+    expect(acceptsAuthenticatorCode(stepOf(error)?.methods ?? [])).toBe(true);
+  });
+});
+
 describe('describeMfaFailure', () => {
   const NOW = 1_000_000;
 
@@ -137,6 +181,7 @@ describe('describeMfaFailure', () => {
     ['MFA_CHALLENGE_INVALID', 'expired'],
     ['MFA_METHOD_NOT_FOUND', 'expired'],
     ['MFA_ALREADY_ENROLLED', 'alreadyEnrolled'],
+    ['ACCOUNT_DISABLED', 'disabled'],
   ])('sends %s back to the password step', (code, reason) => {
     expect(describeMfaFailure(new AuthError('x', { code }), NOW)).toEqual({
       kind: 'restart',

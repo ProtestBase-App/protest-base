@@ -16,6 +16,7 @@ import {
   followOrganizationOnServer,
   unfollowOrganizationOnServer,
 } from '@/services/engagement.service';
+import { useGlobalContext } from '@/context/GlobalProvider';
 import { logger } from '@/utils/logger';
 
 /**
@@ -50,6 +51,7 @@ interface FollowedOrgsContextType {
 const FollowedOrgsContext = createContext<FollowedOrgsContextType | undefined>(undefined);
 
 export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
+  const { localDataGeneration } = useGlobalContext();
   const [followedOrgIds, setFollowedOrgIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -78,6 +80,28 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  // This provider never remounts: after the device's user data is wiped (sign-out, or another
+  // account's cleared at sign-in), the list would outlive the wipe and the next follow would
+  // write it back. Reload it instead.
+  const generationRef = useRef(localDataGeneration);
+  useEffect(() => {
+    if (generationRef.current === localDataGeneration) return;
+    generationRef.current = localDataGeneration;
+    let isMounted = true;
+    fetchFollowedOrgIdsLocally()
+      .then((ids) => {
+        if (isMounted) setFollowedOrgIds(ids);
+      })
+      .catch((error) => {
+        logger.warn('[FollowedOrgs] Reload after a wipe failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [localDataGeneration]);
 
   const persist = useCallback(async (ids: string[]) => {
     try {
