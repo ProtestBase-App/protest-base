@@ -134,6 +134,10 @@ export default (): ExpoConfig => {
         'android.permission.READ_MEDIA_VIDEO',
         'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
         'android.permission.READ_EXTERNAL_STORAGE',
+        // expo-calendar adds these, but Add to Calendar hands the event to the
+        // calendar app through an ACTION_INSERT intent, which needs neither.
+        'android.permission.READ_CALENDAR',
+        'android.permission.WRITE_CALENDAR',
       ],
       // App Links verification is production-only: a verified preview build
       // would auto-open production protestbase.be/event/* links but query a
@@ -209,8 +213,11 @@ export default (): ExpoConfig => {
       [
         'expo-calendar',
         {
-          calendarPermission: 'The app needs to access your calendar.',
-          remindersPermission: 'The app needs to access your reminders to add events.',
+          // Shown only on iOS 16, where the add-event screen needs calendar access; iOS 17+
+          // shows that screen without asking. The app never reads or writes reminders.
+          calendarPermission:
+            'ProtestBase uses this only to add the event you chose to your calendar.',
+          remindersPermission: false,
         },
       ],
       'expo-localization',

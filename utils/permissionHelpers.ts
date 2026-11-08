@@ -45,11 +45,25 @@ export async function getPhotoLibraryReadStatus(): Promise<PermissionStatus> {
 }
 
 /**
+ * Whether adding an event to the device calendar needs the calendar permission.
+ *
+ * The system's add-event screen needs none on Android (an ACTION_INSERT intent) or on
+ * iOS 17+ (it runs outside the app): expo-calendar only checks the permission on iOS 16.
+ */
+export function calendarNeedsPermission(): boolean {
+  return Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) < 17;
+}
+
+/**
  * Get calendar permission status without prompting
- * Used when adding events to the device calendar
+ * Used when adding events to the device calendar. 'notUsed' where adding an event
+ * needs no permission (see calendarNeedsPermission).
  */
 export async function getCalendarStatus(): Promise<PermissionStatus> {
   try {
+    if (!calendarNeedsPermission()) {
+      return 'notUsed';
+    }
     const { status } = await Calendar.getCalendarPermissionsAsync();
     return mapPermissionStatus(status);
   } catch (error) {
