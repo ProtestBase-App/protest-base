@@ -197,6 +197,15 @@ export interface FormattedEvent {
   cancellation_reason: string | null;
 }
 
+/**
+ * French and Dutch put the day before the month and keep the month lowercase:
+ * "Dimanche 8 novembre", "Zondag 8 november". Unsupported languages render in
+ * English, so they keep its order.
+ */
+function isDayFirstLocale(locale: string): boolean {
+  return locale === 'fr' || locale === 'nl';
+}
+
 export function formatEventForDisplay(event: Event, locale: string = 'en'): FormattedEvent {
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -213,9 +222,8 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     formatInBelgiumTimezone(startDateObj, resolvedLocale, { weekday: 'long' })
   );
   const startDayOfMonth = startParts.day.toString().padStart(2, '0');
-  const startMonth = capitalize(
-    formatInBelgiumTimezone(startDateObj, resolvedLocale, { month: 'long' })
-  );
+  const startMonth = formatInBelgiumTimezone(startDateObj, resolvedLocale, { month: 'long' });
+  const dayFirst = isDayFirstLocale(locale);
 
   // 12-hour with AM/PM for English; 24-hour for French/Dutch.
   const timeOptions: Intl.DateTimeFormatOptions =
@@ -230,7 +238,9 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
   const formattedStartTime = isAllDay
     ? getAllDayLabel(locale)
     : formatInBelgiumTimezone(startDateObj, resolvedLocale, timeOptions);
-  const formattedStartDate = `${startDayOfWeek}, ${startMonth} ${startDayOfMonth}`;
+  const formattedStartDate = dayFirst
+    ? `${startDayOfWeek} ${startParts.day} ${startMonth}`
+    : `${startDayOfWeek}, ${capitalize(startMonth)} ${startDayOfMonth}`;
   const startDateNoFormat = event.start_time.split('T')[0];
 
   let formattedEndDate = '';
@@ -242,11 +252,11 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     const endDateObj = parseAsUTC(event.end_time);
     const endParts = getDatePartsInBelgium(endDateObj);
     const endDayOfMonth = endParts.day.toString().padStart(2, '0');
-    const endMonth = capitalize(
-      formatInBelgiumTimezone(endDateObj, resolvedLocale, { month: 'long' })
-    );
+    const endMonth = formatInBelgiumTimezone(endDateObj, resolvedLocale, { month: 'long' });
 
-    formattedEndDate = `${endMonth} ${endDayOfMonth}`;
+    formattedEndDate = dayFirst
+      ? `${endParts.day} ${endMonth}`
+      : `${capitalize(endMonth)} ${endDayOfMonth}`;
     formattedEndTime = isAllDay
       ? ''
       : formatInBelgiumTimezone(endDateObj, resolvedLocale, timeOptions);
@@ -453,13 +463,32 @@ export function formatEventTime24h(isoDateString: string): string {
   });
 }
 
+/** Weekday and date of an event card: "Sunday July 14", "Dimanche 14 juillet". */
+function formatCardDate(date: Date, locale: string): string {
+  const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+
+  const localeMap: Record<string, string> = {
+    en: 'en-US',
+    fr: 'fr-FR',
+    nl: 'nl-NL',
+  };
+  const resolvedLocale = localeMap[locale] || 'en-US';
+
+  const dayOfWeek = capitalize(formatInBelgiumTimezone(date, resolvedLocale, { weekday: 'long' }));
+  const month = formatInBelgiumTimezone(date, resolvedLocale, { month: 'long' });
+  const dayOfMonth = getDatePartsInBelgium(date).day;
+
+  return isDayFirstLocale(locale)
+    ? `${dayOfWeek} ${dayOfMonth} ${month}`
+    : `${dayOfWeek} ${capitalize(month)} ${dayOfMonth}`;
+}
+
 /**
- * Format event date and time for card display, e.g. "Sunday July 14 at 10:00 AM".
+ * Format event date and time for card display, e.g. "Sunday July 14 at 10:00 AM"
+ * or "Dimanche 14 juillet à 10:00".
  */
 export function formatEventDateTime(isoDateString: string, locale: string = 'en'): string {
   const date = parseAsUTC(isoDateString);
-
-  const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
   const localeMap: Record<string, string> = {
     en: 'en-US',
@@ -468,12 +497,6 @@ export function formatEventDateTime(isoDateString: string, locale: string = 'en'
   };
 
   const resolvedLocale = localeMap[locale] || 'en-US';
-
-  const parts = getDatePartsInBelgium(date);
-
-  const dayOfWeek = capitalize(formatInBelgiumTimezone(date, resolvedLocale, { weekday: 'long' }));
-  const month = capitalize(formatInBelgiumTimezone(date, resolvedLocale, { month: 'long' }));
-  const dayOfMonth = parts.day;
 
   const timeOptions: Intl.DateTimeFormatOptions =
     locale === 'en'
@@ -484,7 +507,7 @@ export function formatEventDateTime(isoDateString: string, locale: string = 'en'
 
   const connector = locale === 'en' ? 'at' : locale === 'fr' ? 'à' : 'om';
 
-  return `${dayOfWeek} ${month} ${dayOfMonth} ${connector} ${time}`;
+  return `${formatCardDate(date, locale)} ${connector} ${time}`;
 }
 
 /*
@@ -514,20 +537,5 @@ export function formatEventStartLabel24h(event: TimedEvent, locale: string = 'en
 /** `formatEventDateTime` for an event: "Sunday July 14 at 10:00 AM", or "Sunday July 14 · All day". */
 export function formatEventDateTimeLabel(event: TimedEvent, locale: string = 'en'): string {
   if (event.all_day !== true) return formatEventDateTime(event.start_time, locale);
-
-  const date = parseAsUTC(event.start_time);
-  const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
-  const localeMap: Record<string, string> = {
-    en: 'en-US',
-    fr: 'fr-FR',
-    nl: 'nl-NL',
-  };
-  const resolvedLocale = localeMap[locale] || 'en-US';
-
-  const dayOfWeek = capitalize(formatInBelgiumTimezone(date, resolvedLocale, { weekday: 'long' }));
-  const month = capitalize(formatInBelgiumTimezone(date, resolvedLocale, { month: 'long' }));
-  const dayOfMonth = getDatePartsInBelgium(date).day;
-
-  return `${dayOfWeek} ${month} ${dayOfMonth} · ${getAllDayLabel(locale)}`;
+  return `${formatCardDate(parseAsUTC(event.start_time), locale)} · ${getAllDayLabel(locale)}`;
 }
