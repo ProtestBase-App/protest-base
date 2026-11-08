@@ -336,10 +336,13 @@ const en: LocaleData = {
       one: '1 attempt left.',
       other: '{{count}} attempts left.',
     },
-    blocked: 'Too many incorrect codes. Try again later.',
+    // The lock is on the account, so on a shared account someone else's codes can cause it.
+    blocked:
+      'This account is temporarily locked after too many incorrect codes, which may have come from someone else who uses it. Try again later.',
     lockedFor: {
-      one: 'Too many incorrect codes. Try again in 1 minute.',
-      other: 'Too many incorrect codes. Try again in {{count}} minutes.',
+      one: 'This account is locked after too many incorrect codes, which may have come from someone else who uses it. Try again in 1 minute.',
+      other:
+        'This account is locked after too many incorrect codes, which may have come from someone else who uses it. Try again in {{count}} minutes.',
     },
     expiredTitle: 'Sign-in expired',
     expiredMessage: 'This sign-in took too long. Sign in again.',

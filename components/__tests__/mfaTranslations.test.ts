@@ -56,4 +56,18 @@ describe('two-step verification text', () => {
   ])('has every key the screens use in %s', (_locale, data) => {
     expect(keysUsed().filter((key) => !hasText(data, key))).toEqual([]);
   });
+
+  // The lock is per account: on a shared account, someone else's wrong codes lock everyone out,
+  // so the text has to name the account rather than suggest this person typed them.
+  it.each([
+    ['en', en, /this account/i],
+    ['fr', fr, /ce compte/i],
+    ['nl', nl, /dit account/i],
+  ])('says in %s that the whole account is locked', (_locale, data, account) => {
+    const { blocked, lockedFor } = data.mfa;
+    for (const text of [blocked, lockedFor.one, lockedFor.other]) {
+      expect(text).toMatch(account);
+    }
+    expect(lockedFor.other).toContain('{{count}}');
+  });
 });

@@ -355,10 +355,12 @@ const nl = {
       one: 'Nog 1 poging.',
       other: 'Nog {{count}} pogingen.',
     },
-    blocked: 'Te veel onjuiste codes. Probeer het later opnieuw.',
+    blocked:
+      'Dit account is tijdelijk geblokkeerd na te veel onjuiste codes, misschien ingevoerd door iemand anders die het gebruikt. Probeer het later opnieuw.',
     lockedFor: {
-      one: 'Te veel onjuiste codes. Probeer het over 1 minuut opnieuw.',
-      other: 'Te veel onjuiste codes. Probeer het over {{count}} minuten opnieuw.',
+      one: 'Dit account is geblokkeerd na te veel onjuiste codes, misschien ingevoerd door iemand anders die het gebruikt. Probeer het over 1 minuut opnieuw.',
+      other:
+        'Dit account is geblokkeerd na te veel onjuiste codes, misschien ingevoerd door iemand anders die het gebruikt. Probeer het over {{count}} minuten opnieuw.',
     },
     expiredTitle: 'Inloggen verlopen',
     expiredMessage: 'Het inloggen duurde te lang. Log opnieuw in.',

@@ -344,10 +344,12 @@ const fr: LocaleData = {
       one: 'Il reste 1 essai.',
       other: 'Il reste {{count}} essais.',
     },
-    blocked: 'Trop de codes incorrects. Réessayez plus tard.',
+    blocked:
+      "Ce compte est temporairement bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez plus tard.",
     lockedFor: {
-      one: 'Trop de codes incorrects. Réessayez dans 1 minute.',
-      other: 'Trop de codes incorrects. Réessayez dans {{count}} minutes.',
+      one: "Ce compte est bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez dans 1 minute.",
+      other:
+        "Ce compte est bloqué après trop de codes incorrects, peut-être saisis par une autre personne qui l'utilise. Réessayez dans {{count}} minutes.",
     },
     expiredTitle: 'Connexion expirée',
     expiredMessage: 'Cette connexion a pris trop de temps. Reconnectez-vous.',

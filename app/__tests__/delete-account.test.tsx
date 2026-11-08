@@ -503,6 +503,22 @@ describe('Delete Account Screen', () => {
       );
     });
 
+    // The backend takes a code from any app on the account; a recovery code is the other way.
+    it('deletes with a recovery code instead of an app code', async () => {
+      (deleteAccount as jest.Mock)
+        .mockRejectedValueOnce(reauthRequired())
+        .mockResolvedValueOnce(undefined);
+      (reauthenticate as jest.Mock).mockResolvedValue('proof-token');
+      const utils = await reachCodeStep();
+
+      fireEvent.press(utils.getByTestId('mfa-reauth-switch'));
+      enterCode(utils, 'abcde-23456');
+
+      await waitFor(() => expect(utils.clearAuthState).toHaveBeenCalled());
+      expect(reauthenticate).toHaveBeenCalledWith('mypassword123', 'recovery', 'ABCDE23456');
+      expect(deleteAccount).toHaveBeenLastCalledWith('mypassword123', 'proof-token');
+    });
+
     it('shows a wrong code next to the field and deletes nothing', async () => {
       (deleteAccount as jest.Mock).mockRejectedValueOnce(reauthRequired());
       (reauthenticate as jest.Mock).mockRejectedValue(
