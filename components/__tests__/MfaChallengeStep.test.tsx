@@ -63,6 +63,20 @@ describe('MfaChallengeStep', () => {
     expect(mockVerify).toHaveBeenCalledWith(challenge.challengeId, 'totp', '123456');
   });
 
+  it('offers the authenticator as with ["totp"] when the backend also lists passkeys', async () => {
+    mockVerify.mockResolvedValueOnce({ user });
+    const { onSignedIn } = renderStep({ methods: ['totp', 'webauthn'] });
+
+    expect(screen.getByText('mfa.challengeTitle')).toBeTruthy();
+    expect(screen.queryByText('mfa.passkeyOnly')).toBeNull();
+    // Recovery codes stay one tap away, as with ["totp"].
+    expect(screen.getByTestId('mfa-challenge-switch')).toBeTruthy();
+    enterCode('123456');
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith({ user }));
+    expect(mockVerify).toHaveBeenCalledWith(challenge.challengeId, 'totp', '123456');
+  });
+
   it('signs in with a recovery code and passes on how many are left', async () => {
     mockVerify.mockResolvedValueOnce({ user, recoveryCodesRemaining: 1 });
     const { onSignedIn } = renderStep();

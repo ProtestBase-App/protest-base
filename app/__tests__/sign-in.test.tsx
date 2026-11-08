@@ -548,6 +548,47 @@ describe('SignIn Screen', () => {
       fireEvent.press(utils.getByText('auth.signInButton'));
     }
 
+    // With passkeys configured, the backend lists "webauthn" next to "totp". The app offers
+    // only the authenticator, so both steps must look exactly as with ["totp"].
+    it('shows the usual code step when the backend also lists passkeys', async () => {
+      (login as jest.Mock).mockRejectedValue(
+        secondStepError('MFA_REQUIRED', {
+          challengeId: 'c'.repeat(43),
+          methods: ['totp', 'webauthn'],
+          expiresIn: 300,
+        })
+      );
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+
+      expect(await utils.findByText('mfa.challengeTitle')).toBeTruthy();
+      expect(utils.getByTestId('mfa-challenge-input')).toBeTruthy();
+      expect(utils.queryByText('mfa.passkeyOnly')).toBeNull();
+    });
+
+    it('offers the authenticator setup when the backend also lists passkeys', async () => {
+      (login as jest.Mock).mockRejectedValue(
+        secondStepError('MFA_ENROLLMENT_REQUIRED', {
+          enrollmentToken: 'e'.repeat(43),
+          methods: ['totp', 'webauthn'],
+          expiresIn: 900,
+        })
+      );
+      (startTotpEnrollment as jest.Mock).mockResolvedValue({
+        methodId: 'method-1',
+        otpauthUri: 'otpauth://totp/ProtestBase?secret=AAAABBBBCCCCDDDD',
+        qrDataUri: 'data:image/png;base64,AAAA',
+        manualKey: 'AAAABBBBCCCCDDDD',
+      });
+      const utils = renderSignIn();
+
+      await submitPassword(utils);
+
+      expect(await utils.findByTestId('mfa-enroll-input')).toBeTruthy();
+      expect(startTotpEnrollment).toHaveBeenCalled();
+    });
+
     it('asks for the code after a correct password and signs in with it', async () => {
       (login as jest.Mock).mockRejectedValue(challengeError());
       (verifyMfaCode as jest.Mock).mockResolvedValue({ user });
