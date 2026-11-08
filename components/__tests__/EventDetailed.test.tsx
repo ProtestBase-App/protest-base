@@ -34,6 +34,13 @@ jest.mock('expo-calendar/legacy', () => ({
   },
 }));
 
+// Only iOS 16 asks for calendar access before the add-event screen; each test says which case it is.
+const mockCalendarNeedsPermission = jest.fn(() => true);
+jest.mock('@/utils/permissionHelpers', () => ({
+  ...jest.requireActual('@/utils/permissionHelpers'),
+  calendarNeedsPermission: () => mockCalendarNeedsPermission(),
+}));
+
 jest.mock('@/context/PostalCodeProvider', () => ({
   usePostalCodes: jest.fn(() => ({
     getSubMunicipalityName: jest.fn(() => 'Brussels'),
@@ -311,7 +318,33 @@ describe('EventDetailed', () => {
   });
 });
 
-describe('EventDetailed — calendar integration', () => {
+describe('EventDetailed — calendar integration without a permission (Android, iOS 17+)', () => {
+  beforeEach(() => mockCalendarNeedsPermission.mockReturnValue(false));
+  afterEach(() => {
+    mockCalendarNeedsPermission.mockReturnValue(true);
+    jest.clearAllMocks();
+  });
+
+  it('opens the add-event screen without asking for calendar access', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    (Calendar.createEventInCalendarAsync as jest.Mock).mockResolvedValue({ action: 'saved' });
+
+    render(<EventDetailed {...defaultProps} />);
+    await act(async () => {
+      fireEvent.press(screen.getByText('March 15, 2025'));
+    });
+
+    expect(Calendar.getCalendarPermissionsAsync).not.toHaveBeenCalled();
+    expect(Calendar.requestCalendarPermissionsAsync).not.toHaveBeenCalled();
+    expect(Calendar.createEventInCalendarAsync).toHaveBeenCalledTimes(1);
+    // No explanation dialog either: there is no system prompt to explain.
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+});
+
+describe('EventDetailed — calendar integration (iOS 16, which asks for access)', () => {
+  beforeEach(() => mockCalendarNeedsPermission.mockReturnValue(true));
   afterEach(() => jest.clearAllMocks());
 
   it('opens pre-permission dialog when calendar permission is undetermined', async () => {

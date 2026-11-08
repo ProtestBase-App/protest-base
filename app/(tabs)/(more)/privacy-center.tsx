@@ -200,14 +200,16 @@ export default function PrivacyCenterScreen() {
                 />
               )}
 
-              <PermissionStatusItem
-                name={t('privacyCenter.calendarPermission')}
-                description={t('privacyCenter.calendarDescription')}
-                status={permissionStatuses.calendar}
-                statusLabels={statusLabels}
-                onOpenSettings={openAppSettings}
-                openSettingsLabel={t('privacyCenter.openSettings')}
-              />
+              {permissionStatuses.calendar !== 'notUsed' && (
+                <PermissionStatusItem
+                  name={t('privacyCenter.calendarPermission')}
+                  description={t('privacyCenter.calendarDescription')}
+                  status={permissionStatuses.calendar}
+                  statusLabels={statusLabels}
+                  onOpenSettings={openAppSettings}
+                  openSettingsLabel={t('privacyCenter.openSettings')}
+                />
+              )}
 
               <PermissionStatusItem
                 name={t('privacyCenter.notificationsPermission')}
