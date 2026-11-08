@@ -1,16 +1,55 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ExternalLink } from '@/components/ExternalLink';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Typography, Spacing } from '@/constants/DesignTokens';
+import { ExternalLinks } from '@/constants/ExternalLinks';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { getThemeColors } from '@/utils/themeColors';
-import { t } from '@/utils/i18n';
+import { getCurrentLocale, t } from '@/utils/i18n';
+import { logger } from '@/utils/logger';
+
+const CONTACT_EMAIL = 'info@protestbase.be';
 
 export default function TermsAndConditionsScreen() {
   const colorScheme = useColorScheme();
   const themeColors = getThemeColors(colorScheme);
+  // The policy page in the language these terms are shown in.
+  const privacyPolicyUrl =
+    ExternalLinks.PRIVACY_POLICY[getCurrentLocale()] ?? ExternalLinks.PRIVACY_POLICY.en;
+
+  const openContactEmail = () => {
+    Linking.openURL(`mailto:${CONTACT_EMAIL}`).catch((error: unknown) => {
+      logger.warn('[Terms] Could not open an e-mail app', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  };
+
+  const privacyPolicyLink = (
+    <ExternalLink
+      href={privacyPolicyUrl}
+      accessibilityRole="link"
+      accessibilityHint={t('a11y.hints.openPrivacyPolicy')}
+      style={[styles.link, { color: themeColors.link }]}
+    >
+      {t('termsAndConditions.privacyPolicyLink')}
+    </ExternalLink>
+  );
+
+  const contactEmailLink = (
+    <ThemedText
+      accessibilityRole="link"
+      accessibilityHint={t('a11y.hints.sendEmail')}
+      style={[styles.link, { color: themeColors.link }]}
+      onPress={openContactEmail}
+    >
+      {CONTACT_EMAIL}
+    </ThemedText>
+  );
+
   return (
     <ThemedView style={styles.wrapper}>
       <SafeAreaView style={styles.container}>
@@ -102,9 +141,12 @@ export default function TermsAndConditionsScreen() {
               </ThemedView>
               <ThemedView style={styles.bulletPoint}>
                 <ThemedText style={styles.bullet}>•</ThemedText>
-                <ThemedText style={styles.bulletText}>
-                  {t('termsAndConditions.section3_1Bullet2')}
-                </ThemedText>
+                <ThemedView style={styles.bulletBody}>
+                  <ThemedText style={styles.bulletBodyText}>
+                    {t('termsAndConditions.section3_1Bullet2')}
+                  </ThemedText>
+                  {privacyPolicyLink}
+                </ThemedView>
               </ThemedView>
 
               <ThemedText style={styles.subSectionTitle}>
@@ -112,9 +154,12 @@ export default function TermsAndConditionsScreen() {
               </ThemedText>
               <ThemedView style={styles.bulletPoint}>
                 <ThemedText style={styles.bullet}>•</ThemedText>
-                <ThemedText style={styles.bulletText}>
-                  {t('termsAndConditions.section3_2Bullet1')}
-                </ThemedText>
+                <ThemedView style={styles.bulletBody}>
+                  <ThemedText style={styles.bulletBodyText}>
+                    {t('termsAndConditions.section3_2Bullet1')}
+                  </ThemedText>
+                  {contactEmailLink}
+                </ThemedView>
               </ThemedView>
               <ThemedView style={styles.bulletPoint}>
                 <ThemedText style={styles.bullet}>•</ThemedText>
@@ -178,9 +223,12 @@ export default function TermsAndConditionsScreen() {
               </ThemedText>
               <ThemedView style={styles.bulletPoint}>
                 <ThemedText style={styles.bullet}>•</ThemedText>
-                <ThemedText style={styles.bulletText}>
-                  {t('termsAndConditions.section4_2Bullet1')}
-                </ThemedText>
+                <ThemedView style={styles.bulletBody}>
+                  <ThemedText style={styles.bulletBodyText}>
+                    {t('termsAndConditions.section4_2Bullet1')}
+                  </ThemedText>
+                  {privacyPolicyLink}
+                </ThemedView>
               </ThemedView>
               <ThemedView style={styles.bulletPoint}>
                 <ThemedText style={styles.bullet}>•</ThemedText>
@@ -363,12 +411,7 @@ export default function TermsAndConditionsScreen() {
               <ThemedText style={styles.paragraph}>
                 {t('termsAndConditions.section9Intro')}
               </ThemedText>
-              <ThemedText
-                style={[styles.link, { color: themeColors.link }]}
-                onPress={() => Linking.openURL('mailto:info@protestbase.be')}
-              >
-                info@protestbase.be
-              </ThemedText>
+              {contactEmailLink}
             </ThemedView>
 
             <ThemedView style={styles.divider} />
@@ -450,6 +493,14 @@ const styles = StyleSheet.create({
   },
   bulletText: {
     flex: 1,
+    fontSize: Typography.sizes.base,
+    lineHeight: 24,
+  },
+  // A bullet whose text is followed by a link: the column takes the row's remaining width.
+  bulletBody: {
+    flex: 1,
+  },
+  bulletBodyText: {
     fontSize: Typography.sizes.base,
     lineHeight: 24,
   },

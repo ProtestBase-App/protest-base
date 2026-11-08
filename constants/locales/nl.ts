@@ -1504,7 +1504,7 @@ const nl = {
   // ============================================
   termsAndConditions: {
     title: 'Algemene voorwaarden voor ProtestBase',
-    lastUpdated: 'Laatst bijgewerkt: 21/04/2025',
+    lastUpdated: 'Laatst bijgewerkt: 8 november 2026',
 
     // Introduction
     intro1:
@@ -1540,12 +1540,13 @@ const nl = {
       'Als je ProtestBase als gast gebruikt (zonder in te loggen), is dit wat je moet weten:',
     section3_1Title: '3.1. Gegevensprivacy',
     section3_1Bullet1:
-      'We respecteren je privacy. We verzamelen geen persoonlijke gegevens van gebruikers die niet inloggen.',
+      'We respecteren je privacy. Je hebt geen account nodig, en om evenementen te bekijken vragen we niet naar je naam, je e-mailadres of je locatie.',
     section3_1Bullet2:
-      'Alle protesten die je opslaat of waarmee je interactie hebt, worden alleen lokaal op je apparaat opgeslagen.',
+      'De protesten die je opslaat, leuk vindt of volgt, worden op je apparaat bewaard. Ons Privacybeleid legt precies uit wat er bij onze servers terechtkomt en waarom.',
+    privacyPolicyLink: 'Lees ons Privacybeleid',
     section3_2Title: '3.2. Evenementen of organisaties melden',
     section3_2Bullet1:
-      'Als je een evenement of organisatie tegenkomt die lokale wetten overtreedt of onveilige evenementen organiseert, kun je dit direct via de App melden.',
+      'Als je een evenement of organisatie tegenkomt die lokale wetten overtreedt of onveilige evenementen organiseert, kun je dit melden door een e-mail te sturen naar:',
     section3_2Bullet2:
       'We zullen alle meldingen bekijken en passende actie ondernemen, wat kan betekenen dat het evenement of de organisatie uit de App wordt verwijderd.',
     section3_3Title: '3.3. Jouw verantwoordelijkheid',
@@ -1566,7 +1567,7 @@ const nl = {
       'We kunnen aanvullende informatie vragen om te verifiëren dat je organisatie legitiem is.',
     section4_2Title: '4.2. Gegevensprivacy voor organisaties',
     section4_2Bullet1:
-      'In tegenstelling tot gastgebruikers hebben organisaties niet hetzelfde niveau van privacy omdat we je identiteit moeten verifiëren en de legitimiteit van je organisatie moeten waarborgen.',
+      'Om te controleren of je organisatie legitiem is, hebben we wat informatie over jou en je organisatie nodig. Ons Privacybeleid legt uit wat we bewaren, hoe lang en hoe je je account verwijdert.',
     section4_2Bullet2:
       'Door een account aan te maken, ga je ermee akkoord accurate en actuele informatie over je organisatie te verstrekken.',
     section4_3Title: '4.3. Verantwoordelijkheid voor inhoud',
@@ -2244,6 +2245,8 @@ const nl = {
       manageEvent: 'Opent de acties voor dit evenement',
       openSettings: 'Opent de instellingen van de app op je toestel',
       openExternalLink: 'Opent de link buiten de app',
+      openPrivacyPolicy: 'Opent het privacybeleid in een browser',
+      sendEmail: 'Opent je e-mailapp om ons te schrijven',
       zoomInMap: 'Zoomt in op de kaart',
       zoomOutMap: 'Zoomt uit op de kaart',
       selectOnMap: 'Selecteert dit evenement op de kaart',

@@ -1219,7 +1219,7 @@ const fr: LocaleData = {
   // ============================================
   termsAndConditions: {
     title: 'Conditions générales de ProtestBase',
-    lastUpdated: 'Dernière mise à jour : 21/04/2025',
+    lastUpdated: 'Dernière mise à jour : 8 novembre 2026',
 
     // Introduction
     intro1:
@@ -1255,12 +1255,13 @@ const fr: LocaleData = {
       "Si vous utilisez ProtestBase en tant qu'invité (sans vous connecter), voici ce que vous devez savoir :",
     section3_1Title: '3.1. Confidentialité des données',
     section3_1Bullet1:
-      'Nous respectons votre vie privée. Nous ne collectons aucune donnée personnelle des utilisateurs qui ne se connectent pas.',
+      "Nous respectons votre vie privée. Vous n'avez pas besoin de compte, et nous ne vous demandons ni votre nom, ni votre adresse e-mail, ni votre localisation pour parcourir les événements.",
     section3_1Bullet2:
-      'Toutes les manifestations que vous enregistrez ou avec lesquelles vous interagissez seront uniquement stockées localement sur votre appareil.',
+      'Les manifestations que vous enregistrez, aimez ou suivez sont stockées sur votre appareil. Notre Politique de confidentialité explique précisément ce qui parvient à nos serveurs et pourquoi.',
+    privacyPolicyLink: 'Lire notre Politique de confidentialité',
     section3_2Title: "3.2. Signalement d'événements ou d'organisations",
     section3_2Bullet1:
-      "Si vous rencontrez un événement ou une organisation qui enfreint les lois locales ou organise des événements dangereux, vous pouvez le signaler directement via l'Application.",
+      'Si vous rencontrez un événement ou une organisation qui enfreint les lois locales ou organise des événements dangereux, vous pouvez nous le signaler par e-mail à :',
     section3_2Bullet2:
       "Nous examinerons tous les signalements et prendrons les mesures appropriées, ce qui peut inclure la suppression de l'événement ou de l'organisation de l'Application.",
     section3_3Title: '3.3. Votre responsabilité',
@@ -1282,7 +1283,7 @@ const fr: LocaleData = {
       'Nous pouvons demander des informations supplémentaires pour vérifier que votre organisation est légitime.',
     section4_2Title: '4.2. Confidentialité des données pour les organisations',
     section4_2Bullet1:
-      'Contrairement aux utilisateurs invités, les organisations ne bénéficient pas du même niveau de confidentialité car nous devons vérifier votre identité et garantir la légitimité de votre organisation.',
+      'Pour vérifier que votre organisation est légitime, nous avons besoin de certaines informations sur vous et sur votre organisation. Notre Politique de confidentialité explique ce que nous conservons, pendant combien de temps et comment supprimer votre compte.',
     section4_2Bullet2:
       'En créant un compte, vous acceptez de fournir des informations exactes et à jour sur votre organisation.',
     section4_3Title: '4.3. Responsabilité du contenu',
@@ -1984,6 +1985,8 @@ const fr: LocaleData = {
       manageEvent: 'Ouvre les actions pour cet événement',
       openSettings: "Ouvre les réglages de l'application sur votre appareil",
       openExternalLink: "Ouvre le lien en dehors de l'application",
+      openPrivacyPolicy: 'Ouvre la politique de confidentialité dans un navigateur',
+      sendEmail: 'Ouvre votre application de messagerie pour nous écrire',
       zoomInMap: 'Effectue un zoom avant sur la carte',
       zoomOutMap: 'Effectue un zoom arrière sur la carte',
       selectOnMap: 'Sélectionne cet événement sur la carte',

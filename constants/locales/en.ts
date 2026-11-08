@@ -1196,7 +1196,7 @@ const en: LocaleData = {
   // ============================================
   termsAndConditions: {
     title: 'Terms and Conditions for ProtestBase',
-    lastUpdated: 'Last Updated: 21/04/2025',
+    lastUpdated: 'Last Updated: 8 November 2026',
 
     // Introduction
     intro1:
@@ -1231,12 +1231,13 @@ const en: LocaleData = {
       "If you're using ProtestBase as a guest (without logging in), here's what you need to know:",
     section3_1Title: '3.1. Data Privacy',
     section3_1Bullet1:
-      'We respect your privacy. We do not collect any personal data from users who do not log in.',
+      "We respect your privacy. You don't need an account, and we don't ask for your name, e-mail address or location to browse events.",
     section3_1Bullet2:
-      'Any protests you save or interact with will only be stored locally on your device.',
+      'The protests you save, like or follow are stored on your device. Our Privacy Policy explains exactly what reaches our servers and why.',
+    privacyPolicyLink: 'Read our Privacy Policy',
     section3_2Title: '3.2. Reporting Events or Organisations',
     section3_2Bullet1:
-      'If you come across an event or organisation that violates local laws or organises unsafe events, you can report it directly through the App.',
+      'If you come across an event or organisation that violates local laws or organises unsafe events, you can report it to us by e-mail at:',
     section3_2Bullet2:
       'We will review all reports and take appropriate action, which may include removing the event or organisation from the App.',
     section3_3Title: '3.3. Your Responsibility',
@@ -1257,7 +1258,7 @@ const en: LocaleData = {
       'We may request additional information to verify that your organisation is legitimate.',
     section4_2Title: '4.2. Data Privacy for Organisations',
     section4_2Bullet1:
-      'Unlike guest users, organisations do not have the same level of privacy because we need to verify your identity and ensure the legitimacy of your organisation.',
+      'To check that your organisation is legitimate, we need some information about you and your organisation. Our Privacy Policy explains what we keep, for how long, and how to delete your account.',
     section4_2Bullet2:
       'By creating an account, you agree to provide accurate and up-to-date information about your organisation.',
     section4_3Title: '4.3. Responsibility for Content',
@@ -1927,6 +1928,8 @@ const en: LocaleData = {
       manageEvent: 'Opens the actions for this event',
       openSettings: 'Opens the app settings on your device',
       openExternalLink: 'Opens the link outside the app',
+      openPrivacyPolicy: 'Opens the privacy policy in a browser',
+      sendEmail: 'Opens your e-mail app to write to us',
       zoomInMap: 'Zooms in on the map',
       zoomOutMap: 'Zooms out on the map',
       selectOnMap: 'Selects this event on the map',
