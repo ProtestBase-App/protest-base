@@ -12,6 +12,7 @@ jest.mock('@/services/api', () => ({
     },
   },
   markSessionActive: jest.fn(),
+  appLanguage: jest.fn(() => 'nl'),
 }));
 
 jest.mock('expo-secure-store', () => ({
@@ -451,8 +452,10 @@ describe('auth.service', () => {
       const result = await forgotPassword('user@example.com');
 
       expect(result.success).toBe(true);
+      // The app's language travels with the request, so the reset mail is in it.
       expect(mockApi.post).toHaveBeenCalledWith('/auth/forgot-password', {
         email: 'user@example.com',
+        lang: 'nl',
       });
     });
 

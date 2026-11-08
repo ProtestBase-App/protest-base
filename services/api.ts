@@ -17,6 +17,7 @@ import { SECURE_STORE_KEYS, STORAGE_KEYS } from '@/constants/StorageConfig';
 import { SECURE_STORE_OPTIONS } from '@/utils/secureStoreOptions';
 import { isNetworkError } from '@/utils/networkError';
 import { getInstalledAppVersion } from '@/utils/appVersion';
+import { getCurrentLocale } from '@/utils/i18n';
 
 // Mobile API key, sent as `x-api-key` on every request except the /app/config
 // bootstrap. Trimmed so a stray newline in the EAS env var can't 401 every
@@ -123,6 +124,22 @@ const api = axios.create({
   timeout: 10000,
 });
 
+/**
+ * The app's language (en, fr or nl), for the backend's notices and reset mail. Read per
+ * request so a language change applies at once. The header is optional, so failing to read
+ * it must never stop a request.
+ */
+export function appLanguage(): string | undefined {
+  try {
+    return getCurrentLocale();
+  } catch (error) {
+    logger.warn('[API] Could not read the app language', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 function isBootstrapPath(url: string | undefined): boolean {
   return (url ?? '').split('?')[0] === BOOTSTRAP_PATH;
 }
@@ -155,6 +172,12 @@ api.interceptors.request.use(
     const appVersion = getInstalledAppVersion();
     if (appVersion) {
       config.headers['X-App-Version'] = appVersion;
+    }
+
+    // Without it the backend writes its sign-in notices and reset mail in French.
+    const language = appLanguage();
+    if (language && !config.headers['Accept-Language']) {
+      config.headers['Accept-Language'] = language;
     }
 
     // /app/config is served without a credential, so the version gate and
@@ -257,12 +280,16 @@ function isTransientRefreshFailure(error: unknown): boolean {
 }
 
 // Posts the refresh with plain axios: the instance's interceptors would recurse if the
-// refresh itself failed, so the API key and app version are attached here.
+// refresh itself failed, so the API key, app version and language are attached here.
 async function requestTokenRefresh(refreshToken: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const appVersion = getInstalledAppVersion();
   if (appVersion) {
     headers['X-App-Version'] = appVersion;
+  }
+  const language = appLanguage();
+  if (language) {
+    headers['Accept-Language'] = language;
   }
   if (API_KEY) {
     headers['x-api-key'] = API_KEY;

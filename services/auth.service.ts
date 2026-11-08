@@ -1,4 +1,4 @@
-import api, { markSessionActive } from '@/services/api';
+import api, { appLanguage, markSessionActive } from '@/services/api';
 import * as SecureStore from 'expo-secure-store';
 import type {
   User,
@@ -137,11 +137,12 @@ export const forgotPassword = async (
   email: string
 ): Promise<{ success: true; data: Record<string, unknown>; message?: string }> => {
   try {
+    // `lang` picks the reset mail's language; the backend also reads Accept-Language.
     const response = await api.post<{
       success: true;
       data: Record<string, unknown>;
       message?: string;
-    }>('/auth/forgot-password', { email });
+    }>('/auth/forgot-password', { email, lang: appLanguage() });
     return response.data;
   } catch (error: any) {
     // Forward interceptor-shaped rate-limit / lockout errors intact (see login()).
