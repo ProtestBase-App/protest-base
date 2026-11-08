@@ -824,6 +824,10 @@ const en: LocaleData = {
     // Error messages for data loading
     postalCodeLoadError: 'Failed to load postal codes. Please try again.',
     imagePickerError: 'Failed to select image. Please try again.',
+    imageProcessingError: {
+      one: "We couldn't process one photo, so it wasn't added. Please try another one.",
+      other: "We couldn't process {{count}} photos, so they weren't added. Please try other ones.",
+    },
     maxImagesReached: 'You can add up to {{max}} images.',
   },
 

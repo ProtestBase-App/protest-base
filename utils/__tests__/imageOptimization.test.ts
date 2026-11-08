@@ -1,4 +1,4 @@
-import { optimizeImageForUpload } from '@/utils/imageOptimization';
+import { ImageProcessingError, optimizeImageForUpload } from '@/utils/imageOptimization';
 
 jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: jest.fn(),
@@ -81,7 +81,33 @@ describe('optimizeImageForUpload', () => {
     expect(result.mimeType).toBe('image/jpeg');
   });
 
-  it('falls back to the original asset when manipulation throws', async () => {
+  it('retries once as a plain re-encode when the resize fails', async () => {
+    mockManipulate
+      .mockRejectedValueOnce(new Error('out of memory'))
+      .mockResolvedValueOnce({ uri: 'file:///reencoded.jpg', width: 6048, height: 4032 });
+    const result = await optimizeImageForUpload({
+      uri: 'file:///big.heic',
+      width: 6048,
+      height: 4032,
+      fileSize: 22_000_000,
+      mimeType: 'image/heic',
+      fileName: 'IMG_0001.heic',
+    });
+    expect(mockManipulate).toHaveBeenCalledTimes(2);
+    expect(mockManipulate).toHaveBeenNthCalledWith(
+      2,
+      'file:///big.heic',
+      [],
+      expect.objectContaining({ format: 'jpeg', compress: 0.85 })
+    );
+    expect(result).toEqual({
+      uri: 'file:///reencoded.jpg',
+      mimeType: 'image/jpeg',
+      fileName: 'IMG_0001.jpg',
+    });
+  });
+
+  it('throws ImageProcessingError when re-encoding fails twice, never returning the original', async () => {
     mockManipulate.mockRejectedValue(new Error('boom'));
     const original = {
       uri: 'file:///big.heic',
@@ -91,9 +117,15 @@ describe('optimizeImageForUpload', () => {
       mimeType: 'image/heic',
       fileName: 'IMG_0001.heic',
     };
-    const result = await optimizeImageForUpload(original);
-    expect(result.uri).toBe(original.uri);
-    expect(result.mimeType).toBe('image/heic');
+    await expect(optimizeImageForUpload(original)).rejects.toBeInstanceOf(ImageProcessingError);
+    expect(mockManipulate).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps ImageProcessingError recognisable with instanceof', () => {
+    const error = new ImageProcessingError();
+    expect(error).toBeInstanceOf(ImageProcessingError);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('ImageProcessingError');
   });
 
   it('still optimizes when fileSize is unknown but dimensions are large', async () => {

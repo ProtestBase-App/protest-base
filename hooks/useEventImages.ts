@@ -6,7 +6,7 @@ import { MAX_EVENT_IMAGES } from '@/constants/EventConfig';
 import type { PickedImage } from '@/types/event.types';
 import type { FormState } from '@/types/eventForm.types';
 import { t } from '@/utils/i18n';
-import { optimizeImageForUpload } from '@/utils/imageOptimization';
+import { ImageProcessingError, optimizeImageForUpload } from '@/utils/imageOptimization';
 import { logger } from '@/utils/logger';
 
 // LayoutAnimation is opt-in on Android.
@@ -53,16 +53,31 @@ export function useEventImages({ form, setForm }: UseEventImagesOptions) {
 
         // The backend refuses over 15 MB. One at a time: decoding 5 photos at once spikes memory.
         const optimized: PickedImage[] = [];
+        let dropped = 0;
         for (const asset of selectedAssets) {
-          optimized.push(
-            await optimizeImageForUpload({
-              uri: asset.uri,
-              mimeType: asset.mimeType,
-              fileName: asset.fileName,
-              width: asset.width,
-              height: asset.height,
-              fileSize: asset.fileSize,
-            })
+          try {
+            optimized.push(
+              await optimizeImageForUpload({
+                uri: asset.uri,
+                mimeType: asset.mimeType,
+                fileName: asset.fileName,
+                width: asset.width,
+                height: asset.height,
+                fileSize: asset.fileSize,
+              })
+            );
+          } catch (error) {
+            if (!(error instanceof ImageProcessingError)) throw error;
+            // Never add the original instead: it would be uploaded with its EXIF/GPS metadata.
+            dropped += 1;
+          }
+        }
+
+        if (dropped > 0) {
+          Alert.alert(
+            t('common.error'),
+            t('createEvent.imageProcessingError', { count: dropped }),
+            [{ text: t('common.ok') }]
           );
         }
 

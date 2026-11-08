@@ -875,6 +875,11 @@ const nl = {
     // Error messages for data loading
     postalCodeLoadError: 'Kon postcodes niet laden. Probeer het opnieuw.',
     imagePickerError: 'Kon afbeelding niet selecteren. Probeer het opnieuw.',
+    imageProcessingError: {
+      one: 'We konden één foto niet verwerken, dus die is niet toegevoegd. Probeer een andere.',
+      other:
+        "We konden {{count}} foto's niet verwerken, dus die zijn niet toegevoegd. Probeer andere.",
+    },
     maxImagesReached: 'Je kunt maximaal {{max}} afbeeldingen toevoegen.',
   },
 
