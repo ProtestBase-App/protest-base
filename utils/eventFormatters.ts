@@ -170,6 +170,8 @@ export interface FormattedEvent {
   isMultiDay: boolean;
 
   organization_id: string;
+  /** The organization's name, from the backend. Shown instead of `organizer_name`. */
+  organization_name?: string | null;
   organizer_id: string;
   organizer_name: string;
   website_url: string | null;
@@ -293,6 +295,7 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     series_id: event.series_id ?? null,
     isMultiDay,
     organization_id: event.organization_id ?? '',
+    organization_name: event.organization_name ?? null,
     organizer_id: event.organizer_id ?? '',
     organizer_name: event.organizer_name,
     website_url: event.website_url || null,

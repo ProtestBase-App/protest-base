@@ -38,10 +38,12 @@ const MAX_PERSISTED_CHARS = 1_000_000;
  * inside AsyncStorage limits even for datasets in the thousands.
  *
  * Consequence: after a cache hydrate, `organizations` stays empty until a real
- * fetch happens. Only `EventDetailed` and `app/organizer/[id].tsx` read it, both
- * as an opportunistic shortcut with their own fallbacks (the event's
- * `organizer_name` and the organization detail endpoint). Any new consumer that
- * needs the full objects must not assume they are present.
+ * fetch happens. Only `EventDetailed` and `app/organizer/[id].tsx` read it, and
+ * neither depends on it: the event carries `organization_name`, which the
+ * backend resolves, and the organizer screen has the organization detail
+ * endpoint. `EventDetailed` must never fall back to `organizer_name` for an
+ * event with an organization: that is the creating member's own account name.
+ * Any new consumer that needs the full objects must not assume they are present.
  */
 interface CachedOrganizations {
   dropdownItems: OrganizationDropdownItem[];

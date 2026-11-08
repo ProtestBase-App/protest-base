@@ -728,14 +728,37 @@ describe('EventDetailed — co-organizers rendering', () => {
     expect(screen.getByText('Climate Org')).toBeTruthy();
   });
 
-  it('falls back to organizer_name when no organization matches', () => {
-    const noOrgEvent = {
+  // organizer_name is the creating member's own account name. A guest on a fresh install has
+  // no organization list, so the event's organization_name is what names the organization.
+  it("shows the event's organization_name when the organization list doesn't have it", () => {
+    const orgEvent = {
       ...mockEvent,
       organization_id: 'unknown-org',
+      organization_name: 'Renamed Org',
       organizer_name: 'Personal Organizer',
     };
-    render(<EventDetailed {...defaultProps} event={noOrgEvent} />);
-    expect(screen.getByText('Personal Organizer')).toBeTruthy();
+    render(<EventDetailed {...defaultProps} event={orgEvent} />);
+    expect(screen.getByText('Renamed Org')).toBeTruthy();
+    expect(screen.queryByText('Personal Organizer')).toBeNull();
+  });
+
+  it('prefers organization_name over the organization list', () => {
+    const orgEvent = { ...mockEvent, organization_id: 'org-1', organization_name: 'Renamed Org' };
+    render(<EventDetailed {...defaultProps} event={orgEvent} />);
+    expect(screen.getByText('Renamed Org')).toBeTruthy();
+    expect(screen.queryByText('Climate Org')).toBeNull();
+  });
+
+  it("never shows the member's own name for an event that has an organization", () => {
+    const noOrgNameEvent = {
+      ...mockEvent,
+      organization_id: 'unknown-org',
+      organization_name: null,
+      organizer_name: 'Personal Organizer',
+    };
+    render(<EventDetailed {...defaultProps} event={noOrgNameEvent} />);
+    expect(screen.queryByText('Personal Organizer')).toBeNull();
+    expect(screen.queryByTestId('event-organizer-0')).toBeNull();
   });
 
   it('renders without organization_id', () => {

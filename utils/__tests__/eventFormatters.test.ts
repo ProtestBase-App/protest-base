@@ -201,6 +201,18 @@ describe('eventFormatters', () => {
       expect(result.postal_code).toBe('1000');
     });
 
+    // The event page shows it; formatEventForDisplay copies fields one by one, so a missing
+    // line here would put the creating member's own name back on the page.
+    it("carries the organization's name, or null without one", () => {
+      const withOrganization = {
+        ...mockEvent,
+        organization_id: 'org-1',
+        organization_name: 'Climate Org',
+      };
+      expect(formatEventForDisplay(withOrganization, 'en').organization_name).toBe('Climate Org');
+      expect(formatEventForDisplay(mockEvent, 'en').organization_name).toBeNull();
+    });
+
     it('should format start date correctly in English', () => {
       const result = formatEventForDisplay(mockEvent, 'en');
 

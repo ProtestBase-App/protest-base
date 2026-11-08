@@ -52,8 +52,12 @@ export interface Event {
   series_id?: string | null;
 
   organization_id?: string;
+  // The organization's current name, which the backend resolves on every read. Show this, not
+  // organizer_name, for an event that has an organization.
+  organization_name?: string | null;
 
-  // organizer_* fields are populated from the authenticated user who created the event.
+  // organizer_* fields are populated from the authenticated user who created the event:
+  // organizer_name is that member's own account name.
   organizer_id?: string;
   organizer_name: string;
   co_organizers?: string[];

@@ -153,7 +153,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
   const org = event.organization_id
     ? organizations.find((o) => o.$id === event.organization_id)
     : null;
-  const primaryOrgName = org?.Name || event.organizer_name;
+  // organizer_name is the creating member's own account name, so it only stands in for an
+  // event with no organization. The organization list is often not loaded on this screen.
+  const primaryOrgName = event.organization_id
+    ? event.organization_name || org?.Name || ''
+    : event.organizer_name;
 
   // Tail of the calendar card's time line. An all-day event has no end clock
   // time, so it keeps only the date range when it spans several days — and
