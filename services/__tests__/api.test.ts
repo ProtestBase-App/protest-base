@@ -47,6 +47,13 @@ jest.mock('@/utils/appVersion', () => ({
   getInstalledAppVersion: jest.fn(() => '1.2.3'),
 }));
 
+// The app language, which api.ts reads on every request for Accept-Language.
+const mockGetCurrentLocale = jest.fn(() => 'en');
+jest.mock('@/utils/i18n', () => ({
+  __esModule: true,
+  getCurrentLocale: () => mockGetCurrentLocale(),
+}));
+
 jest.mock('axios', () => {
   // Initialize global store inside factory (runs before interceptors are registered)
   (global as any).__apiTestStore__ = {
@@ -124,6 +131,8 @@ describe('services/api.ts', () => {
     // The one-shot sign-out guard is module state: re-arm it as a fresh login would.
     markSessionActive();
     jest.useRealTimers();
+    mockGetCurrentLocale.mockReset();
+    mockGetCurrentLocale.mockReturnValue('en');
   });
 
   // ============================================================
@@ -246,6 +255,56 @@ describe('services/api.ts', () => {
       }
     });
 
+    it('attaches Accept-Language with the app language, read on every request', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+      mockGetCurrentLocale.mockReturnValue('fr');
+
+      const login = await getStore().requestFulfilled({
+        headers: {},
+        method: 'post',
+        url: '/auth/login',
+      });
+      expect(login.headers['Accept-Language']).toBe('fr');
+
+      // A language change applies to the very next request.
+      mockGetCurrentLocale.mockReturnValue('nl');
+      const next = await getStore().requestFulfilled({
+        headers: {},
+        method: 'get',
+        url: '/events',
+      });
+      expect(next.headers['Accept-Language']).toBe('nl');
+    });
+
+    it('keeps an Accept-Language the caller set', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
+      mockGetCurrentLocale.mockReturnValue('nl');
+
+      const result = await getStore().requestFulfilled({
+        headers: { 'Accept-Language': 'en' },
+        method: 'get',
+        url: '/events',
+      });
+
+      expect(result.headers['Accept-Language']).toBe('en');
+    });
+
+    it('still sends the request, without Accept-Language, when the language cannot be read', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValueOnce(null);
+      mockGetCurrentLocale.mockImplementationOnce(() => {
+        throw new Error('i18n not ready');
+      });
+
+      const result = await getStore().requestFulfilled({
+        headers: {},
+        method: 'get',
+        url: '/events',
+      });
+
+      expect(result.headers['Accept-Language']).toBeUndefined();
+      expect(result.headers['X-App-Version']).toBe('1.2.3');
+    });
+
     it('omits X-App-Version when getInstalledAppVersion returns null', async () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getInstalledAppVersion } = require('@/utils/appVersion');
@@ -315,7 +374,7 @@ describe('services/api.ts', () => {
 
       expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('refresh_token');
       // The raw refresh call bypasses the request interceptor, so it must carry
-      // the API key itself.
+      // the API key and the app language itself.
       expect(mockAxios.post).toHaveBeenCalledWith(
         'https://api.example.com/auth/token/refresh',
         { refreshToken: 'old-refresh-token' },
@@ -323,6 +382,7 @@ describe('services/api.ts', () => {
           headers: expect.objectContaining({
             'x-api-key': 'test-api-key',
             'X-App-Version': '1.2.3',
+            'Accept-Language': 'en',
           }),
           // A stalled refresh must not hold every queued request.
           timeout: 8000,
