@@ -67,12 +67,15 @@ const mockFetchSavedEntriesLocally = jest.fn();
 const mockWriteSavedEntriesLocally = jest.fn();
 const mockAddSavedEntryLocally = jest.fn();
 const mockRemoveSavedIdLocally = jest.fn();
+const mockClaimLocalData = jest.fn();
 
 jest.mock('@/services/localStorageService', () => ({
   fetchSavedEntriesLocally: (...args: any[]) => mockFetchSavedEntriesLocally(...args),
   writeSavedEntriesLocally: (...args: any[]) => mockWriteSavedEntriesLocally(...args),
   addSavedEntryLocally: (...args: any[]) => mockAddSavedEntryLocally(...args),
   removeSavedIdLocally: (...args: any[]) => mockRemoveSavedIdLocally(...args),
+  claimLocalData: (...args: any[]) => mockClaimLocalData(...args),
+  clearAllUserData: jest.fn().mockResolvedValue(undefined),
 }));
 
 // ============================================
@@ -112,6 +115,28 @@ describe('SavedEventsProvider', () => {
     mockWriteSavedEntriesLocally.mockResolvedValue(undefined);
     mockAddSavedEntryLocally.mockResolvedValue(undefined);
     mockRemoveSavedIdLocally.mockResolvedValue(undefined);
+    mockClaimLocalData.mockResolvedValue(false);
+  });
+
+  // Another account's data is wiped at sign-in while the app is signed in, so no isLogged
+  // change marks it: the list reloads on localDataGeneration instead.
+  it("reloads the saved list when another account's data is wiped at sign-in", async () => {
+    mockFetchSavedEntriesLocally.mockResolvedValue([
+      { id: 'event-1', endsAt: Date.now() + 7 * DAY_MS },
+    ]);
+    const { result } = renderHook(() => ({ saved: useSavedEvents(), global: useGlobalContext() }), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.saved.savedEventIds).toEqual(['event-1']));
+
+    mockClaimLocalData.mockResolvedValue(true);
+    mockFetchSavedEntriesLocally.mockResolvedValue([]);
+    await act(async () => {
+      result.current.global.setUser({ $id: 'user-b' } as any);
+    });
+
+    await waitFor(() => expect(result.current.saved.savedEventIds).toEqual([]));
+    expect(mockClaimLocalData).toHaveBeenCalledWith('user-b');
   });
 
   it('should throw when useSavedEvents is used outside the provider', () => {

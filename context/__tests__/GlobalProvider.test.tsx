@@ -78,7 +78,11 @@ jest.mock('@/services/api', () => ({
 
 // expo-router mock (needed for token expiration handler navigation)
 jest.mock('expo-router', () => ({
-  router: { replace: jest.fn() },
+  router: {
+    replace: jest.fn(),
+    canDismiss: jest.fn().mockReturnValue(false),
+    dismissAll: jest.fn(),
+  },
 }));
 
 // ============================================
@@ -403,6 +407,85 @@ describe('GlobalProvider', () => {
       expect(result.current.isLogged).toBe(false);
       expect(result.current.user).toBeNull();
       expect(result.current.userEventCounts).toBeNull();
+    });
+  });
+
+  // A refresh the backend never answered ends the session without wiping; every other end
+  // wipes as before. Whoever signs in next takes over the data only if it is the same account.
+  describe('session ends and the device data', () => {
+    const sessionEndCallback = () =>
+      mockSetTokenExpirationCallback.mock.calls[
+        mockSetTokenExpirationCallback.mock.calls.length - 1
+      ][0] as (reason?: string) => Promise<void>;
+
+    it('signs out without wiping the device data when the refresh could not reach the server', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      mockSecureStore['access_token'] = 'valid-token';
+      mockSecureStore['refresh_token'] = 'refresh-token';
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      await act(async () => {
+        await sessionEndCallback()('unreachable');
+      });
+
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+      expect(mockSecureStore['access_token']).toBeUndefined();
+      expect(mockSecureStore['refresh_token']).toBeUndefined();
+      expect(alertSpy).toHaveBeenCalledWith('Signed Out', expect.any(String), expect.any(Array));
+      alertSpy.mockRestore();
+    });
+
+    it('still wipes the device data when the session simply ended', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      await act(async () => {
+        await sessionEndCallback()(undefined);
+      });
+
+      expect(AsyncStorage.multiRemove).toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Session Expired',
+        expect.any(String),
+        expect.any(Array)
+      );
+      alertSpy.mockRestore();
+    });
+
+    it("clears another account's data when a different account signs in", async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'localDataOwner' ? 'someone-else' : null
+      );
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      expect(result.current.localDataGeneration).toBe(0);
+
+      await act(async () => {
+        result.current.setUser(createMockUser() as any);
+      });
+      await flushPromises();
+
+      expect(AsyncStorage.multiRemove).toHaveBeenCalled();
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith('localDataOwner', 'user-1');
+      expect(result.current.localDataGeneration).toBe(1);
+    });
+
+    it('keeps the data when the same account signs in again', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'localDataOwner' ? 'user-1' : null
+      );
+      const { result } = renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+
+      await act(async () => {
+        result.current.setUser(createMockUser() as any);
+      });
+      await flushPromises();
+
+      expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+      expect(result.current.localDataGeneration).toBe(0);
     });
   });
 
@@ -929,6 +1012,32 @@ describe('GlobalProvider', () => {
       buttons?.[0]?.onPress?.();
       // Signing in again can't work for a disabled account, so not the sign-in screen.
       expect(router.replace).toHaveBeenCalledWith('/explore');
+      alertSpy.mockRestore();
+    });
+
+    // Seen on iOS: Delete Account stayed presented over Explore, waiting on its request.
+    it('closes a screen open over the tabs before going to Explore', async () => {
+      const { router } = jest.requireMock('expo-router') as {
+        router: { replace: jest.Mock; dismissAll: jest.Mock; canDismiss: jest.Mock };
+      };
+      router.canDismiss.mockReturnValueOnce(true);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      renderHook(() => useGlobalContext(), { wrapper });
+      await flushPromises();
+      const expirationCallback = mockSetTokenExpirationCallback.mock.calls[0][0];
+
+      await act(async () => {
+        expirationCallback('account_disabled');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      const [, , buttons] = alertSpy.mock.calls[0];
+      buttons?.[0]?.onPress?.();
+
+      expect(router.dismissAll).toHaveBeenCalledTimes(1);
+      expect(router.replace).toHaveBeenCalledWith('/explore');
+      expect(router.dismissAll.mock.invocationCallOrder[0]).toBeLessThan(
+        router.replace.mock.invocationCallOrder[0]
+      );
       alertSpy.mockRestore();
     });
 

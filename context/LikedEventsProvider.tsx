@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from 'react';
@@ -44,7 +45,7 @@ interface LikedEventsContextType {
 const LikedEventsContext = createContext<LikedEventsContextType | undefined>(undefined);
 
 export function LikedEventsProvider({ children }: { children: ReactNode }) {
-  const { eventsCache } = useGlobalContext();
+  const { eventsCache, localDataGeneration } = useGlobalContext();
   const [likedEventIds, setLikedEventIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,6 +78,28 @@ export function LikedEventsProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  // This provider never remounts: after the device's user data is wiped (sign-out, or another
+  // account's cleared at sign-in), the list would outlive the wipe and the next like would write
+  // it back. Reload it instead.
+  const generationRef = useRef(localDataGeneration);
+  useEffect(() => {
+    if (generationRef.current === localDataGeneration) return;
+    generationRef.current = localDataGeneration;
+    let isMounted = true;
+    fetchLikedEntriesLocally()
+      .then((entries) => {
+        if (isMounted) setLikedEventIds(entries.map((entry) => entry.id));
+      })
+      .catch((error) => {
+        logger.warn('[LikedEvents] Reload after a wipe failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [localDataGeneration]);
 
   const likeEvent = useCallback(
     async (eventId: string, endsAtArg?: number): Promise<number | null> => {

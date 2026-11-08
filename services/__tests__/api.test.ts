@@ -574,7 +574,9 @@ describe('services/api.ts', () => {
       expect(callback).not.toHaveBeenCalled();
     });
 
-    it('signs out once the transit retries are spent', async () => {
+    // The backend never answered, so nothing says the account changed: the session ends (the
+    // token may have been rotated) but as 'unreachable', which keeps the user's data on the phone.
+    it('signs out as unreachable once the transit retries are spent', async () => {
       jest.useFakeTimers();
       const callback = jest.fn();
       setTokenExpirationCallback(callback);
@@ -584,7 +586,66 @@ describe('services/api.ts', () => {
       await jest.advanceTimersByTimeAsync(3000);
 
       expect(mockAxios.post).toHaveBeenCalledTimes(3);
+      expect(callback).toHaveBeenCalledWith('unreachable');
+    });
+
+    it('signs out as unreachable when the refresh keeps getting a 5xx', async () => {
+      jest.useFakeTimers();
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      (mockAxios.post as jest.Mock).mockRejectedValue({
+        response: { status: 503, data: {} },
+      });
+
+      getStore().responseRejected(expiredError());
+      await jest.advanceTimersByTimeAsync(3000);
+
+      expect(callback).toHaveBeenCalledWith('unreachable');
+    });
+
+    it('ends the session as expired, not unreachable, when no refresh token is stored', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      getStore().responseRejected(expiredError());
+      await settle();
+
+      expect(mockAxios.post).not.toHaveBeenCalled();
       expect(callback).toHaveBeenCalledWith(undefined);
+    });
+
+    it('stores the new refresh token before the new access token', async () => {
+      (mockAxios.post as jest.Mock).mockResolvedValueOnce(newTokens);
+      getStore().retryFn.mockResolvedValueOnce({ data: { ok: true } });
+
+      await getStore().responseRejected(expiredError());
+
+      const keys = mockSecureStore.setItemAsync.mock.calls.map((call: unknown[]) => call[0]);
+      expect(keys.indexOf('refresh_token')).toBeGreaterThanOrEqual(0);
+      expect(keys.indexOf('refresh_token')).toBeLessThan(keys.indexOf('access_token'));
+    });
+
+    it('leaves a newer session alone when a stale refresh fails', async () => {
+      const callback = jest.fn();
+      setTokenExpirationCallback(callback);
+      let stored = 'old-refresh-token';
+      mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+        key === 'refresh_token' ? stored : null
+      );
+      const refreshFailure = { response: { status: 401, data: { code: 'INVALID_REFRESH_TOKEN' } } };
+      (mockAxios.post as jest.Mock).mockImplementationOnce(async () => {
+        // The user signed in again while this refresh was on its way.
+        stored = 'new-session-refresh-token';
+        throw refreshFailure;
+      });
+
+      // The old session's request fails rather than hanging, and isn't retried with new tokens.
+      await expect(getStore().responseRejected(expiredError())).rejects.toBe(refreshFailure);
+
+      expect(getStore().retryFn).not.toHaveBeenCalled();
+      expect(mockSecureStore.deleteItemAsync).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it('never replays the refresh token once the grace window may have closed', async () => {
@@ -600,7 +661,7 @@ describe('services/api.ts', () => {
       await jest.advanceTimersByTimeAsync(1000);
 
       expect(mockAxios.post).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(undefined);
+      expect(callback).toHaveBeenCalledWith('unreachable');
     });
 
     it('keeps the session when the refresh is rate-limited, since nothing was rotated', async () => {

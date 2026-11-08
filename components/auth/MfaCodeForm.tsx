@@ -152,7 +152,9 @@ export default function MfaCodeForm({
         containerStyles={styles.submit}
         testID={`${testID}-submit`}
       />
-      {allowAuthenticator && allowRecovery ? (
+      {/* Hidden while locked: switching would clear the lock text and enable Verify, and the
+          backend refuses every code until the lock ends. */}
+      {allowAuthenticator && allowRecovery && !blocked ? (
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityHint={

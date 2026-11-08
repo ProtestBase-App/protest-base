@@ -364,8 +364,11 @@ const nl = {
     },
     expiredTitle: 'Inloggen verlopen',
     expiredMessage: 'Het inloggen duurde te lang. Log opnieuw in.',
+    setupExpiredMessage:
+      'Het instellen duurde te lang. Log opnieuw in om opnieuw te beginnen. Heb je ProtestBase al aan je authenticator-app toegevoegd? Verwijder dat item: de codes ervan werken niet.',
+    alreadyEnrolledTitle: 'Al ingesteld',
     alreadyEnrolledMessage:
-      'Verificatie in twee stappen is al ingesteld voor dit account. Log opnieuw in.',
+      'Verificatie in twee stappen is net ingesteld voor dit account, misschien door iemand anders die het gebruikt. Log opnieuw in met een code uit de authenticator-app waarmee dat is ingesteld, of met een herstelcode. Heb je ProtestBase hier aan je app toegevoegd? Verwijder dat item: de codes ervan werken niet.',
     recoveryCodesLowTitle: 'Weinig herstelcodes over',
     recoveryCodesLow: {
       zero: 'Je hebt je laatste herstelcode gebruikt. Vanaf nu kun je alleen inloggen met je authenticator-app.',
@@ -373,9 +376,15 @@ const nl = {
       other:
         'Je hebt nog {{count}} herstelcodes. Als die gebruikt zijn, kun je alleen nog inloggen met je authenticator-app.',
     },
+    recoveryCodesLowPasskey: {
+      zero: 'Je hebt je laatste herstelcode gebruikt en deze app kan je toegangssleutel nog niet gebruiken. Maak nieuwe herstelcodes aan op de website van ProtestBase om hier weer in te loggen.',
+      one: 'Je hebt nog 1 herstelcode en deze app kan je toegangssleutel nog niet gebruiken. Maak nieuwe herstelcodes aan op de website van ProtestBase voordat je die gebruikt.',
+      other:
+        'Je hebt nog {{count}} herstelcodes en deze app kan je toegangssleutel nog niet gebruiken. Maak nieuwe herstelcodes aan op de website van ProtestBase voordat ze op zijn.',
+    },
     enrollTitle: 'Verificatie in twee stappen instellen',
     enrollIntro:
-      'ProtestBase vraagt nu bij het inloggen een code uit een authenticator-app. Stel dit één keer in op deze telefoon:',
+      'ProtestBase vraagt nu bij het inloggen een code uit een authenticator-app. Stel dit één keer in op deze telefoon. Staat er in je app al een ProtestBase-item voor dit account van een eerdere instelling? Verwijder het: de codes ervan werken niet.',
     stepAddTitle: '1. Voeg ProtestBase toe aan je authenticator-app',
     openAuthenticator: 'Toevoegen aan authenticator-app',
     openAuthenticatorHelp:
@@ -1143,6 +1152,9 @@ const nl = {
     multipleDevices: 'Meerdere apparaten gedetecteerd',
     continueHere: 'Hier doorgaan',
     signInAgain: 'Opnieuw aanmelden',
+    unreachable: 'Afgemeld',
+    unreachableMessage:
+      'ProtestBase was niet bereikbaar om je aangemeld te houden. Je concepten en bewaarde evenementen staan nog op deze telefoon. Meld je opnieuw aan zodra je weer online bent.',
     sessionEnded: 'Sessie beëindigd',
     allSessionsEnded: 'Alle sessies beëindigd',
     securityAlert: 'Beveiligingswaarschuwing',

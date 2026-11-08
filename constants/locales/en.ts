@@ -346,8 +346,12 @@ const en: LocaleData = {
     },
     expiredTitle: 'Sign-in expired',
     expiredMessage: 'This sign-in took too long. Sign in again.',
+    setupExpiredMessage:
+      "This setup took too long. Sign in again to start over. If you added ProtestBase to your authenticator app, delete that entry: its codes won't work.",
+    alreadyEnrolledTitle: 'Already set up',
+    // Codes from an entry that was never confirmed count as wrong, and enough of them lock the account.
     alreadyEnrolledMessage:
-      'Two-step verification is already set up for this account. Sign in again.',
+      "Two-step verification was just set up for this account, perhaps by someone else who uses it. Sign in again with a code from the authenticator app used for that setup, or with a recovery code. If you added ProtestBase to your app here, delete that entry: its codes won't work.",
     recoveryCodesLowTitle: 'Few recovery codes left',
     recoveryCodesLow: {
       zero: "You've used your last recovery code. From now on, you can only sign in with your authenticator app.",
@@ -355,9 +359,16 @@ const en: LocaleData = {
       other:
         "You have {{count}} recovery codes left. Once they're used, you can only sign in with your authenticator app.",
     },
+    // For an account whose only other method is a passkey, which the app can't use.
+    recoveryCodesLowPasskey: {
+      zero: "You've used your last recovery code, and this app can't use your passkey yet. To sign in here again, create new recovery codes on the ProtestBase website.",
+      one: "You have 1 recovery code left, and this app can't use your passkey yet. Create new recovery codes on the ProtestBase website before you use it.",
+      other:
+        "You have {{count}} recovery codes left, and this app can't use your passkey yet. Create new recovery codes on the ProtestBase website before they run out.",
+    },
     enrollTitle: 'Set up two-step verification',
     enrollIntro:
-      'ProtestBase now asks for a code from an authenticator app when you sign in. Set it up once on this phone:',
+      "ProtestBase now asks for a code from an authenticator app when you sign in. Set it up once on this phone. If your app already has a ProtestBase entry for this account from an earlier setup, delete it: its codes won't work.",
     stepAddTitle: '1. Add ProtestBase to your authenticator app',
     openAuthenticator: 'Add to authenticator app',
     openAuthenticatorHelp:
@@ -1067,6 +1078,9 @@ const en: LocaleData = {
     expired: 'Session Expired',
     expiredMessage: 'Your session has expired. Please sign in again to continue.',
     signInAgain: 'Sign In Again',
+    unreachable: 'Signed Out',
+    unreachableMessage:
+      "ProtestBase couldn't be reached to keep you signed in. Your drafts and saved events are still on this phone. Sign in again when you're back online.",
     securityAlert: 'Security Alert',
     securityAlertMessage: 'Your session was terminated for security reasons. Please sign in again.',
     signedInElsewhere: 'Signed In on Another Device',

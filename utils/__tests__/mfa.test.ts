@@ -137,6 +137,7 @@ describe('describeMfaFailure', () => {
     ['MFA_CHALLENGE_INVALID', 'expired'],
     ['MFA_METHOD_NOT_FOUND', 'expired'],
     ['MFA_ALREADY_ENROLLED', 'alreadyEnrolled'],
+    ['ACCOUNT_DISABLED', 'disabled'],
   ])('sends %s back to the password step', (code, reason) => {
     expect(describeMfaFailure(new AuthError('x', { code }), NOW)).toEqual({
       kind: 'restart',

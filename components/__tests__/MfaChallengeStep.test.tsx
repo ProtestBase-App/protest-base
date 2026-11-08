@@ -8,7 +8,7 @@ jest.mock('@/services/mfa.service', () => ({ verifyMfaCode: jest.fn() }));
 
 import React from 'react';
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MfaChallengeStep from '@/components/auth/MfaChallengeStep';
 import { verifyMfaCode } from '@/services/mfa.service';
 import type { MfaChallenge } from '@/types/mfa.types';
@@ -22,14 +22,16 @@ const user = { $id: 'user-1', email: 'organizer@example.org' };
 function renderStep(overrides: Partial<MfaChallenge> = {}) {
   const onSignedIn = jest.fn();
   const onRestart = jest.fn();
+  const onBusyChange = jest.fn();
   render(
     <MfaChallengeStep
       challenge={{ ...challenge, ...overrides }}
       onSignedIn={onSignedIn}
       onRestart={onRestart}
+      onBusyChange={onBusyChange}
     />
   );
-  return { onSignedIn, onRestart };
+  return { onSignedIn, onRestart, onBusyChange };
 }
 
 function enterCode(code: string) {
@@ -167,5 +169,36 @@ describe('MfaChallengeStep', () => {
 
     expect(onRestart).toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the way back closed while a code is being checked', async () => {
+    let answer: (value: { user: typeof user }) => void = () => {};
+    mockVerify.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const { onRestart, onSignedIn, onBusyChange } = renderStep();
+
+    enterCode('123456');
+
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    fireEvent.press(screen.getByTestId('mfa-back-to-sign-in'));
+    expect(onRestart).not.toHaveBeenCalled();
+
+    await act(async () => answer({ user }));
+
+    expect(onSignedIn).toHaveBeenCalledWith({ user });
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  // The second step carries no session, so the global sign-out never sees this answer.
+  it('says the account is disabled and goes back to the password', async () => {
+    mockVerify.mockRejectedValueOnce(
+      new AuthError('Account is disabled', { code: 'ACCOUNT_DISABLED', status: 403 })
+    );
+    const { onRestart } = renderStep();
+
+    enterCode('123456');
+
+    await waitFor(() => expect(onRestart).toHaveBeenCalled());
+    expect(alertSpy).toHaveBeenCalledWith('session.accountDisabled', 'auth.accountDisabledMessage');
+    expect(screen.queryByText('Account is disabled')).toBeNull();
   });
 });

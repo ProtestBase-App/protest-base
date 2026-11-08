@@ -42,6 +42,7 @@ const USER_DATA_KEYS = [
   STORAGE_KEYS.TEMPLATES_CACHE,
   STORAGE_KEYS.TEMPLATES_CACHE_TIMESTAMP,
   STORAGE_KEYS.USER_EVENT_COUNTS,
+  STORAGE_KEYS.LOCAL_DATA_OWNER,
 ];
 
 /**
@@ -62,6 +63,33 @@ export const clearAllUserData = async (): Promise<void> => {
   // OS-scheduled saved-event reminders are user data too: without this they
   // keep firing at 08:30 after logout/account deletion. Never throws.
   await cancelAllSavedEventNotifications();
+};
+
+/**
+ * Makes the device's user data this account's, and says whether it had to wipe it first. A
+ * sign-out the network forced keeps the data of the account that was signed in, so when a
+ * different account signs in next, it must not inherit that person's drafts, lists or
+ * templates. Data from no account (a guest's) is kept and becomes this account's.
+ */
+export const claimLocalData = async (userId: string): Promise<boolean> => {
+  let owner: string | null = null;
+  try {
+    owner = await AsyncStorage.getItem(STORAGE_KEYS.LOCAL_DATA_OWNER);
+  } catch (error: any) {
+    logger.warn('Failed to read the owner of the local user data', {
+      errorMessage: error.message,
+    });
+  }
+  const wipe = owner !== null && owner !== userId;
+  if (wipe) await clearAllUserData();
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.LOCAL_DATA_OWNER, userId);
+  } catch (error: any) {
+    logger.warn('Failed to store the owner of the local user data', {
+      errorMessage: error.message,
+    });
+  }
+  return wipe;
 };
 
 function isLegacyStringArray(value: unknown[]): value is string[] {

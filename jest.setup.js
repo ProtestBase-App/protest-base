@@ -124,6 +124,7 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
     navigate: jest.fn(),
     canGoBack: jest.fn().mockReturnValue(true),
+    canDismiss: jest.fn().mockReturnValue(false),
     dismiss: jest.fn(),
     dismissAll: jest.fn(),
     setParams: jest.fn(),
@@ -146,6 +147,9 @@ jest.mock('expo-router', () => ({
     setOptions: jest.fn(),
     goBack: jest.fn(),
     navigate: jest.fn(),
+    getParent: jest.fn(),
+    // Returns the unsubscribe function, like the real one.
+    addListener: jest.fn(() => jest.fn()),
   }),
   useFocusEffect: jest.fn((callback) => {
     // Faithful to @react-navigation: the focus callback runs as an effect

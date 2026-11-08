@@ -56,6 +56,7 @@ export interface MockGlobalContext {
   userEventCountsLoading?: boolean;
   refreshUserEventCounts?: jest.Mock;
   clearAuthState?: jest.Mock;
+  localDataGeneration?: number;
 }
 
 export interface MockSavedEventsContext {
@@ -219,6 +220,7 @@ const defaultGlobalContext: Required<MockGlobalContext> = {
   userEventCountsLoading: false,
   refreshUserEventCounts: jest.fn().mockResolvedValue(undefined),
   clearAuthState: jest.fn().mockResolvedValue(undefined),
+  localDataGeneration: 0,
 };
 
 const defaultSavedEventsContext: Required<MockSavedEventsContext> = {

@@ -353,8 +353,11 @@ const fr: LocaleData = {
     },
     expiredTitle: 'Connexion expirée',
     expiredMessage: 'Cette connexion a pris trop de temps. Reconnectez-vous.',
+    setupExpiredMessage:
+      "Cette configuration a pris trop de temps. Reconnectez-vous pour recommencer. Si vous avez ajouté ProtestBase à votre application d'authentification, supprimez cette entrée : ses codes ne fonctionneront pas.",
+    alreadyEnrolledTitle: 'Déjà activée',
     alreadyEnrolledMessage:
-      'La validation en deux étapes est déjà activée pour ce compte. Reconnectez-vous.',
+      "La validation en deux étapes vient d'être activée pour ce compte, peut-être par une autre personne qui l'utilise. Reconnectez-vous avec un code de l'application d'authentification utilisée pour cette activation, ou avec un code de secours. Si vous avez ajouté ProtestBase à votre application ici, supprimez cette entrée : ses codes ne fonctionneront pas.",
     recoveryCodesLowTitle: 'Peu de codes de secours',
     recoveryCodesLow: {
       zero: "Vous avez utilisé votre dernier code de secours. Désormais, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
@@ -362,9 +365,15 @@ const fr: LocaleData = {
       other:
         "Il vous reste {{count}} codes de secours. Une fois utilisés, vous ne pourrez vous connecter qu'avec votre application d'authentification.",
     },
+    recoveryCodesLowPasskey: {
+      zero: "Vous avez utilisé votre dernier code de secours, et cette application ne prend pas encore en charge votre clé d'accès. Pour vous reconnecter ici, créez de nouveaux codes de secours sur le site de ProtestBase.",
+      one: "Il vous reste 1 code de secours, et cette application ne prend pas encore en charge votre clé d'accès. Créez de nouveaux codes de secours sur le site de ProtestBase avant de l'utiliser.",
+      other:
+        "Il vous reste {{count}} codes de secours, et cette application ne prend pas encore en charge votre clé d'accès. Créez de nouveaux codes de secours sur le site de ProtestBase avant qu'ils ne soient épuisés.",
+    },
     enrollTitle: 'Activer la validation en deux étapes',
     enrollIntro:
-      "ProtestBase demande désormais, à la connexion, un code fourni par une application d'authentification. À configurer une fois sur ce téléphone :",
+      "ProtestBase demande désormais, à la connexion, un code fourni par une application d'authentification. À configurer une fois sur ce téléphone. Si votre application contient déjà une entrée ProtestBase pour ce compte, issue d'une configuration précédente, supprimez-la : ses codes ne fonctionneront pas.",
     stepAddTitle: "1. Ajoutez ProtestBase à votre application d'authentification",
     openAuthenticator: "Ajouter à l'application d'authentification",
     openAuthenticatorHelp:
@@ -1086,6 +1095,9 @@ const fr: LocaleData = {
     expired: 'Session expirée',
     expiredMessage: 'Votre session a expiré. Veuillez vous reconnecter pour continuer.',
     signInAgain: 'Se reconnecter',
+    unreachable: 'Déconnecté',
+    unreachableMessage:
+      'ProtestBase était injoignable pour garder votre session ouverte. Vos brouillons et vos événements enregistrés sont toujours sur ce téléphone. Reconnectez-vous une fois de retour en ligne.',
     securityAlert: 'Alerte de sécurité',
     securityAlertMessage:
       'Votre session a été interrompue pour des raisons de sécurité. Veuillez vous reconnecter.',

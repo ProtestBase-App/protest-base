@@ -180,6 +180,8 @@ export const deleteAccount = async (password: string, reauthToken?: string): Pro
     ) {
       throw error;
     }
+    // Unchanged, so the screen can say the server wasn't reached and keep its proof for a retry.
+    if (isNetworkError(error)) throw error;
     const apiError = error.response?.data as ApiError;
     if (apiError?.code === 'INVALID_CREDENTIALS') {
       throw new Error('INVALID_CREDENTIALS');

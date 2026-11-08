@@ -30,7 +30,7 @@ import {
 } from '@/services/mfa.service';
 import type { User } from '@/types/auth.types';
 import type { MfaSecondStep } from '@/types/mfa.types';
-import { secondStepFromError } from '@/utils/mfa';
+import { acceptsAuthenticatorCode, secondStepFromError } from '@/utils/mfa';
 import { ExternalLink } from '@/components/ExternalLink';
 import { Colors } from '@/constants/Colors';
 import { Routes } from '@/constants/Routes';
@@ -64,6 +64,9 @@ export default function SignIn() {
   const [secondStep, setSecondStep] = useState<MfaSecondStep | null>(null);
   // While new recovery codes are on screen, nothing may leave it.
   const [leaveBlocked, setLeaveBlocked] = useState(false);
+  // While a code is being checked, leaving would drop the answer.
+  const [stepBusy, setStepBusy] = useState(false);
+  const holdStep = leaveBlocked || stepBusy;
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<'forgot' | 'firstTime'>('forgot');
   const colorScheme = useColorScheme();
@@ -157,8 +160,19 @@ export default function SignIn() {
   const restartSignIn = useCallback(() => {
     setSecondStep(null);
     setLeaveBlocked(false);
+    setStepBusy(false);
     void clearPendingEnrollment();
   }, []);
+
+  // Leaving the screen (the iOS swipe back) ends an unfinished setup, so the next sign-in on
+  // this phone doesn't open it. A system kill sends no event and keeps it to resume.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('removed', () => {
+      void clearPendingEnrollment();
+    });
+    // The event comes after this screen's effects are cleaned up.
+    return () => queueMicrotask(unsubscribe);
+  }, [navigation]);
 
   // A setup the system interrupted (the app was closed while the user was in their
   // authenticator app) picks up where it was, with the same key.
@@ -174,23 +188,24 @@ export default function SignIn() {
     };
   }, []);
 
-  // Android back on a second step returns to the password, and does nothing over new recovery codes.
+  // Android back on a second step returns to the password, and does nothing over new recovery
+  // codes or while a code is being checked.
   useEffect(() => {
     if (!secondStep) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!leaveBlocked) restartSignIn();
+      if (!holdStep) restartSignIn();
       return true;
     });
     return () => subscription.remove();
-  }, [secondStep, leaveBlocked, restartSignIn]);
+  }, [secondStep, holdStep, restartSignIn]);
 
   // The iOS swipe back belongs to the root stack's (auth) screen, one level up.
   useEffect(() => {
-    if (!leaveBlocked) return;
+    if (!holdStep) return;
     const parent = navigation.getParent();
     parent?.setOptions({ gestureEnabled: false });
     return () => parent?.setOptions({ gestureEnabled: true });
-  }, [leaveBlocked, navigation]);
+  }, [holdStep, navigation]);
 
   const completeSignIn = (user: User) => {
     setFailedAttempts(0);
@@ -211,11 +226,16 @@ export default function SignIn() {
     user: User;
     recoveryCodesRemaining?: number;
   }) => {
+    // Read before completeSignIn: an account without an authenticator has only these codes here.
+    const passkeyOnly =
+      secondStep?.kind === 'challenge' && !acceptsAuthenticatorCode(secondStep.challenge.methods);
     completeSignIn(user);
     if (recoveryCodesRemaining !== undefined && recoveryCodesRemaining <= LOW_RECOVERY_CODES) {
       Alert.alert(
         t('mfa.recoveryCodesLowTitle'),
-        t('mfa.recoveryCodesLow', { count: recoveryCodesRemaining })
+        passkeyOnly
+          ? t('mfa.recoveryCodesLowPasskey', { count: recoveryCodesRemaining })
+          : t('mfa.recoveryCodesLow', { count: recoveryCodesRemaining })
       );
     }
   };
@@ -402,6 +422,7 @@ export default function SignIn() {
                 challenge={secondStep.challenge}
                 onSignedIn={handleSecondStepSignedIn}
                 onRestart={restartSignIn}
+                onBusyChange={setStepBusy}
               />
             ) : secondStep?.kind === 'enroll' ? (
               <MfaEnrollmentStep
@@ -410,6 +431,7 @@ export default function SignIn() {
                 onSignedIn={completeSignIn}
                 onRestart={restartSignIn}
                 onCodesShownChange={setLeaveBlocked}
+                onBusyChange={setStepBusy}
               />
             ) : (
               <>

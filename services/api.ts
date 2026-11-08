@@ -172,8 +172,14 @@ api.interceptors.request.use(
   }
 );
 
-/** Why a session ended, so the alert can say so. `undefined` means it simply expired. */
-export type SessionEndReason = 'token_reuse' | 'session_replaced' | 'account_disabled';
+/**
+ * Why a session ended, so the alert can say so. `undefined` means it simply expired.
+ * `unreachable`: the refresh never got an answer (no response, a timeout or a 5xx, after its
+ * retries). The session still ends, since the backend may have rotated the token, but nothing
+ * says the user's data should go, so the device keeps it.
+ */
+export type SessionEndReason =
+  'token_reuse' | 'session_replaced' | 'account_disabled' | 'unreachable';
 
 let tokenExpirationCallback: ((reason?: SessionEndReason) => void) | null = null;
 
@@ -334,11 +340,13 @@ api.interceptors.response.use(
     // HTTP error responses from the server (4xx/5xx) get error-level logging
     // because they typically indicate something the client needs to investigate.
     const logAtLevel = isNetworkError(error) ? logger.warn : logger.error;
+    // The code only, never the body: a second-step answer carries a challenge id or a setup
+    // token, which is enough to finish someone's sign-in.
     logAtLevel(
       `[API] Response Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
       {
         status: error.response?.status,
-        data: error.response?.data,
+        code: error.response?.data?.code,
         message: error.message,
       }
     );
@@ -375,14 +383,20 @@ api.interceptors.response.use(
         originalRequest._retry = true;
         isRefreshing = true;
 
+        let refreshToken: string | null = null;
+        // Only a failure of the refresh request itself can be the network's.
+        let refreshRequestFailed = false;
         try {
-          const refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
+          refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
 
           if (!refreshToken) {
             throw new Error('No refresh token available');
           }
 
-          const response = await requestTokenRefresh(refreshToken);
+          const response = await requestTokenRefresh(refreshToken).catch((error: unknown) => {
+            refreshRequestFailed = true;
+            throw error;
+          });
 
           const responseData = response?.data?.data;
           if (!responseData?.accessToken || !responseData?.refreshToken) {
@@ -391,14 +405,17 @@ api.interceptors.response.use(
 
           const { accessToken, refreshToken: newRefreshToken } = responseData;
 
-          await SecureStore.setItemAsync(
-            SECURE_STORE_KEYS.ACCESS_TOKEN,
-            accessToken,
-            SECURE_STORE_OPTIONS
-          );
+          // The refresh token first: if the app dies between the two writes, the next refresh
+          // uses the new one. With the old one it would be a replay, and once the 30 s grace
+          // has passed the backend ends every session of the account.
           await SecureStore.setItemAsync(
             SECURE_STORE_KEYS.REFRESH_TOKEN,
             newRefreshToken,
+            SECURE_STORE_OPTIONS
+          );
+          await SecureStore.setItemAsync(
+            SECURE_STORE_KEYS.ACCESS_TOKEN,
+            accessToken,
             SECURE_STORE_OPTIONS
           );
 
@@ -416,10 +433,25 @@ api.interceptors.response.use(
             return Promise.reject(rateLimitError);
           }
 
+          // Signed in again while this refresh was failing: the stored session is a newer one,
+          // and ending it would sign that out too. These requests belong to the old session, so
+          // they fail instead of being retried with the new one's tokens.
+          const storedRefreshToken = await SecureStore.getItemAsync(
+            SECURE_STORE_KEYS.REFRESH_TOKEN
+          );
+          if (storedRefreshToken && storedRefreshToken !== refreshToken) {
+            processQueue(refreshError);
+            return Promise.reject(refreshError);
+          }
+
           // Clear queued requests without rejecting — the global handler will navigate away
           failedQueue = [];
 
-          await endSession(sessionEndReason((refreshError as HttpErrorLike)?.response?.data?.code));
+          await endSession(
+            refreshRequestFailed && isTransientRefreshFailure(refreshError)
+              ? 'unreachable'
+              : sessionEndReason((refreshError as HttpErrorLike)?.response?.data?.code)
+          );
 
           // Return a never-settling promise to prevent error propagation to screens
           // The global handler navigates away, unmounting all callers

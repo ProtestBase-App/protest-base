@@ -50,7 +50,8 @@ export default function MfaReauthStep({
         accessibilityRole="button"
         accessibilityHint={t('a11y.hints.cancelCodeStep')}
         onPress={onCancel}
-        style={styles.cancel}
+        disabled={submitting}
+        style={[styles.cancel, submitting && styles.disabled]}
         testID="mfa-reauth-cancel"
       >
         <ThemedText style={[styles.cancelText, { color: themeColors.tint }]}>
@@ -78,5 +79,8 @@ const styles = StyleSheet.create({
   cancelText: {
     fontFamily: Typography.families.semiBold,
     fontSize: Typography.sizes.base,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

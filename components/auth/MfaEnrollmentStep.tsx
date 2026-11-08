@@ -30,7 +30,11 @@ export interface MfaEnrollmentStepProps {
   onRestart: () => void;
   /** True while the new recovery codes are on screen, when nothing may leave the step. */
   onCodesShownChange: (shown: boolean) => void;
+  /** True while the first code is being confirmed: leaving then would lose the recovery codes. */
+  onBusyChange?: (busy: boolean) => void;
 }
+
+type RestartReason = Extract<MfaFailure, { kind: 'restart' }>['reason'];
 
 type Stage = 'loading' | 'setupFailed' | 'setup' | 'codes';
 
@@ -44,6 +48,7 @@ export default function MfaEnrollmentStep({
   onSignedIn,
   onRestart,
   onCodesShownChange,
+  onBusyChange,
 }: MfaEnrollmentStepProps) {
   const themeColors = getThemeColors(useColorScheme());
   const [expiresAt] = useState(() => Date.now() + enrollment.expiresIn * 1000);
@@ -60,11 +65,14 @@ export default function MfaEnrollmentStep({
     onRestartRef.current = onRestart;
   });
 
-  const restart = useCallback((reason: 'expired' | 'alreadyEnrolled') => {
-    Alert.alert(
-      t('mfa.expiredTitle'),
-      reason === 'alreadyEnrolled' ? t('mfa.alreadyEnrolledMessage') : t('mfa.expiredMessage')
-    );
+  const restart = useCallback((reason: RestartReason) => {
+    if (reason === 'disabled') {
+      Alert.alert(t('session.accountDisabled'), t('auth.accountDisabledMessage'));
+    } else if (reason === 'alreadyEnrolled') {
+      Alert.alert(t('mfa.alreadyEnrolledTitle'), t('mfa.alreadyEnrolledMessage'));
+    } else {
+      Alert.alert(t('mfa.expiredTitle'), t('mfa.setupExpiredMessage'));
+    }
     onRestartRef.current();
   }, []);
 
@@ -122,6 +130,7 @@ export default function MfaEnrollmentStep({
       return;
     }
     setSubmitting(true);
+    onBusyChange?.(true);
     setFailure(null);
     try {
       const data = await confirmTotpEnrollment(enrollment.enrollmentToken, setup.methodId, code);
@@ -143,6 +152,7 @@ export default function MfaEnrollmentStep({
       }
     } finally {
       setSubmitting(false);
+      onBusyChange?.(false);
     }
   };
 
@@ -292,7 +302,8 @@ function SetupView({
         accessibilityRole="button"
         accessibilityHint={t('a11y.hints.backToSignIn')}
         onPress={onRestart}
-        style={styles.back}
+        disabled={submitting}
+        style={[styles.back, submitting && styles.disabled]}
         testID="mfa-back-to-sign-in"
       >
         <ThemedText style={[styles.backText, { color: themeColors.tint }]}>
@@ -364,5 +375,8 @@ const styles = StyleSheet.create({
   backText: {
     fontFamily: Typography.families.semiBold,
     fontSize: Typography.sizes.base,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   Dimensions,
@@ -34,12 +34,15 @@ import { Routes } from '@/constants/Routes';
 import type { MfaCodeMethod } from '@/types/mfa.types';
 import { t } from '@/utils/i18n';
 import { describeMfaFailure, type MfaFailure } from '@/utils/mfa';
+import { isNetworkError } from '@/utils/networkError';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { getThemeColors } from '@/utils/themeColors';
 
 // Room kept between a focused field and the keyboard, so the confirm button
 // under the password field stays reachable while typing.
 const KEYBOARD_BOTTOM_OFFSET = 112;
+// The backend's proof lasts 5 minutes; it is reused for 4.5 so it can't run out on the way.
+const PROOF_REUSE_MS = 270_000;
 
 export default function DeleteAccountScreen() {
   const { user, clearAuthState } = useGlobalContext();
@@ -61,6 +64,9 @@ export default function DeleteAccountScreen() {
   const [needsCode, setNeedsCode] = useState(false);
   const [isVerifyingCode, setVerifyingCode] = useState(false);
   const [codeFailure, setCodeFailure] = useState<MfaFailure | null>(null);
+  // A proof the delete didn't use up (network failure, rate limit). Asking for a new code instead
+  // would make the user type the same code again, which the backend counts as a wrong one.
+  const proofRef = useRef<{ token: string; expiresAt: number } | null>(null);
   const impact = useAccountDeletionImpact();
   const sharedOrganizations =
     impact.status === 'ready' ? impact.organizations.filter((org) => org.shared) : [];
@@ -78,13 +84,23 @@ export default function DeleteAccountScreen() {
     ]);
   };
 
+  const validProof = () => {
+    const proof = proofRef.current;
+    return proof && Date.now() < proof.expiresAt ? proof.token : undefined;
+  };
+
   const handleCode = async (method: MfaCodeMethod, code: string) => {
     if (!assertOnlineOrAlert(isOffline)) return;
     setVerifyingCode(true);
     setCodeFailure(null);
     try {
-      const reauthToken = await reauthenticate(form.password, method, code);
+      let reauthToken = validProof();
+      if (!reauthToken) {
+        reauthToken = await reauthenticate(form.password, method, code);
+        proofRef.current = { token: reauthToken, expiresAt: Date.now() + PROOF_REUSE_MS };
+      }
       await deleteAccount(form.password, reauthToken);
+      proofRef.current = null;
       await finishDeletion();
     } catch (error) {
       const errorCode = (error as { code?: string })?.code;
@@ -93,10 +109,12 @@ export default function DeleteAccountScreen() {
         (error as Error)?.message === 'INVALID_CREDENTIALS'
       ) {
         // The password stopped working since it was checked: start again from it.
+        proofRef.current = null;
         setNeedsCode(false);
         Alert.alert(t('common.error'), t('account.incorrectPassword'));
       } else if (errorCode === 'REAUTH_REQUIRED') {
-        // The proof expired between the two calls.
+        // The proof expired or was used up between the two calls.
+        proofRef.current = null;
         setCodeFailure({ kind: 'other', message: t('mfa.reauthExpired') });
       } else {
         setCodeFailure(describeMfaFailure(error));
@@ -140,10 +158,12 @@ export default function DeleteAccountScreen() {
     setSubmitting(true);
 
     try {
-      await deleteAccount(form.password);
+      await deleteAccount(form.password, validProof());
+      proofRef.current = null;
       await finishDeletion();
     } catch (error) {
       if ((error as { code?: string })?.code === 'REAUTH_REQUIRED') {
+        proofRef.current = null;
         setCodeFailure(null);
         setNeedsCode(true);
         return;
@@ -157,7 +177,10 @@ export default function DeleteAccountScreen() {
       if (isRateLimitError) {
         Alert.alert(t('errors.rateLimit.title'), t('errors.rateLimit.deleteAccountMessage'));
       } else if ((error as Error).message === 'INVALID_CREDENTIALS') {
+        proofRef.current = null;
         Alert.alert(t('common.error'), t('account.incorrectPassword'));
+      } else if (isNetworkError(error)) {
+        Alert.alert(t('common.error'), t('errors.network'));
       } else {
         Alert.alert(t('common.error'), (error as Error).message || t('errors.unknownError'));
       }
