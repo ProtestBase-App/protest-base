@@ -77,7 +77,7 @@
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.13.2",
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "@types/semver": "^7.7.1",
     "babel-jest": "^30.5.2",
