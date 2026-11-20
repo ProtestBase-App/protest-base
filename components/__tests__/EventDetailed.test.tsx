@@ -118,6 +118,7 @@ const mockEvent: FormattedEvent = {
   organizer_name: 'Climate Org',
   organizer_avatar: null,
   organization_id: 'org-1',
+  owner_organizer_role: 'primary',
   geocod_lat: 50.8503,
   geocod_lng: 4.3517,
   geocod_status: null,
@@ -806,6 +807,92 @@ describe('EventDetailed — co-organizers rendering', () => {
     const viewProfile = screen.getByText('View profile');
     fireEvent.press(viewProfile);
     expect(onOrganizerPress).toHaveBeenCalledWith('org-1');
+  });
+});
+
+describe('EventDetailed — how the owning organization is shown', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const platformEvent: FormattedEvent = {
+    ...mockEvent,
+    organization_id: 'platform-org',
+    organization_name: 'Platform Org',
+    organizer_name: 'Platform Org',
+    co_organizer_avatars: [
+      { id: 'org-a', name: 'Org A', avatar: null },
+      { id: 'org-b', name: 'Org B', avatar: null },
+    ],
+  };
+
+  it("'primary' lists the owner first", () => {
+    render(<EventDetailed {...defaultProps} event={platformEvent} />);
+    expect(screen.getByTestId('event-organizer-0')).toHaveTextContent(/Platform Org/);
+    expect(screen.getByTestId('event-organizer-2')).toHaveTextContent(/Org B/);
+  });
+
+  it("'co' lists the owner after the other co-organizers", () => {
+    const onOrganizerPress = jest.fn();
+    render(
+      <EventDetailed
+        {...defaultProps}
+        event={{ ...platformEvent, owner_organizer_role: 'co' }}
+        onOrganizerPress={onOrganizerPress}
+      />
+    );
+    expect(screen.getByTestId('event-organizer-0')).toHaveTextContent(/Org A/);
+    expect(screen.getByTestId('event-organizer-1')).toHaveTextContent(/Org B/);
+    expect(screen.getByTestId('event-organizer-2')).toHaveTextContent(/Platform Org/);
+    fireEvent.press(screen.getByTestId('event-organizer-2'));
+    expect(onOrganizerPress).toHaveBeenCalledWith('platform-org');
+  });
+
+  it('null leaves the owner out and lists only the co-organizers', () => {
+    const onOrganizerPress = jest.fn();
+    render(
+      <EventDetailed
+        {...defaultProps}
+        event={{ ...platformEvent, owner_organizer_role: null }}
+        onOrganizerPress={onOrganizerPress}
+      />
+    );
+    expect(screen.queryByText('Platform Org')).toBeNull();
+    expect(screen.getByTestId('event-organizer-0')).toHaveTextContent(/Org A/);
+    expect(screen.getByTestId('event-organizer-1')).toHaveTextContent(/Org B/);
+    expect(screen.queryByTestId('event-organizer-2')).toBeNull();
+    screen.getAllByText('View profile').forEach((link) => fireEvent.press(link));
+    expect(onOrganizerPress).not.toHaveBeenCalledWith('platform-org');
+  });
+
+  it('null with no co-organizers hides the section and never falls back to organizer_name', () => {
+    render(
+      <EventDetailed
+        {...defaultProps}
+        event={{
+          ...platformEvent,
+          owner_organizer_role: null,
+          organization_name: null,
+          organizer_name: 'ProtestBase',
+          co_organizer_avatars: [],
+        }}
+      />
+    );
+    expect(screen.queryByText('ProtestBase')).toBeNull();
+    expect(screen.queryByText('Organizers')).toBeNull();
+    expect(screen.queryByTestId('event-organizer-0')).toBeNull();
+  });
+
+  it('hides the heading when the only co-organizers have no name', () => {
+    render(
+      <EventDetailed
+        {...defaultProps}
+        event={{
+          ...platformEvent,
+          owner_organizer_role: null,
+          co_organizer_avatars: [{ id: 'org-a', name: '  ', avatar: null }],
+        }}
+      />
+    );
+    expect(screen.queryByText('Organizers')).toBeNull();
   });
 });
 

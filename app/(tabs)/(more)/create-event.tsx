@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { EventFormShell } from '@/components/event-form/EventFormShell';
 import { FormByline } from '@/components/event-form/FormByline';
+import { OwnerCoOrganizerQuestion } from '@/components/event-form/OwnerCoOrganizerQuestion';
 import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormFieldAnchor, FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
@@ -23,7 +24,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { useGlobalContext } from '@/context/GlobalProvider';
-import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { usePlatformOrganization, useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import {
   useRecurringEventsEnabled,
@@ -151,6 +152,7 @@ const hasFormChanges = (current: FormState, initial: FormState): boolean => {
     !areArraysEqual(current.co_organizers, initial.co_organizers) ||
     current.help_needed !== initial.help_needed ||
     current.help_description !== initial.help_description ||
+    (current.owner_is_co_organizer ?? false) !== (initial.owner_is_co_organizer ?? false) ||
     isRepeating(current.repeat)
   );
 };
@@ -201,6 +203,9 @@ export default function CreateEventModal() {
 
   const [form, setForm] = useState<FormState>(() =>
     createBlankForm({ organizer_name: user?.name || '' })
+  );
+  const platformOrganization = usePlatformOrganization(
+    form.organization_id || selectedOrganizationId
   );
 
   // What the form holds before the organizer touches it: the auto-filled organization
@@ -389,7 +394,8 @@ export default function CreateEventModal() {
         buildEventRequest(
           form,
           form.organization_id || selectedOrganizationId || '',
-          rule
+          rule,
+          !!platformOrganization
         ) as CreateEventRequest,
         { duplicateOverride, report }
       );
@@ -457,7 +463,12 @@ export default function CreateEventModal() {
       const report: CreateEventReport = {};
 
       await createDraftEvent(
-        buildEventRequest(form, form.organization_id || selectedOrganizationId || '', rule),
+        buildEventRequest(
+          form,
+          form.organization_id || selectedOrganizationId || '',
+          rule,
+          !!platformOrganization
+        ),
         { duplicateOverride, report }
       );
 
@@ -562,6 +573,15 @@ export default function CreateEventModal() {
                 />
               </FormFieldAnchor>
               {userOrganizations.length === 1 && <FormByline name={userOrganizations[0].Name} />}
+              {platformOrganization && (
+                <OwnerCoOrganizerQuestion
+                  organizationName={platformOrganization.Name}
+                  value={form.owner_is_co_organizer ?? false}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, owner_is_co_organizer: value }))
+                  }
+                />
+              )}
             </>
           }
           whenPrompt={

@@ -1,5 +1,10 @@
 import type { RecurrenceInput } from '@/types/eventSeries.types';
-import { buildEventRequest, buildTemplateEventData, createBlankForm } from '@/utils/eventFormData';
+import {
+  buildEventRequest,
+  buildTemplateEventData,
+  createBlankForm,
+  ownerCoOrganizerUpdate,
+} from '@/utils/eventFormData';
 
 describe('createBlankForm', () => {
   it('starts empty, with what the screen knows laid over it', () => {
@@ -57,6 +62,35 @@ describe('buildEventRequest', () => {
     expect(
       buildEventRequest({ ...withText, help_needed: true }, 'org-1', null).help_description
     ).toBe('Bring water');
+  });
+
+  it('answers the co-organizer question only for the platform organization, No by default', () => {
+    expect(buildEventRequest(form, 'org-1', null)).not.toHaveProperty('owner_is_co_organizer');
+    expect(
+      buildEventRequest({ ...form, owner_is_co_organizer: true }, 'org-1', null)
+    ).not.toHaveProperty('owner_is_co_organizer');
+    expect(buildEventRequest(form, 'org-1', null, true).owner_is_co_organizer).toBe(false);
+    expect(
+      buildEventRequest({ ...form, owner_is_co_organizer: true }, 'org-1', null, true)
+        .owner_is_co_organizer
+    ).toBe(true);
+  });
+});
+
+describe('ownerCoOrganizerUpdate', () => {
+  const yes = createBlankForm({ owner_is_co_organizer: true });
+  const no = createBlankForm({ owner_is_co_organizer: false });
+
+  it('sends the answer only when it changed', () => {
+    expect(ownerCoOrganizerUpdate(yes, yes, true)).toEqual({});
+    expect(ownerCoOrganizerUpdate(no, no, true)).toEqual({});
+    expect(ownerCoOrganizerUpdate(no, yes, true)).toEqual({ owner_is_co_organizer: false });
+    expect(ownerCoOrganizerUpdate(yes, no, true)).toEqual({ owner_is_co_organizer: true });
+  });
+
+  it('sends nothing for another organization or before the event loaded', () => {
+    expect(ownerCoOrganizerUpdate(no, yes, false)).toEqual({});
+    expect(ownerCoOrganizerUpdate(no, null, true)).toEqual({});
   });
 });
 

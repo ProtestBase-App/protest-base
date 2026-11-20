@@ -654,7 +654,8 @@ function buildEventFormData(
       key === 'help_needed' ||
       key === 'is_draft' ||
       key === 'all_day' ||
-      key === 'duplicate_override'
+      key === 'duplicate_override' ||
+      key === 'owner_is_co_organizer'
     ) {
       // Booleans must be listed here explicitly: the string branch below would
       // drop them silently, and `all_day: false` is precisely the value that

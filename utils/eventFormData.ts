@@ -47,7 +47,8 @@ function trimEventForm(form: FormState): FormState {
 export function buildEventRequest(
   form: FormState,
   organizationId: string,
-  rule: RecurrenceInput | null
+  rule: RecurrenceInput | null,
+  isPlatformOrganization = false
 ) {
   const trimmed = trimEventForm(form);
   return {
@@ -75,7 +76,20 @@ export function buildEventRequest(
     co_organizers: trimmed.co_organizers?.length ? trimmed.co_organizers : undefined,
     help_needed: trimmed.help_needed,
     help_description: trimmed.help_needed ? trimmed.help_description || undefined : undefined,
+    ...(isPlatformOrganization && { owner_is_co_organizer: form.owner_is_co_organizer ?? false }),
   };
+}
+
+export function ownerCoOrganizerUpdate(
+  form: FormState,
+  initial: FormState | null,
+  isPlatformOrganization: boolean
+): { owner_is_co_organizer?: boolean } {
+  if (!isPlatformOrganization || !initial) return {};
+  const answer = form.owner_is_co_organizer ?? false;
+  return answer === (initial.owner_is_co_organizer ?? false)
+    ? {}
+    : { owner_is_co_organizer: answer };
 }
 
 /** A template's `event_data`: static details only, no dates or organizer. */

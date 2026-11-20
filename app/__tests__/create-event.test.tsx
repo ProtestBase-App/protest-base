@@ -477,7 +477,8 @@ describe('CreateEventModal', () => {
      */
     const renderWithFilledForm = async (
       formOverrides: Record<string, unknown> = {},
-      features?: { recurringEvents: boolean; titleOnlyDrafts: boolean }
+      features?: { recurringEvents: boolean; titleOnlyDrafts: boolean },
+      extraOverrides: Record<string, unknown> = {}
     ) => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const { getEventDraft } = require('@/services/localStorageService');
@@ -489,6 +490,7 @@ describe('CreateEventModal', () => {
         providerOverrides: {
           ...providerOverrides,
           ...(features ? { versionCheckContext: { features } } : {}),
+          ...extraOverrides,
         },
       });
       await utils.findByTestId('btn-create-event-submit');
@@ -632,6 +634,68 @@ describe('CreateEventModal', () => {
       expect(createEventBackend.mock.calls[0][0].help_description).toBeUndefined();
 
       alertSpy.mockRestore();
+    });
+
+    describe('the co-organizer question of the platform organization', () => {
+      const platformOrgs = {
+        userOrganizationsContext: {
+          ...providerOverrides.userOrganizationsContext,
+          userOrganizations: [
+            {
+              ...providerOverrides.userOrganizationsContext.userOrganizations[0],
+              Name: 'Test Org',
+            },
+            { $id: 'org-platform', Name: 'Platform Org', is_platform: true },
+          ],
+        },
+      };
+
+      it('is not asked, nor sent, for another organization', async () => {
+        createEventBackend.mockResolvedValue({ $id: 'evt-new' });
+        const { getByTestId, queryByTestId, alertSpy } = await renderWithFilledForm(
+          {},
+          undefined,
+          platformOrgs
+        );
+        expect(queryByTestId('owner-co-organizer-question')).toBeNull();
+        await submit(getByTestId);
+
+        expect(createEventBackend.mock.calls[0][0]).not.toHaveProperty('owner_is_co_organizer');
+
+        alertSpy.mockRestore();
+      });
+
+      it('is asked for the platform organization and sends No by default', async () => {
+        createEventBackend.mockResolvedValue({ $id: 'evt-new' });
+        const { getByTestId, alertSpy } = await renderWithFilledForm(
+          { organization_id: 'org-platform' },
+          undefined,
+          platformOrgs
+        );
+        expect(getByTestId('owner-co-organizer-question')).toBeTruthy();
+        await submit(getByTestId);
+
+        expect(createEventBackend.mock.calls[0][0].owner_is_co_organizer).toBe(false);
+
+        alertSpy.mockRestore();
+      });
+
+      it('sends Yes once it is picked, for a draft too', async () => {
+        createDraftEvent.mockResolvedValue({ $id: 'draft-new' });
+        const { getByTestId, alertSpy } = await renderWithFilledForm(
+          { organization_id: 'org-platform' },
+          undefined,
+          platformOrgs
+        );
+        fireEvent.press(getByTestId('owner-co-organizer-yes'));
+        await act(async () => {
+          fireEvent.press(getByTestId('btn-create-event-draft'));
+        });
+
+        expect(createDraftEvent.mock.calls[0][0].owner_is_co_organizer).toBe(true);
+
+        alertSpy.mockRestore();
+      });
     });
 
     describe('resuming the local draft', () => {

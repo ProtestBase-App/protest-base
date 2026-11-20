@@ -81,7 +81,12 @@ export function matchesCalendarFilters(
   }
 
   if (filters.organizations.length > 0) {
-    if (!event.organization_id || !filters.organizations.includes(event.organization_id)) {
+    const ownerShown = event.owner_organizer_role !== null;
+    if (
+      !ownerShown ||
+      !event.organization_id ||
+      !filters.organizations.includes(event.organization_id)
+    ) {
       return false;
     }
   }

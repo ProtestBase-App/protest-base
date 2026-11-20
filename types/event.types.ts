@@ -8,6 +8,8 @@ export interface CoOrganizerAvatar {
   avatar: string | null;
 }
 
+export type OwnerOrganizerRole = 'primary' | 'co';
+
 /** Canonical country value the events API filters on (`GET /events?country=`). */
 export type EventCountry = 'belgium' | 'netherlands' | 'luxembourg' | 'france';
 
@@ -55,6 +57,7 @@ export interface Event {
   // The organization's current name, which the backend resolves on every read. Show this, not
   // organizer_name, for an event that has an organization.
   organization_name?: string | null;
+  owner_organizer_role?: OwnerOrganizerRole | null;
 
   // organizer_* fields are populated from the authenticated user who created the event:
   // organizer_name is that member's own account name.
@@ -162,6 +165,8 @@ export interface CreateEventRequest {
   co_organizers?: string[];
   help_needed?: boolean;
   help_description?: string;
+
+  owner_is_co_organizer?: boolean;
 
   // Create-only: when true the event is born status:'draft'. PUT/PATCH ignore it.
   is_draft?: boolean;

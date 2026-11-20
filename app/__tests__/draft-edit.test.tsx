@@ -212,6 +212,53 @@ describe('DraftEdit', () => {
     alertSpy.mockRestore();
   });
 
+  describe('the co-organizer question of the platform organization', () => {
+    const renderDraft = async (role: 'primary' | 'co' | null) => {
+      patchEvent.mockResolvedValue(undefined);
+      getDraftEventPreview.mockResolvedValue(
+        createMockEvent({ $id: 'draft-1', organization_id: 'org-1', owner_organizer_role: role })
+      );
+      return renderWithProviders(<DraftEdit />, {
+        providerOverrides: {
+          globalContext: loggedInGlobal,
+          ...orgOverrides,
+          userOrganizationsContext: {
+            userOrganizations: [{ $id: 'org-1', Name: 'Platform Org', is_platform: true }],
+          },
+        },
+      });
+    };
+
+    const save = async (findByTestId: (id: string) => Promise<any>) => {
+      const button = await findByTestId('btn-draft-save');
+      await act(async () => {
+        fireEvent.press(button);
+      });
+    };
+
+    it('sends the answer in the patch once it changes', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { findByTestId } = await renderDraft(null);
+      const yes = await findByTestId('owner-co-organizer-yes');
+      expect(yes.props.accessibilityState.selected).toBe(false);
+      fireEvent.press(yes);
+      await save(findByTestId);
+
+      expect(patchEvent.mock.calls[0][1]).toMatchObject({ owner_is_co_organizer: true });
+      alertSpy.mockRestore();
+    });
+
+    it('leaves it out of the patch when unchanged', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { findByTestId } = await renderDraft('co');
+      await findByTestId('owner-co-organizer-question');
+      await save(findByTestId);
+
+      expect(patchEvent.mock.calls[0][1]).not.toHaveProperty('owner_is_co_organizer');
+      alertSpy.mockRestore();
+    });
+  });
+
   it('keeps the form on screen while it saves', async () => {
     patchEvent.mockImplementation(() => new Promise(() => {}));
     getDraftEventPreview.mockResolvedValue(createMockEvent({ $id: 'draft-1', title: 'Rally' }));

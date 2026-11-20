@@ -17,6 +17,7 @@ export interface OrganizationBase {
   follower_count?: number;
   member_count?: number;
   avatar?: string | null;
+  is_platform?: boolean;
 }
 
 /** Organization the current user belongs to (GET /organizations/my). */

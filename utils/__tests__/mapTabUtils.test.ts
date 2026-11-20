@@ -344,6 +344,14 @@ describe('mapTabUtils', () => {
       ).toBe(false);
     });
 
+    it("drops an event that hides its owner from that organization's filter", () => {
+      const filters = filtersWith({ organizations: ['org-1'] });
+      const hidden = geocodedEvent({ organization_id: 'org-1', owner_organizer_role: null });
+      const co = geocodedEvent({ organization_id: 'org-1', owner_organizer_role: 'co' });
+      expect(matchesMapFilters(hidden, filters, contextWith())).toBe(false);
+      expect(matchesMapFilters(co, filters, contextWith())).toBe(true);
+    });
+
     it('filters by saved state via the context callback', () => {
       const event = geocodedEvent();
       const savedContext = contextWith({ isSaved: (id) => id === event.$id });

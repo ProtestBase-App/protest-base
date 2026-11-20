@@ -272,6 +272,15 @@ describe('calendarTabUtils', () => {
         const filters = filtersWith({ organizations: ['org-1'] });
         expect(matchesCalendarFilters(event, filters, contextWith())).toBe(false);
       });
+
+      it("drops an event that hides its owner, and keeps 'co' and cached ones without a role", () => {
+        const filters = filtersWith({ organizations: ['org-1'] });
+        const event = (role?: 'primary' | 'co' | null) =>
+          createMockEvent({ organization_id: 'org-1', owner_organizer_role: role });
+        expect(matchesCalendarFilters(event(null), filters, contextWith())).toBe(false);
+        expect(matchesCalendarFilters(event('co'), filters, contextWith())).toBe(true);
+        expect(matchesCalendarFilters(event(undefined), filters, contextWith())).toBe(true);
+      });
     });
 
     describe('savedOnly', () => {

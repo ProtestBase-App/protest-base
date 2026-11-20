@@ -419,6 +419,14 @@ function applyContextMocks(overrides: ProviderOverrides = {}) {
         (userOrgs.userOrganizations ?? []).some((org: any) => org.$id === organizationId)
     );
   jest
+    .spyOn(require('@/context/UserOrganizationsProvider'), 'usePlatformOrganization')
+    .mockImplementation(
+      (organizationId: unknown) =>
+        (userOrgs.userOrganizations ?? []).find(
+          (org: any) => !!organizationId && org.$id === organizationId && org.is_platform === true
+        ) ?? null
+    );
+  jest
     .spyOn(require('@/context/TemplatesProvider'), 'useTemplates')
     .mockReturnValue(templates as any);
   jest

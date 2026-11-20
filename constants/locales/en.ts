@@ -772,6 +772,9 @@ const en: LocaleData = {
     brusselsTime: '{{time}}, Brussels time',
     namePlaceholder: 'Name your action',
     byOrganization: 'by {{name}}',
+    ownerCoOrganizerQuestion: 'Is {{name}} a co-organizer of this event?',
+    ownerCoOrganizerHelper:
+      'This only changes what people see. With No, {{name}} is not listed as an organizer. Its members can still edit the event either way.',
     addDateTime: 'Add date and time',
     addPlace: 'Add a place',
     link: 'Link',
@@ -1918,6 +1921,8 @@ const en: LocaleData = {
       cancelCodeStep: 'Returns to the password step',
       goBack: 'Returns to the previous screen',
       closeScreen: 'Closes this screen',
+      ownerCoOrganizerYes: 'Lists {{name}} among the co-organizers of this event',
+      ownerCoOrganizerNo: 'Leaves {{name}} out of the organizers shown on this event',
       closeDialog: 'Closes this dialog',
       closeMenu: 'Closes the menu',
       openEvent: 'Opens the event details',
