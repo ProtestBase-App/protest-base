@@ -1,4 +1,4 @@
-import { Event, CoOrganizerAvatar, EventStatus } from '@/types/event.types';
+import { Event, CoOrganizerAvatar, EventStatus, OwnerOrganizerRole } from '@/types/event.types';
 import { t } from '@/utils/i18n';
 
 /**
@@ -6,6 +6,12 @@ import { t } from '@/utils/i18n';
  * website behavior for consistency.
  */
 export const EVENT_TIMEZONE = 'Europe/Brussels';
+
+export function getOwnerOrganizerRole(
+  event: Pick<Event, 'owner_organizer_role'>
+): OwnerOrganizerRole | null {
+  return event.owner_organizer_role === undefined ? 'primary' : event.owner_organizer_role;
+}
 
 /**
  * Parse an ISO date string ensuring it's interpreted as UTC.
@@ -172,6 +178,7 @@ export interface FormattedEvent {
   organization_id: string;
   /** The organization's name, from the backend. Shown instead of `organizer_name`. */
   organization_name?: string | null;
+  owner_organizer_role: OwnerOrganizerRole | null;
   organizer_id: string;
   organizer_name: string;
   website_url: string | null;
@@ -296,6 +303,7 @@ export function formatEventForDisplay(event: Event, locale: string = 'en'): Form
     isMultiDay,
     organization_id: event.organization_id ?? '',
     organization_name: event.organization_name ?? null,
+    owner_organizer_role: getOwnerOrganizerRole(event),
     organizer_id: event.organizer_id ?? '',
     organizer_name: event.organizer_name,
     website_url: event.website_url || null,

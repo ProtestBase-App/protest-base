@@ -61,6 +61,15 @@ export const useIsOrganizationMember = (organizationId: string | null | undefine
   return !!organizationId && !!context?.userOrganizations.some((org) => org.$id === organizationId);
 };
 
+export const usePlatformOrganization = (
+  organizationId: string | null | undefined
+): UserOrganization | null => {
+  const context = useContext(UserOrganizationsContext);
+  if (!organizationId) return null;
+  const org = context?.userOrganizations.find((o) => o.$id === organizationId);
+  return org?.is_platform === true ? org : null;
+};
+
 export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps> = ({
   children,
 }) => {

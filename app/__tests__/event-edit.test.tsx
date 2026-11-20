@@ -380,6 +380,74 @@ describe('EditEvent', () => {
     });
   });
 
+  describe('the co-organizer question of the platform organization', () => {
+    const { updateEvent } = require('@/services/event.service');
+
+    const overridesWith = (isPlatform: boolean) => ({
+      globalContext: {
+        user: mockUser,
+        isLogged: true,
+        loading: false,
+        userLanguage: 'en',
+        eventsCache: {},
+        refetchEvents: jest.fn(),
+        refreshUserEventCounts: jest.fn(),
+      },
+      organizationsContext: { dropdownItems: [] },
+      userOrganizationsContext: {
+        userOrganizations: [{ $id: 'org-1', Name: 'Platform Org', is_platform: isPlatform }],
+      },
+    });
+
+    const renderEvent = async (role: 'primary' | 'co' | null | undefined, isPlatform = true) => {
+      const event = createMockEvent({
+        title: 'Published for others',
+        organization_id: 'org-1',
+        owner_organizer_role: role,
+      });
+      getEventByIdBackend.mockResolvedValue(event);
+      updateEvent.mockResolvedValue(event);
+      const utils = renderWithProviders(<EditEvent />, {
+        providerOverrides: overridesWith(isPlatform),
+      });
+      await utils.findByDisplayValue(event.title);
+      return utils;
+    };
+
+    it.each([
+      ['primary', true],
+      ['co', true],
+      [null, false],
+    ] as const)('prefills role %s as %s', async (role, yes) => {
+      const { getByTestId } = await renderEvent(role);
+      expect(getByTestId('owner-co-organizer-yes').props.accessibilityState.selected).toBe(yes);
+      expect(getByTestId('owner-co-organizer-no').props.accessibilityState.selected).toBe(!yes);
+    });
+
+    it('sends nothing when the answer is left as it was', async () => {
+      const { getByTestId } = await renderEvent('primary');
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent.mock.calls[0][1]).not.toHaveProperty('owner_is_co_organizer');
+    });
+
+    it('sends the answer once it changes', async () => {
+      const { getByTestId } = await renderEvent('co');
+      fireEvent.press(getByTestId('owner-co-organizer-no'));
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent.mock.calls[0][1]).toMatchObject({ owner_is_co_organizer: false });
+    });
+
+    it('is not asked for another organization', async () => {
+      const { queryByTestId, getByTestId } = await renderEvent('primary', false);
+      expect(queryByTestId('owner-co-organizer-question')).toBeNull();
+      fireEvent.press(getByTestId('button-save'));
+
+      expect(updateEvent.mock.calls[0][1]).not.toHaveProperty('owner_is_co_organizer');
+    });
+  });
+
   describe('location on save', () => {
     const { updateEvent } = require('@/services/event.service');
 

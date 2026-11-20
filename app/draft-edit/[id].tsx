@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { EventFormShell } from '@/components/event-form/EventFormShell';
 import { FormByline } from '@/components/event-form/FormByline';
+import { OwnerCoOrganizerQuestion } from '@/components/event-form/OwnerCoOrganizerQuestion';
 import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
@@ -26,7 +27,7 @@ import {
 } from '@/services/event.service';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
-import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { usePlatformOrganization, useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -44,8 +45,8 @@ import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
 import { alertWithDuplicateWarning, duplicateHref } from '@/utils/duplicateEvents';
 import { publishFieldToMessageKey } from '@/utils/eventPublishReadiness';
-import { allDaySubmitField } from '@/utils/eventFormatters';
-import { createBlankForm } from '@/utils/eventFormData';
+import { allDaySubmitField, getOwnerOrganizerRole } from '@/utils/eventFormatters';
+import { createBlankForm, ownerCoOrganizerUpdate } from '@/utils/eventFormData';
 import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -82,6 +83,7 @@ export default function DraftEdit() {
   const [form, setForm] = useState<FormState>(() =>
     createBlankForm({ organizer_name: user?.name || '' })
   );
+  const platformOrganization = usePlatformOrganization(form.organization_id);
 
   const validation = useEventFormValidation((intent) =>
     validateEventForm(form, { intent, existingDraft: true })
@@ -139,6 +141,7 @@ export default function DraftEdit() {
             co_organizers: event.co_organizers || [],
             help_needed: event.help_needed || false,
             help_description: event.help_description || '',
+            owner_is_co_organizer: getOwnerOrganizerRole(event) !== null,
           };
           // Snapshot the loaded state as the dirty-check baseline.
           initialFormRef.current = next;
@@ -232,8 +235,9 @@ export default function DraftEdit() {
       help_needed: form.help_needed,
       help_description: form.help_needed ? form.help_description || undefined : undefined,
       ...allDaySubmitField(wasAllDayRef.current, form.start_time),
+      ...ownerCoOrganizerUpdate(form, initialFormRef.current, !!platformOrganization),
     };
-  }, [form]);
+  }, [form, platformOrganization]);
 
   const handleSave = async () => {
     if (!assertOnlineOrAlert(isOffline)) return;
@@ -535,9 +539,20 @@ export default function DraftEdit() {
           heading={t('drafts.editTitle')}
           intro={seriesNote}
           byline={
-            <FormByline
-              name={userOrganizations.find((org) => org.$id === form.organization_id)?.Name}
-            />
+            <>
+              <FormByline
+                name={userOrganizations.find((org) => org.$id === form.organization_id)?.Name}
+              />
+              {platformOrganization && (
+                <OwnerCoOrganizerQuestion
+                  organizationName={platformOrganization.Name}
+                  value={form.owner_is_co_organizer ?? false}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, owner_is_co_organizer: value }))
+                  }
+                />
+              )}
+            </>
           }
           coverActions={
             !editsAllUpcoming && (

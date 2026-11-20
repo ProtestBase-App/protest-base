@@ -846,6 +846,9 @@ const nl = {
     brusselsTime: '{{time}}, Brusselse tijd',
     namePlaceholder: 'Geef je actie een naam',
     byOrganization: 'door {{name}}',
+    ownerCoOrganizerQuestion: 'Is {{name}} mede-organisator van dit evenement?',
+    ownerCoOrganizerHelper:
+      'Dit verandert alleen wat mensen zien. Bij Nee staat {{name}} niet bij de organisatoren. De leden kunnen het evenement altijd blijven bewerken.',
     addDateTime: 'Datum en tijd toevoegen',
     addPlace: 'Een plaats toevoegen',
     link: 'Link',
@@ -2236,6 +2239,8 @@ const nl = {
       cancelCodeStep: 'Gaat terug naar de stap met het wachtwoord',
       goBack: 'Gaat terug naar het vorige scherm',
       closeScreen: 'Sluit dit scherm',
+      ownerCoOrganizerYes: 'Toont {{name}} bij de mede-organisatoren van dit evenement',
+      ownerCoOrganizerNo: 'Laat {{name}} weg uit de organisatoren van dit evenement',
       closeDialog: 'Sluit dit venster',
       closeMenu: 'Sluit het menu',
       openEvent: 'Opent de details van het evenement',

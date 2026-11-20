@@ -156,9 +156,21 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
     : null;
   // organizer_name is the creating member's own account name, so it only stands in for an
   // event with no organization. The organization list is often not loaded on this screen.
-  const primaryOrgName = event.organization_id
+  const ownerName = event.organization_id
     ? event.organization_name || org?.Name || ''
     : event.organizer_name;
+  const ownerRow: OrganizerRowData | null =
+    event.owner_organizer_role !== null && ownerName
+      ? { name: ownerName, avatarUrl: event.organizer_avatar, orgId: event.organization_id || null }
+      : null;
+  const coOrganizerRows: OrganizerRowData[] = (event.co_organizer_avatars ?? [])
+    .filter((co: CoOrganizerAvatar) => co.name?.trim())
+    .map((co: CoOrganizerAvatar) => ({ name: co.name, avatarUrl: co.avatar, orgId: co.id }));
+  const organizerRows = !ownerRow
+    ? coOrganizerRows
+    : event.owner_organizer_role === 'co'
+      ? [...coOrganizerRows, ownerRow]
+      : [ownerRow, ...coOrganizerRows];
 
   // Tail of the calendar card's time line. An all-day event has no end clock
   // time, so it keeps only the date range when it spans several days — and
@@ -796,39 +808,24 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             </View>
           )}
 
-          {(primaryOrgName ||
-            (event.co_organizer_avatars && event.co_organizer_avatars.length > 0)) && (
+          {organizerRows.length > 0 && (
             <View style={styles.organizersSection}>
               <ThemedText style={styles.sectionTitle}>{t('events.organizers')}</ThemedText>
 
-              {primaryOrgName && (
-                <OrganizerRow
-                  testID="event-organizer-0"
-                  name={primaryOrgName}
-                  avatarUrl={event.organizer_avatar}
-                  navigable={!!event.organization_id}
-                  onPress={
-                    event.organization_id
-                      ? () => onOrganizerPress(event.organization_id)
-                      : undefined
-                  }
-                  themeColors={themeColors}
-                />
-              )}
-
-              {event.co_organizer_avatars
-                ?.filter((co: CoOrganizerAvatar) => co.name?.trim())
-                .map((co: CoOrganizerAvatar, i: number) => (
+              {organizerRows.map((row, i) => {
+                const { orgId } = row;
+                return (
                   <OrganizerRow
-                    key={`co-${i}`}
-                    testID={`event-organizer-${i + 1}`}
-                    name={co.name}
-                    avatarUrl={co.avatar}
-                    navigable={!!co.id}
-                    onPress={co.id ? () => onOrganizerPress(co.id!) : undefined}
+                    key={`organizer-${i}`}
+                    testID={`event-organizer-${i}`}
+                    name={row.name}
+                    avatarUrl={row.avatarUrl}
+                    navigable={!!orgId}
+                    onPress={orgId ? () => onOrganizerPress(orgId) : undefined}
                     themeColors={themeColors}
                   />
-                ))}
+                );
+              })}
             </View>
           )}
 
@@ -945,6 +942,12 @@ function CreatorStat({ label, value }: CreatorStatProps) {
       <ThemedText style={styles.creatorStatLabel}>{label}</ThemedText>
     </View>
   );
+}
+
+interface OrganizerRowData {
+  name: string;
+  avatarUrl?: string | null;
+  orgId: string | null;
 }
 
 interface OrganizerRowProps {

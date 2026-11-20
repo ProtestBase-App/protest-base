@@ -7,6 +7,7 @@ import {
   formatEventStartLabel,
   formatEventStartLabel24h,
   formatTodayDate,
+  getOwnerOrganizerRole,
   isBelgiumMidnight,
   parseAsUTC,
   EVENT_TIMEZONE,
@@ -211,6 +212,18 @@ describe('eventFormatters', () => {
       };
       expect(formatEventForDisplay(withOrganization, 'en').organization_name).toBe('Climate Org');
       expect(formatEventForDisplay(mockEvent, 'en').organization_name).toBeNull();
+    });
+
+    it("carries how the owner is shown, reading an event cached without it as 'primary'", () => {
+      expect(formatEventForDisplay(mockEvent, 'en').owner_organizer_role).toBe('primary');
+      expect(
+        formatEventForDisplay({ ...mockEvent, owner_organizer_role: 'co' }, 'en')
+          .owner_organizer_role
+      ).toBe('co');
+      expect(
+        formatEventForDisplay({ ...mockEvent, owner_organizer_role: null }, 'en')
+          .owner_organizer_role
+      ).toBeNull();
     });
 
     it('should format start date correctly in English', () => {
@@ -1291,6 +1304,15 @@ describe('eventFormatters', () => {
       it('clears the flag when the start is missing', () => {
         expect(allDaySubmitField(true, undefined)).toEqual({ all_day: false });
       });
+    });
+  });
+
+  describe('getOwnerOrganizerRole', () => {
+    it("reads an absent role as 'primary' and keeps null", () => {
+      expect(getOwnerOrganizerRole({})).toBe('primary');
+      expect(getOwnerOrganizerRole({ owner_organizer_role: 'primary' })).toBe('primary');
+      expect(getOwnerOrganizerRole({ owner_organizer_role: 'co' })).toBe('co');
+      expect(getOwnerOrganizerRole({ owner_organizer_role: null })).toBeNull();
     });
   });
 });

@@ -515,6 +515,18 @@ describe('event.service recurring series', () => {
       expect(payload.getAll('end_local')).toEqual(['']);
     });
 
+    it('sends the co-organizer answer on JSON and multipart', async () => {
+      mockApi.put.mockResolvedValue(edited);
+
+      await editSeries('series-123', { title: 'New title', owner_is_co_organizer: false });
+      await editSeries('series-123', { images: [pickedImage], owner_is_co_organizer: true });
+
+      const [, json]: any[] = mockApi.put.mock.calls[0];
+      expect(json.owner_is_co_organizer).toBe(false);
+      const [, multipart]: any[] = mockApi.put.mock.calls[1];
+      expect(multipart.getAll('owner_is_co_organizer')).toEqual(['true']);
+    });
+
     it('sends a kept end time as it is on multipart', async () => {
       mockApi.put.mockResolvedValueOnce(edited);
 

@@ -22,6 +22,7 @@ export interface FormState {
   co_organizers: string[];
   help_needed: boolean;
   help_description: string | null;
+  owner_is_co_organizer?: boolean;
   /**
    * Coordinates of the address suggestion the user accepted via a live pick in
    * the CURRENT form session. `null` until a street suggestion is picked, and

@@ -780,6 +780,9 @@ const fr: LocaleData = {
     brusselsTime: '{{time}}, heure de Bruxelles',
     namePlaceholder: 'Nommez votre action',
     byOrganization: 'par {{name}}',
+    ownerCoOrganizerQuestion: '{{name}} co-organise-t-il cet événement ?',
+    ownerCoOrganizerHelper:
+      'Cela ne change que ce que les gens voient. Avec Non, {{name}} n’apparaît pas comme organisateur. Ses membres peuvent toujours modifier l’événement.',
     addDateTime: "Ajouter la date et l'heure",
     addPlace: 'Ajouter un lieu',
     link: 'Lien',
@@ -1976,6 +1979,8 @@ const fr: LocaleData = {
       cancelCodeStep: "Revient à l'étape du mot de passe",
       goBack: "Revient à l'écran précédent",
       closeScreen: 'Ferme cet écran',
+      ownerCoOrganizerYes: 'Affiche {{name}} parmi les co-organisateurs de cet événement',
+      ownerCoOrganizerNo: 'Retire {{name}} des organisateurs affichés pour cet événement',
       closeDialog: 'Ferme cette fenêtre',
       closeMenu: 'Ferme le menu',
       openEvent: "Ouvre le détail de l'événement",

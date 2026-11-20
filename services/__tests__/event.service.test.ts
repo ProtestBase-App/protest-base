@@ -678,6 +678,19 @@ describe('event.service', () => {
       expect(config.timeout).toBe(60000);
     });
 
+    it('carries owner_is_co_organizer: false in a multipart create', async () => {
+      mockApi.post.mockResolvedValueOnce({ data: { success: true, data: { $id: 'new-evt-9' } } });
+
+      await createEventBackend({
+        ...baseEventData,
+        owner_is_co_organizer: false,
+        image: { uri: 'file:///img.jpg', mimeType: 'image/jpeg', fileName: 'img.jpg' },
+      });
+
+      const [, payload] = mockApi.post.mock.calls[0];
+      expect((payload as FormData).getAll('owner_is_co_organizer')).toEqual(['false']);
+    });
+
     it('uses fallback mimeType and fileName when not provided in image', async () => {
       mockApi.post.mockResolvedValueOnce({
         data: { success: true, data: { $id: 'new-evt-3' } },
@@ -958,6 +971,22 @@ describe('event.service', () => {
       const [, payload] = mockApi.put.mock.calls[0];
       expect(payload).toBeInstanceOf(FormData);
       expect((payload as FormData).getAll('all_day')).toEqual(['false']);
+    });
+
+    it('carries owner_is_co_organizer through both branches', async () => {
+      mockApi.put.mockResolvedValue({ data: { success: true, data: { $id: 'evt-1' } } });
+
+      await updateEvent('evt-1', {
+        ...baseUpdates,
+        owner_is_co_organizer: false,
+        image: { uri: 'file:///new-img.jpg', mimeType: 'image/jpeg', fileName: 'new-img.jpg' },
+      });
+      await updateEvent('evt-1', { ...baseUpdates, owner_is_co_organizer: true });
+
+      const [, multipart] = mockApi.put.mock.calls[0];
+      expect((multipart as FormData).getAll('owner_is_co_organizer')).toEqual(['false']);
+      const [, json] = mockApi.put.mock.calls[1];
+      expect(json).toMatchObject({ owner_is_co_organizer: true });
     });
 
     it('carries all_day: true through the multipart branch', async () => {
@@ -1969,6 +1998,15 @@ describe('event.service', () => {
         expect(body.title).toBe('Updated');
         expect(config.headers['Content-Type']).toBe('application/json');
         expect(mockApi.put).not.toHaveBeenCalled();
+      });
+
+      it('sends owner_is_co_organizer as a real boolean', async () => {
+        mockApi.patch.mockResolvedValueOnce({ data: { success: true, data: makeEvent() } });
+
+        await patchEvent('evt-1', { title: 'Updated', owner_is_co_organizer: false });
+
+        const [, body]: any[] = mockApi.patch.mock.calls[0];
+        expect(body.owner_is_co_organizer).toBe(false);
       });
 
       it('delegates to the multipart PUT path when a new image file is provided', async () => {

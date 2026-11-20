@@ -5,6 +5,7 @@ import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { router, Redirect, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { EventFormShell } from '@/components/event-form/EventFormShell';
+import { OwnerCoOrganizerQuestion } from '@/components/event-form/OwnerCoOrganizerQuestion';
 import { EVENT_FORM_SHELL } from '@/constants/EventFormFlags';
 import { FormScreenScaffold } from '@/components/FormScreenScaffold';
 import { FormIssueSummary } from '@/components/FormIssueSummary';
@@ -15,7 +16,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { editSeries, getEventByIdBackend, updateEvent } from '@/services/event.service';
 import CustomButton from '@/components/CustomButton';
 import { useGlobalContext } from '@/context/GlobalProvider';
-import { useUserOrganizations } from '@/context/UserOrganizationsProvider';
+import { usePlatformOrganization, useUserOrganizations } from '@/context/UserOrganizationsProvider';
 import { useConnectivity } from '@/context/ConnectivityProvider';
 import { useRecurringEventsEnabled } from '@/context/VersionCheckProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -28,7 +29,7 @@ import type { SeriesEditRequest, SeriesScope } from '@/types/eventSeries.types';
 import { Routes, DynamicRoutes } from '@/constants/Routes';
 import { Spacing } from '@/constants/DesignTokens';
 import { getThemeColors } from '@/utils/themeColors';
-import { createBlankForm } from '@/utils/eventFormData';
+import { createBlankForm, ownerCoOrganizerUpdate } from '@/utils/eventFormData';
 import { validateEventForm } from '@/utils/eventFormValidation';
 import { logger } from '@/utils/logger';
 import { t } from '@/utils/i18n';
@@ -59,6 +60,7 @@ export default function EditEvent() {
   const [form, setForm] = useState<FormState>(() =>
     createBlankForm({ organizer_name: user?.name || '' })
   );
+  const platformOrganization = usePlatformOrganization(eventDetail[0]?.organization_id);
 
   const validation = useEventFormValidation((intent) => validateEventForm(form, { intent }));
 
@@ -134,6 +136,7 @@ export default function EditEvent() {
           disclaimer: eventDetail[0].disclaimer || '',
           help_needed: eventDetail[0].help_needed || false,
           help_description: eventDetail[0].help_description || '',
+          owner_is_co_organizer: eventDetail[0].owner_organizer_role !== null,
         };
         // Snapshot the loaded state as the dirty-check baseline.
         initialFormRef.current = next;
@@ -223,6 +226,7 @@ export default function EditEvent() {
       co_organizers: finalCoOrganizers,
       help_needed: form.help_needed,
       help_description: form.help_needed ? form.help_description || undefined : undefined,
+      ...ownerCoOrganizerUpdate(form, initialFormRef.current, !!platformOrganization),
     };
   };
 
@@ -362,6 +366,15 @@ export default function EditEvent() {
           }}
           heading={t('eventEdit.title')}
           intro={seriesNote}
+          byline={
+            platformOrganization && (
+              <OwnerCoOrganizerQuestion
+                organizationName={platformOrganization.Name}
+                value={form.owner_is_co_organizer ?? false}
+                onChange={(value) => setForm((prev) => ({ ...prev, owner_is_co_organizer: value }))}
+              />
+            )
+          }
           footer={
             <>
               <CustomButton
