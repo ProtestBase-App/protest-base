@@ -19,6 +19,24 @@ const withDisabledAndroidBackup: ConfigPlugin = (config) =>
     return cfg;
   });
 
+// `orientation: 'portrait'` writes screenOrientation="portrait", and Play turns
+// that into an implied *required* android.hardware.screen.portrait feature,
+// which blocks installs on tablets, desktops and XR. Declaring the feature as
+// optional keeps the portrait lock without filtering devices out.
+const PORTRAIT_FEATURE = 'android.hardware.screen.portrait';
+const withOptionalPortraitFeature: ConfigPlugin = (config) =>
+  withAndroidManifest(config, (cfg) => {
+    const manifest = cfg.modResults.manifest;
+    const features = (manifest['uses-feature'] ??= []);
+    const existing = features.find((f) => f.$['android:name'] === PORTRAIT_FEATURE);
+    if (existing) {
+      existing.$['android:required'] = 'false';
+    } else {
+      features.push({ $: { 'android:name': PORTRAIT_FEATURE, 'android:required': 'false' } });
+    }
+    return cfg;
+  });
+
 // This app's release build merges a large dex set (maplibre + reanimated +
 // hermes + many native modules). The Expo template's default Gradle heap of
 // -Xmx2048m OOMs the D8 dexer on the EAS build path ("java.lang.OutOfMemoryError:
@@ -255,7 +273,9 @@ export default (): ExpoConfig => {
   // Apply the inline mods here rather than via the typed `plugins` array
   // (ExpoConfig['plugins'] does not accept inline function plugins). Expo runs
   // the attached mods during prebuild.
-  return withDisabledAndroidBackup(withGradleHeap(config)) as ExpoConfig;
+  return withOptionalPortraitFeature(
+    withDisabledAndroidBackup(withGradleHeap(config))
+  ) as ExpoConfig;
 };
 
 // Dynamically configure the app based on the environment.
