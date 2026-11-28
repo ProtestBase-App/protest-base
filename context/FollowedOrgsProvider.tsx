@@ -63,7 +63,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    void (async () => {
       try {
         const ids = await fetchFollowedOrgIdsLocally();
         if (isMounted) setFollowedOrgIds(ids);
@@ -119,7 +119,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
       if (!previous.includes(organizationId)) {
         const next = [...previous, organizationId];
         setFollowedOrgIds(next);
-        persist(next);
+        void persist(next);
       }
       try {
         return await followOrganizationOnServer(organizationId);
@@ -129,7 +129,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
           error: error instanceof Error ? error.message : String(error),
         });
         setFollowedOrgIds(previous);
-        persist(previous);
+        void persist(previous);
         return null;
       }
     },
@@ -141,7 +141,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
       const previous = followedOrgIds;
       const next = previous.filter((id) => id !== organizationId);
       setFollowedOrgIds(next);
-      persist(next);
+      void persist(next);
       try {
         return await unfollowOrganizationOnServer(organizationId);
       } catch (error) {
@@ -150,7 +150,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
           error: error instanceof Error ? error.message : String(error),
         });
         setFollowedOrgIds(previous);
-        persist(previous);
+        void persist(previous);
         return null;
       }
     },
@@ -168,7 +168,7 @@ export function FollowedOrgsProvider({ children }: { children: ReactNode }) {
       if (!followedOrgIds.includes(organizationId)) return;
       const next = followedOrgIds.filter((id) => id !== organizationId);
       setFollowedOrgIds(next);
-      persist(next);
+      void persist(next);
       logger.info('[FollowedOrgs] dropped follow for deleted organization', { organizationId });
     },
     [followedOrgIds, persist]

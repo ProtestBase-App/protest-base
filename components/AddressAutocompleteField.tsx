@@ -185,7 +185,7 @@ export default function AddressAutocompleteField({
     setStatus('searching');
     setResults([]);
 
-    (async () => {
+    void (async () => {
       try {
         const data = await searchAddress(trimmed, countryCode, lang, postalCode, controller.signal);
         if (seq !== seqRef.current) return; // a newer search superseded this one

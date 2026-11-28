@@ -106,8 +106,8 @@ describe('EditEvent', () => {
         },
       });
 
-      await findByText('eventEdit.title');
-      await findByDisplayValue(mockEvent.title);
+      expect(await findByText('eventEdit.title')).toBeTruthy();
+      expect(await findByDisplayValue(mockEvent.title)).toBeTruthy();
     });
 
     it('should fetch event from backend when not in cache', async () => {
@@ -259,8 +259,8 @@ describe('EditEvent', () => {
         },
       });
 
-      await findByDisplayValue(eventWithCategories.title);
-      await findByDisplayValue(eventWithCategories.description);
+      expect(await findByDisplayValue(eventWithCategories.title)).toBeTruthy();
+      expect(await findByDisplayValue(eventWithCategories.description)).toBeTruthy();
     });
 
     it('pre-fills co-organizers from the event using IDs directly', async () => {

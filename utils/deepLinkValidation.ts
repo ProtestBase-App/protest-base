@@ -49,7 +49,12 @@ export function validateEventDeepLink(path: string): string | null {
     return null;
   }
 
-  const cleanPath = path.trim().replace(/^\/+|\/+$/g, '');
+  const trimmed = path.trim();
+  let start = 0;
+  let end = trimmed.length;
+  while (start < end && trimmed[start] === '/') start++;
+  while (end > start && trimmed[end - 1] === '/') end--;
+  const cleanPath = trimmed.slice(start, end);
 
   // Must match exactly `event/{id}` — no additional path segments allowed.
   // Accepts UUID v4 (36 chars) or 20-char hex.

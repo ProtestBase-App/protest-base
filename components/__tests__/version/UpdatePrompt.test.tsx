@@ -39,10 +39,7 @@ describe('UpdatePrompt', () => {
         />
       );
 
-      // Modal still exists in DOM but with visible=false
-      // Testing library will still find the text, but the Modal's visible prop controls rendering
-      const title = queryByText(t('version.updatePrompt.title'));
-      // Since Modal with visible=false still renders children, we skip this assertion
+      expect(queryByText(t('version.updatePrompt.title'))).toBeNull();
     });
   });
 

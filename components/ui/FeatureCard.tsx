@@ -42,7 +42,7 @@ export function FeatureCard({ title, description, icon, onPress }: FeatureCardPr
       </View>
       <View style={styles.featureCardContent}>
         <ThemedText style={[styles.featureCardTitle, { color: titleColor }]}>{title}</ThemedText>
-        {description && (
+        {!!description && (
           <ThemedText style={[styles.featureCardDescription, { color: descriptionColor }]}>
             {description}
           </ThemedText>

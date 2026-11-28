@@ -48,7 +48,7 @@ export function useAccountDeletionImpact(): AccountDeletionImpact {
       return { status: 'ready', organizations };
     };
 
-    readImpact()
+    void readImpact()
       .catch((reason: unknown): AccountDeletionImpact => {
         logger.warn('[DeleteAccount] Could not read the organization members', {
           error: reason instanceof Error ? reason.message : String(reason),

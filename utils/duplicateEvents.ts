@@ -16,6 +16,7 @@ import type {
 import { formatEventDateTimeLabel, isBelgiumMidnight } from '@/utils/eventFormatters';
 import { t } from '@/utils/i18n';
 import { formatOccurrenceDate } from '@/utils/recurrence';
+import { compareStrings } from '@/utils/compareStrings';
 
 /**
  * Where "Open" on a match should go.
@@ -148,7 +149,7 @@ export function duplicateWarningNote(
         .map((match) => match.occurrence_start_time)
         .filter((start): start is string => !!start && !Number.isNaN(new Date(start).getTime()))
     ),
-  ].sort();
+  ].sort(compareStrings);
   if (clashing.length === 0) return note;
   const dates = clashing.map((start) => formatOccurrenceDate(start, locale)).join(', ');
   return `${note}\n${t('duplicates.clashingDates', { dates })}`;

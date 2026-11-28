@@ -62,7 +62,7 @@ export function DetailsSection({
 
   // The listing is not fetched at app start.
   React.useEffect(() => {
-    ensureOrganizations();
+    void ensureOrganizations();
   }, [ensureOrganizations]);
 
   // O(1) lookup when resolving co-organizer chip labels.

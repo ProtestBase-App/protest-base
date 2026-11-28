@@ -264,7 +264,7 @@ export function usePaginatedEvents<TApiData, TFormatted>({
       !hasFetchedRef.current
     ) {
       hasFetchedRef.current = true;
-      fetchEvents();
+      void fetchEvents();
     } else if (!isLogged || (!orgsLoading && organizationIds.length === 0)) {
       setLoading(false);
     }
@@ -288,19 +288,19 @@ export function usePaginatedEvents<TApiData, TFormatted>({
     setHasMore(true);
     // Not a "refresh": that flag drives the pull-to-refresh spinner. Rows stay
     // put until the new page lands.
-    fetchEvents();
+    void fetchEvents();
   }, [refetchKey, fetchEvents]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setOffset(0);
     setHasMore(true);
-    fetchEvents(true);
+    void fetchEvents(true);
   }, [fetchEvents]);
 
   const handleEndReached = useCallback(() => {
     if (!loadingMore && hasMore) {
-      loadMoreEvents();
+      void loadMoreEvents();
     }
   }, [loadMoreEvents, loadingMore, hasMore]);
 

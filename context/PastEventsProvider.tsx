@@ -73,7 +73,7 @@ export function PastEventsProvider({ children }: { children: ReactNode }) {
 
       if (cachedData && cachedTimestamp) {
         const cache = JSON.parse(cachedData) as PastEventsCache;
-        const timestamp = parseInt(cachedTimestamp, 10);
+        const timestamp = Number.parseInt(cachedTimestamp, 10);
         return { cache, timestamp };
       }
     } catch (err) {
@@ -241,7 +241,7 @@ export function PastEventsProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initialize();
+    void initialize();
 
     return () => {
       isMounted = false;

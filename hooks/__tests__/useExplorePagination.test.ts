@@ -741,7 +741,7 @@ describe('useExplorePagination', () => {
         })
       );
 
-      const { unmount } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
@@ -753,7 +753,8 @@ describe('useExplorePagination', () => {
         resolveInitial(makeApiResponse(2, 2));
       });
 
-      // No assertions on state — just verifying no crash
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(result.current.events).toEqual([]);
     });
 
     it('does not update state after unmount during fetch error', async () => {
@@ -764,7 +765,7 @@ describe('useExplorePagination', () => {
         })
       );
 
-      const { unmount } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useExplorePagination({ expandLocations: mockExpand, filters: defaultFilters, pageSize: 20 })
       );
 
@@ -774,7 +775,8 @@ describe('useExplorePagination', () => {
         rejectInitial(new Error('Fetch failed after unmount'));
       });
 
-      // No crash expected
+      expect(mockGetEventsForLocations).toHaveBeenCalledTimes(1);
+      expect(result.current.error).toBeNull();
     });
 
     it('does not update state after unmount during load more', async () => {

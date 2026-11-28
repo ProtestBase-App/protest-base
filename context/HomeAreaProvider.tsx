@@ -51,7 +51,7 @@ export function HomeAreaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       const stored = await readHomeArea();
       if (active) {
         setStoredToken(stored);

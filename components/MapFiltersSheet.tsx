@@ -87,7 +87,7 @@ export function MapFiltersSheet({
   // The listing is not fetched at app start — opening the sheet is what makes
   // it needed.
   useEffect(() => {
-    if (visible) ensureOrganizations();
+    if (visible) void ensureOrganizations();
   }, [visible, ensureOrganizations]);
 
   const toggleCategory = useCallback((value: string) => {

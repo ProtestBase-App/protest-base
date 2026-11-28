@@ -93,7 +93,12 @@ export default function Index() {
     // time-to-interactive on a cache the landing screen never reads.
     const allDataLoaded = !loading && !savedEventsLoading && !postalCodesLoading;
     if (allDataLoaded) {
-      redirect();
+      redirect().catch((error: unknown) => {
+        logger.warn('[Launch] Redirect failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        router.replace(Routes.EXPLORE);
+      });
     }
   }, [loading, savedEventsLoading, postalCodesLoading]);
 

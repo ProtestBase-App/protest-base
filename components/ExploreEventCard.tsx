@@ -184,7 +184,7 @@ function ExploreEventCard({
             </ThemedText>
           </ThemedView>
 
-          {cityLabel && (
+          {!!cityLabel && (
             <ThemedView style={styles.metadataRow}>
               <IconSymbol name="map" size={16} color={colors.icon} />
               <ThemedText type="cardMetadata" style={{ color: colors.text }}>

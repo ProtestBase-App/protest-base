@@ -12,6 +12,7 @@
 
 import type { FranceAreas } from '@/constants/PostalCodes_FR';
 import { foldForSearch } from '@/utils/locationFilterOptions';
+import { compareStrings } from '@/utils/compareStrings';
 
 export interface FranceLocality {
   /**
@@ -40,7 +41,7 @@ export function buildFranceLocalities(data: FranceAreas): FranceLocality[] {
   const foldedNames = new Map<string, string>();
   const localities: FranceLocality[] = [];
   // Object.keys lists integer-like codes ("10000") before "01000": sort as text.
-  for (const postalCode of Object.keys(data.postcodes).sort()) {
+  for (const postalCode of Object.keys(data.postcodes).sort(compareStrings)) {
     for (const [city, insee, departementCode] of data.postcodes[postalCode]) {
       const departement = departements.get(departementCode);
       let searchText = foldedNames.get(city);

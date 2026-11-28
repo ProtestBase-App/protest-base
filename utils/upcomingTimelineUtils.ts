@@ -14,6 +14,7 @@ import { dateKeyToDate } from '@/utils/calendarTabUtils';
 import { getEventDateKeyInBelgium } from '@/utils/calendarUtils';
 import { parseAsUTC } from '@/utils/eventFormatters';
 import { getEffectiveEndTime } from '@/utils/eventStatus';
+import { compareStrings } from '@/utils/compareStrings';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -117,7 +118,7 @@ export function buildUpcomingSections(
     byDay.set(dayKey, rows);
   }
 
-  return [...byDay.keys()].sort().map((dayKey) => ({
+  return [...byDay.keys()].sort(compareStrings).map((dayKey) => ({
     dayKey,
     isToday: dayKey === todayKey,
     data: byDay.get(dayKey)!,

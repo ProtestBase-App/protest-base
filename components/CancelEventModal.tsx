@@ -57,7 +57,7 @@ export default function CancelEventModal({
       onDismiss={onDismiss}
       confirmLabel={t('events.cancelAction')}
       onConfirm={() => {
-        onConfirm('only');
+        void onConfirm('only');
       }}
       destructive
       submitting={submitting}

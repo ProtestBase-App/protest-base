@@ -101,7 +101,7 @@ export function VersionCheckProvider({ children }: VersionCheckProviderProps): R
 
   // Check version on mount
   useEffect(() => {
-    performCheck();
+    void performCheck();
   }, [performCheck]);
 
   /**

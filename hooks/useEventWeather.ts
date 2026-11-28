@@ -68,7 +68,7 @@ export function useEventWeather(
   useEffect(() => {
     if (!eventId || !eligible) return;
     let active = true;
-    getEventWeather(eventId, { cacheOnly: isOffline, fingerprint }).then((weather) => {
+    void getEventWeather(eventId, { cacheOnly: isOffline, fingerprint }).then((weather) => {
       if (active) setState({ eventId, weather });
     });
     return () => {

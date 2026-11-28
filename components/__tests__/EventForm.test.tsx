@@ -66,7 +66,7 @@ jest.mock('@/utils/imageOptimization', () => ({
 
 jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(),
-  impactAsync: jest.fn(),
+  impactAsync: jest.fn().mockResolvedValue(undefined),
   ImpactFeedbackStyle: { Medium: 'medium', Light: 'light' },
 }));
 

@@ -41,7 +41,7 @@ const FIELD_TO_LABEL_KEY: Record<string, string> = {
 };
 
 function parseStartMs(startTime?: string | null): number {
-  if (typeof startTime !== 'string' || startTime.trim() === '') return NaN;
+  if (typeof startTime !== 'string' || startTime.trim() === '') return Number.NaN;
   return parseAsUTC(startTime).getTime();
 }
 

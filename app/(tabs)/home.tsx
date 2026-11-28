@@ -43,6 +43,7 @@ import {
 import { parseAsUTC } from '@/utils/eventFormatters';
 import { hasEventEnded } from '@/utils/eventStatus';
 import { logger } from '@/utils/logger';
+import { compareStrings } from '@/utils/compareStrings';
 
 const LOCALE_MAP: Record<string, string> = { en: 'en-US', fr: 'fr-FR', nl: 'nl-NL' };
 
@@ -195,7 +196,7 @@ export default function HomeTab() {
   const agendaDayKeys = useMemo(() => {
     return Object.keys(eventsByDay)
       .filter((key) => key.startsWith(monthPrefix) && (!isCurrentMonthDisplayed || key >= todayKey))
-      .sort();
+      .sort(compareStrings);
   }, [eventsByDay, monthPrefix, isCurrentMonthDisplayed, todayKey]);
 
   // Next event relative to the displayed month (agenda empty state).

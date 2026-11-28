@@ -54,6 +54,7 @@ import { logger } from '@/utils/logger';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
 import { buildRecurrenceRule, isRepeating, seriesErrorMessage } from '@/utils/recurrence';
+import { compareStrings } from '@/utils/compareStrings';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -61,8 +62,8 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
 
   if (a.length !== b.length) return false;
 
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
+  const sortedA = [...a].sort(compareStrings);
+  const sortedB = [...b].sort(compareStrings);
 
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
@@ -290,7 +291,7 @@ export default function CreateEventModal() {
       }
     };
 
-    resumeDraft();
+    void resumeDraft();
   }, [loading, params.resume]);
 
   useFormAutosave({
@@ -337,7 +338,7 @@ export default function CreateEventModal() {
       }
     };
 
-    loadStart();
+    void loadStart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.templateId, params.fromEventId]);
 
@@ -403,7 +404,7 @@ export default function CreateEventModal() {
       await clearEventDraft();
 
       const orgIds = userOrganizations.map((org) => org.$id);
-      refreshUserEventCounts(orgIds);
+      void refreshUserEventCounts(orgIds);
 
       // Seed the global events cache so Home (calendar/list) and other screens
       // see the new event immediately, without waiting for the next refetch.
@@ -478,7 +479,7 @@ export default function CreateEventModal() {
       // Refresh the draft badge count (drafts ARE counted). The global events
       // cache is NOT touched — drafts are excluded from it.
       const orgIds = userOrganizations.map((org) => org.$id);
-      refreshUserEventCounts(orgIds);
+      void refreshUserEventCounts(orgIds);
 
       router.replace(Routes.DRAFT_EVENTS);
       alertWithDuplicateWarning(
@@ -597,7 +598,7 @@ export default function CreateEventModal() {
             open: publishCheckOpen,
             onConfirm: () => {
               setPublishCheckOpen(false);
-              runCreateEvent(false);
+              void runCreateEvent(false);
             },
             onClose: () => setPublishCheckOpen(false),
           }}

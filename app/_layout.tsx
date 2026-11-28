@@ -32,7 +32,11 @@ import { Platform, StyleSheet } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch((error: unknown) => {
+  logger.warn('[RootLayout] Could not keep the splash screen', {
+    error: error instanceof Error ? error.message : String(error),
+  });
+});
 
 // Foreground notifications: silent banner (iOS) + notification list, no sound/badge.
 Notifications.setNotificationHandler({
@@ -66,7 +70,11 @@ export default function RootLayout() {
     }
 
     if (fontsLoaded || error) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch((error: unknown) => {
+        logger.warn('[RootLayout] Could not hide the splash screen', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
   }, [fontsLoaded, error]);
 

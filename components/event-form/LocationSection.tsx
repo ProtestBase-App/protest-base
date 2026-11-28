@@ -88,7 +88,7 @@ export function LocationSection({
         })}
       </ThemedView>
 
-      {form.country && (
+      {!!form.country && (
         <ThemedView style={styles.nestedFieldGroup}>
           <AddressAutocompleteField
             testID="input-event-street-address"

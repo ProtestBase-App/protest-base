@@ -62,7 +62,9 @@ function normalizePrefix(prefix: string | null | undefined): string {
   let value = (prefix ?? '').trim();
   if (!value) return '';
   if (!value.startsWith('/')) value = `/${value}`;
-  return value.replace(/\/+$/, '');
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
 }
 
 export async function setApiPrefix(prefix: string): Promise<void> {

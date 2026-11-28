@@ -235,7 +235,7 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       }
     };
 
-    preloadAll();
+    void preloadAll();
   }, [loadPostalCodesForCountry]);
 
   const getSubMunicipalityName = useCallback(
@@ -250,8 +250,8 @@ export const PostalCodeProvider: React.FC<PostalCodeProviderProps> = ({ children
       if (!codes || !postalCode) return fallback;
 
       // Postal codes are stored as numbers in the data set.
-      const postalCodeNum = parseInt(postalCode, 10);
-      if (isNaN(postalCodeNum)) return fallback;
+      const postalCodeNum = Number.parseInt(postalCode, 10);
+      if (Number.isNaN(postalCodeNum)) return fallback;
 
       // Every row, not the first: one code can cover several places (3000 is Heverlee and Leuven).
       const rows = codes.filter((row: { post_code?: unknown }) => row.post_code === postalCodeNum);

@@ -90,10 +90,10 @@ export default function MoreScreen() {
         return;
       }
       if (userOrganizations.length > 0) {
-        refreshUserEventCounts(userOrganizations.map((org) => org.$id));
+        void refreshUserEventCounts(userOrganizations.map((org) => org.$id));
       }
       if (isTemplatesStale()) {
-        refreshTemplates();
+        void refreshTemplates();
       }
     };
   });

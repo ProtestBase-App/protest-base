@@ -55,7 +55,7 @@ export default function UpcomingEventsListItem({ event }: UpcomingEventsListItem
               {event.start_time}
             </ThemedText>
 
-            {cityLabel && (
+            {!!cityLabel && (
               <View style={styles.locationRow}>
                 <IconSymbol
                   name="location.fill"

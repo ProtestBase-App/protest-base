@@ -112,7 +112,7 @@ export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps>
   const setSelectedOrganizationId = useCallback(
     (id: string | null) => {
       setSelectedOrganizationIdState(id);
-      persistSelection(id);
+      void persistSelection(id);
     },
     [persistSelection]
   );
@@ -138,13 +138,13 @@ export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps>
       if (result.organizations.length === 1) {
         const singleOrgId = result.organizations[0].$id;
         setSelectedOrganizationIdState(singleOrgId);
-        persistSelection(singleOrgId);
+        void persistSelection(singleOrgId);
         logger.debug('[UserOrganizationsProvider] Auto-selected single organization', {
           organizationId: singleOrgId,
         });
       } else {
         setSelectedOrganizationIdState(null);
-        persistSelection(null);
+        void persistSelection(null);
       }
 
       logger.info('[UserOrganizationsProvider] Loaded user organizations', {
@@ -168,7 +168,7 @@ export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps>
 
   useEffect(() => {
     if (!authLoading) {
-      fetchOrganizations();
+      void fetchOrganizations();
     }
   }, [authLoading, fetchOrganizations]);
 
@@ -177,7 +177,7 @@ export const UserOrganizationsProvider: React.FC<UserOrganizationsProviderProps>
       setUserOrganizations([]);
       setDropdownItems([]);
       setSelectedOrganizationIdState(null);
-      persistSelection(null);
+      void persistSelection(null);
       setLoading(false);
       setError(null);
     }

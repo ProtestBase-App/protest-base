@@ -31,7 +31,7 @@ export const canUserEditEvent = (
       effectiveEnd = new Date(eventStartDateFull).getTime() + 2 * 60 * 60 * 1000;
     }
 
-    if (isNaN(effectiveEnd)) {
+    if (Number.isNaN(effectiveEnd)) {
       return false;
     }
 

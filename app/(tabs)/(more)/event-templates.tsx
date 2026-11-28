@@ -80,10 +80,10 @@ export default function EventTemplatesScreen() {
     useCallback(() => {
       setNow(new Date());
       if (isTemplatesStale()) {
-        refreshTemplates();
+        void refreshTemplates();
       }
       if (isPastEventsStale()) {
-        refreshPastEvents();
+        void refreshPastEvents();
       }
     }, [isTemplatesStale, isPastEventsStale, refreshTemplates, refreshPastEvents])
   );
@@ -132,7 +132,7 @@ export default function EventTemplatesScreen() {
   const fallbackOrganizationId = userOrganizations[0]?.$id;
 
   const handleLaunchTemplate = useCallback((template: ParsedEventTemplate) => {
-    confirmReplaceDraft(() =>
+    void confirmReplaceDraft(() =>
       router.push({
         pathname: Routes.CREATE_EVENT,
         params: { templateId: template.$id, source: 'template' },
@@ -216,7 +216,7 @@ export default function EventTemplatesScreen() {
   }, [menuFor, removeTemplate]);
 
   const handleUsePastEvent = useCallback((event: PastEventForTemplate) => {
-    confirmReplaceDraft(() =>
+    void confirmReplaceDraft(() =>
       router.push({
         pathname: Routes.CREATE_EVENT,
         params: { fromEventId: event.$id, source: 'past' },

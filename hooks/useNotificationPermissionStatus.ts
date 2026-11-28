@@ -48,10 +48,10 @@ export function useNotificationPermissionStatus(): NotificationPermissionState {
       }
     };
 
-    check();
+    void check();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        check();
+        void check();
       }
     });
     return () => {

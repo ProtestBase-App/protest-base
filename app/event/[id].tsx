@@ -209,7 +209,7 @@ export default function EventDetails() {
       }
     };
 
-    loadEvent();
+    void loadEvent();
 
     return () => {
       isMounted = false;
@@ -339,7 +339,7 @@ export default function EventDetails() {
       );
       setCancelModalOpen(false);
       Alert.alert(t('common.success'), t('series.messages.cancelled', { count: result.cancelled }));
-      refreshSeries();
+      void refreshSeries();
       refetchEvents().catch((refreshErr) => {
         logger.warn('Global events cache refresh failed', { error: refreshErr });
       });

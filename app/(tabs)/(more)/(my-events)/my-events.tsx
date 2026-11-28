@@ -119,7 +119,7 @@ export default function MyEventsScreen() {
       !hasFetchedRef.current
     ) {
       hasFetchedRef.current = true;
-      fetchUpcomingEvents();
+      void fetchUpcomingEvents();
     }
   }, [fetchUpcomingEvents, isLogged, user?.$id, orgsLoading, organizationIds.length]);
 
@@ -128,7 +128,7 @@ export default function MyEventsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (hasMountedRef.current) {
-        fetchUpcomingEvents();
+        void fetchUpcomingEvents();
       } else {
         hasMountedRef.current = true;
       }

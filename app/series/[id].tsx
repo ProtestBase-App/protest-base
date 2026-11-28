@@ -146,7 +146,7 @@ export default function SeriesScreen() {
   const hasFocusedRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (hasFocusedRef.current) refresh();
+      if (hasFocusedRef.current) void refresh();
       hasFocusedRef.current = true;
     }, [refresh])
   );
@@ -555,7 +555,7 @@ export default function SeriesScreen() {
         onDismiss={() => setDialog(null)}
         confirmLabel={t('series.dialogs.addDatesConfirm')}
         onConfirm={() => {
-          if (addCountValid) runAddDates(parsedAddCount, false);
+          if (addCountValid) void runAddDates(parsedAddCount, false);
         }}
         submitting={busy}
         testID="series-add-dates-dialog"

@@ -37,6 +37,7 @@ import { isTemplateDataTooLong, validateEventForm } from '@/utils/eventFormValid
 import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
+import { compareStrings } from '@/utils/compareStrings';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -44,8 +45,8 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
 
   if (a.length !== b.length) return false;
 
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
+  const sortedA = [...a].sort(compareStrings);
+  const sortedB = [...b].sort(compareStrings);
 
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
@@ -187,7 +188,7 @@ export default function CreateTemplateScreen() {
 
   // An unfinished template comes back as it was left; the autosave below keeps it.
   useEffect(() => {
-    getTemplateDraft().then((draft) => {
+    void getTemplateDraft().then((draft) => {
       if (!draft) return;
       setForm(draft.form as FormState);
       setTemplateName(draft.name);

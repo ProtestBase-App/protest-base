@@ -125,7 +125,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
 
   useEffect(() => {
     if (event.country) {
-      loadPostalCodesForCountry(event.country);
+      void loadPostalCodesForCountry(event.country);
     }
   }, [event.country, loadPostalCodesForCountry]);
 
@@ -209,7 +209,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         }
       }
       const startDateObj = parseAsUTC(startDate);
-      if (isNaN(startDateObj.getTime())) {
+      if (Number.isNaN(startDateObj.getTime())) {
         Alert.alert(t('common.error'), t('common.invalidDateError'));
         return;
       }
@@ -218,7 +218,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
         endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
       } else {
         endDateObj = parseAsUTC(endDate);
-        if (isNaN(endDateObj.getTime())) {
+        if (Number.isNaN(endDateObj.getTime())) {
           // An all-day event always carries a real end (23:59:59.999 of its
           // last day), so this invented 2h window is unreachable for one.
           endDateObj = new Date(startDateObj.getTime() + 2 * 60 * 60 * 1000);
@@ -759,7 +759,7 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
             />
           )}
 
-          {(event.description || (event.help_needed && event.help_description)) && (
+          {!!(event.description || (event.help_needed && event.help_description)) && (
             <View
               style={[
                 styles.infoCard,
@@ -780,11 +780,11 @@ const EventDetailed: React.FC<EventDetailedProps> = ({
                 </View>
               ) : null}
 
-              {event.description && event.help_needed && event.help_description && (
+              {!!(event.description && event.help_needed && event.help_description) && (
                 <View style={[styles.infoSeparator, { backgroundColor: themeColors.separator }]} />
               )}
 
-              {event.help_needed && event.help_description && (
+              {!!(event.help_needed && event.help_description) && (
                 <View
                   style={[
                     styles.helpSection,

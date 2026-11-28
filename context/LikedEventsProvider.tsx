@@ -51,7 +51,7 @@ export function LikedEventsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    void (async () => {
       try {
         const entries = await fetchLikedEntriesLocally();
         const { kept, removedCount } = pruneStaleEntries(entries, RETENTION_DAYS);

@@ -369,7 +369,7 @@ describe('permissionHelpers', () => {
 
   describe('openAppSettings', () => {
     it('should call Linking.openSettings', () => {
-      const openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockImplementation();
+      const openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
 
       openAppSettings();
 

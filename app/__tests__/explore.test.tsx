@@ -4,6 +4,9 @@ jest.mock('@/services/event.service', () => ({
   getEventByIdBackend: jest.fn(),
   getEventsForLocations: jest.fn().mockResolvedValue({ events: [], total: 0, limit: 1, offset: 0 }),
 }));
+jest.mock('@/utils/shareHelpers', () => ({
+  shareEventWithAlert: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('@/hooks/useDebouncedValue', () => ({
   useDebouncedValue: jest.fn((value) => value),
 }));
@@ -26,6 +29,7 @@ import { getEventByIdBackend, getEventsForLocations } from '@/services/event.ser
 import { useExplorePagination } from '@/hooks/useExplorePagination';
 import { BrandLoader } from '@/components/ui/loaders/BrandLoader';
 import { formatEventForList } from '@/utils/eventFormatters';
+import { shareEventWithAlert } from '@/utils/shareHelpers';
 
 describe('Explore Screen', () => {
   beforeEach(() => {
@@ -851,10 +855,13 @@ describe('Explore Screen', () => {
         handleEndReached: jest.fn(),
       });
 
-      renderWithProviders(<ExploreTab />);
+      const { getByTestId } = renderWithProviders(<ExploreTab />);
+      fireEvent.press(getByTestId('explore-card-0-share'), { stopPropagation: jest.fn() });
 
-      // Share functionality is available through event cards
-      // Actual testing would require triggering share from ExploreEventCard
+      await waitFor(() => {
+        expect(shareEventWithAlert).toHaveBeenCalledWith(mockEvent, 'en', expect.anything());
+      });
+      expect(getEventByIdBackend).toHaveBeenCalledWith('event-share');
     });
   });
 

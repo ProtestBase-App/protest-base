@@ -33,7 +33,7 @@ export function NotificationsBootstrap() {
         });
       }
     }
-    setup();
+    void setup();
   }, [userLanguage]);
 
   useEffect(() => {
