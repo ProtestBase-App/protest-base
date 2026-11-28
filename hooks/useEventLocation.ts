@@ -137,7 +137,7 @@ export function useEventLocation({ form, setForm, userLanguage }: UseEventLocati
       }
     };
 
-    loadPostalCodes();
+    void loadPostalCodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.country, userLang, franceEnabled]);
 

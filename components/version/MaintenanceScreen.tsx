@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { getThemeColors } from '@/utils/themeColors';
 import { Spacing, Typography, BorderRadius } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
+import { logger } from '@/utils/logger';
 
 interface MaintenanceScreenProps {
   /** Message from backend, or null for default message */
@@ -69,7 +70,11 @@ export function MaintenanceScreen({ message }: MaintenanceScreenProps): React.Re
   });
 
   const handleSocialPress = (url: string) => {
-    Linking.openURL(url);
+    Linking.openURL(url).catch((error: unknown) => {
+      logger.warn('[MaintenanceScreen] Could not open link', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   };
 
   return (

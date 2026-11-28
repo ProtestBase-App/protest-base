@@ -178,7 +178,7 @@ export default function SignIn() {
   // authenticator app) picks up where it was, with the same key.
   useEffect(() => {
     let active = true;
-    loadPendingEnrollment().then((enrollment) => {
+    void loadPendingEnrollment().then((enrollment) => {
       if (active && enrollment) {
         setSecondStep((current) => current ?? { kind: 'enroll', enrollment });
       }
@@ -641,7 +641,7 @@ export default function SignIn() {
                           returnKeyType="send"
                           onSubmitEditing={() => {
                             if (canResetPassword && !isSubmittingReset) {
-                              handleResetPassword();
+                              void handleResetPassword();
                             }
                           }}
                           accessibilityLabel="Email address for password reset"

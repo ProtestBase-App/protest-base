@@ -16,7 +16,7 @@ function safeParseDate(dateString: string | undefined, fallback: Date = new Date
     return fallback;
   }
   const parsed = new Date(dateString);
-  return isNaN(parsed.getTime()) ? fallback : parsed;
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
 }
 
 export interface DateTimeSectionProps {

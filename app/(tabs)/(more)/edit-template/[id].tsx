@@ -31,6 +31,7 @@ import { t } from '@/utils/i18n';
 import { getThemeColors } from '@/utils/themeColors';
 import { assertOnlineOrAlert } from '@/utils/offlineGuard';
 import { toPostalCodeString } from '@/utils/eventLocation';
+import { compareStrings } from '@/utils/compareStrings';
 
 const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
   const a = arr1 || [];
@@ -38,8 +39,8 @@ const areArraysEqual = (arr1: string[] | undefined, arr2: string[] | undefined):
 
   if (a.length !== b.length) return false;
 
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
+  const sortedA = [...a].sort(compareStrings);
+  const sortedB = [...b].sort(compareStrings);
 
   return sortedA.every((val, idx) => val === sortedB[idx]);
 };
@@ -224,7 +225,7 @@ export default function EditTemplateScreen() {
     };
 
     if (templateId) {
-      loadTemplate();
+      void loadTemplate();
     }
   }, [templateId]);
 

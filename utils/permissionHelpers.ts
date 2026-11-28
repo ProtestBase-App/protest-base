@@ -51,7 +51,7 @@ export async function getPhotoLibraryReadStatus(): Promise<PermissionStatus> {
  * iOS 17+ (it runs outside the app): expo-calendar only checks the permission on iOS 16.
  */
 export function calendarNeedsPermission(): boolean {
-  return Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) < 17;
+  return Platform.OS === 'ios' && Number.parseInt(String(Platform.Version), 10) < 17;
 }
 
 /**
@@ -111,7 +111,11 @@ export async function getNotificationsStatus(): Promise<PermissionStatus> {
  * Allows users to modify permissions from within the app
  */
 export function openAppSettings(): void {
-  Linking.openSettings();
+  Linking.openSettings().catch((error: unknown) => {
+    logger.warn('[permissionHelpers] Could not open settings', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 }
 
 /**

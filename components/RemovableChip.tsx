@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Spacing, BorderRadius, Typography } from '@/constants/DesignTokens';
 import { t } from '@/utils/i18n';
+import { logger } from '@/utils/logger';
 
 interface RemovableChipProps {
   /** Display label for the chip */
@@ -43,7 +44,11 @@ const RemovableChipComponent: React.FC<RemovableChipProps> = ({
   const isDark = colorScheme === 'dark';
 
   const handleRemove = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch((error: unknown) => {
+      logger.debug('[RemovableChip] Haptic feedback failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     onRemove(value);
   }, [onRemove, value]);
 

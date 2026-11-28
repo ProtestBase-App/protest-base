@@ -73,7 +73,7 @@ export function TemplatesProvider({ children }: { children: ReactNode }) {
 
       if (cachedData && cachedTimestamp) {
         const cache = JSON.parse(cachedData) as ParsedEventTemplate[];
-        const timestamp = parseInt(cachedTimestamp, 10);
+        const timestamp = Number.parseInt(cachedTimestamp, 10);
         return { cache, timestamp };
       }
     } catch (err) {
@@ -154,7 +154,7 @@ export function TemplatesProvider({ children }: { children: ReactNode }) {
 
       setTemplates((prev) => {
         const updated = [createdTemplate, ...prev];
-        saveCacheData(updated);
+        void saveCacheData(updated);
         return updated;
       });
 
@@ -169,7 +169,7 @@ export function TemplatesProvider({ children }: { children: ReactNode }) {
 
       setTemplates((prev) => {
         const updated = prev.map((t) => (t.$id === templateId ? updatedTemplate : t));
-        saveCacheData(updated);
+        void saveCacheData(updated);
         return updated;
       });
 
@@ -185,7 +185,7 @@ export function TemplatesProvider({ children }: { children: ReactNode }) {
 
       setTemplates((prev) => {
         const updated = prev.filter((t) => t.$id !== templateId);
-        saveCacheData(updated);
+        void saveCacheData(updated);
         return updated;
       });
 
@@ -272,7 +272,7 @@ export function TemplatesProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initialize();
+    void initialize();
 
     return () => {
       isMounted = false;

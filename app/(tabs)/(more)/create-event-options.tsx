@@ -134,9 +134,9 @@ export default function CreateEventOptionsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      getEventDraft().then(setDraft);
-      if (isTemplatesStale()) refreshTemplates();
-      if (isPastEventsStale()) refreshPastEvents();
+      void getEventDraft().then(setDraft);
+      if (isTemplatesStale()) void refreshTemplates();
+      if (isPastEventsStale()) void refreshPastEvents();
     }, [isTemplatesStale, isPastEventsStale, refreshTemplates, refreshPastEvents])
   );
 
@@ -159,15 +159,15 @@ export default function CreateEventOptionsScreen() {
   const handleResume = () => openForm({ resume: '1', source: 'resume' });
 
   const handleCreateFromScratch = () => {
-    confirmReplaceDraft(() => openForm({ source: 'scratch' }));
+    void confirmReplaceDraft(() => openForm({ source: 'scratch' }));
   };
 
   const handleLaunchTemplate = (template: ParsedEventTemplate) => {
-    confirmReplaceDraft(() => openForm({ templateId: template.$id, source: 'template' }));
+    void confirmReplaceDraft(() => openForm({ templateId: template.$id, source: 'template' }));
   };
 
   const handleUsePastEvent = (event: PastEventForTemplate) => {
-    confirmReplaceDraft(() => openForm({ fromEventId: event.$id, source: 'past' }));
+    void confirmReplaceDraft(() => openForm({ fromEventId: event.$id, source: 'past' }));
   };
 
   return (

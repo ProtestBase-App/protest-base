@@ -159,7 +159,7 @@ export default function DraftEdit() {
       }
     };
 
-    loadDraft();
+    void loadDraft();
   }, [eventId]);
 
   // One date of a series, while the feature is on. "Edit all upcoming" opens the form
@@ -303,9 +303,9 @@ export default function DraftEdit() {
   const handleSaveScopeConfirm = (scope: SeriesScope) => {
     setSaveScopeOpen(false);
     if (scope === 'following') {
-      saveSeries();
+      void saveSeries();
     } else {
-      saveDraft();
+      void saveDraft();
     }
   };
 

@@ -111,7 +111,7 @@ export default function UpcomingEventsScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    loadOngoing().then((events) => {
+    void loadOngoing().then((events) => {
       if (!cancelled && events) setOngoingEvents(events);
     });
     return () => {
@@ -126,7 +126,7 @@ export default function UpcomingEventsScreen() {
 
   const refreshAll = useCallback(() => {
     setNow(new Date());
-    loadOngoing().then((events) => {
+    void loadOngoing().then((events) => {
       if (events) setOngoingEvents(events);
     });
     handleRefresh();

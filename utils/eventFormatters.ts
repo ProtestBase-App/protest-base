@@ -80,7 +80,7 @@ export function getDatePartsInBelgium(date: Date): {
   const parts = formatter.formatToParts(date);
   const getValue = (type: string) => {
     const part = parts.find((p) => p.type === type);
-    return part ? parseInt(part.value, 10) : 0;
+    return part ? Number.parseInt(part.value, 10) : 0;
   };
 
   return {

@@ -51,13 +51,13 @@ export default function PrivacyCenterScreen() {
 
   // Initial load
   useEffect(() => {
-    loadPermissionStatuses();
+    void loadPermissionStatuses();
   }, [loadPermissionStatuses]);
 
   // Reload when screen comes into focus (e.g., returning from Settings)
   useFocusEffect(
     useCallback(() => {
-      loadPermissionStatuses();
+      void loadPermissionStatuses();
     }, [loadPermissionStatuses])
   );
 

@@ -25,7 +25,7 @@ export function useHomeViewPreference() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEYS.HOME_VIEW_PREFERENCE);
         const mode = toHomeViewMode(stored);

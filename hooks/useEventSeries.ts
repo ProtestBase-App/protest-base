@@ -57,7 +57,7 @@ export function useEventSeries(seriesId: string | null): UseEventSeriesReturn {
     setSeries(null);
     setError(null);
     setLoading(!!seriesId);
-    refresh();
+    void refresh();
   }, [seriesId, refresh]);
 
   return { series, loading, error, refresh };

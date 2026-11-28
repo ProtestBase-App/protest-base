@@ -136,7 +136,7 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    initialize();
+    void initialize();
 
     return () => {
       isMounted = false;

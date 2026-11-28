@@ -132,7 +132,7 @@ export function OrganizationsProvider({ children }: OrganizationsProviderProps) 
       if (stateRef.current.hasData || !cached || !cachedTimestamp) return;
 
       const parsed = JSON.parse(cached) as CachedOrganizations;
-      const timestamp = parseInt(cachedTimestamp, 10);
+      const timestamp = Number.parseInt(cachedTimestamp, 10);
       if (!Array.isArray(parsed?.dropdownItems) || Number.isNaN(timestamp)) return;
 
       stateRef.current = { hasData: true, lastFetchTime: timestamp };
@@ -200,7 +200,7 @@ export function OrganizationsProvider({ children }: OrganizationsProviderProps) 
   }, [fetchOrganizations]);
 
   useEffect(() => {
-    startHydration();
+    void startHydration();
   }, [startHydration]);
 
   const value: OrganizationsContextType = useMemo(

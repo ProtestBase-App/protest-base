@@ -29,6 +29,7 @@ import { formatEventStartLabel24h, parseAsUTC } from '@/utils/eventFormatters';
 import { getCurrentLocale, t, tPlural } from '@/utils/i18n';
 import { logger } from '@/utils/logger';
 import { openMap } from '@/utils/mapHelpers';
+import { compareStrings } from '@/utils/compareStrings';
 
 /**
  * Never schedule a trigger closer than this to "now": iOS rejects past (or
@@ -353,7 +354,9 @@ export async function reconcileSavedDayNotifications(
     { content: Notifications.NotificationContentInput; triggerDate: Date }
   >();
   const keepIdentifiers = new Set<string>();
-  const dayKeys = [...eventsByDay.keys()].sort().slice(0, SAVED_DAY_MAX_SCHEDULED_DAYS);
+  const dayKeys = [...eventsByDay.keys()]
+    .sort(compareStrings)
+    .slice(0, SAVED_DAY_MAX_SCHEDULED_DAYS);
   for (const dateKey of dayKeys) {
     const triggerDate = computeSavedDayTriggerDate(dateKey);
     if (triggerDate.getTime() < minTriggerTime) {

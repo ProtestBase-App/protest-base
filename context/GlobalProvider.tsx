@@ -227,15 +227,15 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   }, [userId]);
 
   const refreshUserEventCounts = useCallback(async (organizationIds?: string[]): Promise<void> => {
-    // If no organizations, set counts to zero (not null) to exit loading state
-    if (!organizationIds || organizationIds.length === 0) {
-      const zeroCounts: EventCounts = { upcoming: 0, past: 0, draft: 0 };
-      setUserEventCounts(zeroCounts);
-      await AsyncStorage.setItem(USER_EVENT_COUNTS_KEY, JSON.stringify(zeroCounts));
-      return;
-    }
-
     try {
+      // If no organizations, set counts to zero (not null) to exit loading state
+      if (!organizationIds || organizationIds.length === 0) {
+        const zeroCounts: EventCounts = { upcoming: 0, past: 0, draft: 0 };
+        setUserEventCounts(zeroCounts);
+        await AsyncStorage.setItem(USER_EVENT_COUNTS_KEY, JSON.stringify(zeroCounts));
+        return;
+      }
+
       setUserEventCountsLoading(true);
       const counts = await fetchEventCounts(organizationIds);
       setUserEventCounts(counts);
@@ -415,7 +415,7 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   }, [validateUserSession, fetchInitialEvents]);
 
   useEffect(() => {
-    validateUserSession();
+    void validateUserSession();
 
     const handleTokenExpiration = async (reason?: SessionEndReason): Promise<void> => {
       if (reason === 'unreachable') {
@@ -469,7 +469,7 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
   }, [validateUserSession, clearAuthState, resetAuthState]);
 
   useEffect(() => {
-    fetchInitialEvents();
+    void fetchInitialEvents();
   }, [fetchInitialEvents]);
 
   const upsertEventInCache = useCallback((event: Event): void => {

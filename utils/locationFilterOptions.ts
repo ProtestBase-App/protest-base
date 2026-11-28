@@ -1,5 +1,6 @@
 import { logger } from '@/utils/logger';
 import { canonicalCountry, normalizeEventPostcode } from '@/utils/eventLocation';
+import { compareStrings } from '@/utils/compareStrings';
 import type { LuxembourgCanton, LuxembourgCommune } from '@/constants/PostalCodes_LU';
 import type { FranceAreas } from '@/constants/PostalCodes_FR';
 
@@ -455,7 +456,7 @@ export function buildLocationFilterOptions({
       provinceLabel = '',
       parentToken?: string
     ) => {
-      const codeList = [...(areaCodes.get(value) ?? [])].sort();
+      const codeList = [...(areaCodes.get(value) ?? [])].sort(compareStrings);
       tokenToCodes.set(value, codeList);
       tokenToLabel.set(value, label);
       const { folded, spaced } = foldForSearch(label);

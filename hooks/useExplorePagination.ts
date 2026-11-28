@@ -256,7 +256,7 @@ export function useExplorePagination({
       setEvents([]);
     }
 
-    fetchEvents();
+    void fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.dateFilter,
@@ -268,13 +268,13 @@ export function useExplorePagination({
   ]);
 
   const handleRefresh = useCallback(() => {
-    fetchEvents(true);
+    void fetchEvents(true);
   }, [fetchEvents]);
 
   const handleEndReached = useCallback(() => {
     if (isOfflineRef.current) return;
     if (!loadingMore && hasMore && !loading) {
-      loadMoreEvents();
+      void loadMoreEvents();
     }
   }, [loadMoreEvents, loadingMore, hasMore, loading]);
 

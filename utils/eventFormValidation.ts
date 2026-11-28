@@ -168,7 +168,8 @@ export function validateEventForm(form: FormState, check: EventFormCheck): Event
     const message = messages.get(field);
     if (!message) return [];
     // Some labels are the form's, with its required mark.
-    return [{ field, message, label: t(FIELD_LABEL_KEYS[field]).replace(/\s*\*$/, '') }];
+    const label = t(FIELD_LABEL_KEYS[field]);
+    return [{ field, message, label: label.endsWith('*') ? label.slice(0, -1).trimEnd() : label }];
   });
 }
 

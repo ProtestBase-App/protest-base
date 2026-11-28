@@ -249,7 +249,7 @@ describe('EventDetails', () => {
         },
       });
 
-      await findByText('common.error');
+      expect(await findByText('common.error')).toBeTruthy();
     });
 
     it('should show error state when no event ID provided', async () => {
@@ -273,7 +273,7 @@ describe('EventDetails', () => {
         },
       });
 
-      await findByText('common.error');
+      expect(await findByText('common.error')).toBeTruthy();
     });
   });
 

@@ -239,7 +239,10 @@ export function EventFormPage({
               placeholder={t('createEvent.namePlaceholder')}
               // It wraps like a multiline field, but a title stays one line when pasted.
               handleChangeText={(value) =>
-                setForm((prev) => ({ ...prev, title: value.replace(/\s*\n\s*/g, ' ') }))
+                setForm((prev) => ({
+                  ...prev,
+                  title: value.replace(/\s+/g, (run) => (run.includes('\n') ? ' ' : run)),
+                }))
               }
               maxLength={EVENT_TEXT_LIMITS.title}
               errorText={errors.title}

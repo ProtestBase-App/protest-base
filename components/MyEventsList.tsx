@@ -38,7 +38,7 @@ const MyEventsList: React.FC<EventListProps> = ({
     const uniqueCountries = [...new Set(events.map((event) => event.country).filter(Boolean))];
     uniqueCountries.forEach((country) => {
       if (country) {
-        loadPostalCodesForCountry(country);
+        void loadPostalCodesForCountry(country);
       }
     });
   }, [events, loadPostalCodesForCountry]);

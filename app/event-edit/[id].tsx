@@ -103,7 +103,7 @@ export default function EditEvent() {
     };
 
     if (eventId) {
-      loadEvent();
+      void loadEvent();
     }
   }, [eventId, userLanguage]);
 
@@ -234,7 +234,7 @@ export default function EditEvent() {
     await refetchEvents();
 
     const orgIds = userOrganizations.map((org) => org.$id);
-    refreshUserEventCounts(orgIds);
+    void refreshUserEventCounts(orgIds);
 
     router.replace(DynamicRoutes.event(eventId, { isCreated: isCreated === 'true' }));
 
@@ -290,9 +290,9 @@ export default function EditEvent() {
   const handleScopeConfirm = (scope: SeriesScope) => {
     setScopeDialogOpen(false);
     if (scope === 'following') {
-      saveSeries();
+      void saveSeries();
     } else {
-      saveEvent();
+      void saveEvent();
     }
   };
 

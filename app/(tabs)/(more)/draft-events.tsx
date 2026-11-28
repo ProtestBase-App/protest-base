@@ -401,14 +401,14 @@ export default function DraftEventsScreen() {
     setDeleteScope(null);
     if (!prompt) return;
     if (scope === 'following') {
-      sendDelete(prompt.event, prompt.followingIds, async () => {
+      void sendDelete(prompt.event, prompt.followingIds, async () => {
         const result = await deleteSeriesOccurrences(prompt.seriesId, {
           fromEventId: prompt.event.$id,
         });
         return t('series.messages.deleted', { count: result.deleted });
       });
     } else {
-      sendDelete(prompt.event, [prompt.event.$id], async () => {
+      void sendDelete(prompt.event, [prompt.event.$id], async () => {
         await deleteEvent(prompt.event.$id);
         return t('drafts.deleted');
       });
@@ -421,7 +421,7 @@ export default function DraftEventsScreen() {
       if (mutationBusyRef.current || confirmOpenRef.current) return;
       confirmOpenRef.current = true;
       if (recurringEnabled && event.series_id) {
-        promptSeriesDelete(event, event.series_id);
+        void promptSeriesDelete(event, event.series_id);
         return;
       }
       Alert.alert(
@@ -440,7 +440,7 @@ export default function DraftEventsScreen() {
             style: 'destructive',
             onPress: () => {
               confirmOpenRef.current = false;
-              sendDelete(event, [event.$id], async () => {
+              void sendDelete(event, [event.$id], async () => {
                 await deleteEvent(event.$id);
                 return t('drafts.deleted');
               });
@@ -578,7 +578,7 @@ export default function DraftEventsScreen() {
       ]);
     };
 
-    confirmAndRun();
+    void confirmAndRun();
   }, [
     isOffline,
     batchRunning,

@@ -44,7 +44,7 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
     const uniqueCountries = [...new Set(events.map((event) => event.country).filter(Boolean))];
     uniqueCountries.forEach((country) => {
       if (country) {
-        loadPostalCodesForCountry(country);
+        void loadPostalCodesForCountry(country);
       }
     });
   }, [events, loadPostalCodesForCountry]);
@@ -91,7 +91,7 @@ const UpcomingEventsList: React.FC<UpcomingEventsListProps> = ({
             </ThemedText>
 
             {/* Location */}
-            {cityLabel && (
+            {!!cityLabel && (
               <View style={styles.locationRow}>
                 <IconSymbol name="location.fill" size={12} color={themeColors.subtleText} />
                 <ThemedText

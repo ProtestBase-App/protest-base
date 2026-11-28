@@ -143,7 +143,7 @@ export default function DraftTriageScreen() {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -174,7 +174,7 @@ export default function DraftTriageScreen() {
     pendingDeleteIdRef.current = null;
     if (id) {
       // Fire and forget: the user has left this decision behind.
-      sendDelete(id);
+      void sendDelete(id);
       dispatch({ type: 'clearPendingDelete' });
     }
   }, [sendDelete]);
